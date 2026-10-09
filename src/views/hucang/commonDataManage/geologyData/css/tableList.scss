@@ -1,0 +1,120 @@
+.geology-list {
+    padding: 0px 24px 0px 0;
+    :deep(.ant-upload.ant-upload-select) {
+        width: 100% !important;
+        margin-top: 20px;
+    }
+
+    .file-list {
+        display: flex;
+        align-items: center;
+        span {
+            margin: 0 5px;
+        }
+        .file-del-icon {
+            cursor: pointer;
+            visibility: hidden;
+        }
+        &:hover {
+            .file-del-icon {
+                visibility: visible;
+            }
+        }
+    }
+    .status-tag {
+        min-width: 52px;
+        padding: 0 8px;
+        height: 22px;
+        background: #fef1df;
+        border-radius: 2px;
+        text-align: center;
+        line-height: 22px;
+        font-size: 12px;
+    }
+    .pending-icon {
+        background: #e8f7e3;
+        color: #50b72a;
+    }
+    .long-time {
+        font-size: 12px;
+        line-height: 12px;
+        color: #7c8294;
+        margin-top: 5px;
+    }
+    .finish-icon {
+        background: #fee9e9;
+        color: #ff3e3e;
+    }
+    .stop-icon {
+        background: #eeeff2;
+        color: #7c8294;
+    }
+    .bind-icon {
+        background: #fef1df;
+        color: #ff8411;
+    }
+    .has-bind-icon {
+        background: #dfecff;
+        color: #4b74fe;
+    }
+
+    .tuning-tip {
+        display: flex;
+        height: 42px;
+        align-items: center;
+        padding: 8px 0 5px 0;
+        background: #fef1df;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        .success {
+            color: #fe830f;
+            margin: 0 9px 0 12px;
+        }
+        .tuning-tip-title {
+            font-size: 14px;
+            color: #21263f;
+            line-height: 18px;
+        }
+    }
+    .history-num {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        color: #036b64;
+        .num-icon {
+            margin-left: 5px;
+        }
+    }
+    .name-detail {
+        width: 358px;
+        background: #ffffff;
+        border-radius: 4px;
+        padding: 5px 0;
+        font-size: 12px;
+        line-height: 12px;
+        p {
+            color: #363b4d;
+            &:last-child {
+                color: #7c8294;
+                margin-top: 12px;
+            }
+        }
+    }
+    .name-tip {
+        font-size: 12px;
+        color: #7c8294;
+        line-height: 12px;
+        margin-top: 8px;
+    }
+    .has-bind-clor {
+        color: #036b64;
+    }
+    .operation-type {
+        font-size: 12px;
+        color: #363b4d;
+        line-height: 12px;
+    }
+    .manage-detail {
+        border: none;
+    }
+}

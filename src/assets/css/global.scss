@@ -1,0 +1,584 @@
+$primary-color: #036b64;
+
+// 高级参数
+.advanced-btn {
+    width: 240px;
+    height: 29px;
+    border-radius: 15px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+    font-weight: 400;
+    color: #363b4d;
+    line-height: 29px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 32px 0 40px 0;
+    &:hover {
+        color: #036b64;
+        cursor: pointer;
+        border: 1px solid #036b64;
+        .advanced-icon {
+            color: #036b64;
+        }
+    }
+    .advanced-icon {
+        color: #363b4d;
+        margin-left: 10px;
+    }
+}
+.put-away-btn {
+    width: 240px;
+    height: 29px;
+    background: #f5f6f9;
+    border-radius: 15px;
+    font-size: 14px;
+    font-weight: 400;
+    color: #363b4d;
+    line-height: 29px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 8px 0 40px 0;
+    &:hover {
+        color: $primary-color;
+        cursor: pointer;
+        border: 1px solid $primary-color;
+        .put-away-icon {
+            color: $primary-color;
+        }
+    }
+    .put-away-icon {
+        transform: rotate(180deg);
+        margin-left: 10px;
+    }
+}
+.public-input-large {
+    width: 274px;
+    height: 32px;
+}
+
+.special-item {
+    .ant-form-item-required::before {
+        content: none !important;
+    }
+}
+
+.custom-time-picker .ant-picker-cell {
+    /* 选中状态的颜色 */
+    &.ant-picker-cell-selected {
+        // background-color:red;
+    }
+
+    /* 悬停状态的颜色 */
+    &:hover {
+        background-color: yellow;
+    }
+}
+
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-start:not(
+        .ant-picker-cell-range-start-single
+    ):not(.ant-picker-cell-range-end)
+    .ant-picker-cell-inner {
+    border-start-start-radius: initial;
+    border-end-start-radius: initial;
+    border-end-end-radius: initial;
+    border-radius: 50%;
+}
+
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-end:not(.ant-picker-cell-range-end-single):not(
+        .ant-picker-cell-range-start
+    )
+    .ant-picker-cell-inner {
+    border-start-start-radius: initial;
+    border-end-start-radius: initial;
+    border-end-end-radius: initial;
+    border-radius: 50%;
+}
+
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-in-range.ant-picker-cell-range-hover::before,
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-start.ant-picker-cell-range-hover::before,
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-end.ant-picker-cell-range-hover::before,
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-start:not(
+        .ant-picker-cell-range-start-single
+    ).ant-picker-cell-range-hover-start::before,
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-end:not(
+        .ant-picker-cell-range-end-single
+    ).ant-picker-cell-range-hover-end::before,
+.ant-picker-panel
+    > :not(.ant-picker-date-panel)
+    .ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-in-range.ant-picker-cell-range-hover-start::before,
+.ant-picker-panel
+    > :not(.ant-picker-date-panel)
+    .ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-in-range.ant-picker-cell-range-hover-end::before {
+    background: #f2f7f7;
+}
+.ant-picker-dropdown
+    .ant-picker-date-panel
+    .ant-picker-cell-in-view.ant-picker-cell-in-range.ant-picker-cell-range-hover-start
+    .ant-picker-cell-inner::after,
+.ant-picker-dropdown
+    .ant-picker-date-panel
+    .ant-picker-cell-in-view.ant-picker-cell-in-range.ant-picker-cell-range-hover-end
+    .ant-picker-cell-inner::after {
+    background: #f2f7f7;
+}
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-hover-start:not(.ant-picker-cell-in-range):not(
+        .ant-picker-cell-range-start
+    ):not(.ant-picker-cell-range-end)::after,
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-hover-end:not(.ant-picker-cell-in-range):not(
+        .ant-picker-cell-range-start
+    ):not(.ant-picker-cell-range-end)::after,
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-hover-start.ant-picker-cell-range-start-single::after,
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-hover-start.ant-picker-cell-range-start.ant-picker-cell-range-end.ant-picker-cell-range-end-near-hover::after,
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-hover-end.ant-picker-cell-range-start.ant-picker-cell-range-end.ant-picker-cell-range-start-near-hover::after,
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-hover-end.ant-picker-cell-range-end-single::after,
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-hover:not(.ant-picker-cell-in-range)::after {
+    border-top: none;
+    border-bottom: none;
+    border-right: none;
+    border-left: none;
+}
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-start:not(
+        .ant-picker-cell-range-start-single
+    )::before,
+.ant-picker-dropdown
+    .ant-picker-cell-in-view.ant-picker-cell-range-end:not(
+        .ant-picker-cell-range-end-single
+    )::before {
+    background: #f2f7f7;
+}
+.ant-picker-dropdown .ant-picker-cell-in-view.ant-picker-cell-in-range::before {
+    background: #f2f7f7;
+}
+.ant-picker-dropdown
+    .ant-picker-time-panel-column
+    > li.ant-picker-time-panel-cell-selected
+    .ant-picker-time-panel-cell-inner {
+    background: $primary-color;
+    color: #fff;
+}
+.ant-picker-dropdown
+    .ant-picker-time-panel-column
+    > li.ant-picker-time-panel-cell
+    .ant-picker-time-panel-cell-inner:hover {
+    background: #f2f7f7;
+    color: #666666;
+}
+
+.ant-picker-body {
+    .ant-picker-cell-in-view {
+        // color: red;
+        .ant-picker-cell-inner {
+            border-radius: 50%;
+
+            &::before {
+                border-radius: 50% !important;
+            }
+        }
+    }
+}
+
+// 表格的样式修改
+.ant-table-wrapper .ant-table-thead > tr > th,
+:where(.css-dev-only-do-not-override-5u20k2).ant-table-wrapper .ant-table-thead > tr > td {
+    background: #f2f7f7;
+}
+.ant-table-wrapper
+    .ant-table-thead
+    > tr
+    > th:not(:last-child):not(.ant-table-selection-column):not(.ant-table-row-expand-icon-cell):not(
+        [colspan]
+    )::before,
+:where(.css-dev-only-do-not-override-5u20k2).ant-table-wrapper
+    .ant-table-thead
+    > tr
+    > td:not(:last-child):not(.ant-table-selection-column):not(.ant-table-row-expand-icon-cell):not(
+        [colspan]
+    )::before {
+    width: 0;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th,
+.ant-table-wrapper .ant-table-thead > tr > td {
+    padding: 13px 18px 15px 18px;
+}
+.operation-btn {
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: $primary-color;
+    // line-height: 20px;
+    align-items: center;
+    .operation-btn-item {
+        padding-right: 15px;
+        cursor: pointer;
+        &:hover {
+            color: $primary-color;
+            font-weight: bold;
+        }
+        &:last-child {
+            padding-right: 0;
+        }
+    }
+}
+.operation-btn-more {
+    min-width: 90px;
+    background: #ffffff;
+    box-shadow: 0px 0px 8px 0px rgba(0, 0, 0, 0.15);
+    .operation-btn-more-li {
+        font-size: 12px;
+        line-height: 12px;
+        padding: 10px 12px;
+        text-align: center;
+        cursor: pointer;
+        color: $primary-color;
+        &:hover {
+            background: #f2f7f7;
+            color: $primary-color;
+            font-weight: bold;
+        }
+    }
+}
+// 操作按钮竖向排列
+.operation-btn-column {
+    display: flex;
+    font-size: 12px;
+    color: $primary-color;
+    line-height: 20px;
+    // justify-content: space-between;
+    // align-items: center;
+    align-items: flex-start;
+    .cloumn-btn {
+        display: flex;
+        flex-direction: column;
+        margin-left: 15px;
+        &:first-child {
+            margin-left: 0;
+        }
+    }
+    .operation-btn-item {
+        cursor: pointer;
+    }
+}
+// 菜单样式重置
+// .ant-menu-dark.ant-menu-submenu>.ant-menu{
+//   // background-color: #182445 !important;
+//   background-color: #fff !important;
+//   color: #363B4D;
+//   // box-shadow: 0px 0px 8px 0px rgba(0,0,0,0.15);
+// }
+// .ant-menu-dark .ant-menu-item-selected{
+//   background: #F2F7F7;
+//   color: #036B64;
+//   font-weight: 500;
+// }
+.ant-menu-submenu-popup {
+    background: #fff;
+    color: #363b4d;
+    font-weight: 500;
+    .ant-menu-vertical {
+        background-color: #fff !important;
+    }
+    &:not(.ant-menu-horizontal) .ant-menu-item:not(.ant-menu-item-selected):hover {
+        background: #f2f7f7;
+        color: $primary-color;
+        font-weight: bold;
+    }
+    .ant-menu-item-selected {
+        background: #f2f7f7;
+        color: $primary-color;
+        font-weight: bold;
+    }
+}
+.ant-menu-dark:not(.ant-menu-horizontal) .ant-menu-item:not(.ant-menu-item-selected):hover {
+    font-weight: bold;
+}
+.ant-menu-item-selected {
+    font-weight: bold;
+}
+.ant-layout-sider-collapsed {
+    .ant-menu-dark:not(.ant-menu-horizontal) .ant-menu-item:not(.ant-menu-item-selected):hover {
+        background: #f2f7f7;
+        color: $primary-color;
+        font-weight: 500;
+    }
+    .ant-menu-submenu-selected {
+        background: linear-gradient(90deg, #036b64 0%, #3fafa8 100%);
+        border-radius: 4px;
+        font-weight: bold;
+    }
+    .ant-menu-submenu-title:hover {
+        background-color: transparent !important;
+    }
+    .ant-menu-submenu-open,
+    .ant-menu-submenu-active {
+        background: linear-gradient(90deg, #036b64 0%, #3fafa8 100%);
+        border-radius: 4px;
+    }
+}
+.ant-cascader-dropdown .ant-cascader-menu-item-active:not(.ant-cascader-menu-item-disabled) {
+    background-color: #ffffff !important;
+    color: $primary-color !important;
+}
+.ant-cascader-dropdown .ant-cascader-menu-item-active:not(.ant-cascader-menu-item-disabled):hover {
+    background-color: #ffffff !important;
+    color: $primary-color !important;
+}
+.ant-input-number-focused {
+    border-color: $primary-color;
+    box-shadow: initial;
+}
+.ant-select-focused:where(.css-dev-only-do-not-override-5u20k2).ant-select:not(
+        .ant-select-disabled
+    ):not(.ant-select-customize-input):not(.ant-pagination-size-changer)
+    .ant-select-selector {
+    box-shadow: none;
+}
+.ant-input-affix-wrapper-focused {
+    box-shadow: none;
+}
+// 表格页码样式重置
+.ant-pagination .ant-pagination-item {
+    border-radius: 2px;
+}
+.ant-pagination .ant-pagination-item-active {
+    background-color: $primary-color;
+    &:hover {
+        a {
+            color: #ffffff;
+        }
+    }
+    a {
+        color: #ffffff;
+    }
+}
+// 新增按钮
+.add-btn {
+    width: 99px;
+    height: 32px;
+    background: $primary-color;
+    border-radius: 4px;
+    position: absolute;
+    top: -43px;
+    right: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #ffffff;
+    line-height: 32px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    .add-icon {
+        margin-right: 5px;
+    }
+}
+.mode-list {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    .mode-icon {
+        margin-right: 5px;
+    }
+}
+.ant-table-tbody tr td {
+    font-size: 12px;
+}
+
+// 模态框里面的表单label
+.ant-modal-body .ant-form-item .ant-form-item-label > label {
+    padding-left: 10px;
+}
+.ant-modal-body
+    .ant-form-item
+    .ant-form-item-label
+    > label.ant-form-item-required:not(.ant-form-item-required-mark-optional)::before {
+    position: absolute;
+    left: 0;
+}
+// 下拉框去除阴影
+.ant-select-selector,
+.ant-picker,
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused {
+    box-shadow: none !important;
+}
+.ant-select-selector,
+.ant-picker {
+    font-size: 12px !important;
+}
+::-webkit-input-placeholder {
+    color: #7c8294 !important;
+    font-weight: 400;
+    font-size: 12px;
+}
+.type-active {
+    margin-right: 10px;
+}
+// 文本框与下拉框文字颜色
+
+::-webkit-input-placeholder {
+    color: #7c8294 !important;
+    font-weight: 400;
+    font-size: 12px;
+}
+.ant-select-selection-placeholder {
+    font-size: 12px;
+    color: #7c8294 !important;
+}
+
+// 数字框去除阴影
+.ant-input-affix-wrapper {
+    box-shadow: none;
+}
+// 错误提示样式
+.ant-form-item-explain-error {
+    font-size: 12px;
+}
+// pover样式
+.name-popover-self {
+    width: 400px;
+}
+// pover样式
+.name-popover-self-large {
+    .ant-popover-inner-content {
+        max-height: 80vh;
+        overflow-y: auto;
+        // border: 1px solid #ccc;
+    }
+}
+// 按钮圆角统一设置成4px
+.ant-btn {
+    border-radius: 4px;
+}
+.green {
+    color: $primary-color;
+}
+//自定义上传loading样式
+.loader-check {
+    display: flex;
+    .loader {
+        border: 2px solid #f3f3f3; /* Light grey */
+        border-top: 2px solid $primary-color; /* Blue */
+        border-left: 2px solid $primary-color; /* Blue */
+        border-bottom: 2px solid $primary-color; /* Blue */
+        border-radius: 80%;
+        width: 12px;
+        height: 12px;
+        animation: spin 2s linear infinite;
+    }
+    .is-check-data {
+        font-size: 12px;
+        color: $primary-color;
+        line-height: 12px;
+        margin-left: 5px;
+    }
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+}
+
+// 文本溢出显示省略号
+@mixin ellipsisText($size: 3) {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: $size;
+    -webkit-box-orient: vertical;
+    text-overflow: ellipsis;
+}
+
+.ellipsis-text-name {
+    cursor: pointer;
+    @include ellipsisText(3);
+}
+// 右侧空间样式
+.rigth-space-content {
+    background-color: #fff;
+    padding: 32px 24px 16px 24px;
+    position: relative;
+    min-height: calc(100vh - 120px);
+}
+.ant-modal div[aria-hidden='true'] {
+    display: none !important;
+}
+.ant-select-tree-node-selected {
+    background: transparent !important;
+    color: $primary-color !important;
+    font-weight: bold;
+}
+// 高级参数按钮显示隐藏
+.show-more {
+    width: 240px;
+    height: 30px;
+    margin: 0 auto 40px auto;
+    border-radius: 15px;
+    border: 1px solid $primary-color;
+    color: $primary-color;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+
+    span {
+        margin-right: 4px;
+    }
+
+    .show-more-illustrate {
+        position: absolute;
+        width: 172px;
+        height: 84px;
+        display: flex;
+        background: url(@/assets/img/show-more-illustrate.png) no-repeat;
+        background-size: 172px 84px;
+        background-position: left top;
+        align-items: flex-start;
+        right: -170px;
+        top: -40px;
+        color: #363b4d;
+        font-size: 12px;
+        padding: 22px 20px 22px 28px;
+
+        i {
+            flex: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: $primary-color;
+            color: #ffffff;
+            font-style: normal;
+            margin-right: 5px;
+            margin-top: 3px;
+            font-size: 10px;
+        }
+    }
+}
+

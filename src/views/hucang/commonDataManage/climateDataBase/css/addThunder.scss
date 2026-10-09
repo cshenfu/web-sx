@@ -1,0 +1,82 @@
+$primary-color: #036B64;
+.add-current-geology {
+    background-color: #fff;
+    padding: 24px 0 24px 24px;
+    display: flex;
+    .linkage{
+        flex: none;
+    }
+    .add-geology-right {
+        flex: 1;
+        margin-left: 26px;
+        .add-geology-right-content {
+            height: calc(100vh - 190px);
+            overflow: auto;
+            .content-title {
+                color: #3d435d;
+                display: flex;
+                align-items: center;
+                margin: 24px 0 20px 0;
+
+                img {
+                    height: 14px;
+                    margin-right: 8px;
+                }
+                button {
+                    margin-left: auto;
+                    display: flex;
+                    align-items: center;
+
+                    iconpark-icon {
+                        margin-right: 5px;
+                    }
+                }
+            }
+            .ant-advanced-search-form{
+                padding-right: 80px;
+            }
+            .require-item {
+                span {
+                    &::before {
+                        display: inline-block;
+                        margin-inline-end: 4px;
+                        color: #ff4d4f;
+                        font-size: 14px;
+                        font-family: SimSun, sans-serif;
+                        line-height: 1;
+                        content: '*';
+                    }
+                }
+            }
+            .self-label {
+                font-size: 14px;
+                color: #5c6170;
+                line-height: 12px;
+                &::before {
+                    display: inline-block;
+                    margin-inline-end: 4px;
+                    color: #ff4d4f;
+                    font-size: 14px;
+                    font-family: SimSun, sans-serif;
+                    line-height: 1;
+                    content: '*';
+                }
+            }
+        }
+        .handle-button {
+            margin: 0 16px;
+            width: 80px;
+        }
+    }
+    .tip{
+        color: #7C8294;
+        font-size: 12px;
+    }
+    .tip-download{
+        font-size: 12px;
+        margin:6px 0 16px 0;
+        a{
+            color: $primary-color;
+        }
+    }
+}

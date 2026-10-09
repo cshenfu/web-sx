@@ -1,0 +1,47 @@
+.linkage-component {
+    width: 168px;
+    background: #fafafa;
+    border-radius: 4px;
+    overflow: hidden;
+    height: calc(100vh - 150px);
+    flex: none;
+
+    .tab-address {
+        margin: 16px 16px 12px 15px;
+    }
+
+    .select-address {
+        width: 136px;
+        margin: 0 16px;
+    }
+
+    .address-list {
+        height: calc(100% - 120px);
+        overflow: auto;
+        margin: 12px 0;
+        li {
+            display: flex;
+            align-items: center;
+            padding: 7px 0 7px 16px;
+            // height: 28px;
+            cursor: pointer;
+            &.active{
+                background: #E5F0EF;
+                color: #036B64;
+            }
+            i {
+                width: 6px;
+                height: 6px;
+                border-radius: 100%;
+                margin-right: 8px;
+                background: #A8ADBE;
+                flex: none;
+
+                &.active {
+                    background: #036B64;
+                }
+            }
+        }
+
+    }
+}

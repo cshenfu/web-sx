@@ -1,0 +1,97 @@
+$primary-color: #036B64;
+.content-title {
+    color: #3D435D;
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+
+    img {
+        height: 14px;
+        margin-right: 8px;
+    }
+
+    button {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+
+        iconpark-icon {
+            margin-right: 5px;
+        }
+    }
+}
+.content-body {
+    padding: 20px 24px;
+    // background: #F2F7F7;
+    margin-bottom: 24px;
+
+    &:last-child {
+        margin-bottom: 0;
+    }
+    .ant-col-6 {
+        display: flex;
+        align-items: center;
+        margin-bottom: 36px;
+    }
+
+    span {
+        color: #7C8294;
+        margin-right: 16px;
+        display: inline-block;
+    }
+
+    p {
+        color: #363B4D;
+        font-weight: 500;
+        display: flex;
+
+        a {
+            color: $primary-color;
+            display: flex;
+            align-items: center;
+        }
+    }
+
+    div {
+        &.file-list {
+            display: flex;
+
+            >div {
+                margin-right: 16px;
+
+                h4 {
+                    color: $primary-color;
+                    margin-bottom: 14px;
+                }
+            }
+
+            span {
+                width: 56px;
+                height: 56px;
+                float: left;
+                margin-right: 16px;
+                background-color: #363B4D;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+
+                img {
+                    max-width: 56px;
+                    max-height: 56px;
+                }
+            }
+        }
+    }
+    .fileItemImage{
+        img{
+            float: left;
+        }
+        margin: 0px 12px 0px 0px;
+        width: 56px;
+        height: 56px;
+    }
+}
+.retract-icon {
+    color: #363B4D;
+    transform: rotate(180deg);
+}

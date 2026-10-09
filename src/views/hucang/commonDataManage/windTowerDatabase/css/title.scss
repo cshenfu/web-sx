@@ -1,0 +1,21 @@
+$primary-color: #036b64;
+
+.table-title {
+    color: #3d435d;
+    position: relative;
+    padding-left: 10px;
+    padding: 16px 10px;
+
+    &::after {
+        content: '';
+        width: 4px;
+        height: 4px;
+        background: $primary-color;
+        border-radius: 100%;
+        float: left;
+        position: absolute;
+        left: 0;
+        top: 50%;
+        margin-top: -2px;
+    }
+}

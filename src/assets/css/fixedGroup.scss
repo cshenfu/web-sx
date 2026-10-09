@@ -1,0 +1,15 @@
+.fixed-group{
+    position: absolute;
+    right: 24px;
+    top: 60px;
+    display: flex;
+    justify-content: flex-end;
+    button {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        iconpark-icon{
+            margin-right: 5px;
+        }
+    }
+}

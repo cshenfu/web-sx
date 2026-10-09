@@ -1,0 +1,10 @@
+.wind-tower-content {
+    background-color: #fff;
+    padding: 24px;
+    position: relative;
+    min-height: calc(100vh - 120px);
+
+    .add-btn {
+        cursor: pointer;
+    }
+}
