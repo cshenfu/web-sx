@@ -537,7 +537,7 @@ import {
 } from '@element-plus/icons-vue'
 import MapGL from '@/components/MapGL.vue'
 import SearchBar from '@/components/common/SearchBar.vue'
-import CreateProjectForm from './CreateProjectform.vue'
+import CreateProjectForm from './Createprojectform.vue'
 import ConfigForm from './ConfigForm.vue'
 import TaskPanel from './TaskPanel.vue'
 import VerifyPanel from './VerifyPanel.vue'
