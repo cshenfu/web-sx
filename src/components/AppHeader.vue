@@ -1,18 +1,13 @@
 <template>
   <header class="app-header">
+    <!-- 左侧：Logo 和 AI 平台名称 -->
     <div class="header-left">
-      <img src="@/assets/logo.png" alt="华电集团" class="logo" />
-
-      <div class="divider" />
-
-      <div class="company-info">
-        <span class="company-name">华电陕西能源有限公司</span>
-        <span class="company-en">HUADIAN SHAANXI ENERGY CO., LTD.</span>
-      </div>
+      <!-- 替换为你指定的路径 -->
+      <img src="../../assets/img/logo.png" alt="Logo" class="logo" />
+      <div class="platform-title">新能源项目前期工作AI平台</div>
     </div>
 
-    <div class="platform-title">新能源项目前期工作AI平台</div>
-
+    <!-- 中间：导航（绝对居中） -->
     <nav class="module-nav">
       <RouterLink
         v-for="item in navItems"
@@ -25,15 +20,14 @@
       </RouterLink>
     </nav>
 
+    <!-- 右侧：用户信息 -->
     <div class="header-right">
       <span class="todo">待办(8)</span>
-
       <el-dropdown trigger="click" @command="handleUserCommand">
         <button class="user-trigger" type="button">
           <span class="username">{{ userName }}</span>
           <el-icon class="arrow"><ArrowDown /></el-icon>
         </button>
-
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="logout">退出系统</el-dropdown-item>
@@ -56,30 +50,10 @@ const router = useRouter()
 const userName = ref(sessionStorage.getItem('userName') || '用户名')
 
 const navItems = [
-  {
-    name: 'qinchuan',
-    label: '秦川智筹',
-    to: '/overview',
-    module: 'qinchuan',
-  },
-  {
-    name: 'yanping',
-    label: '研评智坊',
-    to: '/yanping',
-    module: 'yanping',
-  },
-  {
-    name: 'hucang',
-    label: '湖仓汇源',
-    to: '/hucang/geology',
-    module: 'hucang',
-  },
-  {
-    name: 'guizhi',
-    label: '规制中枢',
-    to: '/guizhi/role',
-    module: 'guizhi',
-  },
+  { name: 'qinchuan', label: '秦川智筹', to: '/overview', module: 'qinchuan' },
+  { name: 'yanping', label: '研评智坊', to: '/yanping', module: 'yanping' },
+  { name: 'hucang', label: '湖仓汇源', to: '/hucang/geology', module: 'hucang' },
+  { name: 'guizhi', label: '规制中枢', to: '/guizhi/role', module: 'guizhi' },
 ]
 
 function isActive(item) {
@@ -88,11 +62,9 @@ function isActive(item) {
 
 async function handleUserCommand(command) {
   if (command !== 'logout') return
-
   try {
     await logout()
   } catch (error) {
-    // 即使服务端退出接口失败，也清理本地登录态，避免继续使用失效会话。
     console.warn('退出登录接口调用失败：', error)
   } finally {
     sessionStorage.clear()
@@ -111,59 +83,35 @@ async function handleUserCommand(command) {
   left: 0;
   right: 0;
   z-index: 1000;
-  height: 56px;
+  height: 65px;
   display: flex;
   align-items: center;
   padding: 0 24px;
   box-sizing: border-box;
   background: #fff;
-  border-bottom: 1px solid #e5e7eb;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  /* 去掉所有边框和阴影，实现视觉上的融为一体 */
+  border: none;
+  box-shadow: none;
 }
 
+/* 【核心修改 1】 左侧占据 flex: 1 空间，左对齐 */
 .header-left {
-  width: 330px;
-  flex-shrink: 0;
+  flex: 1; 
+  min-width: 380px; /* 防止缩小的时候内容挤压 */
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
+  justify-content: flex-start;
 }
 
 .logo {
-  width: 42px;
-  height: 38px;
+  width: 160px; /* 按照你的要求设置为 160px */
+  height: auto;
+  max-height: 48px; /* 限制一下最大高度，防止撑破 65px 的 header */
   object-fit: contain;
 }
 
-.divider {
-  width: 1px;
-  height: 32px;
-  background: #d9dfe8;
-}
-
-.company-info {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.25;
-  white-space: nowrap;
-}
-
-.company-name {
-  color: #1a3f6f;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.company-en {
-  margin-top: 2px;
-  color: #888;
-  font-size: 8px;
-  letter-spacing: 0.3px;
-}
-
 .platform-title {
-  flex-shrink: 0;
-  margin-right: 42px;
   color: #1a3f6f;
   font-size: 16px;
   font-weight: 700;
@@ -171,8 +119,9 @@ async function handleUserCommand(command) {
   white-space: nowrap;
 }
 
+/* 【核心修改 2】 中间导航取消 flex 分配，自适应宽度 */
 .module-nav {
-  flex: 1;
+  flex: 0 1 auto; 
   height: 100%;
   display: flex;
   align-items: stretch;
@@ -215,9 +164,10 @@ async function handleUserCommand(command) {
   transform: scaleX(1);
 }
 
+/* 【核心修改 3】 右侧同样占据 flex: 1 空间，右对齐，确保中间完美居中 */
 .header-right {
-  width: 150px;
-  flex-shrink: 0;
+  flex: 1; 
+  min-width: 150px;
   display: flex;
   align-items: center;
   justify-content: flex-end;

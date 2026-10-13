@@ -12,55 +12,54 @@
   qinchuan: [
     {
       key: 'overview',
-      icon: 'Grid',
-      label: '项目\n总览',
+      icon: 'Overview', // 改为 Overview
+      label: '项目总览', // 去掉 \n
       path: '/overview',
       roles: ['admin', 'user', 'viewer']
     },
     {
       key: 'site',
-      icon: 'Location',
-      label: '智能\n选址',
+      icon: 'SiteSelect', // 改为 SiteSelect
+      label: '智能选址', // 去掉 \n
       path: '/site',
       roles: ['admin', 'user', 'viewer']
     },
     {
       key: 'reserve',
-      icon: 'Files',
-      label: '项目\n储备',
+      icon: 'Reserve', // 改为 Reserve
+      label: '项目储备', // 去掉 \n
       path: '/reserve',
       roles: ['admin', 'user', 'viewer']
     },
     {
       key: 'approval',
-      icon: 'Document',
-      label: '立项\n阶段',
+      icon: 'Approval', // 改为 Approval
+      label: '立项阶段', // 去掉 \n
       path: '/approval',
       roles: ['admin', 'user', 'viewer']
     },
     {
       key: 'research',
-      icon: 'Search',
-      label: '可研\n阶段',
+      icon: 'Research', // 改为 Research
+      label: '可研阶段', // 去掉 \n
       path: '/research',
       roles: ['admin', 'user', 'viewer']
     },
     {
       key: 'decision',
-      icon: 'TrendCharts',
-      label: '投资\n决策',
+      icon: 'Decision', // 改为 Decision
+      label: '投资决策', // 去掉 \n
       path: '/decision',
       roles: ['admin', 'user', 'viewer']
     },
     {
       key: 'compute',
-      icon: 'Cpu',
-      label: '计算\n队列',
+      icon: 'Compute', // 改为 Compute
+      label: '计算队列', // 去掉 \n
       path: '/compute',
       roles: ['admin', 'user', 'viewer']
     }
   ],
-
   // ─────────────────────────────────────────────
   // 研评智坊 → 智能评审
   // ─────────────────────────────────────────────

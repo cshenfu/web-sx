@@ -1,54 +1,30 @@
 <template>
   <aside class="sidebar">
     <!-- 顶部菜单 -->
-    <template
-      v-for="item in topMenus"
-      :key="item.key"
-    >
+    <template v-for="item in topMenus" :key="item.key">
       <div
         class="sidebar-item"
         :class="{ active: activeKey === item.key }"
         @click="navigate(item)"
       >
-        <el-icon :size="20">
-          <component :is="iconMap[item.icon]" />
-        </el-icon>
-
-        <!-- 支持使用 \n 换行 -->
-        <span
-          v-for="(line, index) in item.label.split('\n')"
-          :key="index"
-          class="label-line"
-        >
-          {{ line }}
-        </span>
+        <!-- 使用统一封装的 SvgIcon 组件 -->
+        <SvgIcon :name="item.icon" class="item-icon" :size="20" />
+        <span class="label-text">{{ item.label }}</span>
       </div>
     </template>
 
-    <!-- 弹性空白 -->
+    <!-- 弹性空白：把底部固定菜单推到最下方 -->
     <div class="spacer" />
 
     <!-- 底部固定菜单 -->
-    <template
-      v-for="item in bottomMenus"
-      :key="item.key"
-    >
+    <template v-for="item in bottomMenus" :key="item.key">
       <div
         class="sidebar-item"
         :class="{ active: activeKey === item.key }"
         @click="navigate(item)"
       >
-        <el-icon :size="20">
-          <component :is="iconMap[item.icon]" />
-        </el-icon>
-
-        <span
-          v-for="(line, index) in item.label.split('\n')"
-          :key="index"
-          class="label-line"
-        >
-          {{ line }}
-        </span>
+        <SvgIcon :name="item.icon" class="item-icon" :size="20" />
+        <span class="label-text">{{ item.label }}</span>
       </div>
     </template>
   </aside>
@@ -59,65 +35,14 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { sidebarConfig } from '@/config/sidebar'
-
-import {
-  Grid,
-  Location,
-  Files,
-  Document,
-  Search,
-  TrendCharts,
-  Cpu,
-  Upload,
-  MapLocation,
-  Box,
-  Connection,
-  Cloudy,
-  Money,
-  Warning,
-  Memo,
-  UserFilled,
-  Collection,
-  OfficeBuilding,
-  List,
-  House,
-  Plus,
-  Folder,
-  Star
-} from '@element-plus/icons-vue'
+// 引入统一封装的图标组件
+import SvgIcon from '@/components/icons/SvgIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-// 图标名称与 Element Plus 图标组件的映射
-const iconMap = {
-  Grid,
-  Location,
-  Files,
-  Document,
-  Search,
-  TrendCharts,
-  Cpu,
-  Upload,
-  MapLocation,
-  Box,
-  Connection,
-  Cloudy,
-  Money,
-  Warning,
-  Memo,
-  UserFilled,
-  Collection,
-  OfficeBuilding,
-  List,
-  House,
-  Plus,
-  Folder,
-  Star
-}
-
-// 当前使用的侧边栏配置
+// 当前使用的侧边栏配置 key
 const sidebarKey = computed(() => {
   return route.meta.sidebar || ''
 })
@@ -132,10 +57,9 @@ const currentRole = computed(() => {
   return userStore.role
 })
 
-// 当前侧边栏所有菜单
+// 当前侧边栏所有菜单（过滤掉分割线和无权限的项）
 const allMenus = computed(() => {
   const menus = sidebarConfig[sidebarKey.value] || []
-
   return menus
     .filter((item) => item.type !== 'divider')
     .filter((item) => {
@@ -143,7 +67,7 @@ const allMenus = computed(() => {
     })
 })
 
-// 普通菜单
+// 普通菜单（非固定）
 const topMenus = computed(() => {
   return allMenus.value.filter((item) => !item.fixed)
 })
@@ -161,64 +85,71 @@ function navigate(item) {
 
 <style scoped>
 .sidebar {
-  width: 56px;
+  width: 97px;
   height: 100%;
   flex-shrink: 0;
-
   display: flex;
   flex-direction: column;
   align-items: center;
-
-  padding: 8px 0;
+  padding: 12px 6px;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #fff;
+  border: none;
+}
 
-  background: rgba(8, 18, 42, 0.92);
-  backdrop-filter: blur(6px);
+.sidebar::-webkit-scrollbar {
+  display: none;
 }
 
 .sidebar-item {
   width: 100%;
-  min-height: 54px;
+  height: 60px; /* 图标+文字纵向排列需要更高的高度 */
   box-sizing: border-box;
-
   display: flex;
-  flex-direction: column;
+  flex-direction: column; /* 【核心】纵向：图标在上，文字在下 */
   align-items: center;
   justify-content: center;
-
-  padding: 10px 4px;
-  gap: 3px;
-
-  color: rgba(255, 255, 255, 0.5);
-  border-left: 3px solid transparent;
-
+  padding: 6px 4px;
+  margin-bottom: 6px;
+  gap: 4px; /* 图标和文字之间的间距 */
+  
+  color: #64748b;
   cursor: pointer;
   user-select: none;
-  transition:
-    color 0.2s,
-    background 0.2s,
-    border-color 0.2s;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  border-left: none;
 }
 
 .sidebar-item:hover {
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.06);
+  background: #f8fafc;
+  color: #2563eb;
 }
 
+/* 选中状态 */
 .sidebar-item.active {
-  color: #4fc3ff;
-  background: rgba(79, 195, 255, 0.12);
-  border-left-color: #4fc3ff;
+  color: #2563eb;
+  background: #f1f5f9;
+  border-radius: 8px;
+  font-weight: 600;
 }
 
-.label-line {
-  display: block;
+/* 图标容器 */
+.item-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-  font-size: 11px;
-  line-height: 1.2;
+/* 文字样式：单行显示，12px */
+.label-text {
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap; /* 强制单行 */
   text-align: center;
-  white-space: nowrap;
 }
 
 .spacer {
