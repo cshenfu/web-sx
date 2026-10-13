@@ -25,7 +25,7 @@
   <script setup>
   import { ref } from 'vue'
   import CostTable from '../../shared/CostTable.vue'
-  import { costTableDataSource } from '../../../js/reportWizardMockData'
+  import { costTableDataSource } from '../../../js/Reportwizardmockdata'
   
   defineEmits(['save-draft', 'submit'])
   

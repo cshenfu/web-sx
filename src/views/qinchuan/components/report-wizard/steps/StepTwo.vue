@@ -78,7 +78,7 @@
     cableLayingMethodOptions,
     iceThicknessOptions,
     powerGridOptions,
-  } from '../../../js/reportWizardMockData'
+  } from '../../../js/Reportwizardmockdata'
   
   const props = defineProps({
     createProjectMode: { type: Number, default: PACKAGE_TYPE.default },

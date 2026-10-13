@@ -1,4 +1,4 @@
-// js/reportWizardMockData.js
+// js/Reportwizardmockdata.js
 // 一键生成可研报告 三步表单的配置数据。
 // 字段/接口命名尽量保留了老项目里的语义（dataIndex、codeNum 等），
 // 方便后续直接对接你现有的参数接口，不用重新设计字段名。

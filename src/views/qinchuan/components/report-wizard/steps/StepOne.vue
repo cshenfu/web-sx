@@ -314,7 +314,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import RadioOptionGroup from '../../shared/RadioOptionGroup.vue'
 import ReferenceBox from '../../shared/ReferenceBox.vue'
 import UploadBox from '../../shared/UploadBox.vue'
-import { PACKAGE_TYPE } from '../../../js/reportWizardMockData'
+import { PACKAGE_TYPE } from '../../../js/Reportwizardmockdata'
 import * as newApi from '@/api/modules/project'
 
 const props = defineProps({

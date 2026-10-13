@@ -56,7 +56,7 @@ import { computed, ref, watch } from 'vue'
 import StepOne from './steps/StepOne.vue'
 import StepTwo from './steps/StepTwo.vue'
 import StepThree from './steps/StepThree.vue'
-import { PACKAGE_TYPE } from '../../js/reportWizardMockData'
+import { PACKAGE_TYPE } from '../../js/Reportwizardmockdata'
 
 const props = defineProps({
   createProjectMode: { type: Number, default: PACKAGE_TYPE.default },
