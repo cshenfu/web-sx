@@ -1,15 +1,14 @@
 import { defineConfig, mergeConfig } from 'vite'
 import baseConfig from './vite.config.js'
 
-const env = process.env.NODE_ENV || 'production'
-
 export default defineConfig((cfg) =>
   mergeConfig(
     typeof baseConfig === 'function' ? baseConfig(cfg) : baseConfig,
     {
-      base: '/',                                  // 打包用绝对路径
+      base: '/',
       build: {
-        outDir: `dist-${env}`,                    // dist-test / dist-production
+        outDir: 'dist',       // ✅ 固定 dist，和 Dockerfile 对齐
+        emptyOutDir: true,    // 防止残留文件
       },
     }
   )
