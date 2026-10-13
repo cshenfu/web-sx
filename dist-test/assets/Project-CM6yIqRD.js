@@ -1,0 +1,2 @@
+import{_ as c,c as o,a as s,o as r}from"./index-D8r8wMJu.js";const t={},a={class:"page-placeholder"};function n(_,e){return r(),o("div",a,[...e[0]||(e[0]=[s("h2",null,"智能评审 - 项目",-1),s("p",null,"页面建设中",-1)])])}const d=c(t,[["render",n],["__scopeId","data-v-d5377187"],["__file","D:/fcs/web/web-sx/web-sx/src/views/yanping/review/Project.vue"]]);export{d as default};
+//# sourceMappingURL=Project-CM6yIqRD.js.map

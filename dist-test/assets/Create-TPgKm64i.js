@@ -1,0 +1,2 @@
+import{_ as a,c as r,a as s,o as t}from"./index-D8r8wMJu.js";const c={},o={class:"page-placeholder"};function n(_,e){return t(),r("div",o,[...e[0]||(e[0]=[s("h2",null,"智能评审 - 项目",-1),s("p",null,"页面建设中",-1)])])}const d=a(c,[["render",n],["__scopeId","data-v-527f3744"],["__file","D:/fcs/web/web-sx/web-sx/src/views/yanping/review/Create.vue"]]);export{d as default};
+//# sourceMappingURL=Create-TPgKm64i.js.map

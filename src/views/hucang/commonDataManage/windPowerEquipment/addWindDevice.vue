@@ -393,7 +393,7 @@
   } from '@element-plus/icons-vue';
   import { ElMessage } from 'element-plus';
   
-  import LoadingComponent from './components/LoadingComponent';
+  import LoadingComponent from './components/LoadingComponent.vue';
   import {
     WIND_WEIGHT,
     LOAD_COLUMN,

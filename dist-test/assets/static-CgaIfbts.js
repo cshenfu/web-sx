@@ -1,0 +1,2 @@
+console.log("test","当前环境");const o={ppt:"ppt",pdf:"pdf",txt:"txt",docx:"doc",doc:"doc",xls:"exc",xlsx:"exc",zip:"txt",rar:"txt"};console.log("test","----环境");const t={region:"oss-cn-beijing",bucketname:"whln-test-public",privateBucketname:"whln-test-public",endPointShort:"oss-cn-beijing.aliyuncs.com"},e={geologyRegion:"https://whln-prod-public.oss-cn-beijing.aliyuncs.com/template/%E5%9C%BA%E5%8C%BA%E5%9D%90%E6%A0%87%E6%A8%A1%E6%9D%BF.xlsx"};`${t.endPointShort}`;export{o as f,t as o,e as t};
+//# sourceMappingURL=static-CgaIfbts.js.map

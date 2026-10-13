@@ -1,0 +1,30 @@
+.edit-table-component{
+    margin: 0 auto 40px auto;
+  }
+  :deep(.ant-table-thead > tr > th){
+      background: #fafafa;
+      font-size: 14px;
+      font-weight: 500;
+  }
+  :deep(.ant-table-tbody > tr > td) {
+      border-right: 1px solid #E4E6EE !important;
+      font-size: 12px;
+  }
+  :deep(.ant-table-cell) {
+      padding: 0 !important;
+      height: 40px;
+      min-height: 40px;
+      background: #ffffff;
+      border-color: #E4E6EE;
+      border-right-color: #E4E6EE;
+  }
+  :deep(.ant-table-cell .ant-input-number){
+      border: none;
+      width: 100%;
+      border-radius: 0;
+      margin-bottom: 1px !important;
+  }
+  :deep(.ant-input-number-input){
+      text-align: center;
+      font-size: 12px;
+  }

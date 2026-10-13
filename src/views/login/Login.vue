@@ -262,7 +262,7 @@ async function handleLogin() {
 .bg-image {
   position: fixed;
   inset: 0;
-  background: url('@/assets/login-bg.jpg') center / cover no-repeat;
+  /* background: url('@/assets/login-bg.jpg') center / cover no-repeat; */
   z-index: -1;
 }
 

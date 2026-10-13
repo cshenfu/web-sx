@@ -824,7 +824,7 @@
     defineExpose({});
 </script>
 <style scoped lang="scss">
-  @import '../../../../assets/css/detail.scss';
+  @import '@/assets/css/detail.scss';
   @import '@/assets/css/tabs.scss';
 
     .equipment-detail {

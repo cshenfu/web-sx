@@ -1,0 +1,2 @@
+import{_ as s,c,a,o as t}from"./index-D8r8wMJu.js";const o={},n={class:"page-placeholder"};function r(l,e){return t(),c("div",n,[...e[0]||(e[0]=[a("h2",null,"智能评审 - 项目",-1),a("p",null,"页面建设中",-1)])])}const f=s(o,[["render",r],["__scopeId","data-v-1524aaa5"],["__file","D:/fcs/web/web-sx/web-sx/src/views/yanping/finance/DefaultProject.vue"]]);export{f as default};
+//# sourceMappingURL=DefaultProject-Tqi9tkjL.js.map

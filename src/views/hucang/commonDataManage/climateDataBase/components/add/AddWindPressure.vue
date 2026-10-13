@@ -103,7 +103,7 @@
 <script setup>
 import { ref, reactive, toRefs, onBeforeMount, onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import CommonAddDataHeader from '@/components/linkage/CommonAddDataHeader';
+import CommonAddDataHeader from '@/components/linkage/CommonAddDataHeader.vue';
 import {addWindPressure,getWindPressureDetail,updateWindPressure} from "@/api/modules/climate";
 import {DATA_SOURCE_FILE_TYPES,MAP_FILE_TYPES,VECTOR_MAP_FILE_TYPES,temperaturePattern,} from './add';
 import { ElMessage } from 'element-plus'

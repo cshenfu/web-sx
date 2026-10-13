@@ -293,7 +293,7 @@
     import { ref, reactive, toRefs, onBeforeMount, onMounted, watch, computed } from 'vue';
     import { useRoute, useRouter } from 'vue-router';
     import linkage from '@/components/linkage/linkage.vue';
-    import CommonAddDataHeader from '@/components/linkage/CommonAddDataHeader';
+    import CommonAddDataHeader from '@/components/linkage/CommonAddDataHeader.vue';
     import Upload from '@/components/upload/Upload.vue';
     import { addDryRain,getDryRainDetail,updateDryRain } from '@/api/modules/climate';
     import { DATA_SOURCE_FILE_TYPES, MAP_FILE_TYPES, VECTOR_MAP_FILE_TYPES } from './add';

@@ -9,9 +9,7 @@
     import { ref, reactive, toRefs, onBeforeMount, onMounted,shallowRef , watchEffect, computed } from 'vue';
     import { useRoute, useRouter } from 'vue-router';
     import linkage from '@/components/linkage/linkage.vue';
-    import CommonAddDataHeader from '@/components/linkage/CommonAddDataHeader';
     import AddThunder from './components/add/AddThunderData.vue';
-    import AddCing from './components/add/AddCingData.vue';
     import AddAcidRain from './components/add/AddAcidRain.vue';
     import AddTemperature from './components/add/AddTemperature.vue';
     import AddWindPressure from './components/add/AddWindPressure.vue';

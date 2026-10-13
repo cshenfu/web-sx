@@ -196,8 +196,8 @@
     import { ref, reactive, toRefs, onBeforeMount, onMounted,onUnmounted, watchEffect, computed, nextTick } from 'vue';
     import { useRoute, useRouter } from 'vue-router';
     import linkage from '@/components/linkage/linkage.vue';
-    import CommonAddDataHeader from '@/components/linkage/CommonAddDataHeader';
-    import Upload from '@/components/upload/Upload';
+    import CommonAddDataHeader from '@/components/linkage/CommonAddDataHeader.vue';
+    import Upload from '@/components/upload/Upload.vue';
     import Ckeditor from '@/components/editor/Editor.vue';
     import { addGrid, checkPointsExcel,getGridDetail,updateGrid } from '@/api/modules/commonDataManage';
     import { ElMessage } from 'element-plus'

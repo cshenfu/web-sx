@@ -90,7 +90,7 @@
 <script setup>
 import { ref, reactive, toRefs, onBeforeMount, onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import CommonAddDataHeader from '@/components/linkage/CommonAddDataHeader';
+import CommonAddDataHeader from '@/components/linkage/CommonAddDataHeader.vue';
 import Upload from '@/components/upload/Upload.vue';
 import {addWindSpeed,getWindSpeedDetail,updateWindSpeed} from "@/api/modules/climate";
 import { ElMessage } from 'element-plus'

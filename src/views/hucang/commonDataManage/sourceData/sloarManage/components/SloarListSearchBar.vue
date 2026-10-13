@@ -67,7 +67,7 @@
     </SearchBar>
 </template>
 <script setup>
-    import SearchBar from '@/components/searchBar/SearchBar';
+    import SearchBar from '@/components/searchBar/SearchBar.vue';
     import SelectSearch from '@/components/selectSearch/SelectSearch.vue';
     import { computed, reactive, ref,onMounted,watch} from 'vue';
     import mitt from '@/utils/eventBus';

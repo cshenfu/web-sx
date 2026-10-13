@@ -26,7 +26,7 @@
 <script setup>
     import { ref, reactive, onBeforeMount, onMounted,onUnmounted, nextTick } from 'vue';
     import { useRoute, useRouter } from 'vue-router';
-    import CommonAddDataHeader from '@/components/linkage/CommonAddDataHeader';
+    import CommonAddDataHeader from '@/components/linkage/CommonAddDataHeader.vue';
     import {getSolarEnergyDetail } from '@/api/modules/sourceData/sloarManage';
     import { ElMessage } from 'element-plus'
     import Editor from '@/components/editor/Editor.vue';

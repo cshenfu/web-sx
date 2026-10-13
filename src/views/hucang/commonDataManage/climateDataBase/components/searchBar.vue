@@ -77,7 +77,7 @@
     </SearchBar>
 </template>
 <script setup>
-import SearchBar from '@/components/searchBar/SearchBar';
+import SearchBar from '@/components/searchBar/SearchBar.vue';
 import SelectSearch from '@/components/selectSearch/SelectSearch.vue';
 import { reactive, ref, onActivated, onBeforeUnmount, onDeactivated, onMounted, computed } from 'vue';
 import { getProvince } from '@/api/modules/public';

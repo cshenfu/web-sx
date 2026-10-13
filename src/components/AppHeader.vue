@@ -3,7 +3,7 @@
     <!-- 左侧：Logo 和 AI 平台名称 -->
     <div class="header-left">
       <!-- 替换为你指定的路径 -->
-      <img src="../../assets/img/logo.png" alt="Logo" class="logo" />
+      <img src="../assets/logo.png" alt="Logo" class="logo" />
       <div class="platform-title">新能源项目前期工作AI平台</div>
     </div>
 
