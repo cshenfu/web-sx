@@ -79,6 +79,18 @@ const createStoredPath = (bucket, objectKey) => {
 };
 
 
+// ★ 默认上传目录：fd/{userName}/ai-project-files/
+// 调用方不传 storePath 时使用
+const getDefaultStorePath = () => {
+    try {
+        const userName = sessionStorage.getItem('userName') || 'anonymous';
+        return `fd/${userName}/ai-project-files/`;
+    } catch {
+        return 'fd/anonymous/ai-project-files/';
+    }
+};
+
+
 // 从路径中提取对象 Key
 //
 // 兼容：
@@ -156,9 +168,9 @@ const createObjectKey = (file, storePath, bucket) => {
 
 // ★ 新增：根据 credentials + usePublicBucket 决定实际使用的桶名
 // usePublicBucket 默认 false，即所有旧调用不传该参数时行为完全不变（私有桶）
-const resolveBucket = (credentials, usePublicBucket=true) => {
+const resolveBucket = (credentials, usePublicBucket = true) => {
     if (!usePublicBucket) {
-        return credentials.privateBucket;
+        return credentials.publicBucket;
     }
 
     if (!credentials.publicBucket) {
@@ -816,9 +828,12 @@ export function useOssUpload() {
             // 每次上传前重新获取凭证
             const clientInfo = await getClient(isPublic); // ★
 
+            // ★ 调用方没传 storePath 时，用默认目录
+            const finalStorePath = storePath || getDefaultStorePath();
+
             const objectKey = createObjectKey(
                 file,
-                storePath,
+                finalStorePath,
                 clientInfo.bucket,
             );
 

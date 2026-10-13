@@ -27,6 +27,7 @@ console.log('base.ts:22 ==> envUrl-->', envUrl);
  export const publicService3 = new ServiceModule(envUrl.publicServiceUrl3);
  export const publicService4 = new ServiceModule(envUrl.publicServiceUrl4);
  export const publicService5 = new ServiceModule(envUrl.publicServiceUrl5);
+ export const publicService6 = new ServiceModule(envUrl.publicServiceUrl6);
 
 export const get = publicService.get.bind(publicService);
 
