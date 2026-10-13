@@ -1,0 +1,13 @@
+include:
+  - project: 'wuhuan/fd/whln-web-cicd'
+    ref: main
+    file: '/.gitlab-ci.yml'
+
+# 测试 / 生产宿主机端口不一致，按环境覆盖 HOST_PORT（写入部署机 .env）
+deploy_test:
+  variables:
+    HOST_PORT: "30009"
+
+deploy_prod:
+  variables:
+    HOST_PORT: "30009"

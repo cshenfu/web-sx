@@ -1,0 +1,9 @@
+services:
+  web-yn:
+    image: ${APP_IMAGE}
+    container_name: web-sx
+    ports:
+      - "30009:80"
+    environment:
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
