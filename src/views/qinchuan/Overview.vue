@@ -1921,9 +1921,10 @@ onUnmounted(() => {
   left: 12px;
   width: 240px;
 }
+/* Overview.vue —— 找到这段并修改 */
 .area-summary.wizard-layer {
   width: auto;
-  background: transparent;
+  /* background: transparent;  ← 删掉这行 */
 }
 
 /* 右侧：搜索栏 / 编辑工具栏 + 列表 / 详情 */

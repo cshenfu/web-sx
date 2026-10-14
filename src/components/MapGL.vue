@@ -5,11 +5,18 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import * as maplibregl from 'https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.mjs'
+import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import MapboxDraw from '@mapbox/mapbox-gl-draw'
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 
+// 导入 Worker 文件，Vite 会将其打包并返回正确的 URL
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
+
+// 在创建任何地图实例之前，设置 Worker URL
+if (typeof maplibregl.setWorkerUrl === 'function') {
+  maplibregl.setWorkerUrl(workerUrl)
+}
 if (typeof window !== 'undefined' && !window.mapboxgl) {
   window.mapboxgl = maplibregl
 }

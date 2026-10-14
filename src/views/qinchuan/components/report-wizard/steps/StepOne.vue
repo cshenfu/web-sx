@@ -554,15 +554,10 @@ function referenceRows(kind) {
   })
 
   data.files.forEach((file) => {
-    rows.push({
-      label: '引用文件',
-      value: fileLabel(file),
-    })
+    rows.push({ label: '引用文件', value: fileLabel(file) })
   })
 
-  return rows.length
-    ? rows
-    : [{ label: '引用数据', value: '暂无数据' }]
+  return rows.length ? rows : [{ label: '引用数据', value: '暂无数据' }]
 }
 
 function handleEnergyStorageChange() {
@@ -581,12 +576,7 @@ function handleHubTypeChange() {
 }
 
 function addFanTypeRow() {
-  fanTypeRows.push({
-    id: nextFanTypeId++,
-    model: '',
-    power: '',
-    source: '1',
-  })
+  fanTypeRows.push({ id: nextFanTypeId++, model: '', power: '', source: '1' })
 }
 
 function removeFanTypeRow(index) {
@@ -615,19 +605,12 @@ function normalizeFile(file) {
 }
 
 function normalizeFileList(value) {
-  const list = Array.isArray(value)
-    ? value
-    : value
-      ? [value]
-      : []
-
+  const list = Array.isArray(value) ? value : value ? [value] : []
   return list.map(normalizeFile).filter(Boolean)
 }
 
 function readUploadPayload(value) {
-  const eventFiles = value?.target?.files
-    ? Array.from(value.target.files)
-    : null
+  const eventFiles = value?.target?.files ? Array.from(value.target.files) : null
   const raw = eventFiles || value?.detail || value
   const files =
     raw?.fileList ||
@@ -643,10 +626,7 @@ function readUploadPayload(value) {
     raw?.data?.coordinates ||
     []
 
-  return {
-    files: normalizeFileList(files),
-    points: toArray(points),
-  }
+  return { files: normalizeFileList(files), points: toArray(points) }
 }
 
 function handleUploadEvent(kind, value) {
@@ -664,9 +644,7 @@ function syncUploadExposedData(kind, componentRef) {
 }
 
 function clearErrors() {
-  Object.keys(errors).forEach((key) => {
-    errors[key] = ''
-  })
+  Object.keys(errors).forEach((key) => { errors[key] = '' })
   submitError.value = ''
 }
 
@@ -738,14 +716,10 @@ function validateForm() {
     }
   }
 
-  if (
-    form.fieldAreaSource === 'reference' &&
-    !hasReferenceData('field')
-  ) {
+  if (form.fieldAreaSource === 'reference' && !hasReferenceData('field')) {
     errors.field = '该项目目前没有场区范围数据，请手动上传'
     valid = false
   }
-
   if (
     form.fieldAreaSource === 'custom' &&
     !uploadState.field.files.length &&
@@ -755,14 +729,10 @@ function validateForm() {
     valid = false
   }
 
-  if (
-    form.fanLocationSource === 'reference' &&
-    !hasReferenceData('fan')
-  ) {
+  if (form.fanLocationSource === 'reference' && !hasReferenceData('fan')) {
     errors.fan = '该项目目前没有风机点位数据，请手动上传'
     valid = false
   }
-
   if (
     form.fanLocationSource === 'custom' &&
     !uploadState.fan.files.length &&
@@ -780,7 +750,6 @@ function validateForm() {
     errors.booster = '该项目目前没有升压站点位数据，请手动上传'
     valid = false
   }
-
   if (
     !isDistributedMode.value &&
     form.boosterLocationSource === 'custom' &&
@@ -838,24 +807,31 @@ function buildPreferDeviceCodes() {
     .join(';')
 }
 
+/**
+ * sxProjectId：保持原逻辑（Number）。
+ * 第一步不传 editProjectWindReqDTO.id，只依赖外层 sxProjectId 即可。
+ */
+function toProjectId(value) {
+  if (value === '' || value === null || value === undefined) return 0
+  const id = Number(value)
+  return Number.isFinite(id) ? id : 0
+}
+
 function buildPayload(isDraft) {
   const field = getSelectedData('field')
   const fan = getSelectedData('fan')
   const booster = getSelectedData('booster')
   const project = props.project || {}
   const fieldFiles =
-    form.fieldAreaSource === 'reference'
-      ? field.files
-      : uploadState.field.files
+    form.fieldAreaSource === 'reference' ? field.files : uploadState.field.files
   const fanFiles =
-    form.fanLocationSource === 'reference'
-      ? fan.files
-      : uploadState.fan.files
+    form.fanLocationSource === 'reference' ? fan.files : uploadState.fan.files
   const boosterFiles =
     form.boosterLocationSource === 'reference'
       ? booster.files
       : uploadState.booster.files
 
+  // 第一步不带 editProjectWindReqDTO.id
   const editProjectWindReqDTO = {
     projectCode: project.projectCode || project.code,
     projectName: form.projectName,
@@ -911,11 +887,6 @@ function buildPayload(isDraft) {
   }
 
   return {
-    // saveUpdateProject 的请求体结构：
-    // {
-    //   editProjectWindReqDTO: { ...第一步参数，不带 id },
-    //   sxProjectId: 当前项目 id
-    // }
     editProjectWindReqDTO: removeUndefined(editProjectWindReqDTO),
     sxProjectId: toProjectId(project.sxProjectId ?? project.id),
   }
@@ -927,12 +898,9 @@ function removeUndefined(object) {
   )
 }
 
-function toProjectId(value) {
-  if (value === '' || value === null || value === undefined) return 0
-  const id = Number(value)
-  return Number.isFinite(id) ? id : 0
-}
-
+/**
+ * 响应里的 data 是 19 位雪花 ID，字符串返回，别 Number()。
+ */
 function extractSavedProjectId(response) {
   const candidates = [
     response?.data?.id,
@@ -945,11 +913,10 @@ function extractSavedProjectId(response) {
 
   const id = candidates.find((value) => {
     if (value === '' || value === null || value === undefined) return false
-    const number = Number(value)
-    return Number.isFinite(number) && number > 0
+    return /^\d+$/.test(String(value))
   })
 
-  return id === undefined ? null : Number(id)
+  return id === undefined ? null : String(id)
 }
 
 async function submitStep(isDraft) {
@@ -958,16 +925,12 @@ async function submitStep(isDraft) {
   syncUploadExposedData('booster', boosterUploadRef)
   syncUploadExposedData('terrain', terrainUploadRef)
 
-  // 草稿允许保存当前已填写内容，不能因为必填项未完成而直接拦截请求。
-  // “下一步”仍然需要通过校验，避免带着不完整参数进入后续步骤。
   if (!isDraft && !validateForm()) {
     submitError.value = '请先完善页面中标红的必填项，再进入下一步'
     return
   }
 
-  if (isDraft) {
-    clearErrors()
-  }
+  if (isDraft) clearErrors()
 
   submitting.value = true
   submitMode.value = isDraft ? 'draft' : 'next'
@@ -1005,290 +968,99 @@ async function submitStep(isDraft) {
 </script>
 
 <style scoped>
-.step-one {
-  padding-bottom: 20px;
-}
-
-.form-item {
-  margin-bottom: 18px;
-}
-
-.form-item.sub-item {
-  margin-top: -8px;
-  padding-left: 0;
-}
-
-.form-label {
-  display: block;
-  margin-bottom: 8px;
-  color: #1f2937;
-  font-size: 13px;
-}
-
-.form-label.required::before {
-  content: '*';
-  margin-right: 3px;
-  color: #ff6b6b;
-}
-
-.sub-label {
-  margin-top: 14px;
-}
-
+.step-one { padding-bottom: 20px; }
+.form-item { margin-bottom: 18px; }
+.form-item.sub-item { margin-top: -8px; padding-left: 0; }
+.form-label { display: block; margin-bottom: 8px; color: #1f2937; font-size: 13px; }
+.form-label.required::before { content: '*'; margin-right: 3px; color: #ff6b6b; }
+.sub-label { margin-top: 14px; }
 .text-input,
 .select-input {
-  box-sizing: border-box;
-  height: 36px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  outline: none;
-  background: #fff;
-  font-size: 13px;
+  box-sizing: border-box; height: 36px; border: 1px solid #d1d5db;
+  border-radius: 4px; outline: none; background: #fff; font-size: 13px;
 }
-
-.text-input {
-  width: 100%;
-  padding: 0 12px;
-}
-
+.text-input { width: 100%; padding: 0 12px; }
 .text-input:focus,
-.select-input:focus {
-  border-color: #2f8dff;
-}
-
-.input-with-suffix {
-  position: relative;
-}
-
+.select-input:focus { border-color: #2f8dff; }
+.input-with-suffix { position: relative; }
 .input-with-suffix .suffix {
-  position: absolute;
-  top: 50%;
-  right: 12px;
-  color: #1f2937;
-  font-size: 12px;
-  font-weight: 600;
-  transform: translateY(-50%);
+  position: absolute; top: 50%; right: 12px; color: #1f2937;
+  font-size: 12px; font-weight: 600; transform: translateY(-50%);
 }
-
-.short-input {
-  width: 280px;
-}
-
-.short-input .text-input {
-  padding-right: 100px;
-}
-
+.short-input { width: 280px; }
+.short-input .text-input { padding-right: 100px; }
 .storage-ratio-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  color: #374151;
-  font-size: 13px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  color: #374151; font-size: 13px;
 }
-
-.select-input {
-  min-width: 108px;
-  padding: 0 8px;
-}
-
+.select-input { min-width: 108px; padding: 0 8px; }
 .payment-select,
-.hub-height-select {
-  width: 190px;
-}
-
-.select-input:disabled {
-  cursor: not-allowed;
-  background: #f5f6f8;
-}
-
+.hub-height-select { width: 190px; }
+.select-input:disabled { cursor: not-allowed; background: #f5f6f8; }
 .reference-wrap,
 .upload-wrap,
 .auto-tip {
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: 3px;
-  background: #fafafa;
+  margin-top: 10px; padding: 10px 12px; border-radius: 3px; background: #fafafa;
 }
-
 .reference-empty,
-.auto-tip {
-  color: #9ca3af;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.reference-wrap :deep(*) {
-  font-size: 12px;
-}
-
-.advanced-block {
-  animation: show-advanced 0.18s ease-out;
-}
-
+.auto-tip { color: #9ca3af; font-size: 12px; line-height: 1.6; }
+.reference-wrap :deep(*) { font-size: 12px; }
+.advanced-block { animation: show-advanced 0.18s ease-out; }
 .fan-type-box {
-  margin-top: 10px;
-  padding: 8px;
-  border: 1px solid #edf0f4;
-  border-radius: 4px;
-  background: #fafbfc;
+  margin-top: 10px; padding: 8px; border: 1px solid #edf0f4;
+  border-radius: 4px; background: #fafbfc;
 }
-
 .fan-type-head,
 .fan-type-row {
   display: grid;
   grid-template-columns: minmax(90px, 1fr) minmax(70px, 0.8fr) minmax(62px, 0.7fr) 22px;
-  align-items: center;
-  gap: 6px;
+  align-items: center; gap: 6px;
 }
-
-.fan-type-head {
-  padding: 0 2px 6px;
-  color: #9ca3af;
-  font-size: 11px;
-}
-
-.fan-type-row + .fan-type-row {
-  margin-top: 6px;
-}
-
+.fan-type-head { padding: 0 2px 6px; color: #9ca3af; font-size: 11px; }
+.fan-type-row + .fan-type-row { margin-top: 6px; }
 .table-input {
-  box-sizing: border-box;
-  width: 100%;
-  height: 30px;
-  padding: 0 6px;
-  border: 1px solid #d7dce3;
-  border-radius: 3px;
-  outline: none;
-  color: #374151;
-  background: #fff;
-  font-size: 11px;
+  box-sizing: border-box; width: 100%; height: 30px; padding: 0 6px;
+  border: 1px solid #d7dce3; border-radius: 3px; outline: none;
+  color: #374151; background: #fff; font-size: 11px;
 }
-
 .icon-add,
 .row-remove {
-  border: none;
-  cursor: pointer;
-  color: #2f8dff;
-  background: transparent;
-  font-size: 18px;
-  line-height: 1;
+  border: none; cursor: pointer; color: #2f8dff; background: transparent;
+  font-size: 18px; line-height: 1;
 }
-
-.row-remove {
-  color: #9ca3af;
-}
-
-.illustrate {
-  margin: 8px 0 0;
-  color: #9ca3af;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.divider {
-  height: 1px;
-  margin: 20px 0;
-  background: #eef0f3;
-}
-
-.show-more-row {
-  display: flex;
-  justify-content: center;
-  margin: 8px 0 20px;
-}
-
+.row-remove { color: #9ca3af; }
+.illustrate { margin: 8px 0 0; color: #9ca3af; font-size: 12px; line-height: 1.6; }
+.divider { height: 1px; margin: 20px 0; background: #eef0f3; }
+.show-more-row { display: flex; justify-content: center; margin: 8px 0 20px; }
 .show-more-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 18px;
-  border: 1px solid #2f8dff;
-  border-radius: 0;
-  cursor: pointer;
-  color: #2f8dff;
-  background: #fff;
-  font-size: 12.5px;
+  display: inline-flex; align-items: center; gap: 4px; padding: 8px 18px;
+  border: 1px solid #2f8dff; border-radius: 0; cursor: pointer;
+  color: #2f8dff; background: #fff; font-size: 12.5px;
 }
-
-.chevron {
-  width: 12px;
-  height: 12px;
-  transition: transform 0.2s;
-}
-
-.chevron.up {
-  transform: rotate(180deg);
-}
-
+.chevron { width: 12px; height: 12px; transition: transform 0.2s; }
+.chevron.up { transform: rotate(180deg); }
 .field-error,
 .submit-error {
-  margin: 6px 0 0;
-  color: #f04444;
-  font-size: 12px;
-  line-height: 1.5;
+  margin: 6px 0 0; color: #f04444; font-size: 12px; line-height: 1.5;
 }
-
-.submit-error {
-  margin-bottom: 12px;
-  text-align: center;
-}
-
-.footer-actions {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 24px;
-}
-
+.submit-error { margin-bottom: 12px; text-align: center; }
+.footer-actions { display: flex; justify-content: center; gap: 12px; margin-top: 24px; }
 .btn {
-  min-width: 100px;
-  padding: 9px 20px;
-  border: 1px solid #d1d5db;
-  border-radius: 20px;
-  cursor: pointer;
-  color: #374151;
-  background: #fff;
-  font-size: 13px;
+  min-width: 100px; padding: 9px 20px; border: 1px solid #d1d5db;
+  border-radius: 20px; cursor: pointer; color: #374151; background: #fff; font-size: 13px;
 }
-
 .btn.primary {
-  min-width: 154px;
-  border-color: #2f8dff;
-  color: #fff;
-  background: #2f8dff;
+  min-width: 154px; border-color: #2f8dff; color: #fff; background: #2f8dff;
 }
-
-.btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
+.btn:disabled { cursor: not-allowed; opacity: 0.6; }
 @keyframes show-advanced {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-
 @media (max-width: 520px) {
-  .short-input {
-    width: 100%;
-  }
-
-  .storage-ratio-row {
-    align-items: stretch;
-  }
-
-  .storage-ratio-row .select-input {
-    flex: 1 1 100px;
-  }
-
+  .short-input { width: 100%; }
+  .storage-ratio-row { align-items: stretch; }
+  .storage-ratio-row .select-input { flex: 1 1 100px; }
   .fan-type-head,
   .fan-type-row {
     grid-template-columns: minmax(70px, 1fr) minmax(58px, 0.8fr) 58px 18px;

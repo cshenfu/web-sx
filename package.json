@@ -28,7 +28,7 @@
     "esdk-obs-browserjs": "^3.25.6",
     "file-saver": "^2.0.5",
     "jszip": "^3.10.2",
-    "maplibre-gl": "^6.6.0",
+    "maplibre-gl": "^6.14.0",
     "mitt": "^3.0.1",
     "pinia": "^4.0.2",
     "sortablejs": "^1.15.7",

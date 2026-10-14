@@ -32,7 +32,6 @@
         @save-draft="(payload) => handleSaveDraft(0, payload)"
         @next="(payload) => handleNext(0, payload)"
       />
-
       <StepTwo
         v-else-if="currentStep === 1"
         :create-project-mode="createProjectMode"
@@ -40,7 +39,6 @@
         @save-draft="(data) => handleSaveDraft(1, data)"
         @next="(data) => handleNext(1, data)"
       />
-
       <StepThree
         v-else
         :project="workingProject"
@@ -74,15 +72,37 @@ const steps = [
 
 const currentStep = ref(0)
 const collectedData = ref({})
-const workingProject = ref({ ...(props.project || {}) })
+
+/**
+ * sxProjectId 在向导整个生命周期内保持恒定 = 入口 project 的 id。
+ * 用字符串保存，避免 19 位雪花 ID 在 Number() 时丢精度。
+ */
+function resolveSxProjectId(project) {
+  if (!project) return 0
+  const raw = project.sxProjectId ?? project.id
+  if (raw === '' || raw === null || raw === undefined) return 0
+  return String(raw)
+}
+
+const ENTRY_SX_PROJECT_ID = resolveSxProjectId(props.project)
+
+const workingProject = ref({
+  ...(props.project || {}),
+  // id 初始为入口 id，后续会被第一步接口返回的 savedProjectId 更新
+  id: props.project?.id ? String(props.project.id) : undefined,
+  // sxProjectId 锁定为入口值
+  sxProjectId: ENTRY_SX_PROJECT_ID,
+})
 
 watch(
   () => props.project,
   (value) => {
     if (!value) return
+    // 外部 project 变化时，不动 id（保留已保存的）和 sxProjectId（锁定值）
+    const { id: _id, sxProjectId: _sx, ...rest } = value
     workingProject.value = {
       ...workingProject.value,
-      ...value,
+      ...rest,
     }
   },
   { deep: true }
@@ -119,7 +139,7 @@ function handleNext(stepIndex, data) {
 }
 
 function handleSubmit(data) {
-  collectedData.value[2] = data
+  collectedData.value[currentStep.value] = data
   updateWorkingProject(data)
   emit('submit', {
     data: { ...collectedData.value },
@@ -127,13 +147,25 @@ function handleSubmit(data) {
   })
 }
 
+/**
+ * 合并子组件数据到 workingProject。
+ * - form 字段正常合并
+ * - id：被第一步返回的 savedProjectId 更新（第二步第三步的 editProjectWindReqDTO.id 用它）
+ * - sxProjectId：始终保持入口值不变（三步都传同一个）
+ */
 function updateWorkingProject(data) {
-  const savedProjectId = data?.savedProjectId
-  if (!savedProjectId) return
+  if (!data) return
+
+  const { savedProjectId, form } = data
+  const preservedSxProjectId = workingProject.value.sxProjectId
 
   workingProject.value = {
     ...workingProject.value,
-    id: savedProjectId,
+    ...(form && typeof form === 'object' ? form : {}),
+    // 第一步返回的 data 覆盖 id，后续步骤作为 editProjectWindReqDTO.id 使用
+    ...(savedProjectId ? { id: savedProjectId } : {}),
+    // sxProjectId 锁定，三步一致
+    sxProjectId: preservedSxProjectId,
   }
 }
 </script>
