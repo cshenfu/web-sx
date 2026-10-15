@@ -41,6 +41,7 @@
       />
       <StepThree
         v-else
+        :create-project-mode="createProjectMode"
         :project="workingProject"
         @save-draft="(data) => handleSaveDraft(2, data)"
         @submit="handleSubmit"

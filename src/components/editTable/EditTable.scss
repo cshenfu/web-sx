@@ -1,0 +1,111 @@
+$primary-color: var(--theme);
+$primary-light-color: var(--themeLight);
+$primary-gradation-color: var(--themeGradation);;
+.edit-table-component{
+    margin: 0 auto 40px auto;
+  }
+  :deep(.ant-table-thead > tr > th){
+      background: #F2F7F7;
+      font-size: 14px;
+      font-weight: 500;
+  }
+  :deep(.ant-table-tbody > tr > td) {
+      border-right: 1px solid #E4E6EE !important;
+      font-size: 12px;
+  }
+  :deep(.ant-table-cell) {
+      padding: 0 !important;
+      height: 34px;
+      min-height: 34px;
+      background: #FAFAFA;
+      border-color: #E4E6EE;
+      border-right-color: #E4E6EE;
+  }
+  :deep(.ant-table-cell .ant-input-number){
+      border: none;
+      width: 100%;
+      border-radius: 0;
+      margin-bottom: 1px !important;
+  }
+  :deep(.ant-input-number-input){
+      text-align: center;
+      font-size: 12px;
+  }
+  .show-more {
+    width: 240px;
+    height: 30px;
+    margin: 40px auto 40px auto;
+    border-radius: 15px;
+    border: 1px solid $primary-color;
+    color: $primary-color;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+
+    span {
+        margin-right: 4px;
+    }
+
+    .show-more-illustrate {
+        position: absolute;
+        width: 172px;
+        height: 84px;
+        display: flex;
+        background: url(@/assets/img/step/first-step/show-more-illustrate.png) no-repeat;
+        background-size: 172px 84px;
+        background-position: left top;
+        align-items: flex-start;
+        right: -170px;
+        top: -40px;
+        color: #363B4D;
+        font-size: 12px;
+        padding: 22px 20px 22px 28px;
+        line-height: 1.5;
+        i {
+            flex: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: $primary-color;
+            color: #ffffff;
+            font-style: normal;
+            margin-right: 5px;
+            margin-top: 3px;
+            font-size: 10px;
+        }
+    }
+}
+
+.retract-more {
+    width: 240px;
+    height: 30px;
+    margin: 40px auto 40px auto;
+    border-radius: 15px;
+    background: #F5F6F9;
+    color: #363B4D;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    transition: all linear 0.2s;
+
+    &:hover {
+        background: $primary-light-color;
+    }
+
+    span {
+        margin-right: 4px;
+    }   
+}
+.retract-icon {
+    color: #363B4D;
+    transform: rotate(180deg);
+}

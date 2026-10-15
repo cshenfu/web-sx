@@ -31,3 +31,12 @@ export async function saveUpdateProject(data) {
     return await publicService5.post(`/web/shanxi/project/save_update_project`,data);
 }
 
+// 第三步生成
+export async function submitThreeStepParam(type, data) {
+    return await publicService5.post('/web/project/detail/step3/save/' + type, data);
+}
+
+
+export async function getThreeStepDynamicParam(projectType, projectId) {
+    return await publicService5.get('/web/project/detail/step3-default-param_v2/' + projectId + '/' + projectType);
+}
