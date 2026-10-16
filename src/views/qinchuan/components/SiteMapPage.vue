@@ -242,8 +242,13 @@
           <el-icon><ArrowRight /></el-icon>
         </button>
 
-        <!-- ★ 图层控制已由 @whln/layer-control 接管，挂载在左下角 -->
-        <!-- 原 .layer-control 区块已移除 -->
+        <!-- ★ 图层 chip 面板 -->
+        <LayerChipPanel
+          :visible-ids="layerVisibleIds"
+          :inputs="layerInputs"
+          @toggle="onLayerToggle"
+          @input-change="onLayerInputChange"
+        />
       </section>
 
       <section v-else class="project-list-view">
@@ -484,26 +489,26 @@ import shengyazhanIcon from '@/assets/img/mapIcon/shengyazhan.png'
 
 import ProjectDetailPanel from './ProjectDetailPanel.vue'
 
-// ★ 图层控制插件
+// ★ 图层 chip 面板
+import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
+import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPanelConfig'
+
+// ★ whln 图层控制插件（只保留 API，UI 由 LayerChipPanel 接管）
 import { attachLayerControl } from '@whln/layer-control'
-import '@whln/layer-control/style.css'
 
 // =================== props ===================
 const props = defineProps({
-  // 阶段编码；空字符串 = 不过滤（智能选址用）
   stage: { type: String, default: '' },
   summaryTitle: { type: String, default: '项目通道概况' },
   cardActions: {
     type: Array,
     default: () => ['share', 'reserve', 'verify', 'edit', 'delete'],
   },
-  // 'verify' → 核查状态 | 'approval' → 审批状态 | 'none' → 隐藏第 7 列
   statusColumn: {
     type: String,
     default: 'verify',
     validator: (v) => ['verify', 'approval', 'none'].includes(v),
   },
-  // 操作列按钮
   rowActions: {
     type: Array,
     default: () => ['edit', 'delete'],
@@ -512,6 +517,7 @@ const props = defineProps({
   showVerifyPanelFlag: { type: Boolean, default: false },
 })
 const emits = defineEmits(['featureVisibleChange'])
+
 // =================== 常量 ===================
 const ICON_FENGJI = 'icon-fengji'
 const ICON_SHENGYAZHAN = 'icon-shengyazhan'
@@ -531,7 +537,6 @@ const CARD_ACTION_LABELS = {
   delete: '删除',
 }
 
-// 行操作按钮标签
 const ROW_ACTION_LABELS = {
   material: '立项材料',
   establishMeeting: '立项上会',
@@ -635,8 +640,24 @@ const saving = ref(false)
 
 const drawerSort = reactive({ key: '', dir: 'desc' })
 
-// ★ whln 图层控制插件实例
+// ★ whln 图层控制插件实例（仅保留 API 层）
 let whlnPlugin = null
+
+// ★ 图层 chip 面板状态
+const layerVisibleIds = ref([...DEFAULT_VISIBLE])
+const layerInputs = reactive({ noise: 700 })
+const customLayerState = reactive({
+  'base-resource': false,
+  'base-satellite': false,
+  'terrain-3d': false,
+  'measure-tower': false,
+  'wind-turbine': false,
+  booster: false,
+  'access-tower': false,
+  road: false,
+  line: false,
+  noise: false,
+})
 
 const overviewStats = reactive({
   totalCapacity: 0, totalCount: 0,
@@ -652,6 +673,62 @@ const editTools = [
   { key: 'booster', label: '编辑升压站', icon: CircleCheck },
   { key: 'unavailable', label: '设置不可用区域', icon: InfoFilled },
 ]
+
+// =================== 图层 chip 面板 ===================
+function onLayerToggle(item) {
+  const isOn = layerVisibleIds.value.includes(item.id)
+
+  if (item.type === 'whln') {
+    // 归 whln 管：更新 visibleIds，再同步给插件
+    const next = isOn
+      ? layerVisibleIds.value.filter((id) => id !== item.id)
+      : [...layerVisibleIds.value, item.id]
+    layerVisibleIds.value = next
+
+    const whlnOnly = next.filter((id) => WHLN_LAYER_IDS.includes(id))
+    whlnPlugin?.setVisibleIds?.(whlnOnly)
+    return
+  }
+
+  // 非 whln 层：走各自的分支
+  if (item.type === 'base') {
+    toggleBaseMap(item.id)
+  } else if (item.type === 'terrain') {
+    toggleTerrain(item.id)
+  } else if (item.type === 'custom') {
+    toggleCustomLayer(item.id)
+  }
+
+  customLayerState[item.id] = !isOn
+  layerVisibleIds.value = isOn
+    ? layerVisibleIds.value.filter((id) => id !== item.id)
+    : [...layerVisibleIds.value, item.id]
+}
+
+function onLayerInputChange({ id, value }) {
+  layerInputs[id] = value
+  if (id === 'noise') {
+    // TODO: 根据噪音距离更新地图缓冲半径等逻辑
+    // updateNoiseBuffer(value)
+  }
+}
+
+// 底图切换（按你的项目逻辑实现）
+function toggleBaseMap(id) {
+  // 例：
+  // if (id === 'base-satellite') mapRef.value?.getMap?.().setStyle(satelliteStyle)
+  // if (id === 'base-resource') mapRef.value?.getMap?.().setStyle(defaultStyle)
+}
+
+// 3D 地形开关（按你的项目逻辑实现）
+function toggleTerrain(id) {
+  // 例：mapRef.value?.getMap?.().setTerrain({ source: 'terrain-dem', exaggeration: 1.5 })
+}
+
+// 自定义覆盖物（测风塔 / 风机 / 道路 / 线路等）
+function toggleCustomLayer(id) {
+  // 这里按需要 addLayer / removeLayer
+}
 
 // =================== 创建项目 ===================
 const showCreateProject = ref(false)
@@ -704,7 +781,6 @@ const projectList = ref([])
 const listLoading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
 
-const ITEM_TYPE_MAP = { FD: '风电', GF: '光伏' }
 const APPROVAL_STATUS_MAP = {
   NO_APPROVAL: '未审批', APPROVED: '审批通过', REJECTED: '审批不通过',
 }
@@ -717,7 +793,6 @@ const stageMap = computed(() =>
   Object.fromEntries(stageOptions.value.map(item => [item.code, item.desc]))
 )
 
-// ★ 第 7 列配置
 const STATUS_COLUMN_CONFIG = {
   verify: {
     label: '核查状态',
@@ -805,7 +880,6 @@ function handleReset() {
 }
 function handlePageChange(page) { pagination.page = page; fetchProjectList() }
 function handleSizeChange(size) { pagination.pageSize = size; pagination.page = 1; fetchProjectList() }
-function handleEdit(row) { console.log('edit', row.id) }
 
 function handleDelete(row) {
   ElMessageBox.confirm(`确认删除项目「${row.projectName || ''}」吗？`, '提示', {
@@ -819,21 +893,14 @@ function handleDelete(row) {
     .catch(() => {})
 }
 
-// ★ 行操作统一入口
 function handleRowAction(action, row) {
   if (action === 'delete') { handleDelete(row); return }
-
-  if (action === 'edit') {
-    openDetailPanel(row, 'main')
-    return
-  }
+  if (action === 'edit') { openDetailPanel(row, 'main'); return }
   if (['material', 'researchMaterial', 'investMaterial'].includes(action)) {
-    openDetailPanel(row, 'material')
-    return
+    openDetailPanel(row, 'material'); return
   }
   if (['establishMeeting', 'researchReview', 'investMeeting'].includes(action)) {
-    openDetailPanel(row, 'meeting')
-    return
+    openDetailPanel(row, 'meeting'); return
   }
   if (action === 'verify') {
     const p = allMapProjects.value.find(item => item.id === row.id)
@@ -855,13 +922,9 @@ function handleRowAction(action, row) {
   ElMessage.info(`点击了「${label}」：${row.projectName || ''}`)
 }
 
-// 打开右侧详情面板
 function openDetailPanel(row, tab) {
   const p = allMapProjects.value.find(item => item.id === row.id)
-  if (!p) {
-    ElMessage.warning('地图上未找到该项目')
-    return
-  }
+  if (!p) { ElMessage.warning('地图上未找到该项目'); return }
   const centroid = getProjectCentroid(p)
   if (centroid) {
     mapRef.value?.getMap?.()?.flyTo({ center: centroid, zoom: 13, duration: 1200 })
@@ -1275,17 +1338,12 @@ function handleDrawerAction({ type, project }) {
   const p = allMapProjects.value.find((item) => item.id === project.id)
   if (!p) return
 
-  if (type === 'edit') {
-    openDetailPanel(p, 'main')
-    return
-  }
+  if (type === 'edit') { openDetailPanel(p, 'main'); return }
   if (['material', 'researchMaterial', 'investMaterial'].includes(type)) {
-    openDetailPanel(p, 'material')
-    return
+    openDetailPanel(p, 'material'); return
   }
   if (['establishMeeting', 'researchReview', 'investMeeting'].includes(type)) {
-    openDetailPanel(p, 'meeting')
-    return
+    openDetailPanel(p, 'meeting'); return
   }
   if (type === 'delete') {
     ElMessageBox.confirm(`确认删除项目「${p.projectName}」吗？`, '提示', {
@@ -1310,11 +1368,8 @@ function handleDrawerSortChange({ key, dir }) {
   fetchProjectList()
 }
 
-// 切到列表模式时，自动关闭右侧抽屉
 watch(viewMode, (val) => {
-  if (val === 'list') {
-    if (showProjectDrawer.value) showProjectDrawer.value = false
-  }
+  if (val === 'list' && showProjectDrawer.value) showProjectDrawer.value = false
 })
 watch(showProjectDrawer, (val) => {
   if (val) { pagination.page = 1; fetchProjectList() }
@@ -1575,15 +1630,42 @@ async function onMapReady() {
     await renderCityStats()
   }
 
-  // ★ 挂载 whln 图层控制到左下角
+  // ★ 挂载 whln 图层控制插件（保留 API，隐藏 UI）
   try {
     whlnPlugin = attachLayerControl(map, {
-      beforeId: 'site-city-stats', // TODO: 底图弹框确认后调整
+      beforeId: 'site-city-stats',
       placement: 'control',
       position: 'bottom-left',
+      showLayerDetail: false,
     })
-    whlnPlugin.subscribe((ids) => {
-      console.log('[whln] 当前可见图层:', ids)
+
+    // 隐藏插件自带的 UI：等一帧让它渲染，然后移除 DOM 容器
+    await nextTick()
+    const hideWhlnUI = () => {
+      document
+        .querySelectorAll('.maplibregl-ctrl-bottom-left .whln-lc')
+        .forEach((el) => el.remove())
+    }
+    hideWhlnUI()
+
+    // 兜底：防止插件内部再重渲染出面板
+    const ctrlHost = document.querySelector('.maplibregl-ctrl-bottom-left')
+    let lcHider = null
+    if (ctrlHost) {
+      lcHider = new MutationObserver(hideWhlnUI)
+      lcHider.observe(ctrlHost, { childList: true })
+      // 存起来，onUnmounted 里断开
+      window.__whlnLcHider = lcHider
+    }
+
+    // 用 chip 面板当前状态反向同步给插件
+    const whlnOnly = layerVisibleIds.value.filter((id) => WHLN_LAYER_IDS.includes(id))
+    whlnPlugin.setVisibleIds?.(whlnOnly)
+
+    // 插件内部变化时同步回 chip 面板
+    whlnPlugin.subscribe?.((ids) => {
+      const others = layerVisibleIds.value.filter((id) => !WHLN_LAYER_IDS.includes(id))
+      layerVisibleIds.value = [...others, ...ids]
       emits('featureVisibleChange', ids)
     })
   } catch (err) {
@@ -1601,8 +1683,13 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  whlnPlugin?.destroy()
+  if (window.__whlnLcHider) {
+    window.__whlnLcHider.disconnect()
+    window.__whlnLcHider = null
+  }
+  whlnPlugin?.destroy?.()
   whlnPlugin = null
+
   unbindZoomListener()
   const map = mapRef.value?.getMap?.()
   if (map) {
@@ -1734,121 +1821,40 @@ onUnmounted(() => {
   border-radius: 5px 0 0 5px; cursor: pointer;
 }
 
-/* ================= whln 图层控件样式覆盖 ================= */
-/* whln 默认挂在 bottom-left，通过 CSS 变量贴合现有视觉 */
-
-/* 让 whln 控件容器对齐左下角 */
-:deep(.maplibregl-ctrl-bottom-left) {
-  left: 12px;
-  bottom: 12px;
-  margin: 0;
-  z-index: 6;
-}
-
-/* 覆盖 whln 按钮和面板的视觉变量，贴合现有圆角/阴影风格 */
-:deep(.whln-lc) {
-  --whln-lc-btn-size: 52px;
-  --whln-lc-btn-icon: 22px;
-  --whln-lc-panel-bg: rgba(240, 243, 247, 0.93);
-  --whln-lc-panel-radius: 10px;
-  --whln-lc-panel-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
-  --whln-lc-chip-height: 30px;
-  --whln-lc-chip-radius: 6px;
-  --whln-lc-chip-font-size: 13px;
-  --whln-lc-chip-color: #3a4652;
-  --whln-lc-chip-bg: rgba(255, 255, 255, 0.9);
-  --whln-lc-chip-border: 1px solid #e3e7ee;
-  --whln-lc-chip-active-color: #1677ff;
-  --whln-lc-chip-active-bg: #e8f2ff;
-  --whln-lc-chip-active-border: #1677ff;
-  --whln-lc-chip-hover-color: #1677ff;
-  --whln-lc-chip-hover-border: #a9cfff;
-  --whln-lc-row-label-color: #5a6472;
-  --whln-lc-row-label-font-size: 13px;
-  --whln-lc-divider-color: rgba(0, 0, 0, 0.06);
-}
-
-/* 如果 whln 内部按钮需要特殊对齐，可以进一步微调 */
-:deep(.whln-lc .whln-lc-btn) {
-  border-radius: 10px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
-  backdrop-filter: blur(8px);
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  color: #5a6472;
-}
-:deep(.whln-lc .whln-lc-btn:hover) {
-  color: #1677ff;
-}
-
-:deep(.whln-lc-panel){
-  left:100px
-}
-
 .project-list-view {
   position: absolute; inset: 0; z-index: 4; height: 100%;
   padding: 60px 20px 12px; overflow: auto; box-sizing: border-box; background: #fff;
 }
 .list-heading { display: flex; align-items: center; justify-content: space-between; }
 .list-title { display: flex; align-items: center; gap: 6px; color: #333; font-size: 13px; font-weight: 600; }
-.project-table {
-  width: 100%;
-  margin-top: 2px;
-}
+.project-table { width: 100%; margin-top: 2px; }
 
-.project-table :deep(.el-table__row) {
-  height: 56px;
-}
-.project-table :deep(.el-table__cell) {
-  padding: 10px 0;
-}
-
+.project-table :deep(.el-table__row) { height: 56px; }
+.project-table :deep(.el-table__cell) { padding: 10px 0; }
 .project-table :deep(.el-table__header-wrapper th) {
-  background: #f7f8fa;
-  color: #606266;
-  font-weight: 500;
+  background: #f7f8fa; color: #606266; font-weight: 500;
 }
+.project-table :deep(.el-table__body tr.el-table__row--striped td) { background: #fafbfc; }
+.project-table :deep(.el-table__body tr:hover > td) { background: #f5f8ff; }
 
-.project-table :deep(.el-table__body tr.el-table__row--striped td) {
-  background: #fafbfc;
-}
-
-.project-table :deep(.el-table__body tr:hover > td) {
-  background: #f5f8ff;
-}
 .status-text.passed { color: #24b26b; }
 .status-text.pending { color: #e6a23c; }
 .status-text.rejected { color: #f56c6c; }
+
 .pagination-row {
   display: flex; align-items: center; justify-content: flex-end; gap: 18px;
   padding-top: 14px; color: #666; font-size: 12px;
 }
 
-.row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-}
-.row-actions .el-button {
-  margin: 0;
-  padding: 0;
-}
+.row-actions { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.row-actions .el-button { margin: 0; padding: 0; }
 
 .rate-cell {
-  display: inline-flex;
-  flex-direction: column;
-  line-height: 1.2;
-  vertical-align: middle;
-  margin-right: 8px;
+  display: inline-flex; flex-direction: column; line-height: 1.2;
+  vertical-align: middle; margin-right: 8px;
 }
-.rate-line {
-  font-size: 11px;
-  white-space: nowrap;
-}
-.rate-value {
-  display: inline-block;
-  vertical-align: middle;
-}
+.rate-line { font-size: 11px; white-space: nowrap; }
+.rate-value { display: inline-block; vertical-align: middle; }
 
 .create-project-fullpage {
   position: absolute; inset: 0; z-index: 3; display: flex;
