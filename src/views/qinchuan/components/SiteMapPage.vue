@@ -1871,6 +1871,12 @@ onUnmounted(() => {
   position: absolute; top: 18px; right: 18px; display: flex; gap: 8px; pointer-events: auto;
 }
 :deep(.create-project-form) { pointer-events: auto; }
+:deep(.maplibregl-ctrl-bottom-right){
+  display: none;
+}
+:deep(.maplibregl-ctrl-top-right){
+  display: none;
+}
 
 @media (max-width: 1100px) {
   .project-list-view { padding-right: 10px; padding-left: 10px; }
