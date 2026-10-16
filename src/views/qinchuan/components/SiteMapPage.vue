@@ -242,77 +242,8 @@
           <el-icon><ArrowRight /></el-icon>
         </button>
 
-        <!-- ★ 左下角：图层控制 -->
-        <div class="layer-control">
-          <transition name="layer-pop">
-            <div v-if="showLayerPanel" class="layer-panel">
-              <!-- 底图 -->
-              <div class="layer-row">
-                <div class="layer-row-label">底图</div>
-                <div class="layer-row-body">
-                  <button
-                    v-for="item in BASE_MAP_OPTIONS"
-                    :key="item.key"
-                    class="layer-chip"
-                    @click="handleBaseMapClick(item)"
-                  >
-                    <el-icon><component :is="item.icon" /></el-icon>
-                    {{ item.label }}
-                  </button>
-                </div>
-              </div>
-
-              <!-- 规划元素 -->
-              <div class="layer-row">
-                <div class="layer-row-label">规划<br />元素</div>
-                <div class="layer-row-body">
-                  <button
-                    v-for="item in PLANNING_ELEMENT_OPTIONS"
-                    :key="item.key"
-                    class="layer-chip"
-                    :class="{ active: isPlanLayerActive(item.key) }"
-                    @click="handlePlanElementClick(item)"
-                  >
-                    <el-icon><component :is="item.icon" /></el-icon>
-                    {{ item.label }}
-                  </button>
-
-                  <div class="layer-noise">
-                    <el-icon><Bell /></el-icon>
-                    <span>噪音距离</span>
-                    <el-input v-model="noiseDistance" size="small" class="noise-input" />
-                    <span class="noise-unit">m</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 地物 / 限制因素 -->
-              <div class="layer-row">
-                <div class="layer-row-label">规划<br />元素</div>
-                <div class="layer-row-body">
-                  <button
-                    v-for="item in TERRAIN_OPTIONS"
-                    :key="item.key"
-                    class="layer-chip terrain"
-                    @click="handleTerrainClick(item)"
-                  >
-                    <span class="terrain-dot" :style="{ background: item.color }" />
-                    {{ item.label }}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </transition>
-
-          <button
-            class="layer-toggle-button"
-            :class="{ active: showLayerPanel }"
-            title="图层"
-            @click="showLayerPanel = !showLayerPanel"
-          >
-            <el-icon><Files /></el-icon>
-          </button>
-        </div>
+        <!-- ★ 图层控制已由 @whln/layer-control 接管，挂载在左下角 -->
+        <!-- 原 .layer-control 区块已移除 -->
       </section>
 
       <section v-else class="project-list-view">
@@ -553,6 +484,10 @@ import shengyazhanIcon from '@/assets/img/mapIcon/shengyazhan.png'
 
 import ProjectDetailPanel from './ProjectDetailPanel.vue'
 
+// ★ 图层控制插件
+import { attachLayerControl } from '@whln/layer-control'
+import '@whln/layer-control/style.css'
+
 // =================== props ===================
 const props = defineProps({
   // 阶段编码；空字符串 = 不过滤（智能选址用）
@@ -576,7 +511,7 @@ const props = defineProps({
   showConfigPage: { type: Boolean, default: false },
   showVerifyPanelFlag: { type: Boolean, default: false },
 })
-
+const emits = defineEmits(['featureVisibleChange'])
 // =================== 常量 ===================
 const ICON_FENGJI = 'icon-fengji'
 const ICON_SHENGYAZHAN = 'icon-shengyazhan'
@@ -700,6 +635,9 @@ const saving = ref(false)
 
 const drawerSort = reactive({ key: '', dir: 'desc' })
 
+// ★ whln 图层控制插件实例
+let whlnPlugin = null
+
 const overviewStats = reactive({
   totalCapacity: 0, totalCount: 0,
   windCapacity: 0, windCount: 0,
@@ -714,87 +652,6 @@ const editTools = [
   { key: 'booster', label: '编辑升压站', icon: CircleCheck },
   { key: 'unavailable', label: '设置不可用区域', icon: InfoFilled },
 ]
-
-// =================== 图层控制 ===================
-const showLayerPanel = ref(false)
-const noiseDistance = ref(700)
-
-// 只有 wind / booster 是真实生效的
-const layerVisible = reactive({
-  wind: true,
-  booster: true,
-})
-
-const BASE_MAP_OPTIONS = [
-  { key: 'resource',  label: '资源图谱', icon: Grid },
-  { key: 'satellite', label: '卫星遥感', icon: Compass },
-  { key: 'road',      label: '路网',     icon: Share },
-  { key: 'terrain',   label: '3D地形',   icon: Picture },
-]
-
-const PLANNING_ELEMENT_OPTIONS = [
-  { key: 'mast',    label: '测风塔', icon: Odometer },
-  { key: 'wind',    label: '风机',   icon: MapLocation },
-  { key: 'booster', label: '升压塔', icon: Lightning },
-  { key: 'access',  label: '接入塔', icon: Connection },
-  { key: 'road',    label: '道路',   icon: Guide },
-  { key: 'line',    label: '线路',   icon: Share },
-]
-
-const TERRAIN_OPTIONS = [
-  { key: 'building',    label: '建筑物',     color: '#2b6cff' },
-  { key: 'forest',      label: '林地',       color: '#5ac25a' },
-  { key: 'farmland',    label: '耕地',       color: '#26c6a6' },
-  { key: 'water',       label: '水系',       color: '#4a9ff5' },
-  { key: 'unavailable', label: '不可用',     color: '#d6d9de' },
-  { key: 'nature',      label: '自然保护区', color: '#b57edc' },
-  { key: 'mining',      label: '矿区',       color: '#f5b942' },
-]
-
-function isPlanLayerActive(key) {
-  if (key === 'wind' || key === 'booster') return layerVisible[key]
-  return false
-}
-
-function handleBaseMapClick(item) {
-  ElMessage.info(`「${item.label}」功能待开发`)
-}
-
-function handleTerrainClick(item) {
-  ElMessage.info(`「${item.label}」功能待开发`)
-}
-
-function handlePlanElementClick(item) {
-  // 仅风机 / 升压塔真实生效
-  if (item.key === 'wind' || item.key === 'booster') {
-    layerVisible[item.key] = !layerVisible[item.key]
-    const layerId = item.key === 'wind' ? 'project-wind-all' : 'project-booster-all'
-    const map = mapRef.value?.getMap?.()
-    if (map?.getLayer(layerId)) {
-      map.setLayoutProperty(
-        layerId,
-        'visibility',
-        layerVisible[item.key] ? 'visible' : 'none'
-      )
-    }
-    ElMessage.success(`${layerVisible[item.key] ? '已显示' : '已隐藏'}${item.label}`)
-    return
-  }
-  ElMessage.info(`「${item.label}」功能待开发`)
-}
-
-// 渲染完成后统一应用可见性
-function applyLayerVisibility() {
-  const map = mapRef.value?.getMap?.()
-  if (!map) return
-  const setVis = (id, visible) => {
-    if (map.getLayer(id)) {
-      map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none')
-    }
-  }
-  setVis('project-wind-all', layerVisible.wind)
-  setVis('project-booster-all', layerVisible.booster)
-}
 
 // =================== 创建项目 ===================
 const showCreateProject = ref(false)
@@ -1275,9 +1132,6 @@ async function renderProjectsByStage(stage) {
       fallbackColor: '#ef4444', fallbackRadius: 3,
     })
   }
-
-  // ★ 应用图层可见性
-  applyLayerVisibility()
 }
 
 async function fetchMapProjects() {
@@ -1379,7 +1233,6 @@ function handleCardAction(type) {
     return
   }
 
-  // ★ 编辑 / 分享 / 储备 等 → 统一走打开详情面板
   if (type === 'edit') {
     detailPanelTab.value = 'main'
     showDetailPanel.value = true
@@ -1457,11 +1310,10 @@ function handleDrawerSortChange({ key, dir }) {
   fetchProjectList()
 }
 
-// 切到列表模式时，自动关闭右侧抽屉（避免重复）+ 收起图层面板
+// 切到列表模式时，自动关闭右侧抽屉
 watch(viewMode, (val) => {
   if (val === 'list') {
     if (showProjectDrawer.value) showProjectDrawer.value = false
-    if (showLayerPanel.value) showLayerPanel.value = false
   }
 })
 watch(showProjectDrawer, (val) => {
@@ -1722,6 +1574,21 @@ async function onMapReady() {
   } else {
     await renderCityStats()
   }
+
+  // ★ 挂载 whln 图层控制到左下角
+  try {
+    whlnPlugin = attachLayerControl(map, {
+      beforeId: 'site-city-stats', // TODO: 底图弹框确认后调整
+      placement: 'control',
+      position: 'bottom-left',
+    })
+    whlnPlugin.subscribe((ids) => {
+      console.log('[whln] 当前可见图层:', ids)
+      emits('featureVisibleChange', ids)
+    })
+  } catch (err) {
+    console.warn('[whln] 图层控制挂载失败:', err)
+  }
 }
 
 // =================== 生命周期 ===================
@@ -1734,6 +1601,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  whlnPlugin?.destroy()
+  whlnPlugin = null
   unbindZoomListener()
   const map = mapRef.value?.getMap?.()
   if (map) {
@@ -1865,161 +1734,55 @@ onUnmounted(() => {
   border-radius: 5px 0 0 5px; cursor: pointer;
 }
 
-/* ================= 左下角图层控制 ================= */
-.layer-control {
-  position: absolute;
+/* ================= whln 图层控件样式覆盖 ================= */
+/* whln 默认挂在 bottom-left，通过 CSS 变量贴合现有视觉 */
+
+/* 让 whln 控件容器对齐左下角 */
+:deep(.maplibregl-ctrl-bottom-left) {
   left: 12px;
   bottom: 12px;
+  margin: 0;
   z-index: 6;
 }
 
-.layer-toggle-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 52px;
-  height: 52px;
-  color: #5a6472;
-  font-size: 22px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+/* 覆盖 whln 按钮和面板的视觉变量，贴合现有圆角/阴影风格 */
+:deep(.whln-lc) {
+  --whln-lc-btn-size: 52px;
+  --whln-lc-btn-icon: 22px;
+  --whln-lc-panel-bg: rgba(240, 243, 247, 0.93);
+  --whln-lc-panel-radius: 10px;
+  --whln-lc-panel-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+  --whln-lc-chip-height: 30px;
+  --whln-lc-chip-radius: 6px;
+  --whln-lc-chip-font-size: 13px;
+  --whln-lc-chip-color: #3a4652;
+  --whln-lc-chip-bg: rgba(255, 255, 255, 0.9);
+  --whln-lc-chip-border: 1px solid #e3e7ee;
+  --whln-lc-chip-active-color: #1677ff;
+  --whln-lc-chip-active-bg: #e8f2ff;
+  --whln-lc-chip-active-border: #1677ff;
+  --whln-lc-chip-hover-color: #1677ff;
+  --whln-lc-chip-hover-border: #a9cfff;
+  --whln-lc-row-label-color: #5a6472;
+  --whln-lc-row-label-font-size: 13px;
+  --whln-lc-divider-color: rgba(0, 0, 0, 0.06);
+}
+
+/* 如果 whln 内部按钮需要特殊对齐，可以进一步微调 */
+:deep(.whln-lc .whln-lc-btn) {
   border-radius: 10px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
   backdrop-filter: blur(8px);
-  cursor: pointer;
-  transition: color 0.16s, background 0.16s, border-color 0.16s;
-}
-.layer-toggle-button:hover { color: #1677ff; }
-.layer-toggle-button.active {
-  color: #1677ff;
-  background: #e8f2ff;
-  border-color: #b9d8ff;
-}
-
-/* ★ 512 x 246 固定面板，绝对定位在按钮右侧 */
-.layer-panel {
-  position: absolute;
-  left: 64px;
-  bottom: 0;
-  box-sizing: border-box;
-  width: 512px;
-  height: 246px;
-  padding: 8px 14px;
-  background: rgba(240, 243, 247, 0.93);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(12px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transform-origin: left bottom;
-}
-
-.layer-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 8px 0;
-  flex: 1;
-  min-height: 0;
-}
-.layer-row + .layer-row {
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-}
-.layer-row-label {
-  flex: 0 0 44px;
-  padding-top: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   color: #5a6472;
-  font-size: 13px;
-  line-height: 1.25;
-  word-break: break-all;
 }
-.layer-row-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  align-content: flex-start;
-  gap: 8px;
-}
-
-.layer-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 30px;
-  padding: 0 12px;
-  color: #3a4652;
-  font-size: 13px;
-  line-height: 1;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #e3e7ee;
-  border-radius: 6px;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
-}
-.layer-chip:hover {
+:deep(.whln-lc .whln-lc-btn:hover) {
   color: #1677ff;
-  border-color: #a9cfff;
-}
-.layer-chip.active {
-  color: #1677ff;
-  background: #e8f2ff;
-  border-color: #1677ff;
-}
-.layer-chip .el-icon { font-size: 15px; }
-
-.layer-chip.terrain { padding: 0 12px 0 10px; }
-.terrain-dot {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  flex-shrink: 0;
 }
 
-.layer-noise {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 30px;
-  padding: 0 10px;
-  color: #1677ff;
-  font-size: 13px;
-  background: #e8f2ff;
-  border: 1px solid #1677ff;
-  border-radius: 6px;
-  white-space: nowrap;
-}
-.layer-noise .el-icon { font-size: 15px; }
-
-.noise-input { width: 62px; }
-.layer-noise :deep(.el-input__wrapper) {
-  height: 22px;
-  padding: 0 6px;
-  background: #fff;
-  border-radius: 4px;
-  box-shadow: none;
-}
-.layer-noise :deep(.el-input__inner) {
-  height: 22px;
-  color: #1677ff;
-  font-size: 13px;
-  text-align: center;
-}
-
-/* 展开动画 */
-.layer-pop-enter-active,
-.layer-pop-leave-active {
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-.layer-pop-enter-from,
-.layer-pop-leave-to {
-  opacity: 0;
-  transform: translateX(-8px) scale(0.98);
+:deep(.whln-lc-panel){
+  left:100px
 }
 
 .project-list-view {
@@ -2033,7 +1796,6 @@ onUnmounted(() => {
   margin-top: 2px;
 }
 
-/* ★ 行高 */
 .project-table :deep(.el-table__row) {
   height: 56px;
 }
@@ -2041,19 +1803,16 @@ onUnmounted(() => {
   padding: 10px 0;
 }
 
-/* 表头背景浅灰 */
 .project-table :deep(.el-table__header-wrapper th) {
   background: #f7f8fa;
   color: #606266;
   font-weight: 500;
 }
 
-/* 斑马纹 */
 .project-table :deep(.el-table__body tr.el-table__row--striped td) {
   background: #fafbfc;
 }
 
-/* 鼠标悬浮 */
 .project-table :deep(.el-table__body tr:hover > td) {
   background: #f5f8ff;
 }
@@ -2111,6 +1870,5 @@ onUnmounted(() => {
   .project-list-view { padding-right: 10px; padding-left: 10px; }
   .config-fullpage .config-layout { grid-template-columns: 1fr; padding: 0 16px; }
   .create-project-fullpage { flex-direction: column; }
-  .layer-panel { width: calc(100vw - 100px); }
 }
 </style>

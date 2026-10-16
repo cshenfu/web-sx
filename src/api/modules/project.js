@@ -33,7 +33,7 @@ export async function saveUpdateProject(data) {
 
 // 第三步生成
 export async function submitThreeStepParam(type, data) {
-    return await publicService5.post('/web/project/detail/step3/save/' + type, data);
+    return await publicService5.post('/web/shanxi/project/detail/step3/sx_save/' + type, data);
 }
 
 

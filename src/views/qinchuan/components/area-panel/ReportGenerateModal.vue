@@ -27,7 +27,7 @@
             type="button"
             class="option-card"
             :class="{ selected: selectedKey === option.key }"
-            @click="selectedKey = option.key"
+            @click="handleSelect(option)"
           >
             <span v-if="selectedKey === option.key" class="selected-badge">
               <svg viewBox="0 0 16 16">
@@ -47,10 +47,10 @@
       </div>
 
       <footer class="modal-footer">
-        <button type="button" class="footer-btn" @click="$emit('add-report')">
+        <button type="button" class="footer-btn" @click="handleAddReport">
           添加项目报告
         </button>
-        <button type="button" class="footer-btn primary" :disabled="!selectedKey" @click="handleConfirm">
+        <button type="button" class="footer-btn primary" @click="handleAddRequest">
           添加请示文件
         </button>
       </footer>
@@ -64,31 +64,43 @@ import { reportTypeOptions } from '../../js/areaPanelMockData'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
-  defaultKey: { type: String, default: 'feasibility-centralized' },
-  // 由首页传入当前项目。组件本身不读取项目字段，只在确认时一并传回。
+  // 由首页传入当前项目。组件本身不读取项目字段，只在触发时一并传回。
   project: { type: Object, default: () => null },
 })
 
 const emit = defineEmits(['close', 'add-report', 'confirm'])
 
 const options = reportTypeOptions
-const selectedKey = ref(props.defaultKey)
+// 不再有默认选中项，初始为空
+const selectedKey = ref('')
 
+// 每次打开弹窗都重置为「未选中」
 watch(
   () => props.visible,
   (value) => {
-    if (value) selectedKey.value = props.defaultKey
+    if (value) selectedKey.value = ''
   }
 )
 
-function handleConfirm() {
-  const option = options.find((item) => item.key === selectedKey.value)
-  if (!option) return
+// 点击选项卡片：既选中，又触发「添加请示文件」的逻辑
+function handleSelect(option) {
+  selectedKey.value = option.key
 
+  // 原「添加请示文件」按钮的触发逻辑挪到这里
   emit('confirm', {
     option,
     project: props.project,
   })
+}
+
+// 占位：后续替换为「添加项目报告」的真实逻辑
+function handleAddReport() {
+  window.alert('添加项目报告：功能开发中')
+}
+
+// 占位：后续替换为「添加请示文件」的真实逻辑
+function handleAddRequest() {
+  window.alert('添加请示文件：功能开发中')
 }
 </script>
 

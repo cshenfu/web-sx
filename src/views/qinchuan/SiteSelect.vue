@@ -1,6 +1,6 @@
 <template>
   <SiteMapPage
-    stage=""
+    stage="PRELIMINARY_SELECTION"
     summary-title="项目通道概况"
     status-column="verify"
     :card-actions="['share', 'reserve', 'verify', 'edit', 'delete']"
