@@ -1,12 +1,11 @@
 <template>
     <div class="layer-panel" :class="{ expanded: !collapsed }">
-      <!-- 收起态按钮 -->
+      <!-- ★ 小按钮：始终显示，点击切换展开/收起 -->
       <button
-        v-show="collapsed"
         class="layer-toggle"
         type="button"
-        title="图层"
-        @click="collapsed = false"
+        :title="collapsed ? '展开图层' : '收起图层'"
+        @click="collapsed = !collapsed"
       >
         <el-icon><Files /></el-icon>
         <span v-if="activeCount" class="layer-toggle-badge">{{ activeCount }}</span>
@@ -14,10 +13,6 @@
   
       <!-- 展开面板 -->
       <div v-show="!collapsed" class="layer-body">
-        <button class="layer-collapse" type="button" title="收起" @click="collapsed = true">
-          <el-icon><ArrowLeft /></el-icon>
-        </button>
-  
         <div
           v-for="(group, gi) in groups"
           :key="gi"
@@ -36,19 +31,17 @@
               }"
               @click="onChipClick(item)"
             >
-              <!-- 色块 or 图标 -->
               <span
                 v-if="item.color"
                 class="layer-chip-dot"
                 :style="{ background: item.color }"
               />
               <el-icon v-else-if="item.icon && ICON_MAP[item.icon]" class="layer-chip-icon">
-  <component :is="ICON_MAP[item.icon]" />
-</el-icon>
+                <component :is="ICON_MAP[item.icon]" />
+              </el-icon>
   
               <span class="layer-chip-name">{{ item.name }}</span>
   
-              <!-- 内嵌输入 -->
               <span
                 v-if="item.input"
                 class="layer-chip-input"
@@ -73,35 +66,32 @@
   
   <script setup>
   import { computed, ref } from 'vue'
-import {
-  ArrowLeft,
-  Bell,
-  Compass,
-  Connection,
-  Files,
-  Grid,
-  Guide,
-  Lightning,
-  MapLocation,
-  Odometer,
-  Picture,
-  Share,
-  Sunny,        // ★ 新增
-  WindPower,    // ★ 新增
-} from '@element-plus/icons-vue'
-import { PANEL_GROUPS } from './layerPanelConfig'
-
-// ★ 图标名 -> 组件 映射
-const ICON_MAP = {
-  MapLocation, Compass, Grid, Guide, Odometer, Picture,
-  Lightning, Connection, Share, Bell, Sunny,        // ★ 新增
-  WindPower,    // ★ 新增
-}
+  import {
+    Bell,
+    Compass,
+    Connection,
+    Files,
+    Grid,
+    Guide,
+    Lightning,
+    MapLocation,
+    Odometer,
+    Picture,
+    Share,
+    Sunny,
+    WindPower,
+  } from '@element-plus/icons-vue'
+  import { PANEL_GROUPS } from './layerPanelConfig'
+  
+  // ★ 图标名 -> 组件 映射
+  const ICON_MAP = {
+    MapLocation, Compass, Grid, Guide, Odometer, Picture,
+    Lightning, Connection, Share, Bell,
+    WindPower, Sunny,
+  }
   
   const props = defineProps({
-    // 当前可见的图层 id 数组
     visibleIds: { type: Array, default: () => [] },
-    // 输入框的值对象（{ noise: 700 }）
     inputs: { type: Object, default: () => ({}) },
   })
   const emit = defineEmits(['toggle', 'input-change'])
@@ -130,18 +120,23 @@ const ICON_MAP = {
   </script>
   
   <style scoped>
+  /* ★ 外层用 flex 横排，按钮在左，面板在右 */
   .layer-panel {
     position: absolute;
     left: 16px;
     bottom: 24px;
     z-index: 6;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
     font-family: inherit;
     pointer-events: auto;
   }
   
-  /* ---------- 收起态按钮 ---------- */
+  /* ---------- 小按钮：始终显示 ---------- */
   .layer-toggle {
     position: relative;
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -155,9 +150,16 @@ const ICON_MAP = {
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
     backdrop-filter: blur(8px);
     cursor: pointer;
-    transition: color 0.15s, transform 0.15s;
+    transition: color 0.15s, transform 0.15s, box-shadow 0.15s;
   }
-  .layer-toggle:hover { color: #1677ff; transform: translateY(-1px); }
+  .layer-toggle:hover {
+    color: #1677ff;
+    transform: translateY(-1px);
+  }
+  .layer-panel.expanded .layer-toggle {
+    color: #1677ff;
+    box-shadow: 0 6px 20px rgba(22, 119, 255, 0.25);
+  }
   
   .layer-toggle-badge {
     position: absolute;
@@ -172,6 +174,7 @@ const ICON_MAP = {
     text-align: center;
     background: #1677ff;
     border-radius: 8px;
+    pointer-events: none;
   }
   
   /* ---------- 展开面板 ---------- */
@@ -181,30 +184,15 @@ const ICON_MAP = {
     flex-direction: column;
     gap: 4px;
     width: max-content;
-    max-width: min(680px, calc(100vw - 32px));
+    max-width: min(680px, calc(100vw - 100px));
     padding: 14px 18px;
     background: rgba(245, 247, 250, 0.94);
     border-radius: 16px;
     box-shadow: 0 10px 36px rgba(0, 0, 0, 0.16);
     backdrop-filter: blur(14px);
+    /* 让面板底部和小按钮对齐 */
+    margin-bottom: 0;
   }
-  
-  .layer-collapse {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 22px;
-    height: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #909399;
-    background: transparent;
-    border: 0;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  .layer-collapse:hover { color: #1677ff; background: #eef2f7; }
   
   /* ---------- 分组 ---------- */
   .layer-group {
