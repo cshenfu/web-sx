@@ -60,6 +60,6 @@ export const PANEL_GROUPS = [
   
   // 面板默认展开的图层
   export const DEFAULT_VISIBLE = [
-    'wind-resource',
-    'road-network',
+    // 'wind-resource',
+    // 'road-network',
   ]
