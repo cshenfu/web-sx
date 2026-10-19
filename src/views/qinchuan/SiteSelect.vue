@@ -1,7 +1,7 @@
 <template>
   <SiteMapPage
     stage="PRELIMINARY_SELECTION"
-    summary-title="项目通道概况"
+    summary-title="项目遴选情况"
     status-column="verify"
     :card-actions="['share', 'reserve', 'verify', 'edit', 'delete']"
     :row-actions="['assign', 'reserve', 'verify', 'edit', 'delete']"

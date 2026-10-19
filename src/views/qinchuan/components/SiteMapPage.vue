@@ -224,9 +224,9 @@
               :key="action"
               class="detail-action"
               :class="{ danger: action === 'delete' }"
-              @click="handleCardAction(action)"
+              @click="executeAction(action, selectedProject)"
             >
-              {{ CARD_ACTION_LABELS[action] || action }}
+              {{ ACTION_LABELS[action] || action }}
             </button>
           </div>
         </div>
@@ -342,9 +342,9 @@
                   link
                   :type="action === 'delete' ? 'danger' : 'primary'"
                   size="small"
-                  @click="handleRowAction(action, row)"
+                  @click="executeAction(action, row)"
                 >
-                  {{ ROW_ACTION_LABELS[action] || action }}
+                  {{ ACTION_LABELS[action] || action }}
                 </el-button>
               </div>
             </template>
@@ -391,6 +391,7 @@
       <CreateProjectForm
         ref="createProjectFormRef"
         :map-ref="mapRef"
+        :panel-width="550"
         @cancel="closeCreateProject"
         @saved="onProjectCreated"
       />
@@ -430,6 +431,13 @@
       :stage="stage"
       :initial-tab="detailPanelTab"
       @close="showDetailPanel = false"
+    />
+
+    <!-- ★ 分配负责人弹窗 -->
+    <AssignDialog
+      v-model="showAssignDialog"
+      :project="assignTargetProject"
+      @success="onAssignSuccess"
     />
 
     <slot name="page-extra" />
@@ -478,6 +486,8 @@ import ConfigForm from './ConfigForm.vue'
 import TaskPanel from './TaskPanel.vue'
 import VerifyPanel from './VerifyPanel.vue'
 import ProjectDrawer from './ProjectDrawer.vue'
+import ProjectDetailPanel from './ProjectDetailPanel.vue'
+import AssignDialog from './AssignDialog.vue' // ★ 引入新增的弹窗组件
 import { satelliteStyle } from '../js/mapConfig'
 import { useZoomThresholdSwitch } from '../js/useZoomThresholdSwitch'
 import { searchPlaceName } from '../js/useTiandituGeocode'
@@ -486,8 +496,6 @@ import * as configApi from '@/api/modules/selectConfig'
 
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
 import shengyazhanIcon from '@/assets/img/mapIcon/shengyazhan.png'
-
-import ProjectDetailPanel from './ProjectDetailPanel.vue'
 
 // ★ 图层 chip 面板
 import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
@@ -500,19 +508,13 @@ import { attachLayerControl } from '@whln/layer-control'
 const props = defineProps({
   stage: { type: String, default: '' },
   summaryTitle: { type: String, default: '项目通道概况' },
-  cardActions: {
-    type: Array,
-    default: () => ['share', 'reserve', 'verify', 'edit', 'delete'],
-  },
+  cardActions: { type: Array, default: () => [] }, // 保留 prop 但不再使用
   statusColumn: {
     type: String,
     default: 'verify',
     validator: (v) => ['verify', 'approval', 'none'].includes(v),
   },
-  rowActions: {
-    type: Array,
-    default: () => ['edit', 'delete'],
-  },
+  rowActions: { type: Array, default: () => [] }, // 保留 prop 但不再使用
   showConfigPage: { type: Boolean, default: false },
   showVerifyPanelFlag: { type: Boolean, default: false },
   // ★ 陕西省遮罩开关
@@ -540,26 +542,25 @@ const CITY_LAYER_ID = 'site-city-stats'
 const PROVINCE_CODE = '610000'
 const CITY_GEOJSON_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/610000_full.json'
 
-const CARD_ACTION_LABELS = {
-  share: '分享',
-  reserve: '储备',
-  establish: '立项',
-  verify: '核查',
-  edit: '编辑',
-  delete: '删除',
+// ★ 各阶段气泡窗和列表统一的操作按钮
+const STAGE_ACTIONS = {
+  PRELIMINARY_SELECTION: ['assign', 'verify', 'edit', 'delete'],
+  PROJECT_RESERVE:       ['material', 'edit', 'assign', 'delete'],
+  PROJECT_INITIATION:    ['establishMeeting', 'researchMaterial', 'edit', 'assign', 'delete'],
+  FEASIBILITY_REVIEW:    ['researchReview', 'investMaterial', 'edit', 'assign', 'delete'],
+  INVESTMENT_DECISION:   ['investMeeting', 'edit', 'assign', 'delete'],
 }
 
-const ROW_ACTION_LABELS = {
+// 统一操作名称映射
+const ACTION_LABELS = {
   material: '立项材料',
-  establishMeeting: '立项上会',
   researchMaterial: '可研材料',
+  investMaterial: '投决材料',
+  establishMeeting: '立项上会',
   researchReview: '可研审查',
-  investMaterial: '投资材料',
   investMeeting: '投决上会',
   assign: '分配',
-  reserve: '储备',
   verify: '核查',
-  share: '分享',
   edit: '编辑',
   delete: '删除',
 }
@@ -623,6 +624,13 @@ const detailPanelTab = ref('main')
 
 const theme = computed(() => STAGE_THEMES[props.stage] || STAGE_THEMES.DEFAULT)
 
+// ★ 动态计算当前阶段的按钮列表（气泡窗与列表共用）
+const currentActions = computed(() => {
+  return STAGE_ACTIONS[props.stage] || STAGE_ACTIONS['PRELIMINARY_SELECTION']
+})
+const cardActions = computed(() => currentActions.value)
+const rowActions = computed(() => currentActions.value)
+
 const AREA_STYLE = {
   FD: {
     color: '#3b82f6', opacity: 0.22, outlineColor: '#60a5fa',
@@ -641,6 +649,10 @@ const viewMode = ref('map')
 const showConfig = ref(false)
 const showProjectDrawer = ref(false)
 const showVerifyPanel = ref(false)
+
+// 分配弹窗控制
+const showAssignDialog = ref(false)
+const assignTargetProject = ref(null)
 
 const renderedLayerIds = new Set()
 const allMapProjects = ref([])
@@ -722,15 +734,9 @@ function onLayerInputChange({ id, value }) {
   }
 }
 
-function toggleBaseMap(id) {
-  // 按项目逻辑实现
-}
-function toggleTerrain(id) {
-  // 按项目逻辑实现
-}
-function toggleCustomLayer(id) {
-  // 按项目逻辑实现
-}
+function toggleBaseMap(id) { /* 按项目逻辑实现 */ }
+function toggleTerrain(id) { /* 按项目逻辑实现 */ }
+function toggleCustomLayer(id) { /* 按项目逻辑实现 */ }
 
 // =================== 创建项目 ===================
 const showCreateProject = ref(false)
@@ -883,49 +889,72 @@ function handleReset() {
 function handlePageChange(page) { pagination.page = page; fetchProjectList() }
 function handleSizeChange(size) { pagination.pageSize = size; pagination.page = 1; fetchProjectList() }
 
-function handleDelete(row) {
-  ElMessageBox.confirm(`确认删除项目「${row.projectName || ''}」吗？`, '提示', {
-    type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消',
-  })
-    .then(() => {
-      ElMessage.success('删除成功')
-      if (projectList.value.length === 1 && pagination.page > 1) pagination.page -= 1
-      fetchProjectList(); fetchMapProjects(); fetchOverviewStats(); fetchCityStats()
-    })
-    .catch(() => {})
-}
+// ★ 统一操作入口：气泡窗、表格列表、抽屉列表均走这里
+function executeAction(action, project) {
+  if (!project) return
+  const name = project.projectName || ''
+  
+  // 查找地图上的全量数据（列表行数据缺少坐标等字段）
+  const mapProject = allMapProjects.value.find((p) => p.id === project.id) || project
 
-function handleRowAction(action, row) {
-  if (action === 'delete') { handleDelete(row); return }
-  if (action === 'edit') { openDetailPanel(row, 'main'); return }
+  // 1. 打开详情面板
   if (['material', 'researchMaterial', 'investMaterial'].includes(action)) {
-    openDetailPanel(row, 'material'); return
+    openDetailPanel(mapProject, 'material')
+    return
   }
   if (['establishMeeting', 'researchReview', 'investMeeting'].includes(action)) {
-    openDetailPanel(row, 'meeting'); return
+    openDetailPanel(mapProject, 'meeting')
+    return
   }
+
+  // 2. 分配
+  if (action === 'assign') {
+    assignTargetProject.value = mapProject
+    showAssignDialog.value = true
+    return
+  }
+
+  // 3. 核查
   if (action === 'verify') {
-    const p = allMapProjects.value.find(item => item.id === row.id)
-    if (!p) { ElMessage.warning('地图上未找到该项目'); return }
     showProjectDrawer.value = false
+    showDetailPanel.value = false
     viewMode.value = 'map'
-    const centroid = getProjectCentroid(p)
+    
+    const centroid = getProjectCentroid(mapProject)
     if (centroid) {
       mapRef.value?.getMap?.()?.flyTo({ center: centroid, zoom: 13, duration: 1200 })
     }
+    
     setTimeout(() => {
-      onProjectClick(p.id)
+      onProjectClick(mapProject.id)
       showVerifyPanel.value = true
     }, 1300)
     return
   }
 
-  const label = ROW_ACTION_LABELS[action] || action
-  ElMessage.info(`点击了「${label}」：${row.projectName || ''}`)
+  // 4. 编辑
+  if (action === 'edit') {
+    openDetailPanel(mapProject, 'main')
+    return
+  }
+
+  // 5. 删除
+  if (action === 'delete') {
+    ElMessageBox.confirm(`确认删除项目「${name}」吗？`, '提示', {
+      type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消',
+    }).then(() => {
+      ElMessage.success('删除成功')
+      clearSelectionLayers()
+      fetchMapProjects(); fetchProjectList(); fetchOverviewStats(); fetchCityStats()
+    }).catch(() => {})
+    return
+  }
+
+  ElMessage.info(`点击了「${ACTION_LABELS[action] || action}」：${name}`)
 }
 
-function openDetailPanel(row, tab) {
-  const p = allMapProjects.value.find(item => item.id === row.id)
+function openDetailPanel(project, tab) {
+  const p = allMapProjects.value.find(item => item.id === project.id)
   if (!p) { ElMessage.warning('地图上未找到该项目'); return }
   const centroid = getProjectCentroid(p)
   if (centroid) {
@@ -938,6 +967,12 @@ function openDetailPanel(row, tab) {
     detailPanelTab.value = tab
     showDetailPanel.value = true
   }, 1300)
+}
+
+// 监听弹窗成功回调
+function onAssignSuccess() {
+  fetchProjectList()
+  fetchMapProjects()
 }
 
 // =================== 看板 ===================
@@ -1063,11 +1098,9 @@ function hideCityStats() {
 const MASK_LAYER_ID = 'shaanxi-mask'
 const MASK_SOURCE_ID = 'shaanxi-mask-src'
 const SHAANXI_BOUNDARY_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/610000.json'
-// 陕西省外接范围，用于判断视野是否与陕西相交
 const SHAANXI_BOUNDS = [[105.4, 31.7], [111.2, 39.6]]
 
 let shaanxiBoundaryCache = null
-// 记录上一帧写入的不透明度，避免每帧都 setPaintProperty
 let lastMaskOpacity = -1
 
 async function loadShaanxiBoundary() {
@@ -1078,7 +1111,6 @@ async function loadShaanxiBoundary() {
   return shaanxiBoundaryCache
 }
 
-// —— 环方向工具 ——
 function ensureClosed(ring) {
   if (!ring || ring.length < 3) return ring
   const first = ring[0]
@@ -1108,7 +1140,6 @@ function ensureHoleCW(ring) {
   return ringSignedArea(r) <= 0 ? r : r.slice().reverse()
 }
 
-// 世界外环（CCW），作为反遮罩的外边界
 const WORLD_OUTER = ensureOuterCCW([
   [-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85],
 ])
@@ -1163,9 +1194,7 @@ async function ensureShaanxiMask() {
       source: MASK_SOURCE_ID,
       paint: {
         'fill-color': props.maskColor,
-        // 初始为 0，后面 syncMaskVisibility 会按 zoom 算出来
         'fill-opacity': 0,
-        // ★ 关键：不透明度变化自动过渡，避免任何闪跳
         'fill-opacity-transition': {
           duration: props.maskFadeDuration,
           delay: 0,
@@ -1188,7 +1217,6 @@ function removeShaanxiMask() {
   lastMaskOpacity = -1
 }
 
-// 视野是否与陕西外接矩形相交
 function viewIntersectsShaanxi(map) {
   const b = map.getBounds()
   const west = Math.max(-180, Math.min(180, b.getWest()))
@@ -1200,19 +1228,16 @@ function viewIntersectsShaanxi(map) {
   return !(east < sw || west > ne || north < ss || south > nn)
 }
 
-// smoothstep：两端切线为 0，比线性更自然
 function smoothstep(edge0, edge1, x) {
   if (edge1 <= edge0) return x >= edge1 ? 1 : 0
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)))
   return t * t * (3 - 2 * t)
 }
 
-// 计算当前帧应有的不透明度
 function computeMaskOpacity() {
   if (!props.enableShaanxiMask) return 0
   const map = mapRef.value?.getMap?.()
   if (!map) return 0
-  // 视野完全离开陕西 → 不显示（靠 transition 平滑淡出）
   if (!viewIntersectsShaanxi(map)) return 0
   const z = map.getZoom()
   const t = smoothstep(props.maskMinZoom, props.maskFullZoom, z)
@@ -1224,7 +1249,6 @@ function syncMaskVisibility(force = false) {
   const map = mapRef.value?.getMap?.()
   if (!map || !map.getLayer(MASK_LAYER_ID)) return
 
-  // 保证遮罩始终在最顶层
   const styleLayers = map.getStyle()?.layers || []
   const topLayer = styleLayers[styleLayers.length - 1]
   if (topLayer && topLayer.id !== MASK_LAYER_ID) {
@@ -1232,7 +1256,6 @@ function syncMaskVisibility(force = false) {
   }
 
   const target = computeMaskOpacity()
-  // 节流：变化小于 0.01 就不写，避免频繁 setPaintProperty
   if (!force && Math.abs(target - lastMaskOpacity) < 0.01) return
   lastMaskOpacity = target
   map.setPaintProperty(MASK_LAYER_ID, 'fill-opacity', target)
@@ -1377,7 +1400,6 @@ async function renderProjectsByStage(stage) {
     })
   }
 
-  // 项目图层可能被新建在遮罩之上，重新保证置顶
   syncMaskVisibility()
 }
 
@@ -1456,50 +1478,6 @@ function handleMapBlankClick(e) {
   }
 }
 
-function handleCardAction(type) {
-  const p = selectedProject.value
-  const name = p?.projectName || ''
-
-  if (type === 'verify') {
-    showProjectDrawer.value = false
-    showDetailPanel.value = false
-    showVerifyPanel.value = true
-    return
-  }
-
-  if (type === 'delete') {
-    ElMessageBox.confirm(`确认删除项目「${name}」吗？`, '提示', {
-      type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消',
-    })
-      .then(() => {
-        ElMessage.success('删除成功')
-        clearSelectionLayers()
-        fetchMapProjects(); fetchProjectList(); fetchOverviewStats(); fetchCityStats()
-      })
-      .catch(() => {})
-    return
-  }
-
-  if (type === 'edit') {
-    detailPanelTab.value = 'main'
-    showDetailPanel.value = true
-    return
-  }
-  if (['material', 'researchMaterial', 'investMaterial'].includes(type)) {
-    detailPanelTab.value = 'material'
-    showDetailPanel.value = true
-    return
-  }
-  if (['establishMeeting', 'researchReview', 'investMeeting'].includes(type)) {
-    detailPanelTab.value = 'meeting'
-    showDetailPanel.value = true
-    return
-  }
-
-  const labels = CARD_ACTION_LABELS
-  ElMessage.info(`点击了「${labels[type] || type}」：${name}`)
-}
-
 function onVerifySaved(data) {
   console.log('[verify] 已保存:', data)
   showVerifyPanel.value = false
@@ -1519,30 +1497,8 @@ async function focusProject(project) {
 }
 
 function handleDrawerAction({ type, project }) {
-  const p = allMapProjects.value.find((item) => item.id === project.id)
-  if (!p) return
-
-  if (type === 'edit') { openDetailPanel(p, 'main'); return }
-  if (['material', 'researchMaterial', 'investMaterial'].includes(type)) {
-    openDetailPanel(p, 'material'); return
-  }
-  if (['establishMeeting', 'researchReview', 'investMeeting'].includes(type)) {
-    openDetailPanel(p, 'meeting'); return
-  }
-  if (type === 'delete') {
-    ElMessageBox.confirm(`确认删除项目「${p.projectName}」吗？`, '提示', {
-      type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消',
-    })
-      .then(() => {
-        ElMessage.success('删除成功')
-        fetchProjectList(); fetchMapProjects(); fetchOverviewStats(); fetchCityStats()
-      })
-      .catch(() => {})
-    return
-  }
-
-  const labels = { assign: '分配' }
-  ElMessage.info(`点击了「${labels[type] || type}」：${p.projectName}`)
+  const p = allMapProjects.value.find((item) => item.id === project.id) || project
+  executeAction(type, p)
 }
 
 function handleDrawerSortChange({ key, dir }) {
@@ -1842,7 +1798,6 @@ async function onMapReady() {
     if (ctrlHost) {
       lcHider = new MutationObserver(() => {
         hideWhlnUI()
-        // whln 图层若在遮罩之上，重新置顶
         syncMaskVisibility()
       })
       lcHider.observe(ctrlHost, { childList: true })
@@ -1856,7 +1811,6 @@ async function onMapReady() {
       const others = layerVisibleIds.value.filter((id) => !WHLN_LAYER_IDS.includes(id))
       layerVisibleIds.value = [...others, ...ids]
       emits('featureVisibleChange', ids)
-      // 图层显隐变化后，保证遮罩仍置顶
       syncMaskVisibility()
     })
   } catch (err) {
@@ -2065,12 +2019,8 @@ onUnmounted(() => {
   position: absolute; top: 18px; right: 18px; display: flex; gap: 8px; pointer-events: auto;
 }
 :deep(.create-project-form) { pointer-events: auto; }
-:deep(.maplibregl-ctrl-bottom-right){
-  display: none;
-}
-:deep(.maplibregl-ctrl-top-right){
-  display: none;
-}
+:deep(.maplibregl-ctrl-bottom-right) { display: none; }
+:deep(.maplibregl-ctrl-top-right) { display: none; }
 
 @media (max-width: 1100px) {
   .project-list-view { padding-right: 10px; padding-left: 10px; }
