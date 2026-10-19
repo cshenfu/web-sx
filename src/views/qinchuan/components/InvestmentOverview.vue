@@ -271,7 +271,7 @@ function formatValue(value, digits = 2) {
 
 /* ============ 3. 底部乡村振兴 ============ */
 .support-panel {
-  flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 80px; flex-shrink: 0;
+   display: flex; flex-direction: column; justify-content: center; min-height: 80px; flex-shrink: 0;
   padding: 10px 12px; 
   background: transparent;
   border: 1px solid rgba(61, 115, 255, 0.25); border-radius: 8px;

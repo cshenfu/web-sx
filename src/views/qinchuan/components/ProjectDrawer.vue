@@ -2,7 +2,7 @@
   <transition name="drawer-slide">
     <aside v-if="visible" class="project-drawer">
       <!-- 排序 -->
-      <div class="drawer-sort">
+      <!-- <div class="drawer-sort">
         <button
           class="sort-button"
           :class="{ active: sortKey === 'capacity' }"
@@ -28,7 +28,7 @@
         <button class="drawer-close" title="关闭" @click="emit('close')">
           <el-icon><Close /></el-icon>
         </button>
-      </div>
+      </div> -->
 
       <!-- 列表 -->
       <div v-loading="loading" class="drawer-list">
@@ -246,7 +246,7 @@ function isVerified(row) {
 <style scoped>
 .project-drawer {
   position: fixed;
-  top: 80px;
+  top: 120px;
   right: 12px;
   bottom: 12px;
   width: 460px;

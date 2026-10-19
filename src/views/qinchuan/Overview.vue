@@ -76,7 +76,7 @@
 
         <div class="area-view-layer">
           <template v-if="!selectedProject">
-            <div class="area-search-panel">
+            <!-- <div class="area-search-panel">
               <el-select
                 v-model="filters.itemType"
                 placeholder="项目类型"
@@ -163,7 +163,7 @@
                   {{ sortDir === 'asc' ? '▲' : '▼' }}
                 </span>
               </button>
-            </div>
+            </div> -->
 
             <ProjectListPanel
               class="panel-below"
@@ -182,7 +182,7 @@
             />
           </template>
 
-          <template v-else>
+          <!-- <template v-else>
             <EditToolbar
               v-if="!isDetailFullscreen"
               v-model:activeTool="activeEditTool"
@@ -215,7 +215,7 @@
               @back="handleBackToList"
               @generate-report="reportModalVisible = true"
             />
-          </template>
+          </template> -->
         </div>
 
         <div
