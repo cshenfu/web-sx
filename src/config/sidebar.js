@@ -254,28 +254,28 @@
       icon: 'UserFilled',
       label: '角色',
       path: '/guizhi/role',
-      roles: ['admin']
+      roles: ['admin', 'user', 'viewer']
     },
     {
       key: 'dict',
       icon: 'Collection',
       label: '字典',
       path: '/guizhi/dict',
-      roles: ['admin']
+      roles: ['admin', 'user', 'viewer']
     },
     {
       key: 'company',
       icon: 'OfficeBuilding',
       label: '企业\n介绍',
       path: '/guizhi/company',
-      roles: ['admin']
+      roles: ['admin', 'user', 'viewer']
     },
     {
       key: 'log',
       icon: 'List',
       label: '日志',
       path: '/guizhi/log',
-      roles: ['admin']
+      roles: ['admin', 'user', 'viewer']
     }
   ]
 }

@@ -646,7 +646,7 @@ const routes = [
     ]
   },
 
-  // ─────────────────────────────────────────────
+   // ─────────────────────────────────────────────
   // 规制中枢
   // ─────────────────────────────────────────────
   {
@@ -661,8 +661,42 @@ const routes = [
         meta: {
           title: '角色管理',
           module: 'guizhi',
+          sidebar: 'guizhi', // 👈 必须有这个，侧边栏才会显示
+          key: 'role'         // 👈 必须有这个，侧边栏对应的菜单才会高亮
+        }
+      },
+      // 如果你后续加了字典、企业介绍、日志，也要加上上面这两个 meta 字段
+      {
+        path: 'dict',
+        name: 'DictManage',
+        component: () => import('@/views/guizhi/DictPage.vue'),
+        meta: {
+          title: '字典管理',
+          module: 'guizhi',
           sidebar: 'guizhi',
-          key: 'role'
+          key: 'dict'
+        }
+      },
+      {
+        path: 'company',
+        name: 'CompanyIntro',
+        component: () => import('@/views/guizhi/CompanyIntro.vue'),
+        meta: {
+          title: '企业介绍',
+          module: 'guizhi',
+          sidebar: 'guizhi',
+          key: 'company'
+        }
+      },
+      {
+        path: 'log',
+        name: 'LogManage',
+        component: () => import('@/views/guizhi/LogPage.vue'),
+        meta: {
+          title: '日志管理',
+          module: 'guizhi',
+          sidebar: 'guizhi',
+          key: 'log'
         }
       }
     ]
