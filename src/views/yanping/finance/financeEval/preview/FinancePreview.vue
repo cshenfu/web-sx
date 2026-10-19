@@ -47,7 +47,7 @@
   import { message } from 'ant-design-vue'
   import { LeftOutlined } from '@ant-design/icons-vue'
   
-  import CalculationTab from '@/pages/financeEval/create/tabs/CalculationTab.vue'
+  import CalculationTab from '@/views/yanping/finance/financeEval/create/tabs/CalculationTab.vue'
   import { getProjectIfnoById } from '@/api/modules/pric.js'
   
   const router = useRouter()
