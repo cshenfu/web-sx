@@ -272,7 +272,9 @@ import { resolveRegionByPoints, isPolygonWithinRadius } from '../js/useTiandituG
 const MAX_SITE_RANGE_RADIUS_KM = 25
 
 const props = defineProps({
-  mapRef: { type: Object, required: true }
+  mapRef: { type: Object, required: true },
+  // ★ 右侧创建项目面板宽度，用于计算地图可视区中心（面板盖在地图上）
+  panelWidth: { type: Number, default: 550 },
 })
 const emit = defineEmits(['cancel', 'saved', 'site-range-mode-change'])
 
@@ -364,6 +366,68 @@ function getSiteRangeRing() {
   const last = ring[ring.length - 1]
   if (first[0] !== last[0] || first[1] !== last[1]) ring.push([first[0], first[1]])
   return ring
+}
+
+/* ==================== 视角聚焦 ==================== */
+const VIEW_PADDING_EXTRA = 40 // 额外留白，避免贴边
+
+/**
+ * 计算多边形中心 + bounds
+ * @param {Array<{lng:number|string, lat:number|string}>} points
+ */
+function getRingCenterAndBounds(points) {
+  const lngs = []
+  const lats = []
+  for (const p of points) {
+    const lng = Number(p.lng)
+    const lat = Number(p.lat)
+    if (Number.isFinite(lng) && Number.isFinite(lat)) {
+      lngs.push(lng)
+      lats.push(lat)
+    }
+  }
+  if (!lngs.length) return null
+  const minLng = Math.min(...lngs)
+  const maxLng = Math.max(...lngs)
+  const minLat = Math.min(...lats)
+  const maxLat = Math.max(...lats)
+  return {
+    center: [(minLng + maxLng) / 2, (minLat + maxLat) / 2],
+    bounds: [[minLng, minLat], [maxLng, maxLat]],
+  }
+}
+
+/**
+ * 将地图视角聚焦到场区范围
+ * 右侧有固定面板遮挡，所以 padding.right 加大，使内容落在地图可见区中心偏左
+ */
+function focusSiteRangeOnMap(points) {
+  const mapInstance = resolveMapInstance(props.mapRef)
+  const map = mapInstance?.getMap?.()
+  if (!map) return
+
+  const info = getRingCenterAndBounds(points)
+  if (!info) return
+
+  const { bounds } = info
+  const [minLng, minLat] = bounds[0]
+  const [maxLng, maxLat] = bounds[1]
+  // 单点/极小范围时 fitBounds 会算得很大，给个最小跨度兜底
+  const MIN_SPAN = 0.001
+  const lngSpan = Math.max(maxLng - minLng, MIN_SPAN)
+  const latSpan = Math.max(maxLat - minLat, MIN_SPAN)
+  const safeBounds = [[minLng, minLat], [minLng + lngSpan, minLat + latSpan]]
+
+  map.fitBounds(safeBounds, {
+    padding: {
+      top: VIEW_PADDING_EXTRA + 40,           // 顶部有搜索框/工具栏
+      bottom: VIEW_PADDING_EXTRA + 40,
+      left: VIEW_PADDING_EXTRA,
+      right: props.panelWidth + VIEW_PADDING_EXTRA, // ★ 关键：右侧让出面板宽度
+    },
+    maxZoom: 14,
+    duration: 1000,
+  })
 }
 
 /* ==================== 范围校验 ==================== */
@@ -495,6 +559,7 @@ function bindSiteRangeDrawEvents() {
     renderSiteRangeOnMap()
     checkWindPointsInRange()
     checkBoosterPointsInRange()
+    focusSiteRangeOnMap(siteRangePoints.value) // ★ 绘制完成后聚焦
   }
 
   const handleDrawUpdate = (event) => {
@@ -508,6 +573,7 @@ function bindSiteRangeDrawEvents() {
     renderSiteRangeOnMap()
     checkWindPointsInRange()
     checkBoosterPointsInRange()
+    // ★ 注意：这里不聚焦，避免用户拖顶点时地图乱跳
   }
 
   map.on('draw.create', handleDrawCreate)
@@ -559,6 +625,7 @@ async function handleSiteRangeUploadSuccess(dto, file) {
     renderSiteRangeOnMap()
     checkWindPointsInRange()
     checkBoosterPointsInRange()
+    focusSiteRangeOnMap(points) // ★ 上传解析成功后聚焦
     ElMessage.success('场区范围文件解析成功')
   } catch (err) {
     ElMessage.error(`场区范围文件解析失败：${err?.message || '文件内容无法解析'}`)

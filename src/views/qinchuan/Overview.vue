@@ -76,95 +76,6 @@
 
         <div class="area-view-layer">
           <template v-if="!selectedProject">
-            <!-- <div class="area-search-panel">
-              <el-select
-                v-model="filters.itemType"
-                placeholder="项目类型"
-                size="small"
-                clearable
-                style="width: 108px"
-                @change="handleSearch"
-              >
-                <el-option label="风电" value="FD" />
-                <el-option label="光伏" value="GF" />
-              </el-select>
-              <el-select
-                v-model="filters.city"
-                placeholder="市/区"
-                size="small"
-                clearable
-                style="width: 108px"
-                @change="handleSearch"
-              >
-                <el-option
-                  v-for="c in CITY_OPTIONS"
-                  :key="c.value"
-                  :label="c.label"
-                  :value="c.value"
-                />
-              </el-select>
-              <el-select
-                v-model="filters.managerCompany"
-                placeholder="项目所属"
-                size="small"
-                clearable
-                style="width: 130px"
-                @change="handleSearch"
-              >
-                <el-option label="XX能源有限公司" value="XX能源有限公司" />
-              </el-select>
-              <el-select
-                v-model="filters.stage"
-                placeholder="项目阶段"
-                size="small"
-                clearable
-                style="width: 120px"
-                @change="handleSearch"
-              >
-                <el-option
-                  v-for="opt in stageOptions"
-                  :key="opt.code"
-                  :label="opt.desc"
-                  :value="opt.code"
-                />
-              </el-select>
-              <el-input
-                v-model="filters.projectName"
-                placeholder="项目名称"
-                size="small"
-                clearable
-                style="width: 160px"
-                @keyup.enter="handleSearch"
-              >
-                <template #suffix>
-                  <el-icon class="area-search-icon" @click="handleSearch"><Search /></el-icon>
-                </template>
-              </el-input>
-            </div>
-
-            <div class="area-sort-bar">
-              <button
-                class="sort-btn"
-                :class="{ active: sortKey === 'capacity' }"
-                @click="toggleSort('capacity')"
-              >
-                容量
-                <span class="sort-arrow" v-if="sortKey === 'capacity'">
-                  {{ sortDir === 'asc' ? '▲' : '▼' }}
-                </span>
-              </button>
-              <button
-                class="sort-btn"
-                :class="{ active: sortKey === 'rate' }"
-                @click="toggleSort('rate')"
-              >
-                收益率
-                <span class="sort-arrow" v-if="sortKey === 'rate'">
-                  {{ sortDir === 'asc' ? '▲' : '▼' }}
-                </span>
-              </button>
-            </div> -->
-
             <ProjectListPanel
               class="panel-below"
               v-model:model-value-expanded="listExpanded"
@@ -178,35 +89,11 @@
               :stage-options="stageOptions"
               @update:page="handlePageChange"
               @select="handleProjectSelect"
-              @add="startPolygonDrawing"
+              @add="handleAddProject"
             />
           </template>
 
-          <!-- <template v-else>
-            <EditToolbar
-              v-if="!isDetailFullscreen"
-              v-model:activeTool="activeEditTool"
-              :is-drawing="isDrawing"
-              :new-area-feature-id="newAreaFeatureId"
-              :new-area-name="newAreaName"
-              :selected-area="selectedArea"
-              :selected-area-features="selectedAreaFeatures"
-              :edit-area-name="editAreaName"
-              :action-loading="actionLoading"
-              :panel-message="panelMessage"
-              :delete-confirm-visible="deleteConfirmVisible"
-              @update:new-area-name="(v) => (newAreaName = v)"
-              @update:edit-area-name="(v) => (editAreaName = v)"
-              @start-draw="startPolygonDrawing"
-              @save-new="saveNewArea"
-              @cancel-new="cancelNewArea"
-              @save-selected="saveSelectedArea"
-              @cancel-selected="cancelSelectedArea"
-              @open-delete-confirm="openDeleteConfirm"
-              @close-delete-confirm="closeDeleteConfirm"
-              @confirm-delete="confirmDelete"
-            />
-
+          <template v-else>
             <ProjectDetailPanel
               class="panel-below"
               :project="activeProjectDetail"
@@ -215,7 +102,7 @@
               @back="handleBackToList"
               @generate-report="reportModalVisible = true"
             />
-          </template> -->
+          </template>
         </div>
 
         <div
@@ -271,7 +158,7 @@
             <el-icon><List /></el-icon>
             项目列表
           </div>
-          <el-button type="primary" size="small" @click="startPolygonDrawing">
+          <el-button type="primary" size="small" @click="handleAddProject">
             <el-icon><Plus /></el-icon>
             添加项目
           </el-button>
@@ -446,6 +333,18 @@
               <button class="layer-chip" @click="notImplemented('自然保护区')">自然保护区</button>
               <button class="layer-chip" @click="notImplemented('矿区')">矿区</button>
             </div>
+
+            <!-- ★ 项目进度图例 -->
+            <div class="layer-legend">
+              <div class="legend-title">项目进度</div>
+              <div class="legend-items">
+                <span class="legend-item"><i class="dot" style="background:#9254de"></i>初步遴选</span>
+                <span class="legend-item"><i class="dot" style="background:#E8059B"></i>已储备</span>
+                <span class="legend-item"><i class="dot" style="background:#fa8c16"></i>规划中</span>
+                <span class="legend-item"><i class="dot" style="background:#597ef7"></i>施工中</span>
+                <span class="legend-item"><i class="dot" style="background:#a0d911"></i>已投产</span>
+              </div>
+            </div>
           </div>
         </transition>
 
@@ -496,7 +395,6 @@ import RightDashboard from './components/RightDashboard.vue'
 import ProjectOverview from './components/ProjectOverview.vue'
 import ProjectListPanel from './components/area-panel/ProjectListPanel.vue'
 import ProjectDetailPanel from './components/area-panel/ProjectDetailPanel.vue'
-import EditToolbar from './components/area-panel/EditToolbar.vue'
 import ReportGenerateModal from './components/area-panel/ReportGenerateModal.vue'
 import ReportWizard from './components/report-wizard/ReportWizard.vue'
 import { PACKAGE_TYPE } from './js/Reportwizardmockdata'
@@ -504,21 +402,23 @@ import { projectOverviewRows, stageCityData } from './js/dashboardMcokData'
 import { buildStageColorMap } from './js/mapStageColor'
 import { projectDetailMockData } from './js/areaPanelMockData'
 import { buildMainInfoFromAi } from './js/aiProjectAdapter'
-// 区域编辑 API（增 / 改 / 删）
-import * as api from '@/api/modules/gisLayer.js'
+// 区域编辑 API（增 / 改 / 删）—— 测试用，已停用
+// import * as api from '@/api/modules/gisLayer.js'
 // 项目接口（列表 / 阶段枚举）
 import * as newApi from '@/api/modules/project'
 
 import {
   satelliteStyle,
   shaanxiBoundary,
-  AREA_SELECT_LAYER_KEY,
-  UPDATED_BY,
   AREA_ZOOM_THRESHOLD,
   PROVINCE_EXTRUSION_ID
+  // AREA_SELECT_LAYER_KEY, // gisLayer 已停用
+  // UPDATED_BY            // gisLayer 已停用
 } from './js/mapConfig'
-import { cloneValue, getFeatureGuid, getFeatureAreaName } from './js/geoUtils'
-import { useProvinceAreaData } from './js/useProvinceAreaData'
+import { cloneValue } from './js/geoUtils'
+// gisLayer 已停用
+// import { getFeatureGuid, getFeatureAreaName } from './js/geoUtils'
+// import { useProvinceAreaData } from './js/useProvinceAreaData'
 import { useZoomThresholdSwitch } from './js/useZoomThresholdSwitch'
 
 // 地图图标
@@ -547,10 +447,50 @@ const ICON_SHENGYAZHAN = 'icon-shengyazhan-overview'
 const ICON_SIZE_WIND = 0.08
 const ICON_SIZE_BOOSTER = 0.08
 
-// 场区样式
-const AREA_STYLE = {
-  FD: { color: '#3b82f6', opacity: 0.22, outlineColor: '#60a5fa' },
-  GF: { color: '#a855f7', opacity: 0.22, outlineColor: '#c084fc' }
+// ==================== 项目进度分组 → 场区颜色（本组件内部配置） ====================
+// 分组：selection（遴选）/ reserved（已储备）/ planning（规划中）/ construction（施工中）/ operating（已投产）
+const STAGE_GROUP = {
+  PRELIMINARY_SELECTION: 'selection',   // 初步遴选（含智能选址）
+  PROJECT_RESERVE: 'reserved',          // 项目储备
+  PROJECT_INITIATION: 'planning',       // 项目立项
+  FEASIBILITY_REVIEW: 'planning',       // 可研审查
+  INVESTMENT_DECISION: 'planning',      // 投资决策
+  PROJECT_CONSTRUCTION: 'construction', // 项目施工
+  PROJECT_OPERATION: 'operating'        // 项目运营（已投产）
+}
+
+// 分组 → 颜色样式（色值取自 projectOverviewRows，可自行替换）
+const GROUP_AREA_STYLE = {
+  selection:    { color: '#9254de', opacity: 0.22, outlineColor: '#b37feb' }, // 初步遴选
+  reserved:     { color: '#E8059B', opacity: 0.22, outlineColor: '#f759ab' }, // 已储备
+  planning:     { color: '#fa8c16', opacity: 0.22, outlineColor: '#ffc069' }, // 规划中
+  construction: { color: '#597ef7', opacity: 0.22, outlineColor: '#85a5ff' }, // 施工中
+  operating:    { color: '#a0d911', opacity: 0.22, outlineColor: '#d3f261' }, // 已投产
+  unknown:      { color: '#94a3b8', opacity: 0.18, outlineColor: '#cbd5e1' }  // 兜底
+}
+
+// 图例配置（与 GROUP_AREA_STYLE 对应，供模板渲染）
+const STAGE_LEGEND = [
+  { group: 'selection', label: '初步遴选', color: GROUP_AREA_STYLE.selection.color },
+  { group: 'reserved', label: '已储备', color: GROUP_AREA_STYLE.reserved.color },
+  { group: 'planning', label: '规划中', color: GROUP_AREA_STYLE.planning.color },
+  { group: 'construction', label: '施工中', color: GROUP_AREA_STYLE.construction.color },
+  { group: 'operating', label: '已投产', color: GROUP_AREA_STYLE.operating.color }
+]
+
+function getAreaStyleByStage(projectStage) {
+  let group = STAGE_GROUP[projectStage]
+  if (!group) {
+    // 兜底：用 stageOptions 中文 desc 关键字匹配
+    const opt = stageOptions.value.find(o => o.code === projectStage)
+    const desc = opt?.desc || ''
+    if (desc.includes('遴选')) group = 'selection'
+    else if (desc.includes('储备')) group = 'reserved'
+    else if (desc.includes('立项') || desc.includes('可研') || desc.includes('投资决策')) group = 'planning'
+    else if (desc.includes('施工')) group = 'construction'
+    else if (desc.includes('运营') || desc.includes('投产')) group = 'operating'
+  }
+  return GROUP_AREA_STYLE[group || 'unknown']
 }
 
 // ==================== 基础状态 ====================
@@ -563,10 +503,13 @@ const viewMode = ref('map')
 const showLayerPanel = ref(false)
 const isDetailFullscreen = ref(false)
 
-const {
-  provinceAreaGeoJSON,
-  fetchAllProvinceAreaData
-} = useProvinceAreaData(shaanxiBoundary, AREA_SELECT_LAYER_KEY)
+// ==================== 区域数据（gisLayer 测试用，已停用） ====================
+// const {
+//   provinceAreaGeoJSON,
+//   fetchAllProvinceAreaData
+// } = useProvinceAreaData(shaanxiBoundary, AREA_SELECT_LAYER_KEY)
+const provinceAreaGeoJSON = ref({ type: 'FeatureCollection', features: [] })
+async function fetchAllProvinceAreaData() { /* gisLayer 已停用 */ }
 
 const actionLoading = ref(false)
 const panelMessage = ref('')
@@ -615,6 +558,57 @@ const stageMap = computed(() =>
   Object.fromEntries(stageOptions.value.map((item) => [item.code, item.desc]))
 )
 
+// 详情卡片里的风机数量
+const windCount = computed(() => {
+  const pts = selectedProject.value?.windTurbinePoints || []
+  return pts.filter((p) => !p.isAlternative).length
+})
+const altCount = computed(() => {
+  const pts = selectedProject.value?.windTurbinePoints || []
+  return pts.filter((p) => p.isAlternative).length
+})
+
+// ==================== 场区坐标工具 ====================
+function getProjectCoords(project) {
+  return (project?.coordinate || [])
+    .map((c) => [Number(c.longitude), Number(c.latitude)])
+    .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))
+}
+
+function getProjectCentroid(project) {
+  let coords = getProjectCoords(project)
+  if (coords.length >= 2) {
+    const [fx, fy] = coords[0]
+    const [lx, ly] = coords[coords.length - 1]
+    if (fx === lx && fy === ly) coords = coords.slice(0, -1)
+  }
+  if (!coords.length) return null
+  let sumLng = 0
+  let sumLat = 0
+  for (const [lng, lat] of coords) {
+    sumLng += lng
+    sumLat += lat
+  }
+  return [sumLng / coords.length, sumLat / coords.length]
+}
+
+function getProjectBounds(project) {
+  const coords = getProjectCoords(project)
+  if (!coords.length) return null
+  let minLng = Infinity
+  let minLat = Infinity
+  let maxLng = -Infinity
+  let maxLat = -Infinity
+  for (const [lng, lat] of coords) {
+    if (lng < minLng) minLng = lng
+    if (lng > maxLng) maxLng = lng
+    if (lat < minLat) minLat = lat
+    if (lat > maxLat) maxLat = lat
+  }
+  if (minLng === maxLng && minLat === maxLat) return null
+  return [[minLng, minLat], [maxLng, maxLat]]
+}
+
 // ==================== 数据请求 ====================
 async function fetchStageList() {
   try {
@@ -629,7 +623,11 @@ async function fetchStageList() {
 async function fetchProjectList() {
   listLoading.value = true
   try {
-    const params = { pageNo: pagination.page, pageSize: pagination.pageSize }
+    const params = {
+      pageNo: pagination.page,
+      pageSize: pagination.pageSize,
+      province: '610000'
+    }
     if (filters.itemType) params.itemType = filters.itemType
     if (filters.city) params.city = filters.city
     if (filters.managerCompany) params.managerCompany = filters.managerCompany
@@ -724,6 +722,11 @@ function notImplemented(name) {
   ElMessage.info(`「${name}」功能待开发`)
 }
 
+// gisLayer 区域编辑已停用，「添加项目」改为提示
+function handleAddProject() {
+  ElMessage.info('添加项目功能已停用')
+}
+
 // ==================== 详情数据映射 ====================
 function buildDetailFromListItem(item) {
   const base = cloneValue(projectDetailMockData)
@@ -756,8 +759,13 @@ function buildDetailFromListItem(item) {
   base.preferHubHeight = item.preferHubHeight
   base.rawProject = cloneValue(item)
 
-  const hasCoord = item.longitude !== null && item.longitude !== undefined && item.latitude !== null && item.latitude !== undefined
-  if (hasCoord) base.center = [Number(item.longitude), Number(item.latitude)]
+  // ★ 中心点：优先场区质心，其次单点经纬度，最后保留 mock 默认
+  const centroid = getProjectCentroid(item)
+  if (centroid) {
+    base.center = centroid
+  } else if (item.longitude != null && item.latitude != null) {
+    base.center = [Number(item.longitude), Number(item.latitude)]
+  }
   base.zoom = AREA_ZOOM_THRESHOLD + 1.5
   return base
 }
@@ -765,12 +773,30 @@ function buildDetailFromListItem(item) {
 async function handleProjectSelect(item) {
   activeAreaId.value = item.id
   activeProjectDetail.value = buildDetailFromListItem(item)
+
   const map = mapRef.value?.getMap()
-  const center = activeProjectDetail.value.center
-  if (map && center) {
-    map.flyTo({ center, zoom: AREA_ZOOM_THRESHOLD + 1.5, pitch: 0, duration: 1200 })
+  const bounds = getProjectBounds(item)
+  const center = getProjectCentroid(item)
+
+  if (map) {
+    if (bounds) {
+      map.fitBounds(bounds, {
+        padding: { top: 110, bottom: 80, left: 340, right: 40 },
+        maxZoom: AREA_ZOOM_THRESHOLD + 4,
+        duration: 1200
+      })
+    } else if (center) {
+      map.flyTo({
+        center,
+        zoom: AREA_ZOOM_THRESHOLD + 1.5,
+        pitch: 0,
+        duration: 1200
+      })
+    }
   }
+
   rightPanelMode.value = 'detail'
+  isDetailFullscreen.value = true
   selectProjectOnMap(item.id)
   await loadAiProjectDetail(item.id)
 }
@@ -809,20 +835,6 @@ async function loadAiProjectDetail(aiProjectId) {
 const mapProjects = ref([])
 const renderedMapLayerIds = new Set()
 
-function getProjectCoords(project) {
-  return (project.coordinate || [])
-    .map((c) => [Number(c.longitude), Number(c.latitude)])
-    .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))
-}
-
-function getProjectCentroid(project) {
-  const coords = getProjectCoords(project)
-  if (!coords.length) return null
-  let sumLng = 0; let sumLat = 0
-  for (const [lng, lat] of coords) { sumLng += lng; sumLat += lat }
-  return [sumLng / coords.length, sumLat / coords.length]
-}
-
 function buildAreaFeature(project) {
   const coords = getProjectCoords(project)
   if (coords.length < 3) return null
@@ -831,7 +843,7 @@ function buildAreaFeature(project) {
   if (first[0] !== last[0] || first[1] !== last[1]) coords.push([first[0], first[1]])
   return {
     type: 'Feature',
-    properties: { projectId: project.id, projectCode: project.projectCode, projectName: project.projectName, itemType: project.itemType },
+    properties: { projectId: project.id, projectCode: project.projectCode, projectName: project.projectName, itemType: project.itemType, projectStage: project.projectStage },
     geometry: { type: 'Polygon', coordinates: [coords] }
   }
 }
@@ -862,9 +874,17 @@ function addProjectArea(project, highlighted = false) {
   const area = buildAreaFeature(project)
   if (!area) return
   const layerId = `overview-project-area-${project.id}`
-  const base = AREA_STYLE[project.itemType] || AREA_STYLE.FD
-  const style = highlighted ? { color: base.color, opacity: base.opacity + 0.16, outlineColor: base.outlineColor } : base
-  mapRef.value.addPolygon({ id: layerId, geojson: area, color: style.color, opacity: style.opacity, outlineColor: style.outlineColor })
+  const base = getAreaStyleByStage(project.projectStage) // ★ 按阶段分组取色
+  const style = highlighted
+    ? { color: base.color, opacity: base.opacity + 0.16, outlineColor: base.outlineColor }
+    : base
+  mapRef.value.addPolygon({
+    id: layerId,
+    geojson: area,
+    color: style.color,
+    opacity: style.opacity,
+    outlineColor: style.outlineColor
+  })
   renderedMapLayerIds.add(layerId)
   const fillLayerId = `${layerId}-fill`
   mapRef.value.offClick(fillLayerId)
@@ -908,13 +928,12 @@ async function renderProjectsByStage(stage) {
     await safeAddIcon({ layerId: 'overview-project-booster-all', featureCollection: { type: 'FeatureCollection', features: allBoosterFeatures }, iconId: ICON_SHENGYAZHAN, iconUrl: shengyazhanIcon, iconSize: ICON_SIZE_BOOSTER, iconAnchor: 'bottom', fallbackColor: '#ef4444', fallbackRadius: 3 })
   }
   applyLayerVisibility()
-  // 项目图层新建后，保证遮罩仍置顶
   syncMaskVisibility(true)
 }
 
 async function fetchMapProjects() {
   try {
-    const res = await newApi.getPageList({ pageNo: 1, pageSize: 500 })
+    const res = await newApi.getPageList({ pageNo: 1, pageSize: 500, province: '610000' })
     const data = res?.data ?? {}
     mapProjects.value = data.list ?? []
     if (mapReady.value && isAreaView.value) await renderProjectsByStage('area')
@@ -997,16 +1016,15 @@ function onProjectStageSelect(row) {
   if (mapReady.value && !isAreaView.value) renderSelectedProject(row)
 }
 
-// ==================== ★ 陕西省遮罩（反遮罩，opacity 平滑） ====================
+// ==================== ★ 陕西省遮罩 ====================
 const MASK_LAYER_ID = 'shaanxi-mask'
-const MASK_COLOR = '#000000'      // 想柔和一点改 '#03162e' 或 'rgba(0,0,0,0.85)'
-const MASK_MAX_OPACITY = 1.0      // 1 = 全黑，0.9 = 稍柔，0.8 = 更透
-const MASK_FADE_DURATION = 300    // 淡入淡出时长(ms)
-const MASK_FULL_ZOOM_OFFSET = 1.5 // 从 AREA_ZOOM_THRESHOLD 到 +1.5 之间 opacity 爬升到最大
+const MASK_COLOR = '#000000'
+const MASK_MAX_OPACITY = 1.0
+const MASK_FADE_DURATION = 300
+const MASK_FULL_ZOOM_OFFSET = 1.5
 
 let lastMaskOpacity = -1
 
-// 环方向工具（Non-Zero 填充规则下正确挖洞）
 function ensureClosed(ring) {
   if (!ring || ring.length < 3) return ring
   const first = ring[0]
@@ -1036,12 +1054,10 @@ function ensureHoleCW(ring) {
   return ringSignedArea(r) <= 0 ? r : r.slice().reverse()
 }
 
-// 世界外环（CCW），反遮罩的外边界
 const WORLD_OUTER = ensureOuterCCW([
   [-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85],
 ])
 
-// 从本地 610000.json 构造"世界 + 洞"的反遮罩 GeoJSON
 function buildMaskGeoJSON(boundary) {
   const holes = []
   for (const feature of boundary?.features || []) {
@@ -1117,18 +1133,11 @@ function ensureShaanxiMask() {
       opacity: 0,
       fadeDuration: MASK_FADE_DURATION,
     })
-    console.log('[mask] 遮罩层已添加 ✓，洞数量 =', data.features[0].geometry.coordinates.length - 1)
     lastMaskOpacity = -1
     syncMaskVisibility(true)
   } catch (err) {
     console.error('[mask] 陕西省遮罩初始化失败:', err)
   }
-}
-
-function removeShaanxiMask() {
-  if (!mapRef.value) return
-  mapRef.value.removeMaskLayer(MASK_LAYER_ID)
-  lastMaskOpacity = -1
 }
 
 // ==================== 缩放阈值 ====================
@@ -1143,15 +1152,17 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
   },
   onEnter: () => {
     ensureShaanxiMask()
-    if (provinceAreaGeoJSON.value?.features?.length) mapRef.value.loadEditableAreas(provinceAreaGeoJSON.value)
+    // gisLayer 已停用
+    // if (provinceAreaGeoJSON.value?.features?.length) mapRef.value.loadEditableAreas(provinceAreaGeoJSON.value)
     rightPanelMode.value = 'list'
     listExpanded.value = false
     activeEditTool.value = ''
     renderProjectsByStage('area')
   },
   onBelowThreshold: () => {
-    const draw = mapRef.value?.getDraw()
-    if (draw?.getMode?.() === 'draw_polygon') draw.changeMode('simple_select')
+    // gisLayer 已停用
+    // const draw = mapRef.value?.getDraw()
+    // if (draw?.getMode?.() === 'draw_polygon') draw.changeMode('simple_select')
     const map = mapRef.value?.getMap()
     if (map?.getLayer(PROVINCE_EXTRUSION_ID)) {
       map.setLayoutProperty(PROVINCE_EXTRUSION_ID, 'visibility', 'visible')
@@ -1162,7 +1173,7 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
   },
   onExit: () => {
     syncMaskVisibility(true)
-    mapRef.value.clearEditableAreas()
+    // mapRef.value.clearEditableAreas() // gisLayer 已停用
     clearExistingAreaSelection()
     resetNewAreaState()
     activeEditTool.value = ''
@@ -1203,13 +1214,7 @@ function bindCityClick() {
   })
 }
 
-// ==================== 区域编辑 ====================
-let drawCreateHandler = null
-let drawSelectionChangeHandler = null
-let drawUpdateHandler = null
-let drawDeleteHandler = null
-let suppressSelectionEvents = false
-
+// ==================== 区域编辑（gisLayer 测试用，已停用） ====================
 const areaAttributeDefaults = { name: '' }
 
 function buildAreaAttributes(properties = {}, name = '') {
@@ -1225,132 +1230,29 @@ function setPanelMessage(message) { panelMessage.value = message }
 function clearPanelMessage() { panelMessage.value = '' }
 
 async function refreshProvinceAreaData() {
-  await fetchAllProvinceAreaData()
-  if (isAreaView.value && provinceAreaGeoJSON.value?.features?.length) mapRef.value?.loadEditableAreas(provinceAreaGeoJSON.value)
+  // gisLayer 已停用
 }
 
-function bindDrawEvents() {
-  const map = mapRef.value?.getMap()
-  if (!map) return
-  drawCreateHandler = onDrawCreate
-  drawSelectionChangeHandler = onDrawSelectionChange
-  drawUpdateHandler = onDrawUpdate
-  drawDeleteHandler = onDrawDelete
-  map.on('draw.create', drawCreateHandler)
-  map.on('draw.selectionchange', drawSelectionChangeHandler)
-  map.on('draw.update', drawUpdateHandler)
-  map.on('draw.delete', drawDeleteHandler)
-}
+function bindDrawEvents() { /* gisLayer 已停用 */ }
+function unbindDrawEvents() { /* gisLayer 已停用 */ }
 
-function unbindDrawEvents() {
-  const map = mapRef.value?.getMap()
-  if (!map) return
-  if (drawCreateHandler) map.off('draw.create', drawCreateHandler)
-  if (drawSelectionChangeHandler) map.off('draw.selectionchange', drawSelectionChangeHandler)
-  if (drawUpdateHandler) map.off('draw.update', drawUpdateHandler)
-  if (drawDeleteHandler) map.off('draw.delete', drawDeleteHandler)
-  drawCreateHandler = null; drawSelectionChangeHandler = null; drawUpdateHandler = null; drawDeleteHandler = null
-}
-
-function onDrawCreate(event) {
-  const feature = event?.features?.[0]
-  if (!feature || feature.geometry?.type !== 'Polygon') return
-  newAreaFeatureId.value = feature.id
-  newAreaName.value = ''
-  isDrawing.value = false
-  clearExistingAreaSelection()
-  clearPanelMessage()
-}
-
-function onDrawSelectionChange(event) {
-  if (suppressSelectionEvents) return
-  const features = (event?.features || []).filter((feature) => feature.id !== newAreaFeatureId.value)
-  if (!features.length) {
-    if (!newAreaFeatureId.value) clearExistingAreaSelection()
-    return
-  }
-  if (activeEditTool.value !== 'area') {
-    const draw = mapRef.value?.getDraw()
-    suppressSelectionEvents = true
-    try { draw?.changeMode('simple_select') } finally { suppressSelectionEvents = false }
-    openDetailForFeature(features[0])
-    return
-  }
-  selectedAreaFeatures.value = features.map((feature) => cloneValue(feature))
-  selectedArea.value = cloneValue(features[0])
-  originalSelectedArea.value = cloneValue(features[0])
-  editAreaName.value = getFeatureAreaName(features[0])
-  clearPanelMessage()
-  if (features.length === 1 && features[0].geometry?.type === 'Polygon') {
-    nextTick(() => {
-      const draw = mapRef.value?.getDraw()
-      if (!draw || draw.getMode() === 'direct_select') return
-      draw.changeMode('direct_select', { featureId: features[0].id })
-    })
-  }
-}
-
-function onDrawUpdate(event) {
-  const features = event?.features || []
-  if (newAreaFeatureId.value) {
-    if (features.find((f) => f.id === newAreaFeatureId.value)) clearPanelMessage()
-  }
-  if (selectedArea.value) {
-    const selectedFeature = features.find((f) => f.id === selectedArea.value.id)
-    if (selectedFeature) {
-      selectedArea.value = cloneValue(selectedFeature)
-      selectedAreaFeatures.value = selectedAreaFeatures.value.map((f) => f.id === selectedFeature.id ? cloneValue(selectedFeature) : f)
-    }
-  }
-}
-
-function onDrawDelete(event) {
-  const deletedIds = new Set((event?.features || []).map((feature) => feature.id))
-  if (newAreaFeatureId.value && deletedIds.has(newAreaFeatureId.value)) resetNewAreaState()
-  if (selectedArea.value && deletedIds.has(selectedArea.value.id)) clearExistingAreaSelection()
-}
+function onDrawCreate(event) { /* gisLayer 已停用 */ }
+function onDrawSelectionChange(event) { /* gisLayer 已停用 */ }
+function onDrawUpdate(event) { /* gisLayer 已停用 */ }
+function onDrawDelete(event) { /* gisLayer 已停用 */ }
 
 function startPolygonDrawing() {
-  const draw = mapRef.value?.getDraw()
-  if (!draw) return
-  activeEditTool.value = 'area'
-  rightPanelMode.value = 'list'
-  clearExistingAreaSelection()
-  resetNewAreaState()
-  clearPanelMessage()
-  isDrawing.value = true
-  draw.changeMode('draw_polygon')
+  ElMessage.info('添加项目功能已停用')
 }
 
-function cancelNewArea() {
-  const draw = mapRef.value?.getDraw()
-  if (draw && newAreaFeatureId.value) draw.delete(newAreaFeatureId.value)
-  else if (draw && isDrawing.value) draw.changeMode('simple_select')
-  resetNewAreaState()
-}
-
+function cancelNewArea() { /* gisLayer 已停用 */ }
 function resetNewAreaState() {
   isDrawing.value = false
   newAreaFeatureId.value = null
   newAreaName.value = ''
 }
 
-async function saveNewArea() {
-  const draw = mapRef.value?.getDraw()
-  const feature = newAreaFeatureId.value ? draw?.get(newAreaFeatureId.value) : null
-  if (!feature || !newAreaName.value) { setPanelMessage('请先完成多边形绘制并填写区域名称'); return }
-  actionLoading.value = true
-  clearPanelMessage()
-  try {
-    await api.addFeatureById(AREA_SELECT_LAYER_KEY, { geometry: feature.geometry, attributes: buildAreaAttributes(feature.properties, newAreaName.value) })
-    resetNewAreaState()
-    await refreshProvinceAreaData()
-    setPanelMessage('区域保存成功')
-  } catch (error) {
-    console.error('新增区域失败:', error)
-    setPanelMessage('区域保存失败，请稍后重试')
-  } finally { actionLoading.value = false }
-}
+async function saveNewArea() { /* gisLayer 已停用 */ }
 
 function clearExistingAreaSelection() {
   selectedArea.value = null
@@ -1359,93 +1261,41 @@ function clearExistingAreaSelection() {
   editAreaName.value = ''
 }
 
-function getCurrentSelectedFeature() {
-  const draw = mapRef.value?.getDraw()
-  if (!draw || !selectedArea.value) return null
-  return draw.get(selectedArea.value.id)
-}
-
-function hasAreaChanged(currentFeature) {
-  if (!currentFeature || !originalSelectedArea.value) return false
-  const geometryChanged = JSON.stringify(currentFeature.geometry) !== JSON.stringify(originalSelectedArea.value.geometry)
-  const nameChanged = editAreaName.value !== getFeatureAreaName(originalSelectedArea.value)
-  return geometryChanged || nameChanged
-}
-
-async function saveSelectedArea() {
-  if (!selectedArea.value || selectedAreaFeatures.value.length !== 1) { setPanelMessage('一次只能编辑一个区域'); return }
-  const currentFeature = getCurrentSelectedFeature()
-  if (!currentFeature) { setPanelMessage('未找到当前编辑区域'); return }
-  if (!hasAreaChanged(currentFeature)) { setPanelMessage('区域没有发生变化'); return }
-  actionLoading.value = true
-  clearPanelMessage()
-  try {
-    await api.updateFeatureById(AREA_SELECT_LAYER_KEY, getFeatureGuid(selectedArea.value), {
-      geometry: currentFeature.geometry,
-      attributes: buildAreaAttributes(currentFeature.properties, editAreaName.value),
-      updatedBy: UPDATED_BY
-    })
-    clearExistingAreaSelection()
-    await refreshProvinceAreaData()
-    setPanelMessage('区域更新成功')
-  } catch (error) {
-    console.error('更新区域失败:', error)
-    setPanelMessage('区域更新失败，请稍后重试')
-  } finally { actionLoading.value = false }
-}
-
-function cancelSelectedArea() {
-  const draw = mapRef.value?.getDraw()
-  const original = originalSelectedArea.value
-  if (!draw || !original) { clearExistingAreaSelection(); return }
-  suppressSelectionEvents = true
-  try {
-    draw.delete(original.id)
-    draw.add(cloneValue(original))
-    draw.changeMode('simple_select')
-  } finally { suppressSelectionEvents = false }
-  clearExistingAreaSelection()
-  clearPanelMessage()
-}
-
-function openDeleteConfirm() {
-  if (!selectedAreaFeatures.value.length) { setPanelMessage('请先选择要删除的区域'); return }
-  deleteConfirmVisible.value = true
-}
-
-function closeDeleteConfirm() {
-  if (actionLoading.value) return
-  deleteConfirmVisible.value = false
-}
-
-async function confirmDelete() {
-  const guids = selectedAreaFeatures.value.map((f) => getFeatureGuid(f)).filter(Boolean)
-  if (!guids.length) { deleteConfirmVisible.value = false; return }
-  actionLoading.value = true
-  clearPanelMessage()
-  try {
-    await api.deletFeatureById(AREA_SELECT_LAYER_KEY, { guids, updatedBy: UPDATED_BY })
-    deleteConfirmVisible.value = false
-    clearExistingAreaSelection()
-    await refreshProvinceAreaData()
-    setPanelMessage('区域删除成功')
-  } catch (error) {
-    console.error('删除区域失败:', error)
-    setPanelMessage('区域删除失败，请稍后重试')
-  } finally { actionLoading.value = false }
-}
+function getCurrentSelectedFeature() { return null /* gisLayer 已停用 */ }
+function hasAreaChanged() { return false /* gisLayer 已停用 */ }
+async function saveSelectedArea() { /* gisLayer 已停用 */ }
+function cancelSelectedArea() { /* gisLayer 已停用 */ }
+function openDeleteConfirm() { /* gisLayer 已停用 */ }
+function closeDeleteConfirm() { /* gisLayer 已停用 */ }
+async function confirmDelete() { /* gisLayer 已停用 */ }
 
 // ==================== 联动 ====================
 function openDetailForFeature(feature) {
-  activeAreaId.value = getFeatureGuid(feature) || null
+  // gisLayer 已停用，getFeatureGuid 不可用，这里仅切面板
   flyToProjectCenter(activeProjectDetail.value)
   rightPanelMode.value = 'detail'
 }
 
 function flyToProjectCenter(project) {
   const map = mapRef.value?.getMap()
-  if (!map || !project?.center) return
-  map.flyTo({ center: project.center, zoom: project.zoom || AREA_ZOOM_THRESHOLD + 1.5, pitch: 0, duration: 1200 })
+  if (!map) return
+  const bounds = getProjectBounds(project)
+  if (bounds) {
+    map.fitBounds(bounds, {
+      padding: { top: 110, bottom: 80, left: 340, right: 40 },
+      maxZoom: AREA_ZOOM_THRESHOLD + 4,
+      duration: 1200
+    })
+    return
+  }
+  if (project?.center) {
+    map.flyTo({
+      center: project.center,
+      zoom: project.zoom || AREA_ZOOM_THRESHOLD + 1.5,
+      pitch: 0,
+      duration: 1200
+    })
+  }
 }
 
 function handleBackToList() {
@@ -1482,10 +1332,9 @@ function onMapReady() {
   map.on('zoom', updateDetailCardPosition)
   map.on('click', handleMapBlankClick)
   bindCityClick()
-  bindDrawEvents()
+  // bindDrawEvents() // gisLayer 已停用
   bindZoomListener()
 
-  // ★ 陕西省遮罩：监听 + 初始化
   map.on('zoom', syncMaskVisibility)
   map.on('move', syncMaskVisibility)
   map.on('style.load', ensureShaanxiMask)
@@ -1496,12 +1345,17 @@ function onMapReady() {
 
 // ==================== 生命周期 ====================
 onMounted(async () => {
-  await Promise.all([fetchAllProvinceAreaData(), fetchStageList(), fetchProjectList(), fetchMapProjects()])
+  await Promise.all([
+    // fetchAllProvinceAreaData(), // gisLayer 已停用
+    fetchStageList(),
+    fetchProjectList(),
+    fetchMapProjects()
+  ])
 })
 
 onUnmounted(() => {
   unbindZoomListener()
-  unbindDrawEvents()
+  // unbindDrawEvents() // gisLayer 已停用
   const map = mapRef.value?.getMap?.()
   if (map) {
     map.off('move', updateDetailCardPosition)
@@ -1544,7 +1398,6 @@ onUnmounted(() => {
   left: 0;
 }
 
-/* ⭐️ 左右侧栏：严格使用 80vh 高度，并隐藏外层滚动条 */
 .left-layer, .right-layer {
   position: absolute;
   z-index: 20;
@@ -1552,7 +1405,7 @@ onUnmounted(() => {
   height: 85vh;
   max-height: 85vh;
   overflow-x: hidden;
-  overflow-y: auto; /* 内部组件有自适应比例和内部滚动，外层不用滚 */
+  overflow-y: auto;
 }
 
 .left-layer {
@@ -1562,7 +1415,6 @@ onUnmounted(() => {
   right: clamp(12px, 1.35vw, 26px);
 }
 
-/* 隐藏外层滚动条，让界面更干净 */
 .left-layer::-webkit-scrollbar,
 .right-layer::-webkit-scrollbar {
   display: none;
@@ -1571,7 +1423,6 @@ onUnmounted(() => {
   scrollbar-width: none;
 }
 
-/* ===================== 放大时的 UI (地图模式 / 项目列表) ===================== */
 .area-top-toolbar {
   position: absolute;
   z-index: 25;
@@ -1642,70 +1493,12 @@ onUnmounted(() => {
   min-height: 0;
 }
 
-.area-search-panel {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 12px;
-  background: #fff;
-  border-radius: 6px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  box-sizing: border-box;
-}
-
-.area-search-icon {
-  color: #909399;
-  cursor: pointer;
-}
-
-.area-sort-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  background: #fff;
-  border-radius: 6px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  box-sizing: border-box;
-  font-size: 12px;
-  color: #606266;
-}
-
-.sort-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 3px 10px;
-  color: #606266;
-  font-size: 12px;
-  background: #f5f7fa;
-  border: 1px solid #e3e7ee;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
-}
-
-.sort-btn:hover {
-  color: #1677ff;
-  border-color: #a9cfff;
-}
-
-.sort-btn.active {
-  color: #1677ff;
-  background: #e8f2ff;
-  border-color: #1677ff;
-}
-
-.sort-arrow {
-  font-size: 10px;
-}
-
 .area-list-view {
   position: absolute;
   z-index: 15;
-  inset: 56px 12px 12px;
-  padding: 14px 20px;
+  height: 100%;
+  width: 100%;
+  padding: 55px 20px;
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.12);
@@ -1837,7 +1630,6 @@ onUnmounted(() => {
   color: #f56c6c;
 }
 
-/* ===================== 左下角图层控制 ===================== */
 .layer-control {
   position: absolute;
   z-index: 25;
@@ -1922,6 +1714,40 @@ onUnmounted(() => {
   border-color: #1677ff;
 }
 
+/* ★ 项目进度图例 */
+.layer-legend {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+}
+
+.legend-title {
+  margin-bottom: 6px;
+  color: #303133;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #606266;
+  font-size: 12px;
+}
+
+.legend-item .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
 .layer-pop-enter-active, .layer-pop-leave-active {
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
@@ -1931,7 +1757,6 @@ onUnmounted(() => {
   transform: translateX(-8px) scale(0.98);
 }
 
-/* ===================== 响应式 ===================== */
 @media (max-width: 700px) {
   .dashboard-page {
     overflow: auto;

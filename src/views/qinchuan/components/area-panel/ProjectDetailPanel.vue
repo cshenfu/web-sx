@@ -243,6 +243,8 @@ watch(() => props.project?.id, (id) => { if (id) refreshSurveyData() })
 <style scoped>
 .detail-panel {
   position: relative;
+  bottom:20px;
+  height:90%;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -262,11 +264,11 @@ watch(() => props.project?.id, (id) => { if (id) refreshSurveyData() })
 /* ⭐ 全屏状态 */
 .detail-panel.is-fullscreen {
   position: fixed;
-  left: 130px; /* 避开左上角的按钮 */
+  /* left: 130px; 避开左上角的按钮 */
   right: 12px;
-  top: 60px;
-  bottom: 10px;
-  width: auto;
+  bottom: 20px;
+  width: 50%;
+  height:90%;
   max-height: none;
   z-index: 99;
 }

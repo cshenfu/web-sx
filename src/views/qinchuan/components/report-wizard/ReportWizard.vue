@@ -176,7 +176,7 @@ function updateWorkingProject(data) {
   position: relative;
   box-sizing: border-box;
   width: clamp(420px, 30vw, 520px);
-  height: 100%;
+  height: 90%;
   padding: 24px 28px 20px;
   overflow-y: auto;
   color: #1f2937;
