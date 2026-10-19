@@ -84,6 +84,10 @@ onUnmounted(() => {
   width: 100%;
 }
 
+.no-sidebar .dashboard-page{
+  height: 100%;
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.15s ease;

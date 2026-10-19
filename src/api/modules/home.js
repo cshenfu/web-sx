@@ -8,3 +8,8 @@ import { publicService4 } from '@/api/base';
 export async function getHomePageData(data) {
     return await publicService4.post('/api/homepage', data);
 }
+
+
+export async function getMainInfo(id) {
+    return await publicService4.post(`/api/homepage?aiProjectId=${id}`);
+}

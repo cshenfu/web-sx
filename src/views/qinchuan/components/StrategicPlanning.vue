@@ -1,312 +1,196 @@
 <template>
-    <section class="dashboard-panel strategy-panel">
-      <div class="panel-heading">
-        <span class="heading-mark">◆</span>
+  <section class="dashboard-panel strategy-panel">
+    <!-- 统一头部 -->
+    <div class="panel-heading" :style="{ backgroundImage: `url(${titleBg})` }">
+      <div class="heading-left">
+        <img :src="jdyjIcon" class="heading-img" alt="战略规划" />
         <span class="panel-title">“十五五”战略规划</span>
-        <span class="panel-unit">{{ data.year || '十五五' }}</span>
       </div>
-  
-      <div class="strategy-body">
-        <div class="strategy-targets">
-          <div
-            v-for="target in data.targets"
-            :key="target.key"
-            class="strategy-target"
-          >
-            <strong>{{ formatValue(target.value) }}</strong>
-            <small>{{ target.unit }}</small>
-            <span>{{ target.label }}</span>
-            <b>{{ target.completionRate }}%完成率</b>
-            <i :style="{ width: `${target.completionRate}%` }" />
+      <div class="panel-location">
+        <span>{{ data.year || '十五五' }}</span>
+      </div>
+    </div>
+
+    <div class="strategy-body">
+      <!-- 顶部两个卡片 -->
+      <div class="strategy-targets">
+        <div v-for="(target, index) in data.targets" :key="target.key" class="target-card">
+          <div class="target-num-box">
+            <strong :class="`color-${index}`">{{ formatValue(target.value, 2) }}</strong>
+            <span class="unit">{{ target.unit }}</span>
           </div>
-        </div>
-  
-        <div class="structure-columns">
-          <div class="structure-column">
-            <div class="column-title">实际完成结构</div>
-            <div
-              v-for="item in data.actualStructure"
-              :key="`actual-${item.label}`"
-              class="structure-row"
-            >
-              <span class="direction-dot actual-dot" />
-              <span>{{ item.label }}</span>
-              <strong>{{ formatValue(item.value) }}</strong>
-              <small>{{ item.unit }}</small>
-              <em>{{ item.percentage }}%</em>
-            </div>
+          <div class="target-label">{{ target.label }}</div>
+          <div class="target-rate-row">
+            <i class="square-dot" :class="`bg-${index}`" />
+            <span class="rate-label">完成率</span>
+            <span class="rate-val">{{ target.completionRate }}%</span>
           </div>
-  
-          <div class="structure-column">
-            <div class="column-title">十五五期间新增</div>
-            <div
-              v-for="item in data.newDuringPeriod"
-              :key="`new-${item.label}`"
-              class="structure-row"
-            >
-              <span class="direction-dot new-dot" />
-              <span>{{ item.label }}</span>
-              <strong>{{ formatValue(item.value) }}</strong>
-              <small>{{ item.unit }}</small>
-              <em>{{ item.percentage }}%</em>
-            </div>
-          </div>
+          <i :style="{ width: `${target.completionRate}%` }" :class="`bar-${index}`" />
         </div>
       </div>
-    </section>
-  </template>
-  
-  <script setup>
-  import { strategyPlanningData } from '../js/dashboardMcokData'
-  
-  defineProps({
-    data: {
-      type: Object,
-      default: () => strategyPlanningData,
-    },
+
+      <!-- 底部两列结构 -->
+      <div class="structure-columns">
+        <!-- 左列：实际完成结构 -->
+        <div class="structure-column">
+          <div class="column-title">
+            <i class="arrow-icon" />
+            实际完成结构/万kw
+          </div>
+          <div class="structure-list">
+            <div v-for="item in data.actualStructure" :key="`actual-${item.label}`" class="structure-row">
+              <span class="row-label">{{ item.label }}</span>
+              <span class="row-val">{{ formatValue(item.value, 2) }} <span class="slash">/</span> {{ formatValue(item.target || item.value, 2) }}</span>
+            </div>
+          </div>
+          <div class="structure-note" v-if="data.note1">（{{ data.note1 }}）</div>
+        </div>
+
+        <!-- 右列：十五五期间新增 -->
+        <div class="structure-column right-col">
+          <div class="column-title">
+            <i class="arrow-icon" />
+            十五五期间新增/万kw
+          </div>
+          <div class="structure-list">
+            <div v-for="item in data.newDuringPeriod" :key="`new-${item.label}`" class="structure-row">
+              <span class="row-label">{{ item.label }}:</span>
+              <span class="row-val highlight">{{ formatValue(item.value, 2) }}</span>
+            </div>
+            <!-- 特殊备注项（非化石能源...）如果是写死在数据里的 -->
+            <div class="structure-row special-row" v-if="data.note2">
+              <span class="row-label">{{ data.note2 }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</template>
+
+<script setup>
+import titleBg from '@/assets/img/qinchuan/dashbord/title-bg.png'
+import jdyjIcon from '@/assets/img/qinchuan/dashbord/jdyj.png'
+import { strategyPlanningData } from '../js/dashboardMcokData'
+
+defineProps({
+  data: { type: Object, default: () => strategyPlanningData },
+})
+
+// 加入固定小数位
+function formatValue(value, digits = 0) {
+  return Number(value || 0).toLocaleString('zh-CN', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
   })
-  
-  function formatValue(value) {
-    return Number(value || 0).toLocaleString('zh-CN', {
-      minimumFractionDigits: Number(value) % 1 ? 2 : 0,
-      maximumFractionDigits: 2,
-    })
-  }
-  </script>
-  
-  <style scoped>
-  .dashboard-panel {
-    position: relative;
-    overflow: hidden;
-    border: 1px solid rgba(67, 161, 235, 0.48);
-    border-radius: 6px;
-    background:
-      linear-gradient(135deg, rgba(15, 66, 113, 0.82), rgba(5, 23, 56, 0.85) 62%),
-      rgba(4, 19, 47, 0.86);
-    box-shadow:
-      inset 0 0 24px rgba(20, 136, 237, 0.1),
-      0 0 16px rgba(0, 116, 224, 0.13);
-  }
-  
-  .panel-heading {
-    display: flex;
-    align-items: center;
-    min-height: 33px;
-    padding: 0 10px;
-    border-bottom: 1px solid rgba(101, 189, 255, 0.27);
-    background: linear-gradient(90deg, rgba(26, 115, 185, 0.55), rgba(17, 59, 112, 0.18));
-    color: #f2f9ff;
-  }
-  
-  .heading-mark {
-    display: inline-flex;
-    width: 19px;
-    height: 19px;
-    align-items: center;
-    justify-content: center;
-    margin-right: 7px;
-    border: 1px solid rgba(160, 225, 255, 0.9);
-    border-radius: 4px;
-    color: #9ce5ff;
-    font-size: 12px;
-    box-shadow: 0 0 8px rgba(80, 198, 255, 0.5);
-  }
-  
-  .panel-title {
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-  }
-  
-  .panel-unit {
-    margin-left: auto;
-    color: #8cb5d4;
-    font-size: 10px;
-  }
-  
-  .strategy-body {
-    display: grid;
-    grid-template-rows: auto 1fr;
-    height: calc(100% - 33px);
-    min-height: 0;
-    padding: 9px;
-  }
-  
-  .strategy-targets {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 7px;
-  }
-  
-  .strategy-target {
-    position: relative;
-    min-width: 0;
-    min-height: 65px;
-    padding: 7px 8px 12px;
-    overflow: hidden;
-    border: 1px solid rgba(70, 168, 231, 0.4);
-    border-radius: 3px;
-    background: linear-gradient(135deg, rgba(28, 117, 185, 0.52), rgba(12, 50, 101, 0.35));
-  }
-  
-  .strategy-target strong {
-    display: block;
-    color: #58dcff;
-    font-size: 16px;
-    line-height: 18px;
-  }
-  
-  .strategy-target small {
-    margin-left: 3px;
-    color: #8bb3ca;
-    font-size: 8px;
-  }
-  
-  .strategy-target span {
-    display: block;
-    margin-top: 6px;
-    color: #c9eaff;
-    font-size: 9px;
-  }
-  
-  .strategy-target b {
-    position: absolute;
-    right: 7px;
-    bottom: 12px;
-    color: #80cbed;
-    font-size: 8px;
-    font-weight: 400;
-  }
-  
-  .strategy-target i {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    display: block;
-    height: 3px;
-    background: linear-gradient(90deg, #13b4e6, #69efff);
-    box-shadow: 0 0 7px rgba(50, 216, 255, 0.8);
-  }
-  
-  .strategy-target:nth-child(2) i {
-    background: linear-gradient(90deg, #13b7ae, #6ce9d3);
-    box-shadow: 0 0 7px rgba(51, 229, 208, 0.7);
-  }
-  
-  .structure-columns {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    align-content: center;
-    padding-top: 11px;
-  }
-  
-  .structure-column {
-    min-width: 0;
-  }
-  
-  .column-title {
-    margin-bottom: 7px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid rgba(80, 177, 230, 0.27);
-    color: #a7dfff;
-    font-size: 10px;
-    font-weight: 700;
-  }
-  
-  .structure-row {
-    display: grid;
-    grid-template-columns: 7px minmax(0, 1fr) auto auto auto;
-    align-items: center;
-    gap: 3px;
-    min-height: 25px;
-    color: #b9dff2;
-    font-size: 9px;
-  }
-  
-  .direction-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-  }
-  
-  .actual-dot {
-    background: #4cdbf5;
-    box-shadow: 0 0 5px #4cdbf5;
-  }
-  
-  .new-dot {
-    background: #49e3c2;
-    box-shadow: 0 0 5px #49e3c2;
-  }
-  
-  .structure-row span:not(.direction-dot) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  
-  .structure-row strong {
-    color: #d6f4ff;
-    font-size: 10px;
-  }
-  
-  .structure-row small {
-    color: #6f9db8;
-    font-size: 8px;
-  }
-  
-  .structure-row em {
-    color: #59dfff;
-    font-size: 8px;
-    font-style: normal;
-  }
-  
-  .structure-column:last-child .structure-row em {
-    color: #62e4c5;
-  }
-  
-  @media (max-height: 820px), (max-width: 1200px) {
-    .panel-heading {
-      min-height: 29px;
-    }
-  
-    .strategy-body {
-      height: calc(100% - 29px);
-      padding: 6px;
-    }
-  
-    .strategy-target {
-      min-height: 54px;
-      padding: 5px 6px 10px;
-    }
-  
-    .strategy-target strong {
-      font-size: 14px;
-    }
-  
-    .strategy-target span {
-      margin-top: 3px;
-    }
-  
-    .strategy-target b {
-      right: 6px;
-      bottom: 10px;
-    }
-  
-    .structure-columns {
-      gap: 7px;
-      padding-top: 6px;
-    }
-  
-    .column-title {
-      margin-bottom: 3px;
-      padding-bottom: 3px;
-    }
-  
-    .structure-row {
-      min-height: 20px;
-    }
-  }
-  </style>
+}
+</script>
+
+<style scoped>
+/* 基础面板框架 */
+.dashboard-panel {
+  position: relative; width: 100%; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0;
+  border: 0.93px solid transparent;
+  border-image: linear-gradient(162.05deg, rgba(165, 199, 238, 0.0001) 21.01%, #0077FF 51.91%, rgba(165, 199, 238, 0.2) 91.52%) 1;
+  border-top: none; border-radius: 0px 0px 11px 11px;
+  background: linear-gradient(180deg, rgba(16, 98, 222, 0.12) 0%, rgba(57, 126, 233, 0.11) 54.88%, rgba(19, 98, 215, 0.05) 75.82%, rgba(0, 95, 223, 0.03) 100%), linear-gradient(180deg, rgba(0, 40, 96, 0) 0%, rgba(0, 42, 95, 0.09) 23.24%, rgba(0, 42, 97, 0.23) 44.61%, rgba(0, 40, 96, 0.27) 100%);
+  backdrop-filter: blur(14px); box-shadow: inset 0 0 24px rgba(20, 136, 237, 0.1), 0 0 16px rgba(0, 116, 224, 0.13);
+}
+
+/* 统一头部 */
+.panel-heading {
+  position: absolute; top: -14px; left: 0; width: 100%; height: 42px;
+  display: flex; align-items: center; justify-content: space-between; padding: 0 12px;
+  box-sizing: border-box; background-size: 100% 100%; background-repeat: no-repeat; background-position: center; pointer-events: none;
+}
+.heading-left { display: flex; align-items: center; gap: 6px; transform: translateY(-4px); }
+.heading-img { height: 26px; width: auto; object-fit: contain; }
+.panel-title {
+  font-family: 'YouSheBiaoTiHei', sans-serif; font-size: 20px; line-height: 17px; letter-spacing: 0.04em;
+  color: #FFFFFF; -webkit-text-fill-color: #FFFFFF;
+  transform: matrix(1, 0, -0.16, 0.99, 0, 0); text-shadow: 0px 2px 4px rgba(0, 0, 0, 0.8), 0 0 8px rgba(255, 255, 255, 0.4);
+}
+.panel-location { font-family: 'PingFang SC', sans-serif; font-size: 12px; font-weight: 500; color: #fff; opacity: 0.8; transform: translateY(-4px); }
+
+/* 内容区 */
+.strategy-body {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 24px 12px 10px; gap: 12px;
+  overflow-y: auto; scrollbar-width: none;
+}
+.strategy-body::-webkit-scrollbar { display: none; }
+
+/* ============ 1. 顶部卡片 ============ */
+.strategy-targets { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex-shrink: 0; }
+.target-card {
+  position: relative; display: flex; flex-direction: column; padding: 10px 10px 14px; overflow: hidden;
+  border: 1px solid rgba(41, 145, 247, 0.2); border-radius: 4px;
+  background: linear-gradient(180deg, rgba(41, 145, 247, 0) 0%, rgba(41, 145, 247, 0.15) 100%);
+}
+.target-num-box { display: flex; align-items: baseline; gap: 4px; }
+.target-num-box strong { 
+  font-family: 'Bebas Neue', 'YouSheBiaoTiHei', sans-serif; font-size: 26px; line-height: 1; 
+}
+.target-num-box strong.color-0 { 
+  background: linear-gradient(180deg, #FFFFFF 6.94%, #09E0F3 96.03%); 
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+  text-shadow: 0px 0px 10px rgba(9, 224, 243, 0.4);
+}
+.target-num-box strong.color-1 { 
+  background: linear-gradient(180deg, #FFFFFF 10.5%, #1EA2FF 90.61%); 
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+  text-shadow: 0px 0px 10px rgba(30, 162, 255, 0.4);
+}
+.target-num-box .unit { font-family: 'PingFang SC', sans-serif; font-size: 11px; color: rgba(255,255,255,0.7); }
+
+.target-label { font-family: 'PingFang SC', sans-serif; font-size: 13px; color: #E6F7FF; margin-top: 4px; font-weight: 500;}
+.target-rate-row { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+.square-dot { width: 5px; height: 5px; border-radius: 1px; }
+.square-dot.bg-0 { background: #09E0F3; box-shadow: 0 0 4px #09E0F3; }
+.square-dot.bg-1 { background: #1EA2FF; box-shadow: 0 0 4px #1EA2FF; }
+.rate-label { font-family: 'PingFang SC', sans-serif; font-size: 11px; color: rgba(255,255,255,0.6); }
+.rate-val { font-family: 'PingFang SC', sans-serif; font-size: 12px; color: #FFF; }
+
+.target-card i { position: absolute; right: 0; bottom: 0; left: 0; display: block; height: 2px; }
+.target-card i.bar-0 { background: #09E0F3; box-shadow: 0 0 7px rgba(0, 201, 220, 0.8); }
+.target-card i.bar-1 { background: #1EA2FF; box-shadow: 0 0 7px rgba(53, 159, 232, 0.5); }
+
+/* ============ 2. 底部两列结构 ============ */
+.structure-columns { display: grid; grid-template-columns: 1.05fr 1fr; gap: 10px; flex: 1; min-height: 0; padding-top: 4px; }
+.structure-column { display: flex; flex-direction: column; }
+
+/* 右列虚线分隔 */
+.right-col { border-left: 1px dashed rgba(13, 48, 88, 1); padding-left: 12px; }
+
+/* 小标题 */
+.column-title { 
+  display: flex; align-items: center; gap: 6px; 
+  color: #E6F7FF; font-family: 'PingFang SC', sans-serif; font-size: 12px; 
+  font-weight: bold; margin-bottom: 8px; white-space: nowrap;
+}
+/* 三角形箭头 */
+.arrow-icon { 
+  display: inline-block; width: 0; height: 0;
+  border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  border-left: 6px solid #0AE4F5; 
+  filter: drop-shadow(0 0 3px #0AE4F5);
+}
+
+/* 列表容器 */
+.structure-list { display: flex; flex-direction: column; gap: 6px; }
+
+/* 单行数据 */
+.structure-row { display: flex; align-items: center; justify-content: space-between; min-height: 18px; }
+.structure-row .row-label { color: #E6F7FF; font-family: 'PingFang SC', sans-serif; font-size: 12px; white-space: nowrap; }
+.structure-row .row-val { color: #8CC8FF; font-family: 'PingFang SC', sans-serif; font-size: 12px; white-space: nowrap; margin-left: 8px;}
+.structure-row .slash { color: rgba(255,255,255,0.3); margin: 0 2px; }
+
+/* 右列数值高亮 */
+.structure-row .row-val.highlight { color: #00BBFF; font-weight: 500; }
+
+/* 特殊行（非化石能源） */
+.special-row { justify-content: flex-start; margin-top: 2px;}
+.special-row .row-label { color: #00E5FF; font-weight: 500; white-space: normal;}
+
+/* 底部备注（户用光伏） */
+.structure-note { color: #00E5FF; font-family: 'PingFang SC', sans-serif; font-size: 11px; margin-top: 4px; white-space: nowrap;}
+</style>

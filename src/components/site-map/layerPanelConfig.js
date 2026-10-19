@@ -37,7 +37,7 @@ export const PANEL_GROUPS = [
       ],
     },
     {
-      label: '规划元素',
+      label: '地物数据',
       items: [
         { id: 'building',    name: '建筑物体',   color: '#1e40af', type: 'whln' },
         { id: 'forest',      name: '林地',       color: '#4ade80', type: 'whln' },

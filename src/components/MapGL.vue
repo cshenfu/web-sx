@@ -211,9 +211,6 @@ function addPolygon({ id, geojson, color = '#4fc3ff', opacity = 0.7, outlineColo
   addedLayers.add(`${id}-outline`)
 }
 
-// ========================================================
-// 新增：支持 expression 的 fill 图层（用于市级分档）
-// ========================================================
 function addFillLayer({
   id,
   geojson,
@@ -250,8 +247,62 @@ function addFillLayer({
 }
 
 // ========================================================
-// 新增：通用 symbol 图层（支持完整 layout/paint）
+// ★ 遮罩图层（反遮罩 / 带洞 fill，支持透明度渐变）
 // ========================================================
+function addMaskLayer({
+  id,
+  geojson,
+  color = '#000000',
+  opacity = 0,
+  fadeDuration = 300,
+}) {
+  if (!map) return false
+  if (map.getSource(id)) {
+    map.getSource(id).setData(geojson)
+    if (map.getLayer(id)) {
+      map.setPaintProperty(id, 'fill-color', color)
+    }
+    return true
+  }
+  map.addSource(id, { type: 'geojson', data: geojson })
+  map.addLayer({
+    id,
+    type: 'fill',
+    source: id,
+    paint: {
+      'fill-color': color,
+      'fill-opacity': opacity,
+      'fill-opacity-transition': { duration: fadeDuration, delay: 0 },
+    },
+  })
+  addedLayers.add(id)
+  return true
+}
+
+function setMaskOpacity(id, opacity) {
+  if (!map || !map.getLayer(id)) return
+  map.setPaintProperty(id, 'fill-opacity', opacity)
+}
+
+function bringMaskToTop(id) {
+  if (!map || !map.getLayer(id)) return
+  const layers = map.getStyle()?.layers || []
+  if (!layers.length) return
+  const top = layers[layers.length - 1]
+  if (top.id !== id) map.moveLayer(id)
+}
+
+function hasMaskLayer(id) {
+  return !!(map && map.getLayer(id))
+}
+
+function removeMaskLayer(id) {
+  if (!map) return
+  if (map.getLayer(id)) map.removeLayer(id)
+  if (map.getSource(id)) map.removeSource(id)
+  addedLayers.delete(id)
+}
+
 function addSymbolLayer({ id, geojson, layout = {}, paint = {} }) {
   if (!map) return
   if (!map.getSource(id)) {
@@ -528,10 +579,6 @@ function addLabels({ id, geojson, textField = 'name', textColor = '#fff', textSi
   addedLayers.add(id)
 }
 
-// ========================================================
-// 图片图标点位
-// ========================================================
-
 async function ensureImage(iconId, iconUrl, timeout = 8000) {
   if (!map || !iconId || !iconUrl) {
     throw new Error(`ensureImage 参数不合法: iconId=${iconId}, iconUrl=${iconUrl}`)
@@ -613,10 +660,6 @@ async function addImagePoints({
   addedLayers.add(id)
 }
 
-// ========================================================
-// 事件
-// ========================================================
-
 function removeLayer(id) {
   if (!map) return
   unbindHover(id)
@@ -671,6 +714,12 @@ defineExpose({
   loadEditableAreas,
   clearEditableAreas,
   getEditableAreas,
+  // ★ 遮罩相关
+  addMaskLayer,
+  setMaskOpacity,
+  bringMaskToTop,
+  hasMaskLayer,
+  removeMaskLayer,
   getMap: () => map,
   getDraw: () => draw,
 })
@@ -682,5 +731,13 @@ defineExpose({
   inset: 0;
   width: 100%;
   height: 100%;
+}
+
+:deep(.maplibregl-ctrl-top-right){
+  display: none;
+}
+
+:deep(.maplibregl-ctrl-bottom-right){
+  display: none;
 }
 </style>

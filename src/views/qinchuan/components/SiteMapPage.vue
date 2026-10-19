@@ -515,6 +515,18 @@ const props = defineProps({
   },
   showConfigPage: { type: Boolean, default: false },
   showVerifyPanelFlag: { type: Boolean, default: false },
+  // ★ 陕西省遮罩开关
+  enableShaanxiMask: { type: Boolean, default: true },
+  // ★ 遮罩开始显现的 zoom（低于此值完全透明）
+  maskMinZoom: { type: Number, default: 4.5 },
+  // ★ 遮罩完全显现的 zoom（高于此值达到最大不透明度）
+  maskFullZoom: { type: Number, default: 6.5 },
+  // ★ 遮罩最大不透明度（1 = 完全黑，0.9 更柔和，能透出底图）
+  maskMaxOpacity: { type: Number, default: 1 },
+  // ★ 遮罩颜色
+  maskColor: { type: String, default: '#0b1e3a' },
+  // ★ 透明度变化的过渡时长（ms），让状态切换更平滑
+  maskFadeDuration: { type: Number, default: 300 },
 })
 const emits = defineEmits(['featureVisibleChange'])
 
@@ -679,7 +691,6 @@ function onLayerToggle(item) {
   const isOn = layerVisibleIds.value.includes(item.id)
 
   if (item.type === 'whln') {
-    // 归 whln 管：更新 visibleIds，再同步给插件
     const next = isOn
       ? layerVisibleIds.value.filter((id) => id !== item.id)
       : [...layerVisibleIds.value, item.id]
@@ -690,7 +701,6 @@ function onLayerToggle(item) {
     return
   }
 
-  // 非 whln 层：走各自的分支
   if (item.type === 'base') {
     toggleBaseMap(item.id)
   } else if (item.type === 'terrain') {
@@ -709,25 +719,17 @@ function onLayerInputChange({ id, value }) {
   layerInputs[id] = value
   if (id === 'noise') {
     // TODO: 根据噪音距离更新地图缓冲半径等逻辑
-    // updateNoiseBuffer(value)
   }
 }
 
-// 底图切换（按你的项目逻辑实现）
 function toggleBaseMap(id) {
-  // 例：
-  // if (id === 'base-satellite') mapRef.value?.getMap?.().setStyle(satelliteStyle)
-  // if (id === 'base-resource') mapRef.value?.getMap?.().setStyle(defaultStyle)
+  // 按项目逻辑实现
 }
-
-// 3D 地形开关（按你的项目逻辑实现）
 function toggleTerrain(id) {
-  // 例：mapRef.value?.getMap?.().setTerrain({ source: 'terrain-dem', exaggeration: 1.5 })
+  // 按项目逻辑实现
 }
-
-// 自定义覆盖物（测风塔 / 风机 / 道路 / 线路等）
 function toggleCustomLayer(id) {
-  // 这里按需要 addLayer / removeLayer
+  // 按项目逻辑实现
 }
 
 // =================== 创建项目 ===================
@@ -1057,6 +1059,185 @@ function hideCityStats() {
   mapRef.value?.removeLayer(`${CITY_LAYER_ID}-labels`)
 }
 
+// =================== ★ 陕西省遮罩（渐进式淡入淡出） ===================
+const MASK_LAYER_ID = 'shaanxi-mask'
+const MASK_SOURCE_ID = 'shaanxi-mask-src'
+const SHAANXI_BOUNDARY_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/610000.json'
+// 陕西省外接范围，用于判断视野是否与陕西相交
+const SHAANXI_BOUNDS = [[105.4, 31.7], [111.2, 39.6]]
+
+let shaanxiBoundaryCache = null
+// 记录上一帧写入的不透明度，避免每帧都 setPaintProperty
+let lastMaskOpacity = -1
+
+async function loadShaanxiBoundary() {
+  if (shaanxiBoundaryCache) return shaanxiBoundaryCache
+  const res = await fetch(SHAANXI_BOUNDARY_URL)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  shaanxiBoundaryCache = await res.json()
+  return shaanxiBoundaryCache
+}
+
+// —— 环方向工具 ——
+function ensureClosed(ring) {
+  if (!ring || ring.length < 3) return ring
+  const first = ring[0]
+  const last = ring[ring.length - 1]
+  if (first[0] === last[0] && first[1] === last[1]) return ring
+  return [...ring, [first[0], first[1]]]
+}
+
+function ringSignedArea(ring) {
+  if (!ring || ring.length < 3) return 0
+  let area = 0
+  for (let i = 0; i < ring.length - 1; i++) {
+    const [x1, y1] = ring[i]
+    const [x2, y2] = ring[i + 1]
+    area += x1 * y2 - x2 * y1
+  }
+  return area / 2
+}
+
+function ensureOuterCCW(ring) {
+  const r = ensureClosed(ring)
+  return ringSignedArea(r) >= 0 ? r : r.slice().reverse()
+}
+
+function ensureHoleCW(ring) {
+  const r = ensureClosed(ring)
+  return ringSignedArea(r) <= 0 ? r : r.slice().reverse()
+}
+
+// 世界外环（CCW），作为反遮罩的外边界
+const WORLD_OUTER = ensureOuterCCW([
+  [-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85],
+])
+
+function buildMaskGeoJSON(boundary) {
+  const holes = []
+  for (const feature of boundary?.features || []) {
+    const geom = feature?.geometry
+    if (!geom) continue
+    const polygons = geom.type === 'Polygon'
+      ? [geom.coordinates]
+      : geom.type === 'MultiPolygon'
+        ? geom.coordinates
+        : []
+    for (const polygon of polygons) {
+      const outerRing = polygon?.[0]
+      if (!outerRing || outerRing.length < 4) continue
+      holes.push(ensureHoleCW(outerRing))
+    }
+  }
+  if (!holes.length) return { type: 'FeatureCollection', features: [] }
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'Polygon', coordinates: [WORLD_OUTER, ...holes] },
+      },
+    ],
+  }
+}
+
+async function ensureShaanxiMask() {
+  if (!props.enableShaanxiMask || !mapReady.value) return
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+  if (map.getLayer(MASK_LAYER_ID)) { syncMaskVisibility(true); return }
+
+  try {
+    const boundary = await loadShaanxiBoundary()
+    const data = buildMaskGeoJSON(boundary)
+    if (!data.features.length) return
+
+    if (!map.getSource(MASK_SOURCE_ID)) {
+      map.addSource(MASK_SOURCE_ID, { type: 'geojson', data })
+    }
+
+    map.addLayer({
+      id: MASK_LAYER_ID,
+      type: 'fill',
+      source: MASK_SOURCE_ID,
+      paint: {
+        'fill-color': props.maskColor,
+        // 初始为 0，后面 syncMaskVisibility 会按 zoom 算出来
+        'fill-opacity': 0,
+        // ★ 关键：不透明度变化自动过渡，避免任何闪跳
+        'fill-opacity-transition': {
+          duration: props.maskFadeDuration,
+          delay: 0,
+        },
+      },
+    })
+
+    lastMaskOpacity = -1
+    syncMaskVisibility(true)
+  } catch (err) {
+    console.warn('[mask] 陕西省遮罩加载失败:', err)
+  }
+}
+
+function removeShaanxiMask() {
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+  if (map.getLayer(MASK_LAYER_ID)) map.removeLayer(MASK_LAYER_ID)
+  if (map.getSource(MASK_SOURCE_ID)) map.removeSource(MASK_SOURCE_ID)
+  lastMaskOpacity = -1
+}
+
+// 视野是否与陕西外接矩形相交
+function viewIntersectsShaanxi(map) {
+  const b = map.getBounds()
+  const west = Math.max(-180, Math.min(180, b.getWest()))
+  const east = Math.max(-180, Math.min(180, b.getEast()))
+  const south = Math.max(-90, Math.min(90, b.getSouth()))
+  const north = Math.max(-90, Math.min(90, b.getNorth()))
+  if (west > east) return false
+  const [[sw, ss], [ne, nn]] = SHAANXI_BOUNDS
+  return !(east < sw || west > ne || north < ss || south > nn)
+}
+
+// smoothstep：两端切线为 0，比线性更自然
+function smoothstep(edge0, edge1, x) {
+  if (edge1 <= edge0) return x >= edge1 ? 1 : 0
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)))
+  return t * t * (3 - 2 * t)
+}
+
+// 计算当前帧应有的不透明度
+function computeMaskOpacity() {
+  if (!props.enableShaanxiMask) return 0
+  const map = mapRef.value?.getMap?.()
+  if (!map) return 0
+  // 视野完全离开陕西 → 不显示（靠 transition 平滑淡出）
+  if (!viewIntersectsShaanxi(map)) return 0
+  const z = map.getZoom()
+  const t = smoothstep(props.maskMinZoom, props.maskFullZoom, z)
+  return t * props.maskMaxOpacity
+}
+
+function syncMaskVisibility(force = false) {
+  if (!props.enableShaanxiMask) return
+  const map = mapRef.value?.getMap?.()
+  if (!map || !map.getLayer(MASK_LAYER_ID)) return
+
+  // 保证遮罩始终在最顶层
+  const styleLayers = map.getStyle()?.layers || []
+  const topLayer = styleLayers[styleLayers.length - 1]
+  if (topLayer && topLayer.id !== MASK_LAYER_ID) {
+    map.moveLayer(MASK_LAYER_ID)
+  }
+
+  const target = computeMaskOpacity()
+  // 节流：变化小于 0.01 就不写，避免频繁 setPaintProperty
+  if (!force && Math.abs(target - lastMaskOpacity) < 0.01) return
+  lastMaskOpacity = target
+  map.setPaintProperty(MASK_LAYER_ID, 'fill-opacity', target)
+}
+
 // =================== 项目数据 ===================
 function getProjectCoords(project) {
   return (project.coordinate || [])
@@ -1195,6 +1376,9 @@ async function renderProjectsByStage(stage) {
       fallbackColor: '#ef4444', fallbackRadius: 3,
     })
   }
+
+  // 项目图层可能被新建在遮罩之上，重新保证置顶
+  syncMaskVisibility()
 }
 
 async function fetchMapProjects() {
@@ -1260,7 +1444,7 @@ function updateDetailCardPosition() {
 
 function handleMapBlankClick(e) {
   if (!isAreaView.value || !selectedProject.value) return
-  const map = mapRef.value?.getMap()
+  const map = mapRef.value?.getMap?.()
   if (!map) return
   const areaLayerIds = []
   for (const id of renderedLayerIds) {
@@ -1630,7 +1814,13 @@ async function onMapReady() {
     await renderCityStats()
   }
 
-  // ★ 挂载 whln 图层控制插件（保留 API，隐藏 UI）
+  // ★ 陕西省遮罩监听
+  map.on('zoom', syncMaskVisibility)
+  map.on('move', syncMaskVisibility)
+  map.on('style.load', ensureShaanxiMask)
+  await ensureShaanxiMask()
+
+  // ★ whln 图层控制插件
   try {
     whlnPlugin = attachLayerControl(map, {
       beforeId: 'site-city-stats',
@@ -1639,7 +1829,6 @@ async function onMapReady() {
       showLayerDetail: false,
     })
 
-    // 隐藏插件自带的 UI：等一帧让它渲染，然后移除 DOM 容器
     await nextTick()
     const hideWhlnUI = () => {
       document
@@ -1648,25 +1837,27 @@ async function onMapReady() {
     }
     hideWhlnUI()
 
-    // 兜底：防止插件内部再重渲染出面板
     const ctrlHost = document.querySelector('.maplibregl-ctrl-bottom-left')
     let lcHider = null
     if (ctrlHost) {
-      lcHider = new MutationObserver(hideWhlnUI)
+      lcHider = new MutationObserver(() => {
+        hideWhlnUI()
+        // whln 图层若在遮罩之上，重新置顶
+        syncMaskVisibility()
+      })
       lcHider.observe(ctrlHost, { childList: true })
-      // 存起来，onUnmounted 里断开
       window.__whlnLcHider = lcHider
     }
 
-    // 用 chip 面板当前状态反向同步给插件
     const whlnOnly = layerVisibleIds.value.filter((id) => WHLN_LAYER_IDS.includes(id))
     whlnPlugin.setVisibleIds?.(whlnOnly)
 
-    // 插件内部变化时同步回 chip 面板
     whlnPlugin.subscribe?.((ids) => {
       const others = layerVisibleIds.value.filter((id) => !WHLN_LAYER_IDS.includes(id))
       layerVisibleIds.value = [...others, ...ids]
       emits('featureVisibleChange', ids)
+      // 图层显隐变化后，保证遮罩仍置顶
+      syncMaskVisibility()
     })
   } catch (err) {
     console.warn('[whln] 图层控制挂载失败:', err)
@@ -1696,6 +1887,9 @@ onUnmounted(() => {
     map.off('move', updateDetailCardPosition)
     map.off('zoom', updateDetailCardPosition)
     map.off('click', handleMapBlankClick)
+    map.off('zoom', syncMaskVisibility)
+    map.off('move', syncMaskVisibility)
+    map.off('style.load', ensureShaanxiMask)
   }
 })
 </script>

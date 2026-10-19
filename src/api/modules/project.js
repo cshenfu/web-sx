@@ -40,3 +40,9 @@ export async function submitThreeStepParam(type, data) {
 export async function getThreeStepDynamicParam(projectType, projectId) {
     return await publicService5.get('/web/project/detail/step3-default-param_v2/' + projectId + '/' + projectType);
 }
+
+
+//获取ai项目主要信息
+export async function getAiProjectData(projectId) {
+    return await publicService4.get(`/ai/api/projectRelation/main-info?aiProjectId=${projectId}`);
+}

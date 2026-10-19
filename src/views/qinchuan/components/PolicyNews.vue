@@ -1,13 +1,23 @@
 <template>
-    <section class="dashboard-panel news-panel">
-      <div class="panel-heading">
-        <span class="heading-mark">●</span>
-        <span class="panel-title">政策新闻</span>
-        <span class="panel-unit">POLICY NEWS</span>
+  <section class="dashboard-panel news-panel">
+    <div class="news-body">
+      <!-- 左侧：大图标（无边框，直接展示） -->
+      <div class="icon-wrapper">
+        <img :src="newsIcon" class="big-icon" alt="政策新闻" />
       </div>
-  
-      <div class="news-body">
-        <img class="news-icon" :src="newsIcon" alt="" />
+
+      <!-- 右侧：内容区 -->
+      <div class="news-content">
+        <!-- 顶部标题行 -->
+        <div class="news-header">
+          <div class="title-box">
+            <span class="new-tag">NEW</span>
+            <span class="title-text">政策新闻</span>
+          </div>
+          <span class="more-link" @click="emit('more-click')">更多 &gt;&gt;</span>
+        </div>
+
+        <!-- 新闻列表：支持滚动 -->
         <div class="news-list">
           <button
             v-for="news in items"
@@ -16,159 +26,195 @@
             class="news-item"
             @click="emit('news-click', news)"
           >
-            <span class="news-bullet">›</span>
+            <span class="news-tag">集团</span>
             <span class="news-title">{{ news.title }}</span>
-            <time>{{ news.date }}</time>
+            <time class="news-date">{{ news.date }}</time>
           </button>
         </div>
       </div>
-    </section>
-  </template>
+    </div>
+  </section>
+</template>
+
+<script setup>
+import newsIcon from '@/assets/img/qinchuan/dashbord/zcxw.png'
+import { policyNewsData } from '../js/dashboardMcokData'
+
+defineProps({
+  items: { type: Array, default: () => policyNewsData },
+})
+
+const emit = defineEmits(['news-click', 'more-click'])
+</script>
+
+<style scoped>
+/* ⭐️ 完全去掉边框，只保留给定的渐变背景 */
+.dashboard-panel {
+  position: relative; 
+  width: 100%; 
+  height: 100%; 
+  box-sizing: border-box; 
+  display: flex; 
+  flex-direction: column; 
+  min-height: 0;
   
-  <script setup>
-  import newsIcon from '@/assets/img/qinchuan/dashbord/zc.png'
-  import { policyNewsData } from '../js/dashboardMcokData'
+  /* 去除边框，使用你提供的渐变 */
+  border: none;
+  border-radius: 4px; 
+  background: linear-gradient(90deg, rgba(41, 145, 247, 0.3) 0%, rgba(41, 145, 247, 0) 100%);
   
-  defineProps({
-    items: {
-      type: Array,
-      default: () => policyNewsData,
-    },
-  })
-  
-  const emit = defineEmits(['news-click'])
-  </script>
-  
-  <style scoped>
-  .dashboard-panel {
-    position: relative;
-    overflow: hidden;
-    border: 1px solid rgba(67, 161, 235, 0.48);
-    border-radius: 6px;
-    background:
-      linear-gradient(135deg, rgba(15, 66, 113, 0.82), rgba(5, 23, 56, 0.85) 62%),
-      rgba(4, 19, 47, 0.86);
-    box-shadow:
-      inset 0 0 24px rgba(20, 136, 237, 0.1),
-      0 0 16px rgba(0, 116, 224, 0.13);
-  }
-  
-  .panel-heading {
-    display: flex;
-    align-items: center;
-    min-height: 33px;
-    padding: 0 10px;
-    border-bottom: 1px solid rgba(101, 189, 255, 0.27);
-    background: linear-gradient(90deg, rgba(26, 115, 185, 0.55), rgba(17, 59, 112, 0.18));
-    color: #f2f9ff;
-  }
-  
-  .heading-mark {
-    display: inline-flex;
-    width: 19px;
-    height: 19px;
-    align-items: center;
-    justify-content: center;
-    margin-right: 7px;
-    border: 1px solid rgba(160, 225, 255, 0.9);
-    border-radius: 4px;
-    color: #9ce5ff;
-    font-size: 10px;
-    box-shadow: 0 0 8px rgba(80, 198, 255, 0.5);
-  }
-  
-  .panel-title {
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-  }
-  
-  .panel-unit {
-    margin-left: auto;
-    color: #8cb5d4;
-    font-size: 9px;
-  }
-  
-  .news-body {
-    display: flex;
-    height: calc(100% - 33px);
-    min-height: 0;
-    align-items: center;
-    gap: 9px;
-    padding: 8px 9px;
-  }
-  
-  .news-icon {
-    width: 39px;
-    height: 39px;
-    flex: 0 0 auto;
-    object-fit: contain;
-    filter: drop-shadow(0 0 8px rgba(73, 199, 255, 0.45));
-  }
-  
-  .news-list {
-    min-width: 0;
-    flex: 1;
-  }
-  
-  .news-item {
-    display: grid;
-    width: 100%;
-    grid-template-columns: 9px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 3px;
-    min-height: 22px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: #b8dff1;
-    cursor: pointer;
-    text-align: left;
-  }
-  
-  .news-item:hover {
-    color: #6ceaff;
-  }
-  
-  .news-bullet {
-    color: #52dff8;
-    font-size: 14px;
-  }
-  
-  .news-title {
-    overflow: hidden;
-    font-size: 9px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  
-  .news-item time {
-    color: #6794b1;
-    font-size: 8px;
-  }
-  
-  @media (max-height: 820px), (max-width: 1200px) {
-    .panel-heading {
-      min-height: 29px;
-    }
-  
-    .news-body {
-      height: calc(100% - 29px);
-      gap: 6px;
-      padding: 5px 6px;
-    }
-  
-    .news-icon {
-      width: 31px;
-      height: 31px;
-    }
-  
-    .news-item {
-      min-height: 19px;
-    }
-  
-    .news-title {
-      font-size: 8px;
-    }
-  }
-  </style>
+  margin-top: 0 !important;
+  /* 移除 overflow: hidden 以允许内部滚动 */
+}
+
+/* 左右布局 */
+.news-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center; /* 垂直居中，图标自然占位 */
+  gap: 16px;
+  padding: 0 12px;
+}
+
+/* 左侧图标（去除所有框） */
+.icon-wrapper {
+  flex: 0 0 auto;
+  width: 80px; 
+  height: 80px; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.big-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(0, 150, 255, 0.6));
+}
+
+/* 右侧内容区 */
+.news-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  box-sizing: border-box;
+}
+
+/* 标题行 */
+.news-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  flex-shrink: 0; /* 标题不允许被压缩 */
+}
+
+.title-box {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.new-tag {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  color: #127EFF;
+  font-style: italic;
+  text-shadow: 0 0 6px rgba(18, 126, 255, 0.5);
+}
+
+.title-text {
+  font-family: 'YouSheBiaoTiHei', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  font-style: italic;
+  color: #FFFFFF;
+  letter-spacing: 1px;
+  transform: skewX(-8deg);
+  text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+}
+
+.more-link {
+  font-family: 'PingFang SC', sans-serif;
+  font-size: 11px;
+  color: #00E5FF;
+  cursor: pointer;
+  transform: translateY(-2px);
+}
+
+/* ⭐️ 列表区：支持内部滚动 */
+.news-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto; /* 允许滚动 */
+  scrollbar-width: none; /* 隐藏滚动条但保持可滚动 */
+}
+
+.news-list::-webkit-scrollbar {
+  display: none;
+}
+
+.news-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  flex-shrink: 0; /* 防止滚动时被压缩 */
+}
+
+.news-item:hover .news-title {
+  color: #6ceaff;
+}
+
+/* 标签 */
+.news-tag {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 18px;
+  background: rgba(18, 125, 252, 0.2); /* 稍微加深一点背景以适配无边框 */
+  border-radius: 2px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #1177F4;
+  margin-right: 8px;
+}
+
+/* 标题 */
+.news-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'PingFang SC', sans-serif;
+  font-size: 11px;
+  color: #E6F7FF;
+  transition: color 0.2s;
+}
+
+/* 日期 */
+.news-date {
+  flex-shrink: 0;
+  margin-left: 10px;
+  font-family: 'PingFang SC', sans-serif;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+</style>

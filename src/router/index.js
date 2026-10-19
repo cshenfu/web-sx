@@ -110,7 +110,6 @@ const routes = [
     component: MainLayout,
     children: [
       // 研评智坊首页
-      // 注意：这里不设置 sidebar，因此首页没有侧边栏
       {
         path: '',
         name: 'YanpingIndex',
@@ -180,12 +179,19 @@ const routes = [
       // ─────────────────────────────────────────
       {
         path: 'budget',
-        redirect: '/yanping/budget/project',
+        redirect: '/yanping/budget/project', // 默认进项目页
         children: [
+          // 侧边栏“首页”如果指向这里，直接重定向回整个大首页
+          {
+            path: 'home',
+            redirect: '/yanping' 
+          },
+          // 1. 创建
           {
             path: 'create',
             name: 'BudgetCreate',
-            component: () => import('@/views/yanping/budget/Create.vue'),
+            // 替换为你复制过来的真实组件路径
+            component: () => import('@/views/yanping/budget/estimateProject/estimateList/estimateTemplateList.vue'),
             meta: {
               title: '技经概算-创建',
               module: 'yanping',
@@ -193,10 +199,12 @@ const routes = [
               key: 'create'
             }
           },
+          // 2. 项目
           {
             path: 'project',
             name: 'BudgetProject',
-            component: () => import('@/views/yanping/budget/Project.vue'),
+            // 替换为你复制过来的真实组件路径
+            component: () => import('@/views/yanping/budget/estimateProject/estimateList/estimateList.vue'),
             meta: {
               title: '技经概算-项目',
               module: 'yanping',
@@ -204,6 +212,7 @@ const routes = [
               key: 'project'
             }
           },
+          // 3. 草稿（保持原样）
           {
             path: 'draft',
             name: 'BudgetDraft',
@@ -225,21 +234,53 @@ const routes = [
               sidebar: 'yanping-budget',
               key: 'default-project'
             }
+          },
+          // ========== 下面是子页面（不在左侧菜单显示，但需保留防止 404） ==========
+          // 预览页（如果在“项目”里点击进入预览）
+          {
+            path: 'newTemplatePreview',
+            name: 'BudgetNewTemplatePreview',
+            component: () => import('@/views/yanping/budget/estimateProject/templatePreview/NewTemplatePreview.vue'),
+            meta: {
+              title: '新项目预览',
+              module: 'yanping',
+              sidebar: 'yanping-budget',
+              key: 'project' // 保持在左侧菜单高亮“项目”
+            }
+          },
+          // 模版设置（如果在“项目”里点击进入设置）
+          {
+            path: 'set',
+            name: 'BudgetSet',
+            component: () => import('@/views/yanping/budget/estimateProject/estimateList/index2.vue'),
+            meta: {
+              title: '模版设置',
+              module: 'yanping',
+              sidebar: 'yanping-budget',
+              key: 'project' // 保持在左侧菜单高亮“项目”
+            }
           }
         ]
       },
 
-      // ─────────────────────────────────────────
+            // ─────────────────────────────────────────
       // 财务评价
       // ─────────────────────────────────────────
       {
         path: 'finance',
-        redirect: '/yanping/finance/project',
+        redirect: '/yanping/finance/project', // 默认进项目页
         children: [
+          // 侧边栏“首页”统一重定向回研评智坊总首页
+          {
+            path: 'home',
+            redirect: '/yanping'
+          },
+          // 1. 创建
           {
             path: 'create',
             name: 'FinanceCreate',
-            component: () => import('@/views/yanping/finance/Create.vue'),
+            // 替换为你复制过来的真实组件路径
+            component: () => import('@/views/yanping/finance/financeEval/create/Create.vue'),
             meta: {
               title: '财务评价-创建',
               module: 'yanping',
@@ -247,10 +288,12 @@ const routes = [
               key: 'create'
             }
           },
+          // 2. 项目
           {
             path: 'project',
             name: 'FinanceProject',
-            component: () => import('@/views/yanping/finance/Project.vue'),
+            // 替换为你复制过来的真实组件路径
+            component: () => import('@/views/yanping/finance/financeEval/project/Project.vue'),
             meta: {
               title: '财务评价-项目',
               module: 'yanping',
@@ -258,6 +301,7 @@ const routes = [
               key: 'project'
             }
           },
+          // 3. 草稿（保持原样占位）
           {
             path: 'draft',
             name: 'FinanceDraft',
@@ -278,6 +322,19 @@ const routes = [
               module: 'yanping',
               sidebar: 'yanping-finance',
               key: 'default-project'
+            }
+          },
+          // ========== 下面是子页面（不在左侧菜单显示，但需保留防止 404） ==========
+          // 项目预览
+          {
+            path: 'preview',
+            name: 'FinancePreview',
+            component: () => import('@/views/yanping/finance/financeEval/preview/FinancePreview.vue'),
+            meta: {
+              title: '财务评价-项目预览',
+              module: 'yanping',
+              sidebar: 'yanping-finance',
+              key: 'project' // 强制左侧菜单高亮“项目”
             }
           }
         ]
