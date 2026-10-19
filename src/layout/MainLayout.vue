@@ -82,6 +82,7 @@ onUnmounted(() => {
 
 .page-content.no-sidebar {
   width: 100%;
+  border-radius:0;
 }
 
 .no-sidebar .dashboard-page{
