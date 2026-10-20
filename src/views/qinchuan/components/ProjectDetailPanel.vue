@@ -407,9 +407,10 @@ function handleMeetingUploadSaved() {
 <style scoped>
 .detail-panel {
   position: fixed;
-  top: 0;
+  top: 65px;
+  height:calc(100vh - 65px);
   right: 0;
-  bottom: 0;
+  /* bottom: 0; */
   width: 520px;
   z-index: 200;
   display: flex;

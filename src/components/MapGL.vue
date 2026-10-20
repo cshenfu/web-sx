@@ -10,10 +10,8 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import MapboxDraw from '@mapbox/mapbox-gl-draw'
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 
-// 导入 Worker 文件，Vite 会将其打包并返回正确的 URL
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 
-// 在创建任何地图实例之前，设置 Worker URL
 if (typeof maplibregl.setWorkerUrl === 'function') {
   maplibregl.setWorkerUrl(workerUrl)
 }
@@ -21,7 +19,14 @@ if (typeof window !== 'undefined' && !window.mapboxgl) {
   window.mapboxgl = maplibregl
 }
 
-const emit = defineEmits(['ready', 'draw-update', 'draw-create', 'draw-delete'])
+const emit = defineEmits([
+  'ready', 
+  'draw-update', 
+  'draw-create', 
+  'draw-delete',
+  'box-select',   
+  'point-drag'    
+])
 
 const props = defineProps({
   style: {
@@ -40,6 +45,16 @@ const addedLayers = new Set()
 const lastHighlightBySource = new Map()
 const clickHandlers = new Map()
 const imageCache = new Map()
+
+// ★ 交互状态
+let draggingFeatureId = null
+let isBoxSelecting = false
+let boxStartPoint = null
+const boxOverlayId = 'box-select-overlay'
+
+// ★ 用于区分点击和拖拽
+let mousedownPoint = null
+let mousedownFeatureId = null
 
 const drawStyles = [
   {
@@ -79,15 +94,16 @@ const drawStyles = [
     filter: ['all', ['==', '$type', 'Point'], ['==', 'meta', 'midpoint']],
     paint: { 'circle-radius': 3, 'circle-color': '#FFD700' },
   },
+  // ★ 把点的样式改大且加重描边，防止在密集图标里点不中
   {
     id: 'gl-draw-point-inactive', type: 'circle',
     filter: ['all', ['==', 'active', 'false'], ['==', '$type', 'Point'], ['==', 'meta', 'feature']],
-    paint: { 'circle-radius': 5, 'circle-color': '#22c55e', 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 },
+    paint: { 'circle-radius': 7, 'circle-color': '#22c55e', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 },
   },
   {
     id: 'gl-draw-point-active', type: 'circle',
     filter: ['all', ['==', 'active', 'true'], ['==', '$type', 'Point'], ['!=', 'meta', 'midpoint']],
-    paint: { 'circle-radius': 6, 'circle-color': '#FFD700', 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 },
+    paint: { 'circle-radius': 9, 'circle-color': '#FFD700', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 },
   },
 ]
 
@@ -116,6 +132,10 @@ onMounted(() => {
   map.on('draw.create', (e) => emit('draw-create', e.features))
   map.on('draw.delete', (e) => emit('draw-delete', e.features))
 
+  // 绑定自定义交互
+  bindPointInteraction()
+  bindBoxSelect()
+
   map.on('load', () => {
     if (typeof map.setProjection === 'function') {
       map.setProjection({ type: 'globe' })
@@ -143,6 +163,167 @@ onUnmounted(() => {
   draw = null
 })
 
+// ======================== ★ 自定义单点交互（点击/拖拽） ========================
+
+// ★ 把 Draw 的点图层强制移到最上层
+function bringDrawPointsToTop() {
+  if (!map) return
+  const layersToTop = ['gl-draw-point-inactive', 'gl-draw-point-active']
+  layersToTop.forEach(layerId => {
+    if (map.getLayer(layerId)) {
+      map.moveLayer(layerId)
+    }
+  })
+}
+function bindPointInteraction() {
+  if (!map) return
+  const pointLayers = ['gl-draw-point-inactive', 'gl-draw-point-active']
+
+  // ★ 辅助函数：安全地查图层（防止控制台报错）
+  const safeQueryFeatures = (point) => {
+    const existingLayers = pointLayers.filter(l => map.getLayer(l))
+    if (!existingLayers.length) return []
+    return map.queryRenderedFeatures(point, { layers: existingLayers })
+  }
+
+  map.on('mousemove', (e) => {
+    if (isBoxSelecting || draggingFeatureId) return
+    const features = safeQueryFeatures(e.point)
+    if (features.length) {
+      map.getCanvas().style.cursor = 'pointer'
+    } else {
+      map.getCanvas().style.cursor = ''
+    }
+  })
+
+  map.on('mousedown', (e) => {
+    if (isBoxSelecting) return
+    if (e.originalEvent.button !== 0) return
+
+    const features = safeQueryFeatures(e.point)
+    if (!features.length) {
+      mousedownPoint = e.point
+      mousedownFeatureId = null
+      return
+    }
+
+    mousedownPoint = e.point
+    mousedownFeatureId = features[0].id || features[0].properties?.id
+    e.preventDefault() 
+  })
+
+  // mousemove 和 mouseup 保持你上一次的代码不变
+}
+
+// ======================== 自定义矩形框选 ========================
+function bindBoxSelect() {
+  if (!map) return
+
+  map.on('mousedown', (e) => {
+    if (!isBoxSelecting) return
+    if (e.originalEvent.button !== 0) return
+    
+    const pointFeatures = map.queryRenderedFeatures(e.point, { 
+      layers: ['gl-draw-point-inactive', 'gl-draw-point-active'] 
+    })
+    if (pointFeatures.length) return
+
+    boxStartPoint = e.point
+    map.dragPan.disable()
+
+    if (!map.getSource(boxOverlayId)) {
+      map.addSource(boxOverlayId, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      })
+      map.addLayer({
+        id: boxOverlayId,
+        type: 'fill',
+        source: boxOverlayId,
+        paint: { 'fill-color': '#2A9FFF', 'fill-opacity': 0.15 }
+      })
+      map.addLayer({
+        id: `${boxOverlayId}-line`,
+        type: 'line',
+        source: boxOverlayId,
+        paint: { 'line-color': '#2A9FFF', 'line-width': 1.5, 'line-dasharray': [2, 2] }
+      })
+    }
+  })
+
+  map.on('mousemove', (e) => {
+    if (!isBoxSelecting || !boxStartPoint) return
+    
+    const currentPoint = e.point
+    const minX = Math.min(boxStartPoint.x, currentPoint.x)
+    const minY = Math.min(boxStartPoint.y, currentPoint.y)
+    const maxX = Math.max(boxStartPoint.x, currentPoint.x)
+    const maxY = Math.max(boxStartPoint.y, currentPoint.y)
+
+    const p1 = map.unproject([minX, minY])
+    const p2 = map.unproject([maxX, maxY])
+    const coords = [
+      [p1.lng, p1.lat], [p2.lng, p1.lat], [p2.lng, p2.lat], [p1.lng, p2.lat], [p1.lng, p1.lat]
+    ]
+
+    const geojson = {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [coords] },
+        properties: {}
+      }]
+    }
+
+    if (map.getSource(boxOverlayId)) {
+      map.getSource(boxOverlayId).setData(geojson)
+    }
+  })
+
+  map.on('mouseup', (e) => {
+    if (!isBoxSelecting || !boxStartPoint) return
+    
+    const currentPoint = e.point
+    const minX = Math.min(boxStartPoint.x, currentPoint.x)
+    const minY = Math.min(boxStartPoint.y, currentPoint.y)
+    const maxX = Math.max(boxStartPoint.x, currentPoint.x)
+    const maxY = Math.max(boxStartPoint.y, currentPoint.y)
+
+    if (maxX - minX > 5 || maxY - minY > 5) {
+      const selected = map.queryRenderedFeatures(
+        [[minX, minY], [maxX, maxY]], 
+        { layers: ['gl-draw-point-inactive', 'gl-draw-point-active'] }
+      )
+      const ids = selected.map(f => f.id || f.properties?.id).filter(id => id != null)
+      emit('box-select', ids)
+    }
+
+    boxStartPoint = null
+    map.dragPan.enable()
+    
+    if (map.getSource(boxOverlayId)) {
+      map.getSource(boxOverlayId).setData({ type: 'FeatureCollection', features: [] })
+    }
+  })
+}
+
+function startBoxSelect() {
+  isBoxSelecting = true
+  map.getCanvas().style.cursor = 'crosshair'
+  if (draw) draw.changeMode('simple_select')
+}
+
+function stopBoxSelect() {
+  isBoxSelecting = false
+  boxStartPoint = null
+  map.dragPan.enable()
+  map.getCanvas().style.cursor = ''
+  if (map && map.getSource(boxOverlayId)) {
+    map.getSource(boxOverlayId).setData({ type: 'FeatureCollection', features: [] })
+  }
+}
+
+// ======================== 内置方法 ========================
 function flyToShaanxi() {
   map?.flyTo({
     center: [108.9, 35.2],
@@ -156,20 +337,22 @@ function flyToShaanxi() {
 
 function handleDrawUpdate(event) {
   if (!event?.features?.length) return
-  event.features.forEach((feature) => {
-    console.log(`区域 ${feature.id} 坐标已更新:`, feature.geometry.coordinates)
-  })
 }
 
 function loadEditableAreas(featureCollection) {
   if (!draw) return
-  draw.deleteAll()
   if (featureCollection?.features?.length) {
     draw.add(featureCollection)
   }
 }
-function clearEditableAreas() { draw?.deleteAll() }
-function getEditableAreas() { return draw?.getAll() || null }
+
+function clearEditableAreas() { 
+  draw?.deleteAll() 
+}
+
+function getEditableAreas() { 
+  return draw?.getAll() || null 
+}
 
 function cloneGeojson(geojson) { return JSON.parse(JSON.stringify(geojson)) }
 
@@ -212,12 +395,7 @@ function addPolygon({ id, geojson, color = '#4fc3ff', opacity = 0.7, outlineColo
 }
 
 function addFillLayer({
-  id,
-  geojson,
-  fillColor = '#4fc3ff',
-  fillOpacity = 0.5,
-  outlineColor = '#4fc3ff',
-  outlineWidth = 1,
+  id, geojson, fillColor = '#4fc3ff', fillOpacity = 0.5, outlineColor = '#4fc3ff', outlineWidth = 1,
 }) {
   if (!map) return
   if (map.getSource(id)) {
@@ -246,34 +424,17 @@ function addFillLayer({
   addedLayers.add(`${id}-outline`)
 }
 
-// ========================================================
-// ★ 遮罩图层（反遮罩 / 带洞 fill，支持透明度渐变）
-// ========================================================
-function addMaskLayer({
-  id,
-  geojson,
-  color = '#000000',
-  opacity = 0,
-  fadeDuration = 300,
-}) {
+function addMaskLayer({ id, geojson, color = '#000000', opacity = 0, fadeDuration = 300 }) {
   if (!map) return false
   if (map.getSource(id)) {
     map.getSource(id).setData(geojson)
-    if (map.getLayer(id)) {
-      map.setPaintProperty(id, 'fill-color', color)
-    }
+    if (map.getLayer(id)) map.setPaintProperty(id, 'fill-color', color)
     return true
   }
   map.addSource(id, { type: 'geojson', data: geojson })
   map.addLayer({
-    id,
-    type: 'fill',
-    source: id,
-    paint: {
-      'fill-color': color,
-      'fill-opacity': opacity,
-      'fill-opacity-transition': { duration: fadeDuration, delay: 0 },
-    },
+    id, type: 'fill', source: id,
+    paint: { 'fill-color': color, 'fill-opacity': opacity, 'fill-opacity-transition': { duration: fadeDuration, delay: 0 } },
   })
   addedLayers.add(id)
   return true
@@ -292,9 +453,7 @@ function bringMaskToTop(id) {
   if (top.id !== id) map.moveLayer(id)
 }
 
-function hasMaskLayer(id) {
-  return !!(map && map.getLayer(id))
-}
+function hasMaskLayer(id) { return !!(map && map.getLayer(id)) }
 
 function removeMaskLayer(id) {
   if (!map) return
@@ -305,25 +464,18 @@ function removeMaskLayer(id) {
 
 function addSymbolLayer({ id, geojson, layout = {}, paint = {} }) {
   if (!map) return
-  if (!map.getSource(id)) {
-    map.addSource(id, { type: 'geojson', data: geojson })
-  } else {
-    map.getSource(id).setData(geojson)
-  }
+  if (!map.getSource(id)) map.addSource(id, { type: 'geojson', data: geojson })
+  else map.getSource(id).setData(geojson)
   if (map.getLayer(id)) return
   map.addLayer({ id, type: 'symbol', source: id, layout, paint })
   addedLayers.add(id)
 }
 
 function createColorExpression(opts) {
-  const {
-    heightField, heightMultiplier, defaultHeight,
-    colorField, colorStops, colorMap, defaultColor, highlightColor,
-  } = opts
+  const { heightField, heightMultiplier, defaultHeight, colorField, colorStops, colorMap, defaultColor, highlightColor } = opts
   let colorExpression = defaultColor
   if (colorField && Array.isArray(colorStops) && colorStops.length) {
-    const stops = colorStops.flat()
-    colorExpression = ['coalesce', ['interpolate', ['linear'], ['get', colorField], ...stops], defaultColor]
+    colorExpression = ['coalesce', ['interpolate', ['linear'], ['get', colorField], ...colorStops.flat()], defaultColor]
   } else if (colorMap && Object.keys(colorMap).length) {
     const cases = []
     for (const [name, color] of Object.entries(colorMap)) cases.push(name, color)
@@ -332,9 +484,7 @@ function createColorExpression(opts) {
   } else if (colorField) {
     colorExpression = ['coalesce', ['get', colorField], defaultColor]
   }
-  const heightExpression = heightField
-    ? ['*', ['coalesce', ['get', heightField], 0], heightMultiplier]
-    : defaultHeight
+  const heightExpression = heightField ? ['*', ['coalesce', ['get', heightField], 0], heightMultiplier] : defaultHeight
   return {
     color: ['case', ['boolean', ['feature-state', 'highlight'], false], highlightColor, colorExpression],
     height: heightExpression,
@@ -342,27 +492,14 @@ function createColorExpression(opts) {
 }
 
 function addExtrusion(opts) {
-  const {
-    id, geojson, heightField = null, heightMultiplier = 1, defaultHeight = 180000,
-    colorField = null, colorStops = null, colorMap = null,
-    defaultColor = '#2A9FFF', highlightColor = '#FFD700',
-    opacity = 0.9, enableHover = true, useEventLayer = true,
-  } = opts
+  const { id, geojson, heightField = null, heightMultiplier = 1, defaultHeight = 180000, colorField = null, colorStops = null, colorMap = null, defaultColor = '#2A9FFF', highlightColor = '#FFD700', opacity = 0.9, enableHover = true, useEventLayer = true } = opts
   if (!map || !geojson?.features) return
-
   const mapData = cloneGeojson(geojson)
   ensureFeatureIds(mapData)
+  const expressions = createColorExpression({ heightField, heightMultiplier, defaultHeight, colorField, colorStops, colorMap, defaultColor, highlightColor })
 
-  const expressions = createColorExpression({
-    heightField, heightMultiplier, defaultHeight,
-    colorField, colorStops, colorMap, defaultColor, highlightColor,
-  })
-
-  if (!map.getSource(id)) {
-    map.addSource(id, { type: 'geojson', data: mapData })
-  } else {
-    map.getSource(id).setData(mapData)
-  }
+  if (!map.getSource(id)) map.addSource(id, { type: 'geojson', data: mapData })
+  else map.getSource(id).setData(mapData)
 
   if (!map.getLayer(id)) {
     map.addLayer({
@@ -384,10 +521,7 @@ function addExtrusion(opts) {
   const eventLayerId = `${id}-event`
   if (useEventLayer) {
     if (map.getLayer(eventLayerId)) map.removeLayer(eventLayerId)
-    map.addLayer({
-      id: eventLayerId, type: 'fill', source: id,
-      paint: { 'fill-color': '#ffffff', 'fill-opacity': 0 },
-    })
+    map.addLayer({ id: eventLayerId, type: 'fill', source: id, paint: { 'fill-color': '#ffffff', 'fill-opacity': 0 } })
     addedLayers.add(eventLayerId)
   }
 
@@ -445,90 +579,50 @@ function bindHover(sourceId, targetLayer) {
 function centroidOfFeature(feature) {
   const geom = feature?.geometry
   if (!geom) return null
-
   const rings = []
-  if (geom.type === 'Polygon') {
-    if (geom.coordinates?.[0]) rings.push(geom.coordinates[0])
-  } else if (geom.type === 'MultiPolygon') {
-    for (const poly of geom.coordinates || []) {
-      if (poly?.[0]) rings.push(poly[0])
-    }
-  } else {
-    return null
-  }
+  if (geom.type === 'Polygon') { if (geom.coordinates?.[0]) rings.push(geom.coordinates[0]) } 
+  else if (geom.type === 'MultiPolygon') { for (const poly of geom.coordinates || []) { if (poly?.[0]) rings.push(poly[0]) } } 
+  else { return null }
   if (!rings.length) return null
-
   let sx = 0, sy = 0, n = 0
   for (const ring of rings) {
     for (const pt of ring) {
-      const lng = Number(pt?.[0])
-      const lat = Number(pt?.[1])
+      const lng = Number(pt?.[0]), lat = Number(pt?.[1])
       if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue
       sx += lng; sy += lat; n += 1
     }
   }
-  if (!n) return null
-  return [sx / n, sy / n]
+  return n ? [sx / n, sy / n] : null
 }
 
 function addCentroidLabels(opts) {
-  const {
-    id, geojson, labelConfig = null, labelField = 'name', subLabelField = null,
-    textColor = '#FFFFFF', textSize = 14, subTextSize = 10,
-    textOffset = [0, 0], haloColor = '#000000', haloWidth = 1,
-  } = opts
+  const { id, geojson, labelConfig = null, labelField = 'name', subLabelField = null, textColor = '#FFFFFF', textSize = 14, subTextSize = 10, textOffset = [0, 0], haloColor = '#000000', haloWidth = 1 } = opts
   if (!map || !geojson?.features) return
-
   const points = {
     type: 'FeatureCollection',
-    features: geojson.features
-      .map((feature) => {
-        const coordinates = centroidOfFeature(feature)
-        if (!coordinates) return null
-        return {
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates },
-          properties: { ...(feature.properties || {}) },
-        }
-      })
-      .filter(Boolean),
+    features: geojson.features.map((f) => {
+      const coordinates = centroidOfFeature(f)
+      return coordinates ? { type: 'Feature', geometry: { type: 'Point', coordinates }, properties: { ...(f.properties || {}) } } : null
+    }).filter(Boolean),
   }
-
   const sourceId = `${id}-points`
   if (!map.getSource(sourceId)) map.addSource(sourceId, { type: 'geojson', data: points })
   else map.getSource(sourceId).setData(points)
 
   const oldLayers = Array.from(addedLayers).filter((layerId) => layerId.startsWith(`${id}-`))
-  oldLayers.forEach((layerId) => {
-    if (map.getLayer(layerId)) map.removeLayer(layerId)
-    addedLayers.delete(layerId)
-  })
+  oldLayers.forEach((layerId) => { if (map.getLayer(layerId)) map.removeLayer(layerId); addedLayers.delete(layerId) })
 
   const configs = labelConfig || [
     { field: labelField, size: textSize, color: textColor, offset: textOffset, haloColor, haloWidth },
-    ...(subLabelField
-      ? [{ field: subLabelField, size: subTextSize, color: '#A9DFFF', offset: [textOffset[0], textOffset[1] + 1.1], haloColor, haloWidth }]
-      : []),
+    ...(subLabelField ? [{ field: subLabelField, size: subTextSize, color: '#A9DFFF', offset: [textOffset[0], textOffset[1] + 1.1], haloColor, haloWidth }] : []),
   ]
 
   configs.forEach((config, index) => {
     const layerId = `${id}-line-${index}`
-    const textField = getTextExpression(config)
     map.addLayer({
       id: layerId, type: 'symbol', source: sourceId,
-      layout: {
-        'text-field': textField,
-        'text-size': config.size ?? textSize,
-        'text-offset': config.offset ?? [0, 0],
-        'text-allow-overlap': false,
-        'text-ignore-placement': false,
-        'text-anchor': 'center',
-      },
-      paint: {
-        'text-color': config.color ?? textColor,
-        'text-halo-color': config.haloColor ?? haloColor,
-        'text-halo-width': config.haloWidth ?? haloWidth,
-      },
+      layout: { 'text-field': getTextExpression(config), 'text-size': config.size ?? textSize, 'text-offset': config.offset ?? [0, 0], 'text-allow-overlap': false, 'text-ignore-placement': false, 'text-anchor': 'center' },
+      paint: { 'text-color': config.color ?? textColor, 'text-halo-color': config.haloColor ?? haloColor, 'text-halo-width': config.haloWidth ?? haloWidth },
     })
     addedLayers.add(layerId)
   })
@@ -537,23 +631,17 @@ function addCentroidLabels(opts) {
 function getTextExpression(config) {
   if (config.text !== undefined && config.text !== null) return config.text
   if (!config.field) return ''
-  let expression = ['coalesce', ['get', config.field], '']
-  if (config.prefix) expression = ['concat', config.prefix, expression]
-  if (config.suffix) expression = ['concat', expression, config.suffix]
-  return expression
+  let exp = ['coalesce', ['get', config.field], '']
+  if (config.prefix) exp = ['concat', config.prefix, exp]
+  if (config.suffix) exp = ['concat', exp, config.suffix]
+  return exp
 }
 
 function addLine({ id, geojson, color = '#ffcc00', width = 2, dashArray = null }) {
   if (!map) return
   if (map.getSource(id)) { map.getSource(id).setData(geojson); return }
   map.addSource(id, { type: 'geojson', data: geojson })
-  map.addLayer({
-    id, type: 'line', source: id,
-    paint: {
-      'line-color': color, 'line-width': width,
-      ...(dashArray ? { 'line-dasharray': dashArray } : {}),
-    },
-  })
+  map.addLayer({ id, type: 'line', source: id, paint: { 'line-color': color, 'line-width': width, ...(dashArray ? { 'line-dasharray': dashArray } : {}) } })
   addedLayers.add(id)
 }
 
@@ -561,42 +649,20 @@ function addPoints({ id, geojson, color = '#ff5500', radius = 6 }) {
   if (!map) return
   if (map.getSource(id)) { map.getSource(id).setData(geojson); return }
   map.addSource(id, { type: 'geojson', data: geojson })
-  map.addLayer({
-    id, type: 'circle', source: id,
-    paint: {
-      'circle-color': color,
-      'circle-radius': radius,
-      'circle-stroke-width': 1.5,
-      'circle-stroke-color': '#fff',
-    },
-  })
+  map.addLayer({ id, type: 'circle', source: id, paint: { 'circle-color': color, 'circle-radius': radius, 'circle-stroke-width': 1.5, 'circle-stroke-color': '#fff' } })
   addedLayers.add(id)
 }
 
 function addLabels({ id, geojson, textField = 'name', textColor = '#fff', textSize = 12 }) {
   if (!map) return
-  if (!map.getSource(id)) {
-    map.addSource(id, { type: 'geojson', data: geojson })
-  } else {
-    map.getSource(id).setData(geojson)
-    return
-  }
-  map.addLayer({
-    id, type: 'symbol', source: id,
-    layout: {
-      'text-field': ['coalesce', ['get', textField], ''],
-      'text-size': textSize,
-      'text-allow-overlap': false,
-    },
-    paint: { 'text-color': textColor, 'text-halo-color': '#000', 'text-halo-width': 1 },
-  })
+  if (!map.getSource(id)) map.addSource(id, { type: 'geojson', data: geojson })
+  else { map.getSource(id).setData(geojson); return }
+  map.addLayer({ id, type: 'symbol', source: id, layout: { 'text-field': ['coalesce', ['get', textField], ''], 'text-size': textSize, 'text-allow-overlap': false }, paint: { 'text-color': textColor, 'text-halo-color': '#000', 'text-halo-width': 1 } })
   addedLayers.add(id)
 }
 
 async function ensureImage(iconId, iconUrl, timeout = 8000) {
-  if (!map || !iconId || !iconUrl) {
-    throw new Error(`ensureImage 参数不合法: iconId=${iconId}, iconUrl=${iconUrl}`)
-  }
+  if (!map || !iconId || !iconUrl) throw new Error(`ensureImage 参数不合法`)
   if (map.hasImage(iconId)) return iconId
   if (imageCache.has(iconId)) return imageCache.get(iconId)
 
@@ -605,60 +671,27 @@ async function ensureImage(iconId, iconUrl, timeout = 8000) {
     const timer = setTimeout(() => controller.abort(), timeout)
     try {
       const resp = await fetch(iconUrl, { signal: controller.signal })
-      if (!resp.ok) throw new Error(`HTTP ${resp.status} — ${iconUrl}`)
-      const blob = await resp.blob()
-      const bitmap = await createImageBitmap(blob)
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      const bitmap = await createImageBitmap(await resp.blob())
       if (map && !map.hasImage(iconId)) map.addImage(iconId, bitmap)
-      console.log('[MapGL] 图标注册成功:', iconId)
       return iconId
-    } finally {
-      clearTimeout(timer)
-    }
-  })().catch((err) => {
-    console.error('[MapGL] ensureImage 失败:', iconUrl, err?.message || err)
-    imageCache.delete(iconId)
-    throw err
-  })
+    } finally { clearTimeout(timer) }
+  })().catch((err) => { imageCache.delete(iconId); throw err })
 
   imageCache.set(iconId, promise)
   return promise
 }
 
-async function addImagePoints({
-  id,
-  geojson,
-  iconId,
-  iconUrl,
-  iconSize = 0.5,
-  iconAnchor = 'center',
-  allowOverlap = true,
-  textField = null,
-  textSize = 11,
-  textColor = '#ffffff',
-  textHaloColor = '#000000',
-  textHaloWidth = 1,
-  textOffset = [0, 1.4],
-}) {
+async function addImagePoints({ id, geojson, iconId, iconUrl, iconSize = 0.5, iconAnchor = 'center', allowOverlap = true, textField = null, textSize = 11, textColor = '#ffffff', textHaloColor = '#000000', textHaloWidth = 1, textOffset = [0, 1.4] }) {
   if (!map || !geojson?.features) return
-
-  if (iconUrl) {
-    await ensureImage(iconId, iconUrl)
-  }
+  if (iconUrl) await ensureImage(iconId, iconUrl)
 
   if (!map.getSource(id)) map.addSource(id, { type: 'geojson', data: geojson })
   else map.getSource(id).setData(geojson)
-
   if (map.getLayer(id)) return
 
-  const layout = {
-    'icon-image': iconId,
-    'icon-size': iconSize,
-    'icon-anchor': iconAnchor,
-    'icon-allow-overlap': allowOverlap,
-    'icon-ignore-placement': allowOverlap,
-  }
+  const layout = { 'icon-image': iconId, 'icon-size': iconSize, 'icon-anchor': iconAnchor, 'icon-allow-overlap': allowOverlap, 'icon-ignore-placement': allowOverlap }
   const paint = {}
-
   if (textField) {
     layout['text-field'] = ['coalesce', ['get', textField], '']
     layout['text-size'] = textSize
@@ -669,26 +702,16 @@ async function addImagePoints({
     paint['text-halo-color'] = textHaloColor
     paint['text-halo-width'] = textHaloWidth
   }
-
   map.addLayer({ id, type: 'symbol', source: id, layout, paint })
   addedLayers.add(id)
 }
 
 function removeLayer(id) {
   if (!map) return
-  unbindHover(id)
-  clearHighlight(id)
-  const toRemove = Array.from(addedLayers).filter(
-    (layerId) => layerId === id || layerId.startsWith(`${id}-`)
-  )
-  toRemove.forEach((layerId) => {
-    if (map.getLayer(layerId)) map.removeLayer(layerId)
-    addedLayers.delete(layerId)
-  })
-  const sourceIds = [id, `${id}-points`]
-  sourceIds.forEach((sourceId) => {
-    if (map.getSource(sourceId)) map.removeSource(sourceId)
-  })
+  unbindHover(id); clearHighlight(id)
+  const toRemove = Array.from(addedLayers).filter((lId) => lId === id || lId.startsWith(`${id}-`))
+  toRemove.forEach((lId) => { if (map.getLayer(lId)) map.removeLayer(lId); addedLayers.delete(lId) })
+  ;[id, `${id}-points`].forEach((sId) => { if (map.getSource(sId)) map.removeSource(sId) })
 }
 
 function onClick(layerId, callback) {
@@ -711,47 +734,12 @@ function offClick(layerId) {
 }
 
 defineExpose({
-  flyToShaanxi,
-  addPolygon,
-  addFillLayer,
-  addSymbolLayer,
-  addExtrusion,
-  addCentroidLabels,
-  addLine,
-  addPoints,
-  addLabels,
-  addImagePoints,
-  ensureImage,
-  removeLayer,
-  onClick,
-  offClick,
-  loadEditableAreas,
-  clearEditableAreas,
-  getEditableAreas,
-  // ★ 遮罩相关
-  addMaskLayer,
-  setMaskOpacity,
-  bringMaskToTop,
-  hasMaskLayer,
-  removeMaskLayer,
-  getMap: () => map,
-  getDraw: () => draw,
+  flyToShaanxi, addPolygon, addFillLayer, addSymbolLayer, addExtrusion, addCentroidLabels, addLine, addPoints, addLabels, addImagePoints, ensureImage, removeLayer, onClick, offClick, loadEditableAreas, clearEditableAreas, getEditableAreas, addMaskLayer, setMaskOpacity, bringMaskToTop, hasMaskLayer, removeMaskLayer, getMap: () => map, getDraw: () => draw, startBoxSelect, stopBoxSelect,bringDrawPointsToTop,
 })
 </script>
 
 <style scoped>
-.map-container {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-:deep(.maplibregl-ctrl-top-right){
-  display: none;
-}
-
-:deep(.maplibregl-ctrl-bottom-right){
-  display: none;
-}
+.map-container { position: absolute; inset: 0; width: 100%; height: 100%; }
+:deep(.maplibregl-ctrl-top-right) { display: none; }
+:deep(.maplibregl-ctrl-bottom-right) { display: none; }
 </style>

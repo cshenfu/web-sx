@@ -21,23 +21,18 @@ export const PANEL_GROUPS = [
       label: '规划元素',
       items: [
         { id: 'measure-tower', name: '测风塔',  icon: 'Odometer',   type: 'custom' },
-        // ★ 风机 → 对应插件里的「已建风场」(wind-farm)
-        { id: 'wind-farm',     name: '风机',    icon: 'Picture',    type: 'whln'   },
-        { id: 'booster',       name: '升压塔',  icon: 'Lightning',  type: 'custom' },
+        // ★ 风机/升压塔改为 project 类型，控制项目图标显隐
+        { id: 'wind-farm',     name: '风机',    icon: 'Picture',    type: 'project' },
+        { id: 'booster',       name: '升压塔',  icon: 'Lightning',  type: 'project' },
         { id: 'access-tower',  name: '接入塔',  icon: 'Connection', type: 'custom' },
         { id: 'road',          name: '道路',    icon: 'Guide',      type: 'custom' },
         { id: 'line',          name: '线路',    icon: 'Share',      type: 'custom' },
-        {
-          id: 'noise',
-          name: '噪音距离',
-          icon: 'Bell',
-          type: 'custom',
-          input: { unit: 'm', default: 700, min: 0, max: 5000, step: 50 },
-        },
+        { id: 'noise',         name: '噪音距离', icon: 'Bell',      type: 'custom',
+          input: { unit: 'm', default: 700, min: 0, max: 5000, step: 50 } },
       ],
     },
     {
-      label: '地物数据',
+      label: '地物元素',
       items: [
         { id: 'building',    name: '建筑物体',   color: '#1e40af', type: 'whln' },
         { id: 'forest',      name: '林地',       color: '#4ade80', type: 'whln' },
@@ -59,7 +54,8 @@ export const PANEL_GROUPS = [
     .map(it => it.id)
   
   // 面板默认展开的图层
+  // layerPanelConfig.js
   export const DEFAULT_VISIBLE = [
-    // 'wind-resource',
-    // 'road-network',
+    'wind-farm',
+    'booster',
   ]

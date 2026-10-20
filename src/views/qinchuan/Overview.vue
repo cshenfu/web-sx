@@ -310,53 +310,7 @@
       </section>
 
       <!-- 左下角图层按钮 -->
-      <div class="layer-control">
-        <transition name="layer-pop">
-          <div v-if="showLayerPanel" class="layer-panel">
-            <div class="layer-panel-title">图层</div>
-            <div class="layer-panel-body">
-              <button class="layer-chip" @click="notImplemented('资源图谱')">资源图谱</button>
-              <button class="layer-chip" @click="notImplemented('卫星遥感')">卫星遥感</button>
-              <button class="layer-chip" @click="notImplemented('路网')">路网</button>
-              <button class="layer-chip" @click="notImplemented('3D地形')">3D地形</button>
-              <button class="layer-chip" @click="notImplemented('测风塔')">测风塔</button>
-              <button class="layer-chip" :class="{ active: layerVisible.wind }" @click="toggleLayer('wind')">风机</button>
-              <button class="layer-chip" :class="{ active: layerVisible.booster }" @click="toggleLayer('booster')">升压塔</button>
-              <button class="layer-chip" @click="notImplemented('接入塔')">接入塔</button>
-              <button class="layer-chip" @click="notImplemented('道路')">道路</button>
-              <button class="layer-chip" @click="notImplemented('线路')">线路</button>
-              <button class="layer-chip" @click="notImplemented('噪音距离')">噪音距离</button>
-              <button class="layer-chip" @click="notImplemented('建筑物')">建筑物</button>
-              <button class="layer-chip" @click="notImplemented('林地')">林地</button>
-              <button class="layer-chip" @click="notImplemented('耕地')">耕地</button>
-              <button class="layer-chip" @click="notImplemented('水系')">水系</button>
-              <button class="layer-chip" @click="notImplemented('自然保护区')">自然保护区</button>
-              <button class="layer-chip" @click="notImplemented('矿区')">矿区</button>
-            </div>
-
-            <!-- ★ 项目进度图例 -->
-            <div class="layer-legend">
-              <div class="legend-title">项目进度</div>
-              <div class="legend-items">
-                <span class="legend-item"><i class="dot" style="background:#9254de"></i>初步遴选</span>
-                <span class="legend-item"><i class="dot" style="background:#E8059B"></i>已储备</span>
-                <span class="legend-item"><i class="dot" style="background:#fa8c16"></i>规划中</span>
-                <span class="legend-item"><i class="dot" style="background:#597ef7"></i>施工中</span>
-                <span class="legend-item"><i class="dot" style="background:#a0d911"></i>已投产</span>
-              </div>
-            </div>
-          </div>
-        </transition>
-
-        <button
-          class="layer-toggle-button"
-          :class="{ active: showLayerPanel }"
-          title="图层"
-          @click="showLayerPanel = !showLayerPanel"
-        >
-          <el-icon><Files /></el-icon>
-        </button>
-      </div>
+     
     </template>
 
     <ReportGenerateModal

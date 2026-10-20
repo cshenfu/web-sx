@@ -70,14 +70,15 @@
     </el-table>
 
     <div v-if="total > 0" class="task-pagination">
+      <!-- ★ 核心修改：去掉 v-model，改为单向绑定和显式事件 -->
       <el-pagination
-        v-model:current-page="page"
-        v-model:page-size="pageSize"
+        :current-page="page"
+        :page-size="pageSize"
         :page-sizes="[5, 10, 20, 50]"
         :total="total"
         small
         layout="total, prev, pager, next"
-        @current-change="loadTasks"
+        @current-change="handlePageChange"
         @size-change="handleSizeChange"
       />
     </div>
@@ -91,14 +92,11 @@ import { regionData } from 'element-china-area-data'
 import * as configApi from '@/api/modules/selectConfig'
 
 // ---- 陕西省过滤 ----
-// 注意：element-china-area-data@6.x 中省级 code 是 2 位，'61' = 陕西省
-// 市级 code 4 位（如 '6101'），区县级 code 6 位（如 '610103'）
 const regionOptions = shallowRef(
   regionData.filter((p) => String(p.value) === '61')
 )
 
-// ---- 自建 code → 名称 映射（覆盖所有省市县） ----
-// 该包的 codeToText 只包含省级，因此这里自行遍历 regionData 生成完整映射
+// ---- 自建 code → 名称 映射 ----
 const REGION_NAME_MAP = (() => {
   const map = {}
   const walk = (nodes) => {
@@ -115,7 +113,6 @@ function getRegionName(code) {
   const str = String(code ?? '')
   if (!str) return '-'
   if (REGION_NAME_MAP[str]) return REGION_NAME_MAP[str]
-  // 兜底：兼容后端返回 6 位市码但本地只有 4 位市码等位数不一致的情况
   if (REGION_NAME_MAP[str.slice(0, 4)]) return REGION_NAME_MAP[str.slice(0, 4)]
   if (REGION_NAME_MAP[str.slice(0, 2)]) return REGION_NAME_MAP[str.slice(0, 2)]
   return str
@@ -126,16 +123,11 @@ const cascaderProps = {
   value: 'value',
   label: 'label',
   children: 'children',
-  checkStrictly: false, // false = 必须一路选到区县（叶子节点）
+  checkStrictly: false,
   emitPath: true,
 }
 
 // ---- 状态映射 ----
-// 后端枚举：
-//   IN_PROGRESS → 计算中（可取消）
-//   COMPLETED   → 计算完成
-//   FAILED      → 计算失败
-//   CANCELED    → 取消计算
 function resolveStatus(rawStatus) {
   const s = String(rawStatus ?? '').toUpperCase()
   switch (s) {
@@ -170,8 +162,6 @@ const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 
-// 可以点击"开始计算"的条件
-// cascaderProps.checkStrictly = false，因此能选出来的一定是叶子（区县）
 const canStart = computed(
   () =>
     Array.isArray(selectedRegion.value) &&
@@ -183,6 +173,9 @@ const canStart = computed(
 async function loadTasks() {
   loading.value = true
   try {
+    // 打印当前请求参数
+    console.log(`🔥 触发了请求，当前页码: ${page.value}, 每页条数: ${pageSize.value}`)
+    
     const res = await configApi.pageListConfig({
       pageNo: page.value,
       pageSize: pageSize.value,
@@ -205,8 +198,9 @@ async function loadTasks() {
         startTimeText: formatTime(t.startTime),
       }
     })
+    // 更新总条数，驱动分页组件
     total.value = Number(data.total ?? tasks.value.length)
-    console.log('[task] 列表加载:', tasks.value)
+    console.log('🔥 后端返回的总条数 total:', total.value)
   } catch (err) {
     console.error('[task] pageListConfig 失败:', err)
     ElMessage.error(err?.message || '计算任务加载失败')
@@ -217,8 +211,17 @@ async function loadTasks() {
   }
 }
 
-function handleSizeChange() {
-  page.value = 1
+// ---- 分页事件处理 ----
+function handlePageChange(newPage) {
+  console.log('🔥 用户点击了翻页，目标页码:', newPage)
+  page.value = newPage
+  loadTasks()
+}
+
+function handleSizeChange(newSize) {
+  console.log('🔥 用户改变了每页条数:', newSize)
+  pageSize.value = newSize
+  page.value = 1 // 改变条数时重置到第一页
   loadTasks()
 }
 
@@ -229,8 +232,6 @@ async function handleStartCalculation() {
     return
   }
 
-  // selectedRegion 形如 ['61', '6101', '610103']
-  // 最后一项即区县 6 位 code，直接传给后端
   const code = selectedRegion.value[selectedRegion.value.length - 1]
   const regionName = getRegionName(code)
   console.log('[task] 发起计算 code =', code, 'name =', regionName)

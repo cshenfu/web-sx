@@ -6,14 +6,16 @@ export async function getLastConfig() {
 }
 
 //选址配置分页查询
-export async function pageListConfig() {
-    return await publicService4.get('/api/calculationTask/page');
+export async function pageListConfig(data) {
+    return await publicService4.get('/api/calculationTask/page',data);
 }
 
-// //获取项目列表
-// export async function pageListProject(data) {
-//     return await publicService4.post('/ai/api/aiProject/page', data);
-// }
+//获取项目列表
+export async function updateCalculateStatus(projectId,data) {
+    const fd = new FormData()
+    fd.append('isReturnProject', data.isReturnProject)
+    return await publicService4.put(`/ai/api/aiProject/updateCalculateStatus/${projectId}`,fd);
+}
 
 
 

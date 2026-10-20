@@ -18,13 +18,14 @@
     <!-- 常驻地图 -->
     <div class="map-layer">
       <MapGL
-        ref="mapRef"
-        :style="satelliteStyle"
-        @ready="onMapReady"
-        @draw-update="onDrawChange"
-        @draw-create="onDrawChange"
-        @draw-delete="onDrawChange"
-      />
+  ref="mapRef"
+  :style="satelliteStyle"
+  @ready="onMapReady"
+  @draw-update="onDrawChange"
+  @draw-create="onDrawChange"
+  @draw-delete="onDrawChange"
+  @box-select="handleBoxSelect" 
+/>
     </div>
 
     <!-- 默认视图 -->
@@ -154,6 +155,7 @@
         </div>
 
         <!-- 右上：编辑工具栏 -->
+        <!-- 右上：编辑工具栏 -->
         <div v-if="selectedProject && !showVerifyPanel && !showDetailPanel" class="edit-toolbar">
           <button
             v-for="item in editTools"
@@ -168,19 +170,44 @@
 
           <template v-if="editMode === 'wind' || editMode === 'booster'">
             <span class="edit-divider" />
-            <button
-              class="edit-tool-button"
-              :class="{ active: drawingNewPoint }"
-              @click="toggleAddPoint"
-            >
-              {{ drawingNewPoint ? '退出新增' : '新增点' }}
-            </button>
-            <button class="edit-tool-button danger" @click="deleteSelectedPoints">
-              删除选中
-            </button>
+            <template v-if="editMode === 'wind'">
+              <button class="edit-tool-button" :class="{ active: drawingNewPoint }" @click="startAddWindPoint">
+                添加风机
+              </button>
+              <button class="edit-tool-button" :class="{ active: isBoxSelecting }" @click="startBoxSelection">
+                框选
+              </button>
+              <button class="edit-tool-button" @click="deleteSelectedPoints">
+                删除
+              </button>
+              <button class="edit-tool-button" @click="markReserve(true)">
+                标记备选
+              </button>
+              <button class="edit-tool-button" @click="markReserve(false)">
+                取消备选
+              </button>
+            </template>
+            <template v-else>
+              <button class="edit-tool-button" :class="{ active: drawingNewPoint }" @click="toggleAddPoint">
+                {{ drawingNewPoint ? '退出新增' : '新增点' }}
+              </button>
+              <button class="edit-tool-button danger" @click="deleteSelectedPoints">
+                删除选中
+              </button>
+            </template>
           </template>
 
           <span class="edit-divider" />
+          
+          <!-- ★ 新增：重新计算按钮，只有保存过（hasSaved）才能点击 -->
+          <button 
+            class="edit-tool-button recalculate" 
+            :disabled="!hasSaved || recalculating" 
+            @click="handleRecalculate"
+          >
+            {{ recalculating ? '计算中...' : '重新计算' }}
+          </button>
+
           <button class="edit-tool-button save" :disabled="saving" @click="saveEdit">
             {{ saving ? '保存中...' : '保存' }}
           </button>
@@ -453,42 +480,15 @@
     <slot name="page-extra" />
   </div>
 </template>
-
 <script setup>
 import {
-  computed,
-  nextTick,
-  onMounted,
-  onUnmounted,
-  reactive,
-  ref,
-  watch,
+  computed, nextTick, onMounted, onUnmounted, reactive, ref, watch,
 } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  ArrowLeft,
-  ArrowRight,
-  Bell,
-  CircleCheck,
-  Compass,
-  Connection,
-  Files,
-  Fold,
-  Grid,
-  Guide,
-  InfoFilled,
-  Lightning,
-  List,
-  Location,
-  LocationFilled,
-  MapLocation,
-  Odometer,
-  Picture,
-  Plus,
-  Search,
-  Setting,
-  Share,
+  ArrowLeft, ArrowRight, CircleCheck, Files, Fold, InfoFilled, List, Location,
+  LocationFilled, MapLocation, Plus, Search, Setting,
 } from '@element-plus/icons-vue'
 import MapGL from '@/components/MapGL.vue'
 import SearchBar from '@/components/common/SearchBar.vue'
@@ -499,7 +499,7 @@ import VerifyPanel from './VerifyPanel.vue'
 import ProjectDrawer from './ProjectDrawer.vue'
 import ProjectDetailPanel from './ProjectDetailPanel.vue'
 import AssignDialog from './AssignDialog.vue'
-import GenerateReportPanel from './GenerateReportPanel.vue' // ★ 新增：全屏报告生成面板
+import GenerateReportPanel from './GenerateReportPanel.vue'
 import { satelliteStyle } from '../js/mapConfig'
 import { useZoomThresholdSwitch } from '../js/useZoomThresholdSwitch'
 import { searchPlaceName } from '../js/useTiandituGeocode'
@@ -507,13 +507,11 @@ import * as api from '@/api/modules/project'
 import * as configApi from '@/api/modules/selectConfig'
 
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
+import fengjiBxIcon from '@/assets/img/mapIcon/fengji-bx.png'
 import shengyazhanIcon from '@/assets/img/mapIcon/shengyazhan.png'
 
-// ★ 图层 chip 面板
 import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
 import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPanelConfig'
-
-// ★ whln 图层控制插件
 import { attachLayerControl } from '@whln/layer-control'
 
 // =================== props ===================
@@ -540,6 +538,7 @@ const emits = defineEmits(['featureVisibleChange'])
 
 // =================== 常量 ===================
 const ICON_FENGJI = 'icon-fengji'
+const ICON_FENGJI_BX = 'icon-fengji-bx'
 const ICON_SHENGYAZHAN = 'icon-shengyazhan'
 const ICON_SIZE_WIND = 0.08
 const ICON_SIZE_BOOSTER = 0.08
@@ -547,6 +546,11 @@ const ICON_SIZE_BOOSTER = 0.08
 const CITY_LAYER_ID = 'site-city-stats'
 const PROVINCE_CODE = '610000'
 const CITY_GEOJSON_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/610000_full.json'
+
+const PROJECT_ICON_LAYER_MAP = {
+  'wind-farm': ['project-wind-all', 'project-wind-bx-all'],
+  booster: ['project-booster-all'],
+}
 
 const STAGE_ACTIONS = {
   PRELIMINARY_SELECTION: ['assign', 'verify', 'edit', 'delete'],
@@ -557,105 +561,54 @@ const STAGE_ACTIONS = {
 }
 
 const ACTION_LABELS = {
-  material: '立项材料',
-  researchMaterial: '可研材料',
-  investMaterial: '投决材料',
-  establishMeeting: '立项上会',
-  researchReview: '可研审查',
-  investMeeting: '投决上会',
-  assign: '分配',
-  verify: '核查',
-  edit: '编辑',
-  delete: '删除',
+  material: '立项材料', researchMaterial: '可研材料', investMaterial: '投决材料',
+  establishMeeting: '立项上会', researchReview: '可研审查', investMeeting: '投决上会',
+  assign: '分配', verify: '核查', edit: '编辑', delete: '删除',
 }
 
 const CITY_OPTIONS = [
-  { label: '西安市', value: '610100' },
-  { label: '铜川市', value: '610200' },
-  { label: '宝鸡市', value: '610300' },
-  { label: '咸阳市', value: '610400' },
-  { label: '渭南市', value: '610500' },
-  { label: '延安市', value: '610600' },
-  { label: '汉中市', value: '610700' },
-  { label: '榆林市', value: '610800' },
-  { label: '安康市', value: '610900' },
-  { label: '商洛市', value: '611000' },
+  { label: '西安市', value: '610100' }, { label: '铜川市', value: '610200' },
+  { label: '宝鸡市', value: '610300' }, { label: '咸阳市', value: '610400' },
+  { label: '渭南市', value: '610500' }, { label: '延安市', value: '610600' },
+  { label: '汉中市', value: '610700' }, { label: '榆林市', value: '610800' },
+  { label: '安康市', value: '610900' }, { label: '商洛市', value: '611000' },
 ]
 
 const CITY_LABEL_CENTER = {
-  '610100': [108.945, 34.26],
-  '610200': [108.980, 35.10],
-  '610300': [107.140, 34.36],
-  '610400': [108.180, 34.52],
-  '610500': [109.510, 34.83],
-  '610600': [109.100, 36.58],
-  '610700': [107.030, 33.06],
-  '610800': [109.730, 38.28],
-  '610900': [109.030, 32.68],
+  '610100': [108.945, 34.26], '610200': [108.980, 35.10], '610300': [107.140, 34.36],
+  '610400': [108.180, 34.52], '610500': [109.510, 34.83], '610600': [109.100, 36.58],
+  '610700': [107.030, 33.06], '610800': [109.730, 38.28], '610900': [109.030, 32.68],
   '611000': [109.940, 33.86],
 }
 
 const STAGE_THEMES = {
-  DEFAULT: {
-    cityFillStops: ['interpolate', ['linear'], ['get', 'totalCapacity'],
-      0, '#e9d5ff', 30, '#c084fc', 80, '#a855f7', 150, '#7c3aed'],
-    cityOutline: '#f0abfc',
-  },
-  PROJECT_RESERVE: {
-    cityFillStops: ['interpolate', ['linear'], ['get', 'totalCapacity'],
-      0, '#bfdbfe', 30, '#60a5fa', 80, '#3b82f6', 150, '#1d4ed8'],
-    cityOutline: '#93c5fd',
-  },
-  PROJECT_INITIATION: {
-    cityFillStops: ['interpolate', ['linear'], ['get', 'totalCapacity'],
-      0, '#bbf7d0', 30, '#4ade80', 80, '#22c55e', 150, '#15803d'],
-    cityOutline: '#86efac',
-  },
-  FEASIBILITY_REVIEW: {
-    cityFillStops: ['interpolate', ['linear'], ['get', 'totalCapacity'],
-      0, '#fed7aa', 30, '#fb923c', 80, '#f97316', 150, '#c2410c'],
-    cityOutline: '#fdba74',
-  },
-  INVESTMENT_DECISION: {
-    cityFillStops: ['interpolate', ['linear'], ['get', 'totalCapacity'],
-      0, '#fecaca', 30, '#f87171', 80, '#ef4444', 150, '#b91c1c'],
-    cityOutline: '#fca5a5',
-  },
+  DEFAULT: { cityFillStops: ['interpolate', ['linear'], ['get', 'totalCapacity'], 0, '#e9d5ff', 30, '#c084fc', 80, '#a855f7', 150, '#7c3aed'], cityOutline: '#f0abfc' },
+  PROJECT_RESERVE: { cityFillStops: ['interpolate', ['linear'], ['get', 'totalCapacity'], 0, '#bfdbfe', 30, '#60a5fa', 80, '#3b82f6', 150, '#1d4ed8'], cityOutline: '#93c5fd' },
+  PROJECT_INITIATION: { cityFillStops: ['interpolate', ['linear'], ['get', 'totalCapacity'], 0, '#bbf7d0', 30, '#4ade80', 80, '#22c55e', 150, '#15803d'], cityOutline: '#86efac' },
+  FEASIBILITY_REVIEW: { cityFillStops: ['interpolate', ['linear'], ['get', 'totalCapacity'], 0, '#fed7aa', 30, '#fb923c', 80, '#f97316', 150, '#c2410c'], cityOutline: '#fdba74' },
+  INVESTMENT_DECISION: { cityFillStops: ['interpolate', ['linear'], ['get', 'totalCapacity'], 0, '#fecaca', 30, '#f87171', 80, '#ef4444', 150, '#b91c1c'], cityOutline: '#fca5a5' },
 }
 
 const showDetailPanel = ref(false)
 const detailPanelTab = ref('main')
-
-// ★ 全屏报告生成面板
 const showGeneratePanel = ref(false)
 const generatePanelProject = ref(null)
 const generatePanelActionKey = ref('')
 const generatePanelSubCode = ref('')
 
 const theme = computed(() => STAGE_THEMES[props.stage] || STAGE_THEMES.DEFAULT)
-
-const currentActions = computed(() => {
-  return STAGE_ACTIONS[props.stage] || STAGE_ACTIONS['PRELIMINARY_SELECTION']
-})
+const currentActions = computed(() => STAGE_ACTIONS[props.stage] || STAGE_ACTIONS['PRELIMINARY_SELECTION'])
 const cardActions = computed(() => currentActions.value)
 const rowActions = computed(() => currentActions.value)
 
 const AREA_STYLE = {
-  FD: {
-    color: '#3b82f6', opacity: 0.22, outlineColor: '#60a5fa',
-    highlight: { color: '#2563eb', opacity: 0.38, outlineColor: '#93c5fd' },
-  },
-  GF: {
-    color: '#a855f7', opacity: 0.22, outlineColor: '#c084fc',
-    highlight: { color: '#7c3aed', opacity: 0.38, outlineColor: '#d8b4fe' },
-  },
+  FD: { color: '#3b82f6', opacity: 0.22, outlineColor: '#60a5fa', highlight: { color: '#2563eb', opacity: 0.38, outlineColor: '#93c5fd' } },
+  GF: { color: '#a855f7', opacity: 0.22, outlineColor: '#c084fc', highlight: { color: '#7c3aed', opacity: 0.38, outlineColor: '#d8b4fe' } },
 }
 
 // =================== 地图 ===================
 const mapRef = ref(null)
 const mapReady = ref(false)
-
-// ★ 支持 ?view=list 直接进入列表模式
 const route = useRoute()
 const viewMode = ref(route.query.view === 'list' ? 'list' : 'map')
 
@@ -663,7 +616,6 @@ const showConfig = ref(false)
 const showProjectDrawer = ref(false)
 const showVerifyPanel = ref(false)
 
-// 分配弹窗控制
 const showAssignDialog = ref(false)
 const assignTargetProject = ref(null)
 
@@ -674,33 +626,18 @@ const detailCardPos = reactive({ x: 0, y: 0, visible: false })
 const editMode = ref('area')
 const drawingNewPoint = ref(false)
 const saving = ref(false)
+const isBoxSelecting = ref(false)
+const hasSaved = ref(false) 
+const recalculating = ref(false)
 
 const drawerSort = reactive({ key: '', dir: 'desc' })
 
-// ★ whln 图层控制插件实例
 let whlnPlugin = null
-
-// ★ 图层 chip 面板状态
 const layerVisibleIds = ref([...DEFAULT_VISIBLE])
 const layerInputs = reactive({ noise: 700 })
-const customLayerState = reactive({
-  'base-resource': false,
-  'base-satellite': false,
-  'terrain-3d': false,
-  'measure-tower': false,
-  'wind-turbine': false,
-  booster: false,
-  'access-tower': false,
-  road: false,
-  line: false,
-  noise: false,
-})
+const customLayerState = reactive({})
 
-const overviewStats = reactive({
-  totalCapacity: 0, totalCount: 0,
-  windCapacity: 0, windCount: 0,
-  solarCapacity: 0, solarCount: 0,
-})
+const overviewStats = reactive({ totalCapacity: 0, totalCount: 0, windCapacity: 0, windCount: 0, solarCapacity: 0, solarCount: 0 })
 const cityStats = ref([])
 let cityGeoJSONCache = null
 
@@ -711,105 +648,86 @@ const editTools = [
   { key: 'unavailable', label: '设置不可用区域', icon: InfoFilled },
 ]
 
-// =================== 图层 chip 面板 ===================
+// =================== 图层显隐 ===================
+function setProjectIconVisible(chipId, visible) {
+  const layerIds = PROJECT_ICON_LAYER_MAP[chipId]
+  if (!layerIds) return
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+  for (const layerId of layerIds) {
+    if (!map.getLayer(layerId)) continue
+    map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none')
+  }
+}
+
+function syncAllProjectIcons() {
+  for (const chipId of Object.keys(PROJECT_ICON_LAYER_MAP)) {
+    setProjectIconVisible(chipId, layerVisibleIds.value.includes(chipId))
+  }
+}
+
 function onLayerToggle(item) {
   const isOn = layerVisibleIds.value.includes(item.id)
-
   if (item.type === 'whln') {
-    const next = isOn
-      ? layerVisibleIds.value.filter((id) => id !== item.id)
-      : [...layerVisibleIds.value, item.id]
+    const next = isOn ? layerVisibleIds.value.filter((id) => id !== item.id) : [...layerVisibleIds.value, item.id]
     layerVisibleIds.value = next
-
-    const whlnOnly = next.filter((id) => WHLN_LAYER_IDS.includes(id))
-    whlnPlugin?.setVisibleIds?.(whlnOnly)
+    whlnPlugin?.setVisibleIds?.(next.filter((id) => WHLN_LAYER_IDS.includes(id)))
     return
   }
-
-  if (item.type === 'base') {
+  if (item.type === 'project') {
+    setProjectIconVisible(item.id, !isOn)
+  } else if (item.type === 'base') {
     toggleBaseMap(item.id)
   } else if (item.type === 'terrain') {
     toggleTerrain(item.id)
   } else if (item.type === 'custom') {
     toggleCustomLayer(item.id)
   }
-
   customLayerState[item.id] = !isOn
-  layerVisibleIds.value = isOn
-    ? layerVisibleIds.value.filter((id) => id !== item.id)
-    : [...layerVisibleIds.value, item.id]
+  layerVisibleIds.value = isOn ? layerVisibleIds.value.filter((id) => id !== item.id) : [...layerVisibleIds.value, item.id]
 }
 
-function onLayerInputChange({ id, value }) {
-  layerInputs[id] = value
-}
-
-function toggleBaseMap(id) { }
-function toggleTerrain(id) { }
-function toggleCustomLayer(id) { }
+function onLayerInputChange({ id, value }) { layerInputs[id] = value }
+function toggleBaseMap(id) {}
+function toggleTerrain(id) {}
+function toggleCustomLayer(id) {}
 
 // =================== 创建项目 ===================
 const showCreateProject = ref(false)
 const createProjectFormRef = ref(null)
 const placeSearchKeyword = ref('')
 
-function openCreateProject() {
-  showCreateProject.value = true
-  if (mapReady.value) nextTick(() => startCreateDrawing())
-}
-function closeCreateProject() {
-  showCreateProject.value = false
-  placeSearchKeyword.value = ''
-}
+function openCreateProject() { showCreateProject.value = true; if (mapReady.value) nextTick(() => startCreateDrawing()) }
+function closeCreateProject() { showCreateProject.value = false; placeSearchKeyword.value = '' }
 function startCreateDrawing() { createProjectFormRef.value?.startPolygonDrawing?.() }
 function saveCreateDrawing() { createProjectFormRef.value?.handleMapDrawSave?.() }
 function clearCreateDrawing() { createProjectFormRef.value?.handleMapDrawClear?.() }
 function onProjectCreated() {
-  showCreateProject.value = false
-  placeSearchKeyword.value = ''
-  viewMode.value = 'list'
-  pagination.page = 1
-  fetchProjectList()
-  fetchMapProjects()
-  fetchOverviewStats()
-  fetchCityStats()
+  showCreateProject.value = false; placeSearchKeyword.value = ''; viewMode.value = 'list'; pagination.page = 1;
+  fetchProjectList(); fetchMapProjects(); fetchOverviewStats(); fetchCityStats();
 }
 async function handlePlaceSearch() {
   if (!placeSearchKeyword.value.trim()) return
   try {
     const { lng, lat } = await searchPlaceName(placeSearchKeyword.value.trim())
     mapRef.value?.getMap?.()?.flyTo({ center: [lng, lat], zoom: 11, duration: 1500 })
-  } catch (err) {
-    ElMessage.warning(err.message || '未找到匹配的地名')
-  }
+  } catch (err) { ElMessage.warning(err.message || '未找到匹配的地名') }
 }
 
-// =================== 筛选 ===================
+// =================== 筛选 & 列表 ===================
 const filters = reactive({
-  province: '610000',
-  city: '', district: '',
-  itemType: '', projectStage: '',
-  approvalStatus: '', managerCompany: '', managerName: '',
-  createTimeStart: '', createTimeEnd: '',
-  projectCode: '', projectName: '', isVerified: '',
+  province: '610000', city: '', district: '', itemType: '', projectStage: '', approvalStatus: '',
+  managerCompany: '', managerName: '', createTimeStart: '', createTimeEnd: '', projectCode: '', projectName: '', isVerified: '',
 })
 
-// =================== 列表 ===================
 const projectList = ref([])
 const listLoading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
 
-const APPROVAL_STATUS_MAP = {
-  NO_APPROVAL: '未审批', APPROVED: '审批通过', REJECTED: '审批不通过',
-}
-const APPROVAL_STATUS_CLASS = {
-  NO_APPROVAL: 'pending', APPROVED: 'passed', REJECTED: 'rejected',
-}
-
+const APPROVAL_STATUS_MAP = { NO_APPROVAL: '未审批', APPROVED: '审批通过', REJECTED: '审批不通过' }
+const APPROVAL_STATUS_CLASS = { NO_APPROVAL: 'pending', APPROVED: 'passed', REJECTED: 'rejected' }
 const stageOptions = ref([])
-const stageMap = computed(() =>
-  Object.fromEntries(stageOptions.value.map(item => [item.code, item.desc]))
-)
+const stageMap = computed(() => Object.fromEntries(stageOptions.value.map(item => [item.code, item.desc])))
 
 const STATUS_COLUMN_CONFIG = {
   verify: {
@@ -827,33 +745,20 @@ const STATUS_COLUMN_CONFIG = {
 const statusColumnConfig = computed(() => STATUS_COLUMN_CONFIG[props.statusColumn] || null)
 
 async function fetchStageList() {
-  try {
-    const res = await api.getStageList()
-    stageOptions.value = res?.data ?? []
-  } catch {
-    stageOptions.value = []
-  }
+  try { stageOptions.value = (await api.getStageList())?.data ?? [] } catch { stageOptions.value = [] }
 }
 function formatRegion(row) {
   const names = [row.provinceName, row.cityName, row.districtName].filter(Boolean)
   return names.length ? names.join('/') : (row.address || '-')
 }
-function formatRate(val) {
-  return val === null || val === undefined || val === '' ? '-' : `${val}%`
-}
+function formatRate(val) { return val === null || val === undefined || val === '' ? '-' : `${val}%` }
 
 async function fetchProjectList() {
   listLoading.value = true
   try {
-    const params = {
-      pageNo: pagination.page,
-      pageSize: pagination.pageSize,
-      province: filters.province,
-    }
-
+    const params = { pageNo: pagination.page, pageSize: pagination.pageSize, province: filters.province }
     const stage = filters.projectStage || props.stage
     if (stage) params.projectStage = stage
-
     if (filters.city) params.city = filters.city
     if (filters.district) params.district = filters.district
     if (filters.itemType) params.itemType = filters.itemType
@@ -864,10 +769,7 @@ async function fetchProjectList() {
     if (filters.createTimeEnd) params.createTimeEnd = filters.createTimeEnd
     if (filters.projectCode) params.projectCode = filters.projectCode
     if (filters.projectName) params.projectName = filters.projectName
-    if (filters.isVerified !== '' && filters.isVerified !== null) {
-      params.isVerified = String(filters.isVerified)
-    }
-
+    if (filters.isVerified !== '' && filters.isVerified !== null) params.isVerified = String(filters.isVerified)
     if (drawerSort.key === 'capacity') params.capacitySort = drawerSort.dir
     if (drawerSort.key === 'rate') params.rateSort = drawerSort.dir
 
@@ -879,80 +781,43 @@ async function fetchProjectList() {
     ElMessage.error(err?.message || '项目列表加载失败')
     projectList.value = []
     pagination.total = 0
-  } finally {
-    listLoading.value = false
-  }
+  } finally { listLoading.value = false }
 }
 
 function handleSearch() { pagination.page = 1; fetchProjectList() }
 function handleReset() {
-  Object.assign(filters, {
-    city: '', district: '', itemType: '', projectStage: '',
-    approvalStatus: '', managerCompany: '', managerName: '',
-    createTimeStart: '', createTimeEnd: '',
-    projectCode: '', projectName: '', isVerified: '',
-  })
-  drawerSort.key = ''; drawerSort.dir = 'desc'
-  pagination.page = 1
-  fetchProjectList()
+  Object.assign(filters, { city: '', district: '', itemType: '', projectStage: '', approvalStatus: '', managerCompany: '', managerName: '', createTimeStart: '', createTimeEnd: '', projectCode: '', projectName: '', isVerified: '' })
+  drawerSort.key = ''; drawerSort.dir = 'desc'; pagination.page = 1; fetchProjectList()
 }
 function handlePageChange(page) { pagination.page = page; fetchProjectList() }
 function handleSizeChange(size) { pagination.pageSize = size; pagination.page = 1; fetchProjectList() }
 
+// =================== 动作分发 ===================
 function executeAction(action, project) {
   if (!project) return
   const name = project.projectName || ''
-  
   const mapProject = allMapProjects.value.find((p) => p.id === project.id) || project
 
-  if (['material', 'researchMaterial', 'investMaterial'].includes(action)) {
-    openDetailPanel(mapProject, 'material')
-    return
-  }
-  if (['establishMeeting', 'researchReview', 'investMeeting'].includes(action)) {
-    openDetailPanel(mapProject, 'meeting')
-    return
-  }
-
-  if (action === 'assign') {
-    assignTargetProject.value = mapProject
-    showAssignDialog.value = true
-    return
-  }
-
+  if (['material', 'researchMaterial', 'investMaterial'].includes(action)) { openDetailPanel(mapProject, 'material'); return }
+  if (['establishMeeting', 'researchReview', 'investMeeting'].includes(action)) { openDetailPanel(mapProject, 'meeting'); return }
+  if (action === 'assign') { assignTargetProject.value = mapProject; showAssignDialog.value = true; return }
   if (action === 'verify') {
-    showProjectDrawer.value = false
-    showDetailPanel.value = false
-    viewMode.value = 'map'
-    
+    showProjectDrawer.value = false; showDetailPanel.value = false; viewMode.value = 'map'
     const centroid = getProjectCentroid(mapProject)
-    if (centroid) {
-      mapRef.value?.getMap?.()?.flyTo({ center: centroid, zoom: 13, duration: 1200 })
-    }
-    
-    setTimeout(() => {
-      onProjectClick(mapProject.id)
-      showVerifyPanel.value = true
-    }, 1300)
+    if (centroid) mapRef.value?.getMap?.()?.flyTo({ center: centroid, zoom: 13, duration: 1200 })
+    setTimeout(() => { onProjectClick(mapProject.id); showVerifyPanel.value = true }, 1300)
     return
   }
-
-  if (action === 'edit') {
-    openDetailPanel(mapProject, 'main')
-    return
-  }
-
+  if (action === 'edit') { openDetailPanel(mapProject, 'main'); return }
   if (action === 'delete') {
-    ElMessageBox.confirm(`确认删除项目「${name}」吗？`, '提示', {
-      type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消',
-    }).then(() => {
-      ElMessage.success('删除成功')
-      clearSelectionLayers()
-      fetchMapProjects(); fetchProjectList(); fetchOverviewStats(); fetchCityStats()
-    }).catch(() => {})
+    ElMessageBox.confirm(`确认删除项目「${name}」吗？`, '提示', { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' })
+      .then(() => {
+        ElMessage.success('删除成功')
+        clearSelectionLayers()
+        fetchMapProjects(); fetchProjectList(); fetchOverviewStats(); fetchCityStats()
+      }).catch(() => {})
     return
   }
-
   ElMessage.info(`点击了「${ACTION_LABELS[action] || action}」：${name}`)
 }
 
@@ -960,102 +825,56 @@ function openDetailPanel(project, tab) {
   const p = allMapProjects.value.find(item => item.id === project.id)
   if (!p) { ElMessage.warning('地图上未找到该项目'); return }
   const centroid = getProjectCentroid(p)
-  if (centroid) {
-    mapRef.value?.getMap?.()?.flyTo({ center: centroid, zoom: 13, duration: 1200 })
-  }
-  showProjectDrawer.value = false
-  viewMode.value = 'map'
-  setTimeout(() => {
-    onProjectClick(p.id)
-    detailPanelTab.value = tab
-    showDetailPanel.value = true
-  }, 1300)
+  if (centroid) mapRef.value?.getMap?.()?.flyTo({ center: centroid, zoom: 13, duration: 1200 })
+  showProjectDrawer.value = false; viewMode.value = 'map'
+  setTimeout(() => { onProjectClick(p.id); detailPanelTab.value = tab; showDetailPanel.value = true }, 1300)
 }
 
-function onAssignSuccess() {
-  fetchProjectList()
-  fetchMapProjects()
-}
+function onAssignSuccess() { fetchProjectList(); fetchMapProjects() }
 
-// ★ 详情面板事件：阶段推进成功 / 打开报告生成
 function onDetailPanelAction(payload) {
-  // 1. 阶段推进成功（跳转页面）
   if (payload?.type === 'stage-changed') {
-    showDetailPanel.value = false
-    fetchMapProjects()
-    fetchProjectList()
-    fetchOverviewStats()
-    fetchCityStats()
-    return
+    showDetailPanel.value = false; fetchMapProjects(); fetchProjectList(); fetchOverviewStats(); fetchCityStats(); return
   }
-
-  // 2. 打开全屏生成报告面板
   if (payload?.type === 'generate-report') {
-    generatePanelProject.value = payload.project
-    generatePanelActionKey.value = payload.actionKey
-    generatePanelSubCode.value = payload.subCode
-    showGeneratePanel.value = true
-    return
+    generatePanelProject.value = payload.project; generatePanelActionKey.value = payload.actionKey; generatePanelSubCode.value = payload.subCode; showGeneratePanel.value = true; return
   }
 }
+function onReportGenerated() { console.log('[site-map] 报告已生成') }
 
-function onReportGenerated() {
-  console.log('[site-map] 报告已生成')
-}
-
-// =================== 看板 ===================
+// =================== 看板 & 市级面 ===================
 async function fetchOverviewStats() {
   try {
     const payload = { regionCode: PROVINCE_CODE, regionType: 'PROVINCE' }
     if (props.stage) payload.projectStage = props.stage
-
-    const res = await configApi.overViewData(payload)
-    const data = res?.data ?? {}
-    overviewStats.totalCapacity = data.totalCapacity ?? 0
-    overviewStats.totalCount = data.totalCount ?? 0
-    overviewStats.windCapacity = data.windCapacity ?? 0
-    overviewStats.windCount = data.windCount ?? 0
-    overviewStats.solarCapacity = data.solarCapacity ?? 0
-    overviewStats.solarCount = data.solarCount ?? 0
-  } catch (err) {
-    console.error('[stats] overViewData 失败:', err)
-  }
+    const data = (await configApi.overViewData(payload))?.data ?? {}
+    Object.assign(overviewStats, {
+      totalCapacity: data.totalCapacity ?? 0, totalCount: data.totalCount ?? 0,
+      windCapacity: data.windCapacity ?? 0, windCount: data.windCount ?? 0,
+      solarCapacity: data.solarCapacity ?? 0, solarCount: data.solarCount ?? 0,
+    })
+  } catch (err) { console.error('[stats] overViewData 失败:', err) }
 }
 
 async function fetchCityStats() {
   try {
     const payload = { provinceCode: PROVINCE_CODE }
     if (props.stage) payload.projectStage = props.stage
-
-    const res = await configApi.provinceViewData(payload)
-    cityStats.value = res?.data ?? []
-    if (mapReady.value && !isAreaView.value) {
-      await renderCityStats()
-    }
-  } catch (err) {
-    console.error('[stats] provinceViewData 失败:', err)
-  }
+    cityStats.value = (await configApi.provinceViewData(payload))?.data ?? []
+    if (mapReady.value && !isAreaView.value) await renderCityStats()
+  } catch (err) { console.error('[stats] provinceViewData 失败:', err) }
 }
 
-// =================== 市级面 ===================
 async function loadCityGeoJSON() {
   if (cityGeoJSONCache) return cityGeoJSONCache
-  try {
-    const res = await fetch(CITY_GEOJSON_URL)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    cityGeoJSONCache = await res.json()
-    return cityGeoJSONCache
-  } catch (err) {
-    console.error('[city] GeoJSON 加载失败:', err)
-    return null
-  }
+  try { cityGeoJSONCache = await (await fetch(CITY_GEOJSON_URL)).json(); return cityGeoJSONCache }
+  catch (err) { console.error('[city] GeoJSON 加载失败:', err); return null }
 }
 
 async function renderCityStats() {
   if (!mapReady.value || !mapRef.value) return
   const geoJSON = await loadCityGeoJSON()
   if (!geoJSON) return
-
   const statMap = {}
   for (const s of cityStats.value) statMap[String(s.regionCode)] = s
 
@@ -1063,226 +882,87 @@ async function renderCityStats() {
     const code = String(f.properties.adcode ?? f.properties.regionCode ?? f.properties.code ?? '')
     const stat = statMap[code]
     const center = CITY_LABEL_CENTER[code] || f.properties.center || f.properties.centroid || null
-    return {
-      ...f,
-      properties: {
-        ...f.properties,
-        regionCode: code,
-        regionName: stat?.regionName || f.properties.name || '',
-        totalCapacity: Number(stat?.totalCapacity) || 0,
-        center,
-      },
-    }
+    return { ...f, properties: { ...f.properties, regionCode: code, regionName: stat?.regionName || f.properties.name || '', totalCapacity: Number(stat?.totalCapacity) || 0, center } }
   })
 
-  mapRef.value.addFillLayer({
-    id: CITY_LAYER_ID,
-    geojson: { type: 'FeatureCollection', features },
-    fillColor: theme.value.cityFillStops,
-    fillOpacity: 0.55,
-    outlineColor: theme.value.cityOutline,
-    outlineWidth: 1.2,
-  })
+  mapRef.value.addFillLayer({ id: CITY_LAYER_ID, geojson: { type: 'FeatureCollection', features }, fillColor: theme.value.cityFillStops, fillOpacity: 0.55, outlineColor: theme.value.cityOutline, outlineWidth: 1.2 })
 
-  const labelFeatures = features
-    .filter((f) => Array.isArray(f.properties.center) && f.properties.center.length === 2)
-    .map((f) => ({
-      type: 'Feature',
-      properties: f.properties,
-      geometry: { type: 'Point', coordinates: f.properties.center },
-    }))
+  const labelFeatures = features.filter((f) => Array.isArray(f.properties.center) && f.properties.center.length === 2).map((f) => ({ type: 'Feature', properties: f.properties, geometry: { type: 'Point', coordinates: f.properties.center } }))
 
   mapRef.value.addSymbolLayer({
     id: `${CITY_LAYER_ID}-labels`,
     geojson: { type: 'FeatureCollection', features: labelFeatures },
     layout: {
-      'text-field': [
-        'format',
-        ['get', 'totalCapacity'], { 'font-scale': 1.25 },
-        'MW', { 'font-scale': 0.85 },
-        '\n',
-        ['get', 'regionName'], { 'font-scale': 0.85 },
-      ],
-      'text-size': 13,
-      'text-anchor': 'center',
-      'text-allow-overlap': true,
-      'text-ignore-placement': true,
-      'text-line-height': 1.1,
+      'text-field': ['format', ['get', 'totalCapacity'], { 'font-scale': 1.25 }, 'MW', { 'font-scale': 0.85 }, '\n', ['get', 'regionName'], { 'font-scale': 0.85 }],
+      'text-size': 13, 'text-anchor': 'center', 'text-allow-overlap': true, 'text-ignore-placement': true, 'text-line-height': 1.1,
     },
-    paint: {
-      'text-color': '#ffffff',
-      'text-halo-color': '#000000',
-      'text-halo-width': 1.6,
-    },
+    paint: { 'text-color': '#ffffff', 'text-halo-color': '#000000', 'text-halo-width': 1.6 },
   })
 }
 
-function hideCityStats() {
-  mapRef.value?.removeLayer(CITY_LAYER_ID)
-  mapRef.value?.removeLayer(`${CITY_LAYER_ID}-labels`)
-}
+function hideCityStats() { mapRef.value?.removeLayer(CITY_LAYER_ID); mapRef.value?.removeLayer(`${CITY_LAYER_ID}-labels`) }
 
-// =================== ★ 陕西省遮罩（渐进式淡入淡出） ===================
+// =================== 遮罩 ===================
 const MASK_LAYER_ID = 'shaanxi-mask'
 const MASK_SOURCE_ID = 'shaanxi-mask-src'
 const SHAANXI_BOUNDARY_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/610000.json'
 const SHAANXI_BOUNDS = [[105.4, 31.7], [111.2, 39.6]]
-
 let shaanxiBoundaryCache = null
 let lastMaskOpacity = -1
 
-async function loadShaanxiBoundary() {
-  if (shaanxiBoundaryCache) return shaanxiBoundaryCache
-  const res = await fetch(SHAANXI_BOUNDARY_URL)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  shaanxiBoundaryCache = await res.json()
-  return shaanxiBoundaryCache
-}
+async function loadShaanxiBoundary() { if (shaanxiBoundaryCache) return shaanxiBoundaryCache; shaanxiBoundaryCache = await (await fetch(SHAANXI_BOUNDARY_URL)).json(); return shaanxiBoundaryCache }
+function ensureClosed(ring) { if (!ring || ring.length < 3) return ring; const f = ring[0], l = ring[ring.length - 1]; return (f[0] === l[0] && f[1] === l[1]) ? ring : [...ring, [f[0], f[1]]] }
+function ringSignedArea(ring) { if (!ring || ring.length < 3) return 0; let a = 0; for (let i = 0; i < ring.length - 1; i++) { a += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1] } return a / 2 }
+function ensureOuterCCW(ring) { const r = ensureClosed(ring); return ringSignedArea(r) >= 0 ? r : r.slice().reverse() }
+function ensureHoleCW(ring) { const r = ensureClosed(ring); return ringSignedArea(r) <= 0 ? r : r.slice().reverse() }
 
-function ensureClosed(ring) {
-  if (!ring || ring.length < 3) return ring
-  const first = ring[0]
-  const last = ring[ring.length - 1]
-  if (first[0] === last[0] && first[1] === last[1]) return ring
-  return [...ring, [first[0], first[1]]]
-}
-
-function ringSignedArea(ring) {
-  if (!ring || ring.length < 3) return 0
-  let area = 0
-  for (let i = 0; i < ring.length - 1; i++) {
-    const [x1, y1] = ring[i]
-    const [x2, y2] = ring[i + 1]
-    area += x1 * y2 - x2 * y1
-  }
-  return area / 2
-}
-
-function ensureOuterCCW(ring) {
-  const r = ensureClosed(ring)
-  return ringSignedArea(r) >= 0 ? r : r.slice().reverse()
-}
-
-function ensureHoleCW(ring) {
-  const r = ensureClosed(ring)
-  return ringSignedArea(r) <= 0 ? r : r.slice().reverse()
-}
-
-const WORLD_OUTER = ensureOuterCCW([
-  [-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85],
-])
+const WORLD_OUTER = ensureOuterCCW([[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]])
 
 function buildMaskGeoJSON(boundary) {
   const holes = []
-  for (const feature of boundary?.features || []) {
-    const geom = feature?.geometry
-    if (!geom) continue
-    const polygons = geom.type === 'Polygon'
-      ? [geom.coordinates]
-      : geom.type === 'MultiPolygon'
-        ? geom.coordinates
-        : []
-    for (const polygon of polygons) {
-      const outerRing = polygon?.[0]
-      if (!outerRing || outerRing.length < 4) continue
-      holes.push(ensureHoleCW(outerRing))
-    }
+  for (const f of boundary?.features || []) {
+    const g = f?.geometry; if (!g) continue
+    const polys = g.type === 'Polygon' ? [g.coordinates] : (g.type === 'MultiPolygon' ? g.coordinates : [])
+    for (const poly of polys) { if (poly?.[0] && poly[0].length >= 4) holes.push(ensureHoleCW(poly[0])) }
   }
   if (!holes.length) return { type: 'FeatureCollection', features: [] }
-  return {
-    type: 'FeatureCollection',
-    features: [
-      {
-        type: 'Feature',
-        properties: {},
-        geometry: { type: 'Polygon', coordinates: [WORLD_OUTER, ...holes] },
-      },
-    ],
-  }
+  return { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [WORLD_OUTER, ...holes] } }] }
 }
 
 async function ensureShaanxiMask() {
   if (!props.enableShaanxiMask || !mapReady.value) return
-  const map = mapRef.value?.getMap?.()
-  if (!map) return
+  const map = mapRef.value?.getMap?.(); if (!map) return
   if (map.getLayer(MASK_LAYER_ID)) { syncMaskVisibility(true); return }
-
   try {
-    const boundary = await loadShaanxiBoundary()
-    const data = buildMaskGeoJSON(boundary)
-    if (!data.features.length) return
-
-    if (!map.getSource(MASK_SOURCE_ID)) {
-      map.addSource(MASK_SOURCE_ID, { type: 'geojson', data })
-    }
-
-    map.addLayer({
-      id: MASK_LAYER_ID,
-      type: 'fill',
-      source: MASK_SOURCE_ID,
-      paint: {
-        'fill-color': props.maskColor,
-        'fill-opacity': 0,
-        'fill-opacity-transition': {
-          duration: props.maskFadeDuration,
-          delay: 0,
-        },
-      },
-    })
-
-    lastMaskOpacity = -1
-    syncMaskVisibility(true)
-  } catch (err) {
-    console.warn('[mask] 陕西省遮罩加载失败:', err)
-  }
-}
-
-function removeShaanxiMask() {
-  const map = mapRef.value?.getMap?.()
-  if (!map) return
-  if (map.getLayer(MASK_LAYER_ID)) map.removeLayer(MASK_LAYER_ID)
-  if (map.getSource(MASK_SOURCE_ID)) map.removeSource(MASK_SOURCE_ID)
-  lastMaskOpacity = -1
+    const data = buildMaskGeoJSON(await loadShaanxiBoundary()); if (!data.features.length) return
+    if (!map.getSource(MASK_SOURCE_ID)) map.addSource(MASK_SOURCE_ID, { type: 'geojson', data })
+    map.addLayer({ id: MASK_LAYER_ID, type: 'fill', source: MASK_SOURCE_ID, paint: { 'fill-color': props.maskColor, 'fill-opacity': 0, 'fill-opacity-transition': { duration: props.maskFadeDuration, delay: 0 } } })
+    lastMaskOpacity = -1; syncMaskVisibility(true)
+  } catch (err) { console.warn('[mask] 陕西省遮罩加载失败:', err) }
 }
 
 function viewIntersectsShaanxi(map) {
   const b = map.getBounds()
-  const west = Math.max(-180, Math.min(180, b.getWest()))
-  const east = Math.max(-180, Math.min(180, b.getEast()))
-  const south = Math.max(-90, Math.min(90, b.getSouth()))
-  const north = Math.max(-90, Math.min(90, b.getNorth()))
-  if (west > east) return false
+  const w = Math.max(-180, Math.min(180, b.getWest())), e = Math.max(-180, Math.min(180, b.getEast()))
+  const s = Math.max(-90, Math.min(90, b.getSouth())), n = Math.max(-90, Math.min(90, b.getNorth()))
+  if (w > e) return false
   const [[sw, ss], [ne, nn]] = SHAANXI_BOUNDS
-  return !(east < sw || west > ne || north < ss || south > nn)
+  return !(e < sw || w > ne || n < ss || s > nn)
 }
 
-function smoothstep(edge0, edge1, x) {
-  if (edge1 <= edge0) return x >= edge1 ? 1 : 0
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)))
-  return t * t * (3 - 2 * t)
-}
+function smoothstep(e0, e1, x) { if (e1 <= e0) return x >= e1 ? 1 : 0; const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t) }
 
 function computeMaskOpacity() {
   if (!props.enableShaanxiMask) return 0
-  const map = mapRef.value?.getMap?.()
-  if (!map) return 0
-  if (!viewIntersectsShaanxi(map)) return 0
-  const z = map.getZoom()
-  const t = smoothstep(props.maskMinZoom, props.maskFullZoom, z)
-  return t * props.maskMaxOpacity
+  const map = mapRef.value?.getMap?.(); if (!map || !viewIntersectsShaanxi(map)) return 0
+  return smoothstep(props.maskMinZoom, props.maskFullZoom, map.getZoom()) * props.maskMaxOpacity
 }
 
 function syncMaskVisibility(force = false) {
   if (!props.enableShaanxiMask) return
-  const map = mapRef.value?.getMap?.()
-  if (!map || !map.getLayer(MASK_LAYER_ID)) return
-
-  const styleLayers = map.getStyle()?.layers || []
-  const topLayer = styleLayers[styleLayers.length - 1]
-  if (topLayer && topLayer.id !== MASK_LAYER_ID) {
-    map.moveLayer(MASK_LAYER_ID)
-  }
-
+  const map = mapRef.value?.getMap?.(); if (!map || !map.getLayer(MASK_LAYER_ID)) return
+  const top = map.getStyle()?.layers?.slice(-1)[0]
+  if (top && top.id !== MASK_LAYER_ID) map.moveLayer(MASK_LAYER_ID)
   const target = computeMaskOpacity()
   if (!force && Math.abs(target - lastMaskOpacity) < 0.01) return
   lastMaskOpacity = target
@@ -1290,105 +970,49 @@ function syncMaskVisibility(force = false) {
 }
 
 // =================== 项目数据 ===================
-function getProjectCoords(project) {
-  return (project.coordinate || [])
-    .map((c) => [Number(c.longitude), Number(c.latitude)])
-    .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))
-}
+function getProjectCoords(project) { return (project.coordinate || []).map((c) => [Number(c.longitude), Number(c.latitude)]).filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat)) }
 function getProjectCentroid(project) {
-  const coords = getProjectCoords(project)
-  if (!coords.length) return null
-  let sumLng = 0, sumLat = 0
-  for (const [lng, lat] of coords) { sumLng += lng; sumLat += lat }
-  return [sumLng / coords.length, sumLat / coords.length]
+  const coords = getProjectCoords(project); if (!coords.length) return null
+  let sx = 0, sy = 0; for (const [lng, lat] of coords) { sx += lng; sy += lat }
+  return [sx / coords.length, sy / coords.length]
 }
 function buildAreaFeature(project) {
-  const coords = getProjectCoords(project)
-  if (coords.length < 3) return null
-  const first = coords[0], last = coords[coords.length - 1]
-  if (first[0] !== last[0] || first[1] !== last[1]) coords.push([first[0], first[1]])
-  return {
-    type: 'Feature',
-    properties: {
-      projectId: project.id,
-      projectCode: project.projectCode,
-      projectName: project.projectName,
-      itemType: project.itemType,
-    },
-    geometry: { type: 'Polygon', coordinates: [coords] },
-  }
+  const coords = getProjectCoords(project); if (coords.length < 3) return null
+  const f = coords[0], l = coords[coords.length - 1]; if (f[0] !== l[0] || f[1] !== l[1]) coords.push([f[0], f[1]])
+  return { type: 'Feature', properties: { projectId: project.id, projectCode: project.projectCode, projectName: project.projectName, itemType: project.itemType }, geometry: { type: 'Polygon', coordinates: [coords] } }
 }
 function buildWindFC(project) {
-  return {
-    type: 'FeatureCollection',
-    features: (project.windTurbinePoints || [])
-      .map((p, index) => {
-        const lng = Number(p.longitude), lat = Number(p.latitude)
-        if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
-        return {
-          type: 'Feature',
-          properties: { projectId: project.id, index, isAlternative: p.isAlternative },
-          geometry: { type: 'Point', coordinates: [lng, lat] },
-        }
-      })
-      .filter(Boolean),
+  const normal = [], reserve = []
+  for (const [index, p] of (project.windTurbinePoints || []).entries()) {
+    const lng = Number(p.longitude), lat = Number(p.latitude)
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue
+    const isReserve = Number(p.isReserve) === 1
+    const feature = { type: 'Feature', properties: { projectId: project.id, index, isReserve: isReserve ? 1 : 0 }, geometry: { type: 'Point', coordinates: [lng, lat] } }
+    ;(isReserve ? reserve : normal).push(feature)
   }
+  return { normal: { type: 'FeatureCollection', features: normal }, reserve: { type: 'FeatureCollection', features: reserve } }
 }
 function buildBoosterFC(project) {
-  return {
-    type: 'FeatureCollection',
-    features: (project.boosterStationLocations || [])
-      .map((p, index) => {
-        const lng = Number(p.lng), lat = Number(p.lat)
-        if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
-        return {
-          type: 'Feature',
-          properties: { projectId: project.id, index, isBest: p.isBest },
-          geometry: { type: 'Point', coordinates: [lng, lat] },
-        }
-      })
-      .filter(Boolean),
-  }
+  return { type: 'FeatureCollection', features: (project.boosterStationLocations || []).map((p, index) => { const lng = Number(p.lng), lat = Number(p.lat); return Number.isFinite(lng) && Number.isFinite(lat) ? { type: 'Feature', properties: { projectId: project.id, index, isBest: p.isBest }, geometry: { type: 'Point', coordinates: [lng, lat] } } : null }).filter(Boolean) }
 }
 
-function clearProjectLayers() {
-  if (!mapRef.value) return
-  for (const id of renderedLayerIds) mapRef.value.removeLayer(id)
-  renderedLayerIds.clear()
-}
+function clearProjectLayers() { if (!mapRef.value) return; for (const id of renderedLayerIds) mapRef.value.removeLayer(id); renderedLayerIds.clear() }
 
-async function safeAddIcon({
-  layerId, featureCollection,
-  iconId, iconUrl, iconSize, iconAnchor = 'center',
-  fallbackColor = '#3b82f6', fallbackRadius = 8,
-}) {
+async function safeAddIcon({ layerId, featureCollection, iconId, iconUrl, iconSize, iconAnchor = 'center', fallbackColor = '#3b82f6', fallbackRadius = 8 }) {
   try {
     await mapRef.value.ensureImage(iconId, iconUrl)
-    await mapRef.value.addImagePoints({
-      id: layerId, geojson: featureCollection,
-      iconId, iconUrl, iconSize, iconAnchor,
-    })
-  } catch (err) {
-    mapRef.value.addPoints({
-      id: layerId, geojson: featureCollection,
-      color: fallbackColor, radius: fallbackRadius,
-    })
-  }
+    await mapRef.value.addImagePoints({ id: layerId, geojson: featureCollection, iconId, iconUrl, iconSize, iconAnchor })
+  } catch (err) { mapRef.value.addPoints({ id: layerId, geojson: featureCollection, color: fallbackColor, radius: fallbackRadius }) }
   renderedLayerIds.add(layerId)
 }
 
 function addProjectArea(project, highlighted = false) {
-  const area = buildAreaFeature(project)
-  if (!area) return
+  const area = buildAreaFeature(project); if (!area) return
   const layerId = `project-area-${project.id}`
   const style = AREA_STYLE[project.itemType] || AREA_STYLE.FD
   const s = highlighted ? style.highlight : style
-  mapRef.value.addPolygon({
-    id: layerId, geojson: area,
-    color: s.color, opacity: s.opacity, outlineColor: s.outlineColor,
-  })
+  mapRef.value.addPolygon({ id: layerId, geojson: area, color: s.color, opacity: s.opacity, outlineColor: s.outlineColor })
   renderedLayerIds.add(layerId)
-
   const fillLayerId = `${layerId}-fill`
   mapRef.value.offClick(fillLayerId)
   mapRef.value.onClick(fillLayerId, () => onProjectClick(project.id))
@@ -1397,37 +1021,23 @@ function addProjectArea(project, highlighted = false) {
 async function renderProjectsByStage(stage) {
   if (!mapReady.value || !mapRef.value) return
   clearProjectLayers()
-  const projects = allMapProjects.value
-  if (!projects.length || stage === 'overview') return
+  if (!allMapProjects.value.length || stage === 'overview') return
 
-  const allWindFeatures = []
-  const allBoosterFeatures = []
+  const allWindNormal = [], allWindReserve = [], allBoosterFeatures = []
 
-  for (const p of projects) {
+  for (const p of allMapProjects.value) {
     addProjectArea(p, p.id === selectedProject.value?.id)
-    const wf = buildWindFC(p); if (wf.features.length) allWindFeatures.push(...wf.features)
+    const wf = buildWindFC(p)
+    if (wf.normal.features.length) allWindNormal.push(...wf.normal.features)
+    if (wf.reserve.features.length) allWindReserve.push(...wf.reserve.features)
     const bf = buildBoosterFC(p); if (bf.features.length) allBoosterFeatures.push(...bf.features)
   }
 
-  if (allWindFeatures.length) {
-    await safeAddIcon({
-      layerId: 'project-wind-all',
-      featureCollection: { type: 'FeatureCollection', features: allWindFeatures },
-      iconId: ICON_FENGJI, iconUrl: fengjiIcon,
-      iconSize: ICON_SIZE_WIND, iconAnchor: 'bottom',
-      fallbackColor: '#22c55e', fallbackRadius: 3,
-    })
-  }
-  if (allBoosterFeatures.length) {
-    await safeAddIcon({
-      layerId: 'project-booster-all',
-      featureCollection: { type: 'FeatureCollection', features: allBoosterFeatures },
-      iconId: ICON_SHENGYAZHAN, iconUrl: shengyazhanIcon,
-      iconSize: ICON_SIZE_BOOSTER, iconAnchor: 'bottom',
-      fallbackColor: '#ef4444', fallbackRadius: 3,
-    })
-  }
+  if (allWindNormal.length) await safeAddIcon({ layerId: 'project-wind-all', featureCollection: { type: 'FeatureCollection', features: allWindNormal }, iconId: ICON_FENGJI, iconUrl: fengjiIcon, iconSize: ICON_SIZE_WIND, iconAnchor: 'bottom', fallbackColor: '#22c55e', fallbackRadius: 3 })
+  if (allWindReserve.length) await safeAddIcon({ layerId: 'project-wind-bx-all', featureCollection: { type: 'FeatureCollection', features: allWindReserve }, iconId: ICON_FENGJI_BX, iconUrl: fengjiBxIcon, iconSize: ICON_SIZE_WIND, iconAnchor: 'bottom', fallbackColor: '#f59e0b', fallbackRadius: 3 })
+  if (allBoosterFeatures.length) await safeAddIcon({ layerId: 'project-booster-all', featureCollection: { type: 'FeatureCollection', features: allBoosterFeatures }, iconId: ICON_SHENGYAZHAN, iconUrl: shengyazhanIcon, iconSize: ICON_SIZE_BOOSTER, iconAnchor: 'bottom', fallbackColor: '#ef4444', fallbackRadius: 3 })
 
+  syncAllProjectIcons()
   syncMaskVisibility()
 }
 
@@ -1435,24 +1045,14 @@ async function fetchMapProjects() {
   try {
     const params = { pageNo: 1, pageSize: 100, province: '610000' }
     if (props.stage) params.projectStage = props.stage
-
-    const res = await api.getPageList(params)
-    const data = res?.data ?? {}
-    allMapProjects.value = data.list ?? []
-    if (mapReady.value && isAreaView.value) {
-      await renderProjectsByStage('area')
-    }
-  } catch (err) {
-    ElMessage.error(err?.message || '地图项目数据加载失败')
-  }
+    allMapProjects.value = (await api.getPageList(params))?.data?.list ?? []
+    if (mapReady.value && isAreaView.value) await renderProjectsByStage('area')
+  } catch (err) { ElMessage.error(err?.message || '地图项目数据加载失败') }
 }
 
-// =================== 选中 ===================
+// =================== 选中 & 详情卡 ===================
 const windCount = computed(() => selectedProject.value?.windTurbinePoints?.length || 0)
-const altCount = computed(
-  () => (selectedProject.value?.windTurbinePoints || [])
-    .filter((p) => p.isAlternative === 1 || p.isAlternative === true).length
-)
+const altCount = computed(() => (selectedProject.value?.windTurbinePoints || []).filter((p) => Number(p.isReserve) === 1).length)
 
 async function onProjectClick(projectId) {
   if (selectedProject.value?.id === projectId) return
@@ -1460,6 +1060,7 @@ async function onProjectClick(projectId) {
   const project = allMapProjects.value.find((p) => p.id === projectId)
   if (!project) return
   selectedProject.value = project
+  hasSaved.value = false // ★ 重置保存状态
   addProjectArea(project, true)
   updateDetailCardPosition()
   initEditBuffer(project)
@@ -1469,47 +1070,30 @@ async function onProjectClick(projectId) {
 function clearSelectionLayers() {
   if (!selectedProject.value) return
   const pid = selectedProject.value.id
-  showVerifyPanel.value = false
-  showDetailPanel.value = false
-  mapRef.value?.clearEditableAreas()
-  editBuffer.value = null
-  drawingNewPoint.value = false
+  showVerifyPanel.value = false; showDetailPanel.value = false
+  mapRef.value?.clearEditableAreas(); editBuffer.value = null; drawingNewPoint.value = false
   const project = allMapProjects.value.find((p) => p.id === pid)
   if (project && isAreaView.value) addProjectArea(project, false)
-  selectedProject.value = null
-  detailCardPos.visible = false
+  selectedProject.value = null; detailCardPos.visible = false
 }
 
 function updateDetailCardPosition() {
   if (!selectedProject.value || !mapRef.value) { detailCardPos.visible = false; return }
   const centroid = getProjectCentroid(selectedProject.value)
   if (!centroid) { detailCardPos.visible = false; return }
-  const map = mapRef.value.getMap()
-  if (!map) return
-  const point = map.project(centroid)
-  detailCardPos.x = point.x
-  detailCardPos.y = point.y
-  detailCardPos.visible = true
+  const map = mapRef.value.getMap(); if (!map) return
+  const pt = map.project(centroid); detailCardPos.x = pt.x; detailCardPos.y = pt.y; detailCardPos.visible = true
 }
 
 function handleMapBlankClick(e) {
   if (!isAreaView.value || !selectedProject.value) return
-  const map = mapRef.value?.getMap?.()
-  if (!map) return
-  const areaLayerIds = []
-  for (const id of renderedLayerIds) {
-    if (id.startsWith('project-area-')) areaLayerIds.push(`${id}-fill`)
-  }
-  if (!areaLayerIds.length) return
-  if (!map.queryRenderedFeatures(e.point, { layers: areaLayerIds }).length) {
-    clearSelectionLayers()
-  }
+  const map = mapRef.value?.getMap?.(); if (!map) return
+  const areaIds = []; for (const id of renderedLayerIds) { if (id.startsWith('project-area-')) areaIds.push(`${id}-fill`) }
+  if (!areaIds.length) return
+  if (!map.queryRenderedFeatures(e.point, { layers: areaIds }).length) clearSelectionLayers()
 }
 
-function onVerifySaved(data) {
-  console.log('[verify] 已保存:', data)
-  showVerifyPanel.value = false
-}
+function onVerifySaved(data) { console.log('[verify] 已保存:', data); showVerifyPanel.value = false }
 
 // =================== 抽屉 ===================
 async function focusProject(project) {
@@ -1517,120 +1101,75 @@ async function focusProject(project) {
   if (!p) { ElMessage.warning('地图上未找到该项目'); return }
   const centroid = getProjectCentroid(p)
   if (!centroid) { ElMessage.warning('该项目缺少坐标信息'); return }
-  const map = mapRef.value?.getMap?.()
-  if (!map) return
+  const map = mapRef.value?.getMap?.(); if (!map) return
   showProjectDrawer.value = false
   map.flyTo({ center: centroid, zoom: 13, duration: 1200 })
   setTimeout(() => onProjectClick(p.id), 1300)
 }
+function handleDrawerAction({ type, project }) { executeAction(type, allMapProjects.value.find((item) => item.id === project.id) || project) }
+function handleDrawerSortChange({ key, dir }) { drawerSort.key = key; drawerSort.dir = dir; pagination.page = 1; fetchProjectList() }
 
-function handleDrawerAction({ type, project }) {
-  const p = allMapProjects.value.find((item) => item.id === project.id) || project
-  executeAction(type, p)
-}
+watch(viewMode, (val) => { if (val === 'list' && showProjectDrawer.value) showProjectDrawer.value = false })
+watch(showProjectDrawer, (val) => { if (val) { pagination.page = 1; fetchProjectList() } })
 
-function handleDrawerSortChange({ key, dir }) {
-  drawerSort.key = key
-  drawerSort.dir = dir
-  pagination.page = 1
-  fetchProjectList()
-}
-
-watch(viewMode, (val) => {
-  if (val === 'list' && showProjectDrawer.value) showProjectDrawer.value = false
-})
-watch(showProjectDrawer, (val) => {
-  if (val) { pagination.page = 1; fetchProjectList() }
-})
-
-// =================== 编辑 ===================
+// =================== 编辑核心 ===================
 const editBuffer = ref(null)
 let suppressDrawSync = false
 
 function initEditBuffer(project) {
   const area = getProjectCoords(project)
-  const wind = (project.windTurbinePoints || [])
-    .map(p => [Number(p.longitude), Number(p.latitude)])
-    .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))
-  const booster = (project.boosterStationLocations || [])
-    .map(p => [Number(p.lng), Number(p.lat)])
-    .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))
+  const wind = (project.windTurbinePoints || []).map(p => {
+    const lng = Number(p.longitude), lat = Number(p.latitude)
+    return Number.isFinite(lng) && Number.isFinite(lat) ? { lng, lat, isReserve: Number(p.isReserve) === 1 ? 1 : 0 } : null
+  }).filter(Boolean)
+  const booster = (project.boosterStationLocations || []).map(p => {
+    const lng = Number(p.lng), lat = Number(p.lat)
+    return Number.isFinite(lng) && Number.isFinite(lat) ? { lng, lat, isBest: Number(p.isBest) === 1 ? 1 : 0 } : null
+  }).filter(Boolean)
   editBuffer.value = { area, wind, booster, unavailable: [] }
 }
 
-function closeRing(coords) {
-  if (!coords || coords.length < 3) return coords
-  const first = coords[0], last = coords[coords.length - 1]
-  if (first[0] !== last[0] || first[1] !== last[1]) return [...coords, [first[0], first[1]]]
-  return coords
-}
+function closeRing(coords) { if (!coords || coords.length < 3) return coords; const f = coords[0], l = coords[coords.length - 1]; return f[0] === l[0] && f[1] === l[1] ? coords : [...coords, [f[0], f[1]]] }
 
 function syncDrawToBuffer() {
   if (!editBuffer.value) return
   const draw = mapRef.value?.getDraw?.()
   const all = draw?.getAll?.() || { type: 'FeatureCollection', features: [] }
-  const mode = editMode.value
-  if (mode === 'area') {
-    const af = all.features.find(f => f.properties?.kind === 'area')
-    if (af && af.geometry?.type === 'Polygon') {
-      editBuffer.value.area = af.geometry.coordinates[0].map(c => [c[0], c[1]])
+  
+  const currentMode = editMode.value
+
+  if (currentMode === 'area') {
+    const areaF = all.features.find(f => f.properties?.kind === 'area')
+    if (areaF) {
+      editBuffer.value.area = areaF.geometry.coordinates[0].map(c => [c[0], c[1]])
+    } else {
+      editBuffer.value.area = [] 
     }
-  } else if (mode === 'wind') {
-    editBuffer.value.wind = all.features.filter(f => f.properties?.kind === 'wind').map(f => f.geometry.coordinates)
-  } else if (mode === 'booster') {
-    editBuffer.value.booster = all.features.filter(f => f.properties?.kind === 'booster').map(f => f.geometry.coordinates)
-  } else if (mode === 'unavailable') {
+  } 
+  else if (currentMode === 'wind') {
+    editBuffer.value.wind = all.features
+      .filter(f => f.properties?.kind === 'wind')
+      .map(f => ({
+        lng: f.geometry.coordinates[0],
+        lat: f.geometry.coordinates[1],
+        isReserve: Number(f.properties?.isReserve) === 1 ? 1 : 0
+      }))
+  } 
+  else if (currentMode === 'booster') {
+    editBuffer.value.booster = all.features
+      .filter(f => f.properties?.kind === 'booster')
+      .map(f => ({
+        lng: f.geometry.coordinates[0],
+        lat: f.geometry.coordinates[1],
+        isBest: Number(f.properties?.isBest) === 1 ? 1 : 0
+      }))
+  } 
+  else if (currentMode === 'unavailable') {
     editBuffer.value.unavailable = all.features
-      .filter(f => !f.properties?.kind || f.properties.kind === 'unavailable')
-      .map(f => f.geometry)
+      .filter(f => f.properties?.kind === 'unavailable')
   }
+
   refreshAllPointsLayers()
-}
-
-function enterEditMode(mode) {
-  if (!selectedProject.value || !editBuffer.value) return
-  const draw = mapRef.value?.getDraw?.()
-  if (!draw) return
-  suppressDrawSync = true
-  editMode.value = mode
-  drawingNewPoint.value = false
-  mapRef.value.clearEditableAreas()
-
-  if (mode === 'area') {
-    const coords = editBuffer.value.area
-    if (coords && coords.length >= 3) {
-      mapRef.value.loadEditableAreas({
-        type: 'FeatureCollection',
-        features: [{
-          type: 'Feature',
-          id: `edit-area-${selectedProject.value.id}`,
-          properties: { kind: 'area' },
-          geometry: { type: 'Polygon', coordinates: [closeRing(coords)] },
-        }],
-      })
-      const all = draw.getAll()
-      if (all.features.length) draw.changeMode('direct_select', { featureId: all.features[0].id })
-    }
-  } else if (mode === 'wind') {
-    const features = editBuffer.value.wind.map((coords, i) => ({
-      type: 'Feature', id: `edit-wind-${i}`,
-      properties: { kind: 'wind', index: i },
-      geometry: { type: 'Point', coordinates: coords },
-    }))
-    if (features.length) mapRef.value.loadEditableAreas({ type: 'FeatureCollection', features })
-    draw.changeMode('simple_select')
-  } else if (mode === 'booster') {
-    const features = editBuffer.value.booster.map((coords, i) => ({
-      type: 'Feature', id: `edit-booster-${i}`,
-      properties: { kind: 'booster', index: i },
-      geometry: { type: 'Point', coordinates: coords },
-    }))
-    if (features.length) mapRef.value.loadEditableAreas({ type: 'FeatureCollection', features })
-    draw.changeMode('simple_select')
-  } else if (mode === 'unavailable') {
-    draw.changeMode('draw_polygon')
-  }
-  suppressDrawSync = false
 }
 
 function onDrawChange() {
@@ -1638,26 +1177,142 @@ function onDrawChange() {
   syncDrawToBuffer()
 }
 
-function toggleAddPoint() {
+function enterEditMode(mode) {
+  if (!selectedProject.value || !editBuffer.value) return
   const draw = mapRef.value?.getDraw?.()
   if (!draw) return
-  if (drawingNewPoint.value) {
-    draw.changeMode('simple_select')
-    drawingNewPoint.value = false
-  } else {
-    draw.changeMode('draw_point')
-    drawingNewPoint.value = true
-    ElMessage.info('点击地图添加新点，添加完记得点"保存"')
+
+  const currentFeatures = draw.getAll().features
+  if (!suppressDrawSync && currentFeatures.length > 0) {
+    syncDrawToBuffer()
   }
+
+  refreshAllPointsLayers() 
+
+  suppressDrawSync = true
+  editMode.value = mode
+  drawingNewPoint.value = false
+  isBoxSelecting.value = false
+  mapRef.value.stopBoxSelect?.()
+
+  mapRef.value.clearEditableAreas()
+
+  const buf = editBuffer.value
+  const features = []
+
+  if (mode === 'area') {
+    if (buf.area && buf.area.length >= 3) {
+      features.push({ 
+        type: 'Feature', 
+        id: 'edit-area', 
+        properties: { kind: 'area' }, 
+        geometry: { type: 'Polygon', coordinates: [closeRing(buf.area)] } 
+      })
+    }
+  } else if (mode === 'wind') {
+    buf.wind.forEach((p, i) => {
+      features.push({ 
+        type: 'Feature', 
+        id: `edit-wind-${i}`, 
+        properties: { kind: 'wind', index: i, isReserve: p.isReserve }, 
+        geometry: { type: 'Point', coordinates: [p.lng, p.lat] } 
+      })
+    })
+  } else if (mode === 'booster') {
+    buf.booster.forEach((p, i) => {
+      features.push({ 
+        type: 'Feature', 
+        id: `edit-booster-${i}`, 
+        properties: { kind: 'booster', index: i, isBest: p.isBest }, 
+        geometry: { type: 'Point', coordinates: [p.lng, p.lat] } 
+      })
+    })
+  } else if (mode === 'unavailable') {
+    buf.unavailable.forEach(f => features.push(f))
+  }
+
+  if (features.length) {
+    draw.add({ type: 'FeatureCollection', features })
+  }
+
+  if (mode === 'area') {
+    const areaFeat = features.find(f => f.properties.kind === 'area')
+    if (areaFeat) {
+      draw.changeMode('direct_select', { featureId: areaFeat.id })
+    } else {
+      draw.changeMode('simple_select')
+    }
+  } else if (mode === 'unavailable') {
+    draw.changeMode('draw_polygon')
+  } else {
+    draw.changeMode('simple_select')
+  }
+
+  nextTick(() => {
+    mapRef.value?.bringDrawPointsToTop?.()
+  })
+
+  suppressDrawSync = false
+}
+
+function startAddWindPoint() {
+  const draw = mapRef.value?.getDraw?.()
+  if (!draw) return
+  draw.changeMode('draw_point')
+  drawingNewPoint.value = true
+  ElMessage.info('点击地图添加风机，点击"标记备选"可切换备选状态')
+}
+
+function startBoxSelection() {
+  if (editMode.value !== 'wind' && editMode.value !== 'booster') {
+    ElMessage.warning('仅支持在编辑风机/升压站时框选')
+    return
+  }
+  isBoxSelecting.value = true
+  mapRef.value.startBoxSelect?.()
+  ElMessage.info('请在地图上拖拽进行框选')
+}
+
+function handleBoxSelect(featureIds) {
+  if (!featureIds.length) return
+  const draw = mapRef.value?.getDraw?.()
+  if (!draw) return
+  draw.changeMode('simple_select', { featureIds })
+  isBoxSelecting.value = false
+}
+
+function markReserve(isReserve) {
+  const draw = mapRef.value?.getDraw?.()
+  if (!draw) return
+  const ids = draw.getSelectedIds()
+  if (!ids.length) {
+    ElMessage.warning('请先选中风机点位')
+    return
+  }
+  
+  let count = 0
+  ids.forEach(id => {
+    draw.setFeatureProperty(id, 'isReserve', isReserve ? 1 : 0)
+    const feat = draw.get(id)
+    if (feat && feat.properties?.kind === 'wind') {
+      count++
+    }
+  })
+  
+  if (count === 0) return
+  syncDrawToBuffer()
+  enterEditMode('wind')
+  ElMessage.success(`已${isReserve ? '标记' : '取消'}备选 ${count} 个风机`)
 }
 
 function deleteSelectedPoints() {
   const draw = mapRef.value?.getDraw?.()
   if (!draw) return
   const ids = draw.getSelectedIds()
-  if (!ids.length) { ElMessage.warning('请先点击选中要删除的点'); return }
+  if (!ids.length) { ElMessage.warning('请先选中要删除的点'); return }
   draw.delete(ids)
   syncDrawToBuffer()
+  enterEditMode(editMode.value)
   ElMessage.success(`已删除 ${ids.length} 个点`)
 }
 
@@ -1668,24 +1323,43 @@ function refreshAllPointsLayers() {
   const pid = selectedProject.value.id
   const other = allMapProjects.value.filter(p => p.id !== pid)
 
-  const windFeatures = []
-  for (const p of other) { const fc = buildWindFC(p); if (fc.features.length) windFeatures.push(...fc.features) }
-  for (const [lng, lat] of editBuffer.value.wind) {
-    windFeatures.push({ type: 'Feature', properties: { projectId: pid }, geometry: { type: 'Point', coordinates: [lng, lat] } })
+  if (editBuffer.value.area && editBuffer.value.area.length >= 3) {
+    const areaFeature = {
+      type: 'Feature',
+      properties: { projectId: pid, projectCode: selectedProject.value.projectCode, projectName: selectedProject.value.projectName, itemType: selectedProject.value.itemType },
+      geometry: { type: 'Polygon', coordinates: [closeRing(editBuffer.value.area)] }
+    }
+    const layerId = `project-area-${pid}`
+    const style = AREA_STYLE[selectedProject.value.itemType] || AREA_STYLE.FD
+    mapRef.value.addPolygon({ 
+      id: layerId, 
+      geojson: areaFeature, 
+      color: style.highlight.color, 
+      opacity: style.highlight.opacity, 
+      outlineColor: style.highlight.outlineColor 
+    })
+  }
+
+  const windNormal = [], windReserve = []
+  for (const p of other) {
+    const wf = buildWindFC(p)
+    if (wf.normal.features.length) windNormal.push(...wf.normal.features)
+    if (wf.reserve.features.length) windReserve.push(...wf.reserve.features)
+  }
+  for (const p of editBuffer.value.wind) {
+    const f = { type: 'Feature', properties: { projectId: pid }, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } }
+    ;(p.isReserve === 1 ? windReserve : windNormal).push(f)
   }
 
   const boosterFeatures = []
   for (const p of other) { const fc = buildBoosterFC(p); if (fc.features.length) boosterFeatures.push(...fc.features) }
-  for (const [lng, lat] of editBuffer.value.booster) {
-    boosterFeatures.push({ type: 'Feature', properties: { projectId: pid }, geometry: { type: 'Point', coordinates: [lng, lat] } })
+  for (const p of editBuffer.value.booster) {
+    boosterFeatures.push({ type: 'Feature', properties: { projectId: pid }, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } })
   }
 
-  if (map.getSource('project-wind-all')) {
-    map.getSource('project-wind-all').setData({ type: 'FeatureCollection', features: windFeatures })
-  }
-  if (map.getSource('project-booster-all')) {
-    map.getSource('project-booster-all').setData({ type: 'FeatureCollection', features: boosterFeatures })
-  }
+  if (map.getSource('project-wind-all')) map.getSource('project-wind-all').setData({ type: 'FeatureCollection', features: windNormal })
+  if (map.getSource('project-wind-bx-all')) map.getSource('project-wind-bx-all').setData({ type: 'FeatureCollection', features: windReserve })
+  if (map.getSource('project-booster-all')) map.getSource('project-booster-all').setData({ type: 'FeatureCollection', features: boosterFeatures })
 }
 
 async function saveEdit() {
@@ -1696,24 +1370,16 @@ async function saveEdit() {
 
   const fallbackRegionCode = project.coordinate?.[0]?.regionCode ?? null
   const coordinate = editBuffer.value.area.map(([lng, lat]) => ({
-    regionCode: fallbackRegionCode,
-    longitude: String(lng),
-    latitude: String(lat),
+    regionCode: fallbackRegionCode, longitude: String(lng), latitude: String(lat),
   }))
 
-  const originalWind = project.windTurbinePoints || []
-  const windTurbinePoints = editBuffer.value.wind.map(([lng, lat]) => {
-    const match = originalWind.find(p =>
-      Math.abs(Number(p.longitude) - lng) < 1e-9 && Math.abs(Number(p.latitude) - lat) < 1e-9)
-    return { longitude: lng, latitude: lat, isAlternative: match?.isAlternative ?? 0 }
-  })
+  const windTurbinePoints = editBuffer.value.wind.map(p => ({
+    longitude: p.lng, latitude: p.lat, isReserve: p.isReserve,
+  }))
 
-  const originalBooster = project.boosterStationLocations || []
-  const boosterStationLocations = editBuffer.value.booster.map(([lng, lat]) => {
-    const match = originalBooster.find(p =>
-      Math.abs(Number(p.lng) - lng) < 1e-9 && Math.abs(Number(p.lat) - lat) < 1e-9)
-    return { lng, lat, isBest: match?.isBest ?? 0 }
-  })
+  const boosterStationLocations = editBuffer.value.booster.map(p => ({
+    lng: p.lng, lat: p.lat, isBest: p.isBest,
+  }))
 
   const payload = {
     coordinate, windTurbinePoints, boosterStationLocations,
@@ -1739,6 +1405,7 @@ async function saveEdit() {
     const res = await configApi.upDataLayer(pid, payload)
     if (res?.code === 200) {
       ElMessage.success('保存成功')
+      hasSaved.value = true // ★ 保存成功后，允许点击重新计算
       const target = allMapProjects.value.find(p => p.id === pid)
       if (target) {
         target.coordinate = coordinate
@@ -1749,19 +1416,42 @@ async function saveEdit() {
       updateDetailCardPosition()
       if (target) { initEditBuffer(target); enterEditMode('area') }
       fetchOverviewStats(); fetchCityStats()
+    } else { ElMessage.error(res?.msg || '保存失败') }
+  } catch (err) { ElMessage.error(err?.message || '保存失败') } 
+  finally { saving.value = false }
+}
+
+// ★ 新增：重新计算
+async function handleRecalculate() {
+  if (!selectedProject.value || !hasSaved.value) return
+  
+  try {
+    recalculating.value = true
+    const res = await configApi.updateCalculateStatus(selectedProject.value.id, {
+      isReturnProject: 1
+    })
+    
+    if (res?.code === 200) {
+      ElMessage.success('重新计算发起成功')
+      hasSaved.value = false 
+      fetchMapProjects()
+      fetchProjectList()
     } else {
-      ElMessage.error(res?.msg || '保存失败')
+      ElMessage.error(res?.msg || '重新计算失败')
     }
   } catch (err) {
-    ElMessage.error(err?.message || '保存失败')
+    ElMessage.error(err?.message || '重新计算请求异常')
   } finally {
-    saving.value = false
+    recalculating.value = false
   }
 }
 
 function cancelEdit() {
   mapRef.value?.clearEditableAreas()
   drawingNewPoint.value = false
+  isBoxSelecting.value = false
+  mapRef.value.stopBoxSelect?.()
+  hasSaved.value = false // ★ 取消时重置
   if (selectedProject.value) {
     initEditBuffer(selectedProject.value)
     editMode.value = 'area'
@@ -1774,14 +1464,10 @@ function cancelEdit() {
 const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoomThresholdSwitch({
   mapRef,
   onEnter: () => { hideCityStats(); renderProjectsByStage('area') },
-  onExit: () => {
-    clearSelectionLayers()
-    renderProjectsByStage('overview')
-    if (cityStats.value.length) renderCityStats()
-  },
+  onExit: () => { clearSelectionLayers(); renderProjectsByStage('overview'); if (cityStats.value.length) renderCityStats() },
 })
 
-// =================== 地图就绪 ===================
+// =================== 就绪 ===================
 async function onMapReady() {
   mapReady.value = true
   if (showCreateProject.value) nextTick(() => startCreateDrawing())
@@ -1791,87 +1477,43 @@ async function onMapReady() {
   map.on('click', handleMapBlankClick)
   bindZoomListener()
   syncByZoom()
-  if (isAreaView.value) {
-    hideCityStats()
-    renderProjectsByStage('area')
-  } else {
-    await renderCityStats()
-  }
+  if (isAreaView.value) { hideCityStats(); renderProjectsByStage('area') } 
+  else { await renderCityStats() }
 
-  // ★ 陕西省遮罩监听
   map.on('zoom', syncMaskVisibility)
   map.on('move', syncMaskVisibility)
   map.on('style.load', ensureShaanxiMask)
   await ensureShaanxiMask()
 
-  // ★ whln 图层控制插件
   try {
-    whlnPlugin = attachLayerControl(map, {
-      beforeId: 'site-city-stats',
-      placement: 'control',
-      position: 'bottom-left',
-      showLayerDetail: false,
-    })
-
+    whlnPlugin = attachLayerControl(map, { beforeId: 'site-city-stats', placement: 'control', position: 'bottom-left', showLayerDetail: false })
     await nextTick()
-    const hideWhlnUI = () => {
-      document
-        .querySelectorAll('.maplibregl-ctrl-bottom-left .whln-lc')
-        .forEach((el) => el.remove())
-    }
+    const hideWhlnUI = () => { document.querySelectorAll('.maplibregl-ctrl-bottom-left .whln-lc').forEach((el) => el.remove()) }
     hideWhlnUI()
-
     const ctrlHost = document.querySelector('.maplibregl-ctrl-bottom-left')
-    let lcHider = null
     if (ctrlHost) {
-      lcHider = new MutationObserver(() => {
-        hideWhlnUI()
-        syncMaskVisibility()
-      })
-      lcHider.observe(ctrlHost, { childList: true })
-      window.__whlnLcHider = lcHider
+      window.__whlnLcHider = new MutationObserver(() => { hideWhlnUI(); syncMaskVisibility() })
+      window.__whlnLcHider.observe(ctrlHost, { childList: true })
     }
-
-    const whlnOnly = layerVisibleIds.value.filter((id) => WHLN_LAYER_IDS.includes(id))
-    whlnPlugin.setVisibleIds?.(whlnOnly)
-
+    whlnPlugin.setVisibleIds?.(layerVisibleIds.value.filter((id) => WHLN_LAYER_IDS.includes(id)))
     whlnPlugin.subscribe?.((ids) => {
-      const others = layerVisibleIds.value.filter((id) => !WHLN_LAYER_IDS.includes(id))
-      layerVisibleIds.value = [...others, ...ids]
+      layerVisibleIds.value = [...layerVisibleIds.value.filter((id) => !WHLN_LAYER_IDS.includes(id)), ...ids]
       emits('featureVisibleChange', ids)
       syncMaskVisibility()
     })
-  } catch (err) {
-    console.warn('[whln] 图层控制挂载失败:', err)
-  }
+  } catch (err) { console.warn('[whln] 图层控制挂载失败:', err) }
 }
 
-// =================== 生命周期 ===================
-onMounted(() => {
-  fetchStageList()
-  fetchProjectList()
-  fetchMapProjects()
-  fetchOverviewStats()
-  fetchCityStats()
-})
-
+onMounted(() => { fetchStageList(); fetchProjectList(); fetchMapProjects(); fetchOverviewStats(); fetchCityStats() })
 onUnmounted(() => {
-  if (window.__whlnLcHider) {
-    window.__whlnLcHider.disconnect()
-    window.__whlnLcHider = null
-  }
-  whlnPlugin?.destroy?.()
-  whlnPlugin = null
-
+  if (window.__whlnLcHider) { window.__whlnLcHider.disconnect(); window.__whlnLcHider = null }
+  whlnPlugin?.destroy?.(); whlnPlugin = null
   unbindZoomListener()
   const map = mapRef.value?.getMap?.()
   if (map) {
-    map.off('move', updateDetailCardPosition)
-    map.off('zoom', updateDetailCardPosition)
-    map.off('click', handleMapBlankClick)
-    map.off('zoom', syncMaskVisibility)
-    map.off('move', syncMaskVisibility)
-    map.off('style.load', ensureShaanxiMask)
+    map.off('move', updateDetailCardPosition); map.off('zoom', updateDetailCardPosition)
+    map.off('click', handleMapBlankClick); map.off('zoom', syncMaskVisibility)
+    map.off('move', syncMaskVisibility); map.off('style.load', ensureShaanxiMask)
   }
 })
 </script>
