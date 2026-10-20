@@ -424,13 +424,23 @@
       @sort-change="handleDrawerSortChange"
     />
 
-    <!-- ★ 右侧项目详情面板 -->
-    <ProjectDetailPanel
+            <ProjectDetailPanel
       :visible="showDetailPanel"
       :project="selectedProject"
       :stage="stage"
       :initial-tab="detailPanelTab"
       @close="showDetailPanel = false"
+      @action="onDetailPanelAction"
+    />
+
+        <!-- ★ 全屏生成报告面板 -->
+    <GenerateReportPanel
+      :visible="showGeneratePanel"
+      :project="generatePanelProject"
+      :action-key="generatePanelActionKey"
+      :sub-code="generatePanelSubCode"
+      @close="showGeneratePanel = false"
+      @generated="onReportGenerated"
     />
 
     <!-- ★ 分配负责人弹窗 -->
@@ -454,6 +464,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft,
@@ -487,7 +498,8 @@ import TaskPanel from './TaskPanel.vue'
 import VerifyPanel from './VerifyPanel.vue'
 import ProjectDrawer from './ProjectDrawer.vue'
 import ProjectDetailPanel from './ProjectDetailPanel.vue'
-import AssignDialog from './AssignDialog.vue' // ★ 引入新增的弹窗组件
+import AssignDialog from './AssignDialog.vue'
+import GenerateReportPanel from './GenerateReportPanel.vue' // ★ 新增：全屏报告生成面板
 import { satelliteStyle } from '../js/mapConfig'
 import { useZoomThresholdSwitch } from '../js/useZoomThresholdSwitch'
 import { searchPlaceName } from '../js/useTiandituGeocode'
@@ -501,33 +513,27 @@ import shengyazhanIcon from '@/assets/img/mapIcon/shengyazhan.png'
 import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
 import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPanelConfig'
 
-// ★ whln 图层控制插件（只保留 API，UI 由 LayerChipPanel 接管）
+// ★ whln 图层控制插件
 import { attachLayerControl } from '@whln/layer-control'
 
 // =================== props ===================
 const props = defineProps({
   stage: { type: String, default: '' },
   summaryTitle: { type: String, default: '项目通道概况' },
-  cardActions: { type: Array, default: () => [] }, // 保留 prop 但不再使用
+  cardActions: { type: Array, default: () => [] },
   statusColumn: {
     type: String,
     default: 'verify',
     validator: (v) => ['verify', 'approval', 'none'].includes(v),
   },
-  rowActions: { type: Array, default: () => [] }, // 保留 prop 但不再使用
+  rowActions: { type: Array, default: () => [] },
   showConfigPage: { type: Boolean, default: false },
   showVerifyPanelFlag: { type: Boolean, default: false },
-  // ★ 陕西省遮罩开关
   enableShaanxiMask: { type: Boolean, default: true },
-  // ★ 遮罩开始显现的 zoom（低于此值完全透明）
   maskMinZoom: { type: Number, default: 4.5 },
-  // ★ 遮罩完全显现的 zoom（高于此值达到最大不透明度）
   maskFullZoom: { type: Number, default: 6.5 },
-  // ★ 遮罩最大不透明度（1 = 完全黑，0.9 更柔和，能透出底图）
   maskMaxOpacity: { type: Number, default: 1 },
-  // ★ 遮罩颜色
   maskColor: { type: String, default: '#0b1e3a' },
-  // ★ 透明度变化的过渡时长（ms），让状态切换更平滑
   maskFadeDuration: { type: Number, default: 300 },
 })
 const emits = defineEmits(['featureVisibleChange'])
@@ -542,7 +548,6 @@ const CITY_LAYER_ID = 'site-city-stats'
 const PROVINCE_CODE = '610000'
 const CITY_GEOJSON_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/610000_full.json'
 
-// ★ 各阶段气泡窗和列表统一的操作按钮
 const STAGE_ACTIONS = {
   PRELIMINARY_SELECTION: ['assign', 'verify', 'edit', 'delete'],
   PROJECT_RESERVE:       ['material', 'edit', 'assign', 'delete'],
@@ -551,7 +556,6 @@ const STAGE_ACTIONS = {
   INVESTMENT_DECISION:   ['investMeeting', 'edit', 'assign', 'delete'],
 }
 
-// 统一操作名称映射
 const ACTION_LABELS = {
   material: '立项材料',
   researchMaterial: '可研材料',
@@ -622,9 +626,14 @@ const STAGE_THEMES = {
 const showDetailPanel = ref(false)
 const detailPanelTab = ref('main')
 
+// ★ 全屏报告生成面板
+const showGeneratePanel = ref(false)
+const generatePanelProject = ref(null)
+const generatePanelActionKey = ref('')
+const generatePanelSubCode = ref('')
+
 const theme = computed(() => STAGE_THEMES[props.stage] || STAGE_THEMES.DEFAULT)
 
-// ★ 动态计算当前阶段的按钮列表（气泡窗与列表共用）
 const currentActions = computed(() => {
   return STAGE_ACTIONS[props.stage] || STAGE_ACTIONS['PRELIMINARY_SELECTION']
 })
@@ -645,7 +654,11 @@ const AREA_STYLE = {
 // =================== 地图 ===================
 const mapRef = ref(null)
 const mapReady = ref(false)
-const viewMode = ref('map')
+
+// ★ 支持 ?view=list 直接进入列表模式
+const route = useRoute()
+const viewMode = ref(route.query.view === 'list' ? 'list' : 'map')
+
 const showConfig = ref(false)
 const showProjectDrawer = ref(false)
 const showVerifyPanel = ref(false)
@@ -664,7 +677,7 @@ const saving = ref(false)
 
 const drawerSort = reactive({ key: '', dir: 'desc' })
 
-// ★ whln 图层控制插件实例（仅保留 API 层）
+// ★ whln 图层控制插件实例
 let whlnPlugin = null
 
 // ★ 图层 chip 面板状态
@@ -729,14 +742,11 @@ function onLayerToggle(item) {
 
 function onLayerInputChange({ id, value }) {
   layerInputs[id] = value
-  if (id === 'noise') {
-    // TODO: 根据噪音距离更新地图缓冲半径等逻辑
-  }
 }
 
-function toggleBaseMap(id) { /* 按项目逻辑实现 */ }
-function toggleTerrain(id) { /* 按项目逻辑实现 */ }
-function toggleCustomLayer(id) { /* 按项目逻辑实现 */ }
+function toggleBaseMap(id) { }
+function toggleTerrain(id) { }
+function toggleCustomLayer(id) { }
 
 // =================== 创建项目 ===================
 const showCreateProject = ref(false)
@@ -889,15 +899,12 @@ function handleReset() {
 function handlePageChange(page) { pagination.page = page; fetchProjectList() }
 function handleSizeChange(size) { pagination.pageSize = size; pagination.page = 1; fetchProjectList() }
 
-// ★ 统一操作入口：气泡窗、表格列表、抽屉列表均走这里
 function executeAction(action, project) {
   if (!project) return
   const name = project.projectName || ''
   
-  // 查找地图上的全量数据（列表行数据缺少坐标等字段）
   const mapProject = allMapProjects.value.find((p) => p.id === project.id) || project
 
-  // 1. 打开详情面板
   if (['material', 'researchMaterial', 'investMaterial'].includes(action)) {
     openDetailPanel(mapProject, 'material')
     return
@@ -907,14 +914,12 @@ function executeAction(action, project) {
     return
   }
 
-  // 2. 分配
   if (action === 'assign') {
     assignTargetProject.value = mapProject
     showAssignDialog.value = true
     return
   }
 
-  // 3. 核查
   if (action === 'verify') {
     showProjectDrawer.value = false
     showDetailPanel.value = false
@@ -932,13 +937,11 @@ function executeAction(action, project) {
     return
   }
 
-  // 4. 编辑
   if (action === 'edit') {
     openDetailPanel(mapProject, 'main')
     return
   }
 
-  // 5. 删除
   if (action === 'delete') {
     ElMessageBox.confirm(`确认删除项目「${name}」吗？`, '提示', {
       type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消',
@@ -969,10 +972,35 @@ function openDetailPanel(project, tab) {
   }, 1300)
 }
 
-// 监听弹窗成功回调
 function onAssignSuccess() {
   fetchProjectList()
   fetchMapProjects()
+}
+
+// ★ 详情面板事件：阶段推进成功 / 打开报告生成
+function onDetailPanelAction(payload) {
+  // 1. 阶段推进成功（跳转页面）
+  if (payload?.type === 'stage-changed') {
+    showDetailPanel.value = false
+    fetchMapProjects()
+    fetchProjectList()
+    fetchOverviewStats()
+    fetchCityStats()
+    return
+  }
+
+  // 2. 打开全屏生成报告面板
+  if (payload?.type === 'generate-report') {
+    generatePanelProject.value = payload.project
+    generatePanelActionKey.value = payload.actionKey
+    generatePanelSubCode.value = payload.subCode
+    showGeneratePanel.value = true
+    return
+  }
+}
+
+function onReportGenerated() {
+  console.log('[site-map] 报告已生成')
 }
 
 // =================== 看板 ===================

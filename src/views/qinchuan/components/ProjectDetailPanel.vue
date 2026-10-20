@@ -15,8 +15,15 @@
       <template v-else>
         <div class="panel-header">
           <span class="panel-title">{{ project?.projectName || '-' }}</span>
-          <el-button size="small" type="primary" @click="handleHeaderAction">
-            开始立项
+          <el-button
+            v-if="advanceConfig"
+            size="small"
+            type="primary"
+            :disabled="!necessaryFilesDone"
+            :loading="advancing"
+            @click="handleHeaderAction"
+          >
+            {{ advanceConfig.label }}
           </el-button>
         </div>
 
@@ -85,13 +92,16 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 import DetailMainTab from './DetailMainTab.vue'
 import DetailMaterialTab from './DetailMaterialTab.vue'
 import DetailMeetingTab from './DetailMeetingTab.vue'
 import MaterialSettingPanel from './MaterialSettingPanel.vue'
 import FileUploadDialog from './FileUploadDialog.vue'
 import MeetingMinutesUploadDialog from './MeetingMinutesUploadDialog.vue'
+import * as api from '@/api/modules/project'
+import * as fileApi from '@/api/modules/projectFile'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -101,6 +111,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'action'])
+
+const router = useRouter()
 
 const activeTab = ref('main')
 const showSettingPanel = ref(false)
@@ -117,24 +129,118 @@ const meetingTabRef = ref(null)
 const showMeetingUpload = ref(false)
 const meetingUploadConfig = ref({
   tagName: '会议纪要',
-  subCode: '',      // PIM_TO_NEW_ENERGY_COMPANY 等
-  record: null,     // 该步骤下已有记录（用于 update 追加）
+  subCode: '',
+  record: null,
 })
 
-// 走会议纪要上传弹窗的 action key
-const MEETING_UPLOAD_ACTIONS = new Set([
+// ★ 走全屏生成面板的 action（把投决相关拦截掉暂不支持）
+const GENERATE_REPORT_ACTIONS = new Set([
   'gen-application',
   'gen-letter',
   'gen-report',
+])
+
+// ★ 走上传弹窗的 action
+const MEETING_UPLOAD_ACTIONS = new Set([
   'upload-minutes',
   'upload-approval',
-  'replace',        // 替换按钮也复用这个弹窗
+  'replace',
 ])
+
+// ========================================================
+// ★ 阶段推进配置（header 右上角按钮）
+// ========================================================
+const STAGE_ADVANCE = {
+  PROJECT_RESERVE:    { label: '开始立项', next: 'PROJECT_INITIATION' },
+  PROJECT_INITIATION: { label: '开始审查', next: 'FEASIBILITY_REVIEW' },
+}
+const advanceConfig = computed(() => STAGE_ADVANCE[props.stage] || null)
+
+// ★ 阶段 → 路由 name 映射（与 router 中各阶段页面一致）
+const STAGE_ROUTE_NAME = {
+  PRELIMINARY_SELECTION: 'SiteSelect',
+  PROJECT_RESERVE:       'Reserve',
+  PROJECT_INITIATION:    'Approval',
+  FEASIBILITY_REVIEW:    'Research',
+  INVESTMENT_DECISION:   'Decision',
+}
+
+// ★ 必要性文件是否全部上传完成
+const necessaryFilesDone = ref(false)
+const advancing = ref(false)
+
+function isRequired(r) {
+  const v = r?.isRequiredUpload
+  return v === 1 || v === '1' || v === true || v === 'true'
+}
+function normalizeRecord(r) {
+  let urls = r.fileUrlList
+  if (typeof urls === 'string') {
+    try { urls = JSON.parse(urls) } catch { urls = [] }
+  }
+  return { ...r, fileUrlList: Array.isArray(urls) ? urls : [] }
+}
+
+async function loadNecessaryFiles() {
+  if (!advanceConfig.value || !props.project?.id) {
+    necessaryFilesDone.value = false
+    return
+  }
+  try {
+    const res = await fileApi.getFileListByProjectid({
+      aiProjectId: props.project.id,
+      firstBusinessTitle: 'PROJECT_INITIATION_MATERIALS',
+    })
+    const list = (res?.data || []).map(normalizeRecord)
+    const required = list.filter(isRequired)
+    necessaryFilesDone.value =
+      required.length > 0 && required.every(f => f.fileUrlList.length > 0)
+  } catch (err) {
+    console.error('[panel] 加载必要性文件失败:', err)
+    necessaryFilesDone.value = false
+  }
+}
+
+watch(
+  () => [props.visible, props.project?.id, props.stage],
+  ([visible]) => { if (visible) loadNecessaryFiles() },
+  { immediate: true }
+)
+
+async function handleHeaderAction() {
+  if (!advanceConfig.value || !necessaryFilesDone.value || advancing.value) return
+  const { label, next } = advanceConfig.value
+  try {
+    await ElMessageBox.confirm(`确认「${label}」？推进后不可回退`, '提示', {
+      type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消',
+    })
+  } catch { return }
+
+  advancing.value = true
+  try {
+    await api.updateProjectStage({ id: props.project.id, newStage: next })
+    ElMessage.success(`${label}成功`)
+    emit('action', { type: 'stage-changed', project: props.project, newStage: next })
+
+    // ★ 跳转到下一阶段的列表模式
+    const targetName = STAGE_ROUTE_NAME[next]
+    if (targetName) {
+      router.push({ name: targetName, query: { view: 'list' } })
+    }
+  } catch (err) {
+    ElMessage.error(err?.message || `${label}失败`)
+  } finally {
+    advancing.value = false
+  }
+}
 
 // ========================================================
 // 各阶段 Tabs 配置
 // ========================================================
 const STAGE_TABS_CONFIG = {
+  PRELIMINARY_SELECTION: [
+    { key: 'main', label: '主要信息' },
+  ],
   PROJECT_RESERVE: [
     { key: 'main', label: '主要信息' },
     {
@@ -236,14 +342,6 @@ function handleSettingSave(data) {
 }
 
 // ========================================================
-// 面板顶栏按钮
-// ========================================================
-function handleHeaderAction() {
-  ElMessage.info('点击了「开始立项」')
-  emit('action', { type: 'header-button', project: props.project })
-}
-
-// ========================================================
 // 通用材料上传（DetailMaterialTab → FileUploadDialog）
 // ========================================================
 function handleUpload(item) {
@@ -256,6 +354,7 @@ function handleUpload(item) {
 function handleUploadSaved() {
   showUploadDialog.value = false
   materialTabRef.value?.loadFiles()
+  loadNecessaryFiles()          // ★ 同步刷新 header 按钮可用态
 }
 
 // ========================================================
@@ -264,14 +363,26 @@ function handleUploadSaved() {
 function handleMeetingAction(payload) {
   console.log('[panel] meeting action =', payload)
 
-  // 设置负责人：将来接弹窗（暂时弹提示占位）
+  // 设置负责人
   if (payload.key === 'set-owner') {
     ElMessage.info(`点击了「设置负责人」：${payload.step || ''}（弹窗待接）`)
     emit('action', { type: 'meeting', ...payload })
     return
   }
 
-  // 上传 / 生成 / 替换 → 打开会议纪要上传弹窗
+  // ★ 生成报告：抛给上层打开全屏面板
+  if (GENERATE_REPORT_ACTIONS.has(payload.key)) {
+    emit('action', {
+      type: 'generate-report',
+      actionKey: payload.key,
+      subCode: payload.subCode,
+      step: payload.step,
+      project: props.project,
+    })
+    return
+  }
+
+  // 上传 / 替换 → 打开会议纪要上传弹窗
   if (MEETING_UPLOAD_ACTIONS.has(payload.key)) {
     meetingUploadConfig.value = {
       tagName: payload.label?.replace(/^(生成|上传)/, '') || '会议纪要',

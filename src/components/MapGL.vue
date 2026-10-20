@@ -443,18 +443,32 @@ function bindHover(sourceId, targetLayer) {
 }
 
 function centroidOfFeature(feature) {
-  const { geometry } = feature
-  if (!geometry) return null
-  let rings = []
-  if (geometry.type === 'Polygon') rings = geometry.coordinates?.[0] || []
-  else if (geometry.type === 'MultiPolygon') rings = geometry.coordinates?.[0]?.[0] || []
-  else return null
+  const geom = feature?.geometry
+  if (!geom) return null
+
+  const rings = []
+  if (geom.type === 'Polygon') {
+    if (geom.coordinates?.[0]) rings.push(geom.coordinates[0])
+  } else if (geom.type === 'MultiPolygon') {
+    for (const poly of geom.coordinates || []) {
+      if (poly?.[0]) rings.push(poly[0])
+    }
+  } else {
+    return null
+  }
   if (!rings.length) return null
-  const totals = rings.reduce(
-    (result, [lng, lat]) => ({ lng: result.lng + lng, lat: result.lat + lat }),
-    { lng: 0, lat: 0 }
-  )
-  return [totals.lng / rings.length, totals.lat / rings.length]
+
+  let sx = 0, sy = 0, n = 0
+  for (const ring of rings) {
+    for (const pt of ring) {
+      const lng = Number(pt?.[0])
+      const lat = Number(pt?.[1])
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue
+      sx += lng; sy += lat; n += 1
+    }
+  }
+  if (!n) return null
+  return [sx / n, sy / n]
 }
 
 function addCentroidLabels(opts) {

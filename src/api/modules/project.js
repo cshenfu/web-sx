@@ -46,3 +46,11 @@ export async function getThreeStepDynamicParam(projectType, projectId) {
 export async function getAiProjectData(projectId) {
     return await publicService4.get(`/ai/api/projectRelation/main-info?aiProjectId=${projectId}`);
 }
+
+
+
+
+//变更项目状态
+export async function updateProjectStage(data) {
+    return await publicService4.put(`/ai/api/aiProject/update-stage`,data);
+}

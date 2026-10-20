@@ -24,6 +24,7 @@
     "ali-oss": "^6.23.0",
     "ant-design-vue": "^4.2.6",
     "axios": "^1.19.0",
+    "docx-preview": "^0.4.1",
     "echarts": "^6.1.0",
     "element-china-area-data": "^6.1.0",
     "element-plus": "^2.14.3",

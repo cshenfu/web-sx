@@ -1191,10 +1191,83 @@ function syncMapDisplayByZoom() { syncByZoom() }
 function focusCity(cityName) {
   if (!cityName || !mapRef.value) return
   const map = mapRef.value.getMap()
-  const feature = shaanxiBoundary.features.find((item) => item.properties?.name === cityName)
-  const coords = feature ? centroidOfFeature(feature) : null
-  if (!coords) return
-  map.flyTo({ center: coords, zoom: AREA_ZOOM_THRESHOLD + 0.5, pitch: 45, duration: 1500 })
+  if (!map) return
+
+  const feature = shaanxiBoundary.features.find(
+    (item) => item.properties?.name === cityName
+  )
+  if (!feature) {
+    console.warn('[focusCity] 未找到城市:', cityName)
+    return
+  }
+
+  const center = resolveCityCenter(feature)
+  console.log('[focusCity]', cityName, center)
+
+  if (!center) {
+    console.warn('[focusCity] 无法解析城市中心:', cityName)
+    return
+  }
+
+  map.flyTo({
+    center,
+    zoom: AREA_ZOOM_THRESHOLD + 0.5,
+    pitch: 45,
+    duration: 1500
+  })
+}
+
+// 独立解析城市中心：properties.centroid → properties.center → 几何平均
+function resolveCityCenter(feature) {
+  const p = feature?.properties || {}
+
+  // ① properties.centroid
+  const c1 = p.centroid
+  if (
+    Array.isArray(c1) &&
+    Number.isFinite(Number(c1[0])) &&
+    Number.isFinite(Number(c1[1]))
+  ) {
+    return [Number(c1[0]), Number(c1[1])]
+  }
+
+  // ② properties.center
+  const c2 = p.center
+  if (
+    Array.isArray(c2) &&
+    Number.isFinite(Number(c2[0])) &&
+    Number.isFinite(Number(c2[1]))
+  ) {
+    return [Number(c2[0]), Number(c2[1])]
+  }
+
+  // ③ 几何外环平均
+  const geom = feature?.geometry
+  if (!geom) return null
+
+  let rings = []
+  if (geom.type === 'Polygon') {
+    if (geom.coordinates?.[0]) rings = [geom.coordinates[0]]
+  } else if (geom.type === 'MultiPolygon') {
+    rings = (geom.coordinates || []).map((poly) => poly?.[0]).filter(Boolean)
+  }
+  if (!rings.length) return null
+
+  let sx = 0
+  let sy = 0
+  let n = 0
+  for (const ring of rings) {
+    for (const pt of ring) {
+      const lng = Number(pt?.[0])
+      const lat = Number(pt?.[1])
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue
+      sx += lng
+      sy += lat
+      n += 1
+    }
+  }
+  if (!n) return null
+  return [sx / n, sy / n]
 }
 
 function centroidOfFeature(feature) {
