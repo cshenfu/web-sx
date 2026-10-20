@@ -910,7 +910,7 @@ async function handleDeleteProject(project) {
 
   deletingId.value = id
   try {
-    const res = await api.deleteProject(id)
+    const res = await api.deletProject(id)
     if (res?.code !== 200) {
       ElMessage.error(res?.msg || '删除失败')
       return
