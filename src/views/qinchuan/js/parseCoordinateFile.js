@@ -105,3 +105,41 @@ export async function parseWindTurbineFile(file) {
   }
   return kmlResultToPoints(data)
 }
+
+
+/**
+ * 解析“升压站”上传文件，返回结构化结果，由调用方决定渲染成面还是点
+ * 返回：
+ *   { type: 'polygon', rings: number[][][] }  // 面
+ *   { type: 'points',  points: {lng,lat}[] }   // 点
+ */
+export async function parseBoosterFile(file) {
+  const { ext, data } = await parseByExt(file)
+
+  if (ext === 'xlsx') {
+    const pts = xlsxRowsToPoints(data)
+    if (!pts.length) throw new Error('文件内无坐标数据')
+    return { type: 'points', points: pts }
+  }
+
+  // kml / kmz / ovkml：优先面，其次点
+  const polygons = data?.polygons || []
+  if (polygons.length) {
+    const ring = polygons[0].coordinates
+      .map((c) => [Number(c.lng), Number(c.lat)])
+      .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))
+    if (ring.length >= 3) return { type: 'polygon', rings: [ring] }
+  }
+
+  const pts = (data?.points || [])
+    .map((p) => {
+      const c = p?.coordinates ?? p
+      const lng = Number(c?.lng ?? c?.longitude)
+      const lat = Number(c?.lat ?? c?.latitude)
+      return Number.isFinite(lng) && Number.isFinite(lat) ? { lng, lat } : null
+    })
+    .filter(Boolean)
+  if (pts.length) return { type: 'points', points: pts }
+
+  throw new Error('文件内无坐标数据')
+}

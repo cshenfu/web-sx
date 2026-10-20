@@ -9,7 +9,6 @@
     </div>
 
     <div class="cp-body">
-      <!-- 标签宽度设置为 110px，标签在左侧 -->
       <el-form label-position="right" label-width="110px" size="default" class="cp-form">
         <!-- 项目类型 -->
         <el-form-item label="项目类型" required>
@@ -19,17 +18,14 @@
           </el-radio-group>
         </el-form-item>
 
-        <!-- 项目编号 -->
         <el-form-item label="项目编号" required>
           <el-input v-model="form.projectCode" placeholder="请输入" />
         </el-form-item>
 
-        <!-- 项目名称 -->
         <el-form-item label="项目名称" required>
           <el-input v-model="form.projectName" placeholder="请输入" />
         </el-form-item>
 
-        <!-- 项目阶段 -->
         <el-form-item label="项目阶段" required>
           <el-select v-model="form.projectStage" placeholder="请选择" :loading="stageLoading" style="width: 100%">
             <el-option v-for="opt in projectStageOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
@@ -46,7 +42,7 @@
           <div class="cp-full-width">
             <template v-if="form.siteRangeMode === 'draw'">
               <p class="cp-tip" style="margin-bottom: 8px;">说明：请在左侧地图绘制场区范围，最大支持半径 25km。</p>
-              
+
               <div class="cp-point-toolbar">
                 <el-button size="small" type="primary" plain @click="startPolygonDrawing">
                   {{ siteRangeDrawn ? '重画场区' : '开始绘制' }}
@@ -66,7 +62,7 @@
             <template v-else>
               <OmniUploader
                 v-model="siteRangeFileModel"
-                accept=".xlsx,.kmz,.kml,.ovkml"
+                accept=".xlsx,.kmz,.kml,.ovkml,.json"
                 biz-type="场区范围"
                 button-text="上传数据"
                 :user-name="userName"
@@ -76,14 +72,14 @@
                 @error="handleUploadError"
               />
               <p class="cp-tip">
-                说明：支持xlsx/kmz/kml/ovkml格式数据，xlsx数据需
+                说明：支持xlsx/kmz/kml/ovkml/json格式数据，xlsx数据需
                 <span class="cp-link" @click="downloadTemplate('siteRange')">下载数据模板</span>
               </p>
             </template>
           </div>
         </el-form-item>
 
-        <!-- ================= 风机点位（仅上传） ================= -->
+        <!-- ================= 风机点位 ================= -->
         <el-form-item label="风机点位">
           <el-radio-group v-model="form.windTurbineMode">
             <el-radio label="has">有</el-radio>
@@ -93,7 +89,7 @@
           <div class="cp-full-width" v-if="form.windTurbineMode === 'has'">
             <OmniUploader
               v-model="windTurbineFileModel"
-              accept=".xlsx,.kmz,.kml,.ovkml"
+              accept=".xlsx,.kmz,.kml,.ovkml,.json"
               biz-type="风机点位"
               button-text="上传数据"
               :user-name="userName"
@@ -103,11 +99,10 @@
               @error="handleUploadError"
             />
             <p class="cp-tip">
-              说明：支持xlsx/kmz/kml/ovkml格式数据，xlsx数据需
+              说明：支持xlsx/kmz/kml/ovkml/json格式数据，xlsx数据需
               <span class="cp-link" @click="downloadTemplate('windTurbine')">下载数据模板</span>
             </p>
 
-            <!-- 解析结果 -->
             <div v-if="windTurbinePoints.length" class="cp-point-result">
               <p class="cp-tip cp-tip-success">
                 共解析 {{ windTurbinePoints.length }} 个风机点位
@@ -136,7 +131,6 @@
           </el-radio-group>
 
           <div class="cp-full-width" v-if="form.boosterMode === 'has'">
-            <!-- 录入方式及工具栏 (紧凑一行) -->
             <div class="booster-toolbar">
               <el-select v-model="boosterEntryMode" size="small" class="booster-select-mode">
                 <el-option label="手动录入" value="manual" />
@@ -154,23 +148,17 @@
                   >
                     {{ idx + 1 }}
                   </span>
-                  <!-- ★ 限制最多 2 个 -->
-                  <span 
-                    v-if="boosterPoints.length < 2" 
-                    class="booster-tab booster-tab-add" 
-                    title="添加升压站点位" 
+                  <span
+                    v-if="boosterPoints.length < 2"
+                    class="booster-tab booster-tab-add"
+                    title="添加升压站点位"
                     @click="addBoosterPoint"
                   >
                     +
                   </span>
                 </div>
-                
-                <span class="booster-caption">个点位</span>
 
-                <el-radio-group v-model="activeBoosterPoint.placement" size="small" class="booster-placement">
-                  <el-radio-button label="center">中心点</el-radio-button>
-                  <el-radio-button label="closure">封闭区域</el-radio-button>
-                </el-radio-group>
+                <span class="booster-caption">个点位</span>
 
                 <el-select v-model="activeBoosterPoint.isBest" size="small" class="booster-select-best">
                   <el-option label="最优" :value="1" />
@@ -179,26 +167,40 @@
               </template>
             </div>
 
-            <!-- 手动录入：坐标行 -->
-            <div v-if="boosterEntryMode === 'manual'" class="booster-coord-row">
-              <el-input v-model="activeBoosterPoint.lng" placeholder="请输入经度" />
-              <el-input v-model="activeBoosterPoint.lat" placeholder="请输入纬度" />
-              <el-icon
-                v-if="boosterPoints.length > 1"
-                class="booster-remove"
-                title="删除该点位"
-                style="cursor: pointer; margin-left: 8px; color: #f56c6c;"
-                @click="removeBoosterPoint(activeBoosterIndex)"
+            <div v-if="boosterEntryMode === 'manual'" class="booster-coord-list">
+              <div
+                v-for="(point, idx) in boosterPoints"
+                :key="idx"
+                class="booster-coord-row"
+                :class="{ active: idx === activeBoosterIndex }"
+                @click="activeBoosterIndex = idx"
               >
-                <Close />
-              </el-icon>
+                <span class="booster-coord-index">{{ idx + 1 }}</span>
+                <el-input
+                  v-model="point.lng"
+                  placeholder="请输入经度"
+                  @blur="onBoosterCoordInput"
+                />
+                <el-input
+                  v-model="point.lat"
+                  placeholder="请输入纬度"
+                  @blur="onBoosterCoordInput"
+                />
+                <el-icon
+                  v-if="boosterPoints.length > 1"
+                  class="booster-remove"
+                  title="删除该点位"
+                  @click.stop="removeBoosterPoint(idx)"
+                >
+                  <Close />
+                </el-icon>
+              </div>
             </div>
 
-            <!-- 导入数据 -->
             <template v-else>
               <OmniUploader
                 v-model="boosterFileModel"
-                accept=".xlsx,.kmz,.kml,.ovkml"
+                accept=".xlsx,.kmz,.kml,.ovkml,.json"
                 biz-type="升压站点位"
                 button-text="上传数据"
                 :user-name="userName"
@@ -208,7 +210,7 @@
                 @error="handleUploadError"
               />
               <p class="cp-tip">
-                说明：支持xlsx/kmz/kml/ovkml格式数据，xlsx数据需
+                说明：支持xlsx/kmz/kml/ovkml/json格式数据，xlsx数据需
                 <span class="cp-link" @click="downloadTemplate('booster')">下载数据模板</span>
               </p>
             </template>
@@ -223,13 +225,11 @@
           </el-radio-group>
 
           <div class="cp-full-width" v-if="form.accessMode === 'has'">
-            <!-- 名称占满整行 -->
             <div class="cp-subfield-row">
               <span class="cp-subfield-label">拟接入变电站名称</span>
               <el-input v-model="form.accessName" placeholder="请输入拟接入的变电站名称" />
             </div>
-            
-            <!-- 经纬度平分 -->
+
             <div class="cp-subfield-row">
               <span class="cp-subfield-label">拟接入变电站位置</span>
               <div class="cp-inline-row">
@@ -238,7 +238,6 @@
               </div>
             </div>
 
-            <!-- 接入方式 -->
             <div class="cp-subfield-row">
               <span class="cp-subfield-label">送出工程接入方式</span>
               <el-radio-group v-model="form.sendOutType">
@@ -249,7 +248,6 @@
           </div>
         </el-form-item>
 
-        <!-- 项目备注 -->
         <el-form-item label="项目备注">
           <el-input v-model="form.notes" type="textarea" :rows="3" placeholder="请输入" />
         </el-form-item>
@@ -266,15 +264,20 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Close } from '@element-plus/icons-vue'
 import OmniUploader from '@/components/upload/Upload2.vue'
 import * as api from '@/api/modules/project'
-import { parseSiteRangeFile, parseWindTurbineFile } from '../js/parseCoordinateFile'
+import {
+  parseSiteRangeFile,
+  parseWindTurbineFile,
+  parseBoosterFile as parseBoosterFileFromModule,
+} from '../js/parseCoordinateFile'
 import { resolveRegionByPoints, isPolygonWithinRadius } from '../js/useTiandituGeocode'
+
+import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
+import shengyazhanIcon from '@/assets/img/mapIcon/shengyazhan.png'
 
 const MAX_SITE_RANGE_RADIUS_KM = 25
 
 const props = defineProps({
-  mapRef: { type: Object, required: true },
-  // ★ 右侧创建项目面板宽度，用于计算地图可视区中心（面板盖在地图上）
-  panelWidth: { type: Number, default: 550 },
+  mapRef: { type: Object, required: true }
 })
 const emit = defineEmits(['cancel', 'saved', 'site-range-mode-change'])
 
@@ -320,7 +323,7 @@ const windOutOfRangeList = ref([])
 
 /* ==================== 升压站 ==================== */
 const boosterEntryMode = ref('manual')
-const createBoosterPoint = () => ({ lng: '', lat: '', isBest: 0, placement: 'center' })
+const createBoosterPoint = () => ({ lng: '', lat: '', isBest: 0, placement: 'center', geometry: null })
 const boosterPoints = ref([createBoosterPoint()])
 const activeBoosterIndex = ref(0)
 const activeBoosterPoint = computed(() => boosterPoints.value[activeBoosterIndex.value])
@@ -335,13 +338,20 @@ function addBoosterPoint() {
   }
   boosterPoints.value.push(createBoosterPoint())
   activeBoosterIndex.value = boosterPoints.value.length - 1
+  renderBoosterOnMap()
 }
 
 function removeBoosterPoint(idx) {
   if (boosterPoints.value.length <= 1) return
   boosterPoints.value.splice(idx, 1)
   activeBoosterIndex.value = Math.min(activeBoosterIndex.value, boosterPoints.value.length - 1)
-  renderBoosterPointsOnMap()
+  renderBoosterOnMap()
+  checkBoosterPointsInRange()
+}
+
+let boosterInputTimer = null
+function onBoosterCoordInput() {
+   renderBoosterOnMap()
   checkBoosterPointsInRange()
 }
 
@@ -368,66 +378,60 @@ function getSiteRangeRing() {
   return ring
 }
 
-/* ==================== 视角聚焦 ==================== */
-const VIEW_PADDING_EXTRA = 40 // 额外留白，避免贴边
-
-/**
- * 计算多边形中心 + bounds
- * @param {Array<{lng:number|string, lat:number|string}>} points
- */
-function getRingCenterAndBounds(points) {
-  const lngs = []
-  const lats = []
-  for (const p of points) {
-    const lng = Number(p.lng)
-    const lat = Number(p.lat)
-    if (Number.isFinite(lng) && Number.isFinite(lat)) {
-      lngs.push(lng)
-      lats.push(lat)
-    }
-  }
-  if (!lngs.length) return null
-  const minLng = Math.min(...lngs)
-  const maxLng = Math.max(...lngs)
-  const minLat = Math.min(...lats)
-  const maxLat = Math.max(...lats)
-  return {
-    center: [(minLng + maxLng) / 2, (minLat + maxLat) / 2],
-    bounds: [[minLng, minLat], [maxLng, maxLat]],
-  }
+/* ==================== 升压站文件解析辅助 ==================== */
+function withName(blob, name) {
+  if (!blob || !name) return blob
+  try {
+    Object.defineProperty(blob, 'name', { value: name, configurable: true })
+  } catch { /* 某些环境不可写，忽略 */ }
+  return blob
 }
 
 /**
- * 将地图视角聚焦到场区范围
- * 右侧有固定面板遮挡，所以 padding.right 加大，使内容落在地图可见区中心偏左
+ * 拿到可被解析器读取的 File/Blob。
+ * 优先用 @success 第二参；拿不到时用 dto.url 下载并补 name。
  */
-function focusSiteRangeOnMap(points) {
-  const mapInstance = resolveMapInstance(props.mapRef)
-  const map = mapInstance?.getMap?.()
-  if (!map) return
+async function resolveUploadFile(dto, file) {
+  const raw = (typeof file?.text === 'function' && file)
+    || (typeof file?.raw?.text === 'function' && file.raw)
+    || (typeof file?.file?.text === 'function' && file.file)
+  if (raw) return raw
 
-  const info = getRingCenterAndBounds(points)
-  if (!info) return
+  if (dto?.url) {
+    const res = await fetch(dto.url)
+    if (!res.ok) throw new Error(`下载文件失败：HTTP ${res.status}`)
+    const blob = await res.blob()
+    return withName(blob, dto.fileName || `file.${dto.fileSuffix || 'kml'}`)
+  }
+  throw new Error('未获取到可解析的文件内容')
+}
 
-  const { bounds } = info
-  const [minLng, minLat] = bounds[0]
-  const [maxLng, maxLat] = bounds[1]
-  // 单点/极小范围时 fitBounds 会算得很大，给个最小跨度兜底
-  const MIN_SPAN = 0.001
-  const lngSpan = Math.max(maxLng - minLng, MIN_SPAN)
-  const latSpan = Math.max(maxLat - minLat, MIN_SPAN)
-  const safeBounds = [[minLng, minLat], [minLng + lngSpan, minLat + latSpan]]
+// 相邻重复点去重，并保证首尾闭合（面用）
+function dedupeRing(points) {
+  const out = []
+  for (const p of points) {
+    const lng = Number(Array.isArray(p) ? p[0] : (p.lng ?? p.longitude))
+    const lat = Number(Array.isArray(p) ? p[1] : (p.lat ?? p.latitude))
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue
+    const last = out[out.length - 1]
+    if (!last || last[0] !== lng || last[1] !== lat) out.push([lng, lat])
+  }
+  if (out.length >= 3) {
+    const first = out[0], last = out[out.length - 1]
+    if (first[0] !== last[0] || first[1] !== last[1]) out.push([first[0], first[1]])
+  }
+  return out
+}
 
-  map.fitBounds(safeBounds, {
-    padding: {
-      top: VIEW_PADDING_EXTRA + 40,           // 顶部有搜索框/工具栏
-      bottom: VIEW_PADDING_EXTRA + 40,
-      left: VIEW_PADDING_EXTRA,
-      right: props.panelWidth + VIEW_PADDING_EXTRA, // ★ 关键：右侧让出面板宽度
-    },
-    maxZoom: 14,
-    duration: 1000,
-  })
+function centroidOfRing(ring) {
+  let sumLng = 0, sumLat = 0
+  const pts = (ring.length > 1 &&
+    ring[0][0] === ring[ring.length - 1][0] &&
+    ring[0][1] === ring[ring.length - 1][1])
+    ? ring.slice(0, -1)
+    : ring
+  for (const [lng, lat] of pts) { sumLng += lng; sumLat += lat }
+  return [sumLng / pts.length, sumLat / pts.length]
 }
 
 /* ==================== 范围校验 ==================== */
@@ -455,24 +459,44 @@ function checkBoosterPointsInRange() {
   }
   const list = []
   boosterPoints.value.forEach((p, index) => {
+    if (p.placement === 'closure' && p.geometry) {
+      const center = p.geometry[0][0]
+      if (!pointInPolygon(center, ring)) list.push({ index, lng: p.lng, lat: p.lat })
+      return
+    }
     if (!p.lng || !p.lat) return
     if (!pointInPolygon([Number(p.lng), Number(p.lat)], ring)) {
       list.push({ index, lng: p.lng, lat: p.lat })
     }
   })
   boosterOutOfRangeList.value = list
-  renderBoosterPointsOnMap()
+  renderBoosterOnMap()
 }
 
 /* ==================== 地图渲染 ==================== */
 const WIND_LAYER_IN = 'create-wind-in'
 const WIND_LAYER_OUT = 'create-wind-out'
-const BOOSTER_LAYER = 'create-booster'
+const BOOSTER_POINT_LAYER = 'create-booster-point'
+const BOOSTER_AREA_LAYER = 'create-booster-area'
 const SITE_RANGE_LAYER = 'create-site-range'
 
 function removeLayers(ids) {
   const mapInstance = resolveMapInstance(props.mapRef)
   ids.forEach((id) => mapInstance?.removeLayer?.(id))
+}
+
+function bringCustomLayersToFront() {
+  const mapInstance = resolveMapInstance(props.mapRef)
+  const map = mapInstance?.getMap?.()
+  if (!map) return
+  const layers = [
+    WIND_LAYER_IN, WIND_LAYER_OUT,
+    BOOSTER_POINT_LAYER, BOOSTER_AREA_LAYER,
+    SITE_RANGE_LAYER
+  ]
+  layers.forEach(id => {
+    if (map.getLayer(id)) map.moveLayer(id)
+  })
 }
 
 function renderWindPointsOnMap() {
@@ -494,27 +518,76 @@ function renderWindPointsOnMap() {
   })
 
   if (inFeatures.length) {
-    mapInstance.addPoints({ id: WIND_LAYER_IN, geojson: { type: 'FeatureCollection', features: inFeatures }, color: '#22c55e', radius: 6 })
+    mapInstance.addImagePoints({
+      id: WIND_LAYER_IN,
+      geojson: { type: 'FeatureCollection', features: inFeatures },
+      iconId: 'wind-icon',
+      iconUrl: fengjiIcon,
+      iconSize: 0.15,
+      iconAnchor: 'bottom'
+    })
   }
+
   if (outFeatures.length) {
-    mapInstance.addPoints({ id: WIND_LAYER_OUT, geojson: { type: 'FeatureCollection', features: outFeatures }, color: '#f56c6c', radius: 6 })
+    mapInstance.addImagePoints({
+      id: WIND_LAYER_OUT,
+      geojson: { type: 'FeatureCollection', features: outFeatures },
+      iconId: 'wind-icon',
+      iconUrl: fengjiIcon,
+      iconSize: 0.15,
+      iconAnchor: 'bottom'
+    })
   }
+  setTimeout(bringCustomLayersToFront, 50)
 }
 
-function renderBoosterPointsOnMap() {
+function renderBoosterOnMap() {
   const mapInstance = resolveMapInstance(props.mapRef)
   if (!mapInstance) return
-  removeLayers([BOOSTER_LAYER])
+  removeLayers([BOOSTER_POINT_LAYER, BOOSTER_AREA_LAYER])
 
-  const features = boosterPoints.value
-    .filter((p) => p.lng && p.lat)
-    .map((p, i) => ({
-      type: 'Feature',
-      properties: { index: i },
-      geometry: { type: 'Point', coordinates: [Number(p.lng), Number(p.lat)] }
-    }))
-  if (!features.length) return
-  mapInstance.addPoints({ id: BOOSTER_LAYER, geojson: { type: 'FeatureCollection', features }, color: '#f59e0b', radius: 7 })
+  const centerPoints = []
+  const closureAreas = []
+
+  boosterPoints.value.forEach((p, i) => {
+    if (p.placement === 'closure' && p.geometry && p.geometry.length > 0) {
+      closureAreas.push({
+        type: 'Feature',
+        properties: { index: i },
+        geometry: { type: 'Polygon', coordinates: p.geometry }
+      })
+    } else if (p.lng && p.lat) {
+      const lng = Number(p.lng), lat = Number(p.lat)
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return
+      centerPoints.push({
+        type: 'Feature',
+        properties: { index: i },
+        geometry: { type: 'Point', coordinates: [lng, lat] }
+      })
+    }
+  })
+
+  if (closureAreas.length) {
+    mapInstance.addPolygon({
+      id: BOOSTER_AREA_LAYER,
+      geojson: { type: 'FeatureCollection', features: closureAreas },
+      color: '#22c55e',
+      opacity: 0.4,
+      outlineColor: '#16a34a'
+    })
+  }
+
+  if (centerPoints.length) {
+    mapInstance.addImagePoints({
+      id: BOOSTER_POINT_LAYER,
+      geojson: { type: 'FeatureCollection', features: centerPoints },
+      iconId: 'booster-icon',
+      iconUrl: shengyazhanIcon,
+      iconSize: 0.04,
+      iconAnchor: 'bottom'
+    })
+  }
+  setTimeout(bringCustomLayersToFront, 50)
 }
 
 function renderSiteRangeOnMap() {
@@ -530,6 +603,28 @@ function renderSiteRangeOnMap() {
     opacity: 0.2,
     outlineColor: '#2A9FFF'
   })
+  setTimeout(bringCustomLayersToFront, 50)
+}
+
+/* ==================== 视角飞行 ==================== */
+function flyToBounds(coords) {
+  if (!coords || !coords.length) return
+  const mapInstance = resolveMapInstance(props.mapRef)
+  const map = mapInstance?.getMap?.()
+  if (!map) return
+  let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity
+  coords.forEach(c => {
+    const lng = Array.isArray(c) ? c[0] : c.lng
+    const lat = Array.isArray(c) ? c[1] : c.lat
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return
+    if (lng < minLng) minLng = lng
+    if (lng > maxLng) maxLng = lng
+    if (lat < minLat) minLat = lat
+    if (lat > maxLat) maxLat = lat
+  })
+  if (minLng !== Infinity) {
+    map.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 100, duration: 1200 })
+  }
 }
 
 /* ==================== 场区绘制 ==================== */
@@ -559,7 +654,7 @@ function bindSiteRangeDrawEvents() {
     renderSiteRangeOnMap()
     checkWindPointsInRange()
     checkBoosterPointsInRange()
-    focusSiteRangeOnMap(siteRangePoints.value) // ★ 绘制完成后聚焦
+    flyToBounds(ring)
   }
 
   const handleDrawUpdate = (event) => {
@@ -573,7 +668,6 @@ function bindSiteRangeDrawEvents() {
     renderSiteRangeOnMap()
     checkWindPointsInRange()
     checkBoosterPointsInRange()
-    // ★ 注意：这里不聚焦，避免用户拖顶点时地图乱跳
   }
 
   map.on('draw.create', handleDrawCreate)
@@ -613,19 +707,20 @@ function clearSiteRange() {
   windOutOfRangeList.value = []
   boosterOutOfRangeList.value = []
   renderWindPointsOnMap()
-  renderBoosterPointsOnMap()
+  renderBoosterOnMap()
 }
 
 /* ==================== 上传处理 ==================== */
 async function handleSiteRangeUploadSuccess(dto, file) {
   siteRangeFileDto.value = { ...dto }
   try {
-    const points = await parseSiteRangeFile(file)
+    const raw = await resolveUploadFile(dto, file)
+    const points = await parseSiteRangeFile(raw)
     siteRangePoints.value = points
     renderSiteRangeOnMap()
     checkWindPointsInRange()
     checkBoosterPointsInRange()
-    focusSiteRangeOnMap(points) // ★ 上传解析成功后聚焦
+    flyToBounds(points.map(p => [Number(p.lng), Number(p.lat)]))
     ElMessage.success('场区范围文件解析成功')
   } catch (err) {
     ElMessage.error(`场区范围文件解析失败：${err?.message || '文件内容无法解析'}`)
@@ -641,11 +736,12 @@ function handleSiteRangeUploadRemove() {
 async function handleWindTurbineUploadSuccess(dto, file) {
   windTurbineFileDto.value = { ...dto }
   try {
-    const points = await parseWindTurbineFile(file)
+    const raw = await resolveUploadFile(dto, file)
+    const points = await parseWindTurbineFile(raw)
     windTurbinePoints.value = points.map((p) => ({ lng: Number(p.lng), lat: Number(p.lat), isAlternative: Number(p.isAlternative || 0) }))
     checkWindPointsInRange()
     const out = windOutOfRangeList.value.length
-    if (out > 0) ElMessage.warning(`风机点位解析成功，但有 ${out} 个点位不在场区范围内（已标红）`)
+    if (out > 0) ElMessage.warning(`风机点位解析成功，但有 ${out} 个点位不在场区范围内`)
     else ElMessage.success('风机点位文件解析成功')
   } catch (err) {
     ElMessage.error(`风机点位文件解析失败：${err?.message || '文件内容无法解析'}`)
@@ -673,33 +769,65 @@ function removeAllOutOfRangeWindPoints() {
   }).catch(() => {})
 }
 
+// ★ 升压站上传：按结构判定面/点，不依赖文件名和首尾坐标
 async function handleBoosterUploadSuccess(dto, file) {
   boosterFileDto.value = { ...dto }
   try {
-    const points = await parseWindTurbineFile(file)
-    // 导入数据不限制 2 个，全部接收
-    boosterPoints.value = points.map((p) => ({ 
-      lng: String(p.lng), 
-      lat: String(p.lat), 
-      isBest: Number(p.isBest || 0), 
-      placement: 'center' 
-    }))
-    
-    activeBoosterIndex.value = 0
-    renderBoosterPointsOnMap()
-    checkBoosterPointsInRange()
+    const raw = await resolveUploadFile(dto, file)
+    const parsed = await parseBoosterFileFromModule(raw)
+
+    if (parsed.type === 'polygon') {
+      const ring = dedupeRing(parsed.rings[0])
+      if (ring.length < 3) throw new Error('范围坐标点不足')
+      const [centerLng, centerLat] = centroidOfRing(ring)
+      boosterPoints.value = [{
+        lng: centerLng.toFixed(6),
+        lat: centerLat.toFixed(6),
+        isBest: 1,
+        placement: 'closure',
+        geometry: [ring],
+      }]
+      activeBoosterIndex.value = 0
+      renderBoosterOnMap()
+      checkBoosterPointsInRange()
+      flyToBounds(ring) // ★ 跳转到升压站区域视角
+    } else {
+      const pts = parsed.points || []
+      if (!pts.length) throw new Error('文件内无坐标数据')
+      const seen = new Set()
+      const uniq = []
+      for (const p of pts) {
+        const key = `${p.lng},${p.lat}`
+        if (!seen.has(key)) { seen.add(key); uniq.push(p) }
+      }
+      boosterPoints.value = uniq.map(p => ({
+        lng: String(p.lng),
+        lat: String(p.lat),
+        isBest: Number(p.isBest || 0),
+        placement: 'center',
+        geometry: null,
+      }))
+      activeBoosterIndex.value = 0
+      renderBoosterOnMap()
+      checkBoosterPointsInRange()
+      if (uniq.length) {
+        flyToBounds(uniq.map(p => [Number(p.lng), Number(p.lat)])) // 点位也跳一下
+      }
+    }
+
+    ElMessage.success('升压站数据解析成功')
   } catch (err) {
     ElMessage.error(`升压站点位文件解析失败：${err?.message || '文件内容无法解析'}`)
     boosterPoints.value = [createBoosterPoint()]
     boosterOutOfRangeList.value = []
-    renderBoosterPointsOnMap()
+    renderBoosterOnMap()
   }
 }
 function handleBoosterUploadRemove() {
   boosterFileDto.value = null
   boosterPoints.value = [createBoosterPoint()]
   boosterOutOfRangeList.value = []
-  renderBoosterPointsOnMap()
+  renderBoosterOnMap()
 }
 
 function handleUploadError(err) { ElMessage.error(`上传失败：${err?.message || '请稍后重试'}`) }
@@ -709,7 +837,7 @@ function downloadTemplate(type) { ElMessage.info(`下载 ${type} 数据模板`) 
 watch(() => form.siteRangeMode, (mode) => {
   emit('site-range-mode-change', mode)
   const mapInstance = resolveMapInstance(props.mapRef)
-  if (mode === 'draw') { clearSiteRange(); startPolygonDrawing() } 
+  if (mode === 'draw') { clearSiteRange(); startPolygonDrawing() }
   else { clearSiteRange(); mapInstance?.getDraw?.()?.changeMode?.('simple_select') }
 }, { immediate: true })
 
@@ -717,12 +845,34 @@ watch(() => form.windTurbineMode, (mode) => {
   if (mode !== 'has') { windTurbinePoints.value = []; windOutOfRangeList.value = []; renderWindPointsOnMap() }
 })
 watch(() => form.boosterMode, (mode) => {
-  if (mode !== 'has') { boosterPoints.value = [createBoosterPoint()]; boosterOutOfRangeList.value = []; renderBoosterPointsOnMap() }
+  if (mode !== 'has') { boosterPoints.value = [createBoosterPoint()]; boosterOutOfRangeList.value = []; renderBoosterOnMap() }
 })
+
+// ★ 从「导入数据」切到「手动录入」时，把 closure 转成 center
+watch(boosterEntryMode, (mode) => {
+  if (mode === 'manual') {
+    boosterPoints.value = boosterPoints.value.map(p => ({
+      lng: p.lng || '',
+      lat: p.lat || '',
+      isBest: Number(p.isBest || 0),
+      placement: 'center',
+      geometry: null,
+    }))
+    if (!boosterPoints.value.length) boosterPoints.value = [createBoosterPoint()]
+    activeBoosterIndex.value = 0
+    renderBoosterOnMap()
+    checkBoosterPointsInRange()
+  }
+})
+
 watch(() => resolveMapInstance(props.mapRef), (mapInstance) => { if (mapInstance) bindSiteRangeDrawEvents() }, { immediate: true })
 
 onMounted(() => { bindSiteRangeDrawEvents(); loadProjectStages() })
-onUnmounted(() => { unbindDrawCreate?.(); removeLayers([WIND_LAYER_IN, WIND_LAYER_OUT, BOOSTER_LAYER, SITE_RANGE_LAYER]) })
+onUnmounted(() => {
+  if (boosterInputTimer) clearTimeout(boosterInputTimer)
+  unbindDrawCreate?.()
+  removeLayers([WIND_LAYER_IN, WIND_LAYER_OUT, BOOSTER_POINT_LAYER, BOOSTER_AREA_LAYER, SITE_RANGE_LAYER])
+})
 
 /* ==================== 其他 ==================== */
 async function loadProjectStages() {
@@ -790,7 +940,12 @@ async function handleSave() {
       province_name: regionPayload.provinceName, city_name: regionPayload.cityName, district_name: regionPayload.districtName, address: regionPayload.address,
       coordinate: siteRangePoints.value.map(p => ({ longitude: String(p.lng), latitude: String(p.lat), regionCode: Number(region.regionCode) })),
       windTurbinePoints: form.windTurbineMode === 'has' ? windTurbinePoints.value.map(p => ({ longitude: Number(p.lng), latitude: Number(p.lat), isAlternative: Number(p.isAlternative || 0) })) : [],
-      boosterStationLocations: form.boosterMode === 'has' ? boosterPoints.value.map(p => ({ lng: Number(p.lng), lat: Number(p.lat), isBest: Number(p.isBest || 0) })) : [],
+      boosterStationLocations: form.boosterMode === 'has' ? boosterPoints.value.map(p => {
+        if (p.placement === 'closure' && p.geometry) {
+          return { lng: Number(p.lng), lat: Number(p.lat), isBest: Number(p.isBest || 0), geometry: p.geometry, placement: 'closure' }
+        }
+        return { lng: Number(p.lng), lat: Number(p.lat), isBest: Number(p.isBest || 0), placement: 'center' }
+      }) : [],
       accessSubstationName: form.accessMode === 'has' ? form.accessName.trim() : undefined,
       accessSubstationPoints: form.accessMode === 'has' ? [{ lng: Number(form.accessLng), lat: Number(form.accessLat) }] : [],
       sendOutType: form.accessMode === 'has' ? Number(form.sendOutType) : undefined,
@@ -813,11 +968,10 @@ defineExpose({
 </script>
 
 <style scoped>
-/* ★ 父容器宽度修改为 550px */
 .create-project-form {
-  display: flex; flex-direction: column; 
-  flex: 0 0 550px; 
-  width: 550px; 
+  display: flex; flex-direction: column;
+  flex: 0 0 550px;
+  width: 550px;
   height: 100%;
   background: #fff; border-left: 1px solid #ebeef5; box-shadow: -4px 0 16px rgba(0, 0, 0, 0.06);
 }
@@ -826,10 +980,9 @@ defineExpose({
 .cp-header-actions { display: flex; gap: 8px; }
 .cp-body { flex: 1; overflow-y: auto; padding: 16px 18px 24px; }
 
-/* 表单左标签调整 */
 :deep(.el-form-item) { margin-bottom: 20px; }
 :deep(.el-form-item__label) { color: #606266; padding-right: 12px; font-size: 13px; line-height: 32px; }
-:deep(.el-form-item__content) { flex: 1; display: block; } 
+:deep(.el-form-item__content) { flex: 1; display: block; }
 
 .cp-full-width { width: 100%; margin-top: 8px; }
 .cp-tip { margin-top: 4px; color: #a0a5ad; font-size: 12px; line-height: 1.6; }
@@ -838,17 +991,9 @@ defineExpose({
 .cp-link { color: #1677ff; cursor: pointer; }
 .cp-point-toolbar { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 
-/* ★ 升压站工具栏极小化紧凑排版，强制一行 */
-.booster-toolbar { 
-  display: flex; 
-  align-items: center; 
-  gap: 6px; 
-  flex-wrap: nowrap; 
-  margin-bottom: 8px; 
-}
+.booster-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; margin-bottom: 8px; }
 .booster-select-mode { width: 85px; flex-shrink: 0; }
 .booster-select-best { width: 75px; flex-shrink: 0; }
-
 .booster-tabs { display: flex; gap: 2px; flex-shrink: 0; }
 .booster-tab {
   display: flex; align-items: center; justify-content: center;
@@ -858,24 +1003,31 @@ defineExpose({
 .booster-tab.active { color: #fff; background: #1677ff; border-color: #1677ff; }
 .booster-tab-add { color: #1677ff; font-weight: 600; }
 .booster-caption { color: #606266; font-size: 12px; white-space: nowrap; margin-right: 2px; }
-.booster-placement { flex-shrink: 0; }
 
-/* 覆盖 Element Plus 的默认 Radio Button Padding，让按钮更小 */
-.booster-placement :deep(.el-radio-button__inner) { padding: 5px 8px; font-size: 12px; }
+.booster-coord-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.booster-coord-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 6px; border: 1px solid transparent; border-radius: 4px;
+  cursor: pointer;
+}
+.booster-coord-row.active { border-color: #1677ff; background: #f0f7ff; }
+.booster-coord-index {
+  flex-shrink: 0; width: 18px; height: 18px; line-height: 18px;
+  text-align: center; font-size: 11px; color: #fff;
+  background: #1677ff; border-radius: 50%;
+}
+.booster-coord-row .el-input { flex: 1; }
+.booster-remove { flex-shrink: 0; color: #f56c6c; cursor: pointer; }
 
-.booster-coord-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-
-/* 接入站排版 */
 .cp-subfield-row { display: flex; align-items: flex-start; margin-bottom: 12px; }
 .cp-subfield-row:last-child { margin-bottom: 0; }
 .cp-subfield-label {
-  width: 120px; flex-shrink: 0; color: #606266; font-size: 13px; line-height: 32px;
+  width: 110px; flex-shrink: 0; color: #606266; font-size: 13px; line-height: 32px;
   text-align: right; padding-right: 12px; box-sizing: border-box;
 }
 .cp-inline-row { flex: 1; display: flex; gap: 8px; }
 .cp-inline-row .el-input { flex: 1; }
 
-/* 超范围警告框 */
 .cp-point-result { margin-top: 10px; }
 .cp-warn-box {
   margin-top: 6px; padding: 8px 10px;
