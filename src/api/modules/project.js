@@ -14,6 +14,16 @@ export async function getPageList(data) {
 }
 
 
+
+// 删除项目列表
+export async function deletProject(id) {
+    const fd = new FormData()
+    fd.append('id', id)
+    return await publicService4.del(`/ai/api/aiProject/delete`,fd);
+}
+
+
+
 // // 删除项目列表
 // export async function getPageList(data) {
 //     return await publicService4.post(`/ai/api/aiProject/page`,data);

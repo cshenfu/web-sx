@@ -18,14 +18,14 @@
     <!-- 常驻地图 -->
     <div class="map-layer">
       <MapGL
-  ref="mapRef"
-  :style="satelliteStyle"
-  @ready="onMapReady"
-  @draw-update="onDrawChange"
-  @draw-create="onDrawChange"
-  @draw-delete="onDrawChange"
-  @box-select="handleBoxSelect" 
-/>
+        ref="mapRef"
+        :style="satelliteStyle"
+        @ready="onMapReady"
+        @draw-update="onDrawChange"
+        @draw-create="onDrawChange"
+        @draw-delete="onDrawChange"
+        @box-select="handleBoxSelect"
+      />
     </div>
 
     <!-- 默认视图 -->
@@ -154,64 +154,81 @@
           </el-input>
         </div>
 
-        <!-- 右上：编辑工具栏 -->
-        <!-- 右上：编辑工具栏 -->
+        <!-- 右上：编辑工具栏（两种状态：未进入编辑 = 只显示「编辑」；已进入编辑 = 完整工具栏） -->
         <div v-if="selectedProject && !showVerifyPanel && !showDetailPanel" class="edit-toolbar">
-          <button
-            v-for="item in editTools"
-            :key="item.key"
-            class="edit-tool-button"
-            :class="{ active: editMode === item.key }"
-            @click="enterEditMode(item.key)"
-          >
-            <el-icon><component :is="item.icon" /></el-icon>
-            {{ item.label }}
-          </button>
+          <!-- 未进入编辑 -->
+          <template v-if="!isEditing">
+            <button class="edit-tool-button" @click="startEdit">
+              <el-icon><Edit /></el-icon>
+              编辑
+            </button>
+          </template>
 
-          <template v-if="editMode === 'wind' || editMode === 'booster'">
-            <span class="edit-divider" />
-            <template v-if="editMode === 'wind'">
-              <button class="edit-tool-button" :class="{ active: drawingNewPoint }" @click="startAddWindPoint">
-                添加风机
+          <!-- 已进入编辑 -->
+          <template v-else>
+            <button
+              v-for="item in editTools"
+              :key="item.key"
+              class="edit-tool-button"
+              :class="{ active: editMode === item.key }"
+              @click="enterEditMode(item.key)"
+            >
+              <el-icon><component :is="item.icon" /></el-icon>
+              {{ item.label }}
+            </button>
+
+            <template v-if="editMode === 'wind' || editMode === 'booster'">
+              <span class="edit-divider" />
+              <template v-if="editMode === 'wind'">
+                <button class="edit-tool-button" :class="{ active: drawingNewPoint }" @click="startAddWindPoint">
+                  添加风机
+                </button>
+                <button class="edit-tool-button" :class="{ active: isBoxSelecting }" @click="startBoxSelection">
+                  框选
+                </button>
+                <button class="edit-tool-button" @click="deleteSelectedPoints">
+                  删除
+                </button>
+                <button class="edit-tool-button" @click="markReserve(true)">
+                  标记备选
+                </button>
+                <button class="edit-tool-button" @click="markReserve(false)">
+                  取消备选
+                </button>
+              </template>
+              <template v-else>
+                <button class="edit-tool-button" :class="{ active: drawingNewPoint }" @click="toggleAddPoint">
+                  {{ drawingNewPoint ? '退出新增' : '新增点' }}
+                </button>
+                <button class="edit-tool-button danger" @click="deleteSelectedPoints">
+                  删除选中
+                </button>
+              </template>
+            </template>
+
+            <!-- 保存 / 取消：仅当有未保存修改时显示 -->
+            <template v-if="isDirty">
+              <span class="edit-divider" />
+              <button class="edit-tool-button save" :disabled="saving" @click="saveEdit">
+                {{ saving ? '保存中...' : '保存' }}
               </button>
-              <button class="edit-tool-button" :class="{ active: isBoxSelecting }" @click="startBoxSelection">
-                框选
-              </button>
-              <button class="edit-tool-button" @click="deleteSelectedPoints">
-                删除
-              </button>
-              <button class="edit-tool-button" @click="markReserve(true)">
-                标记备选
-              </button>
-              <button class="edit-tool-button" @click="markReserve(false)">
-                取消备选
+              <button class="edit-tool-button" :disabled="saving" @click="cancelEdit">
+                取消
               </button>
             </template>
-            <template v-else>
-              <button class="edit-tool-button" :class="{ active: drawingNewPoint }" @click="toggleAddPoint">
-                {{ drawingNewPoint ? '退出新增' : '新增点' }}
-              </button>
-              <button class="edit-tool-button danger" @click="deleteSelectedPoints">
-                删除选中
+
+            <!-- 重新计算：保存成功后显示（isDirty 为 false 时） -->
+            <template v-if="hasSaved && !isDirty">
+              <span class="edit-divider" />
+              <button
+                class="edit-tool-button recalculate"
+                :disabled="recalculating"
+                @click="handleRecalculate"
+              >
+                {{ recalculating ? '计算中...' : '重新计算' }}
               </button>
             </template>
           </template>
-
-          <span class="edit-divider" />
-          
-          <!-- ★ 新增：重新计算按钮，只有保存过（hasSaved）才能点击 -->
-          <button 
-            class="edit-tool-button recalculate" 
-            :disabled="!hasSaved || recalculating" 
-            @click="handleRecalculate"
-          >
-            {{ recalculating ? '计算中...' : '重新计算' }}
-          </button>
-
-          <button class="edit-tool-button save" :disabled="saving" @click="saveEdit">
-            {{ saving ? '保存中...' : '保存' }}
-          </button>
-          <button class="edit-tool-button" :disabled="saving" @click="cancelEdit">取消</button>
         </div>
 
         <!-- 详情卡 -->
@@ -260,16 +277,21 @@
 
         <slot name="map-overlay" :projects="projectList" :selected="selectedProject" />
 
+        <!-- 展开/收起项目列表 toggle -->
         <button
-          v-if="!showProjectDrawer && !showVerifyPanel && !showDetailPanel"
+          v-if="!showVerifyPanel && !showDetailPanel"
           class="expand-button"
-          title="打开项目列表"
-          @click="showProjectDrawer = true"
+          :style="expandButtonStyle"
+          :title="showProjectDrawer ? '收起项目列表' : '打开项目列表'"
+          @click="showProjectDrawer = !showProjectDrawer"
         >
-          <el-icon><ArrowRight /></el-icon>
+          <el-icon>
+            <ArrowLeft v-if="showProjectDrawer" />
+            <ArrowRight v-else />
+          </el-icon>
         </button>
 
-        <!-- ★ 图层 chip 面板 -->
+        <!-- 图层 chip 面板 -->
         <LayerChipPanel
           :visible-ids="layerVisibleIds"
           :inputs="layerInputs"
@@ -451,7 +473,7 @@
       @sort-change="handleDrawerSortChange"
     />
 
-            <ProjectDetailPanel
+    <ProjectDetailPanel
       :visible="showDetailPanel"
       :project="selectedProject"
       :stage="stage"
@@ -460,7 +482,7 @@
       @action="onDetailPanelAction"
     />
 
-        <!-- ★ 全屏生成报告面板 -->
+    <!-- 全屏生成报告面板 -->
     <GenerateReportPanel
       :visible="showGeneratePanel"
       :project="generatePanelProject"
@@ -470,7 +492,7 @@
       @generated="onReportGenerated"
     />
 
-    <!-- ★ 分配负责人弹窗 -->
+    <!-- 分配负责人弹窗 -->
     <AssignDialog
       v-model="showAssignDialog"
       :project="assignTargetProject"
@@ -480,6 +502,7 @@
     <slot name="page-extra" />
   </div>
 </template>
+
 <script setup>
 import {
   computed, nextTick, onMounted, onUnmounted, reactive, ref, watch,
@@ -487,7 +510,7 @@ import {
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  ArrowLeft, ArrowRight, CircleCheck, Files, Fold, InfoFilled, List, Location,
+  ArrowLeft, ArrowRight, CircleCheck, Edit, Files, Fold, InfoFilled, List, Location,
   LocationFilled, MapLocation, Plus, Search, Setting,
 } from '@element-plus/icons-vue'
 import MapGL from '@/components/MapGL.vue'
@@ -540,7 +563,7 @@ const emits = defineEmits(['featureVisibleChange'])
 const ICON_FENGJI = 'icon-fengji'
 const ICON_FENGJI_BX = 'icon-fengji-bx'
 const ICON_SHENGYAZHAN = 'icon-shengyazhan'
-const ICON_SIZE_WIND = 0.08
+const ICON_SIZE_WIND = 0.18
 const ICON_SIZE_BOOSTER = 0.08
 
 const CITY_LAYER_ID = 'site-city-stats'
@@ -551,6 +574,12 @@ const PROJECT_ICON_LAYER_MAP = {
   'wind-farm': ['project-wind-all', 'project-wind-bx-all'],
   booster: ['project-booster-all'],
 }
+
+const SELECTED_ICON_LAYER_IDS = ['project-wind-all', 'project-wind-bx-all', 'project-booster-all']
+
+// 抽屉宽度与右边距，需与 ProjectDrawer.vue 的样式保持一致
+const DRAWER_WIDTH = 460
+const DRAWER_GAP = 12
 
 const STAGE_ACTIONS = {
   PRELIMINARY_SELECTION: ['assign', 'verify', 'edit', 'delete'],
@@ -601,9 +630,32 @@ const currentActions = computed(() => STAGE_ACTIONS[props.stage] || STAGE_ACTION
 const cardActions = computed(() => currentActions.value)
 const rowActions = computed(() => currentActions.value)
 
+// ★ 场区样式：默认有半透明填充，选中（highlight）填充透明仅保留加粗边框
 const AREA_STYLE = {
-  FD: { color: '#3b82f6', opacity: 0.22, outlineColor: '#60a5fa', highlight: { color: '#2563eb', opacity: 0.38, outlineColor: '#93c5fd' } },
-  GF: { color: '#a855f7', opacity: 0.22, outlineColor: '#c084fc', highlight: { color: '#7c3aed', opacity: 0.38, outlineColor: '#d8b4fe' } },
+  FD: {
+    color: '#3b82f6',
+    opacity: 0.22,
+    outlineColor: '#60a5fa',
+    outlineWidth: 1.5,
+    highlight: {
+      color: 'transparent',
+      opacity: 0,
+      outlineColor: '#93c5fd',
+      outlineWidth: 3,
+    },
+  },
+  GF: {
+    color: '#a855f7',
+    opacity: 0.22,
+    outlineColor: '#c084fc',
+    outlineWidth: 1.5,
+    highlight: {
+      color: 'transparent',
+      opacity: 0,
+      outlineColor: '#d8b4fe',
+      outlineWidth: 3,
+    },
+  },
 }
 
 // =================== 地图 ===================
@@ -627,8 +679,12 @@ const editMode = ref('area')
 const drawingNewPoint = ref(false)
 const saving = ref(false)
 const isBoxSelecting = ref(false)
-const hasSaved = ref(false) 
+const hasSaved = ref(false)
 const recalculating = ref(false)
+
+// ★ 新增：编辑态 / 脏标记
+const isEditing = ref(false)
+const isDirty = ref(false)
 
 const drawerSort = reactive({ key: '', dir: 'desc' })
 
@@ -647,6 +703,13 @@ const editTools = [
   { key: 'booster', label: '编辑升压站', icon: CircleCheck },
   { key: 'unavailable', label: '设置不可用区域', icon: InfoFilled },
 ]
+
+// expand-button 位置：抽屉收起时贴右边缘，展开时贴抽屉左边
+const expandButtonStyle = computed(() => ({
+  right: showProjectDrawer.value
+    ? `${DRAWER_WIDTH + DRAWER_GAP}px`
+    : '0px',
+}))
 
 // =================== 图层显隐 ===================
 function setProjectIconVisible(chipId, visible) {
@@ -793,6 +856,8 @@ function handlePageChange(page) { pagination.page = page; fetchProjectList() }
 function handleSizeChange(size) { pagination.pageSize = size; pagination.page = 1; fetchProjectList() }
 
 // =================== 动作分发 ===================
+const deletingId = ref(null)
+
 function executeAction(action, project) {
   if (!project) return
   const name = project.projectName || ''
@@ -803,31 +868,86 @@ function executeAction(action, project) {
   if (action === 'assign') { assignTargetProject.value = mapProject; showAssignDialog.value = true; return }
   if (action === 'verify') {
     showProjectDrawer.value = false; showDetailPanel.value = false; viewMode.value = 'map'
-    const centroid = getProjectCentroid(mapProject)
-    if (centroid) mapRef.value?.getMap?.()?.flyTo({ center: centroid, zoom: 13, duration: 1200 })
-    setTimeout(() => { onProjectClick(mapProject.id); showVerifyPanel.value = true }, 1300)
+    setTimeout(() => { onProjectClick(mapProject.id); showVerifyPanel.value = true }, 100)
     return
   }
-  if (action === 'edit') { openDetailPanel(mapProject, 'main'); return }
+  if (action === 'edit') {
+  // 直接进入编辑模式，不打开右侧详情面板
+  showProjectDrawer.value = false
+  showDetailPanel.value = false
+  viewMode.value = 'map'
+  setTimeout(async () => {
+    // 若目标项目尚未选中，先选中（onProjectClick 内部会飞到场区、加载图标）
+    if (selectedProject.value?.id !== mapProject.id) {
+      await onProjectClick(mapProject.id)
+    }
+    // 进入编辑（若尚未进入）
+    if (!isEditing.value) startEdit()
+  }, 100)
+  return
+}
   if (action === 'delete') {
-    ElMessageBox.confirm(`确认删除项目「${name}」吗？`, '提示', { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' })
-      .then(() => {
-        ElMessage.success('删除成功')
-        clearSelectionLayers()
-        fetchMapProjects(); fetchProjectList(); fetchOverviewStats(); fetchCityStats()
-      }).catch(() => {})
+    handleDeleteProject(mapProject)
     return
   }
   ElMessage.info(`点击了「${ACTION_LABELS[action] || action}」：${name}`)
 }
 
+async function handleDeleteProject(project) {
+  if (!project || deletingId.value) return
+  const id = project.id
+  const name = project.projectName || ''
+
+  try {
+    await ElMessageBox.confirm(
+      `确认删除项目「${name}」吗？删除后不可恢复。`,
+      '提示',
+      { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+
+  deletingId.value = id
+  try {
+    const res = await api.deleteProject(id)
+    if (res?.code !== 200) {
+      ElMessage.error(res?.msg || '删除失败')
+      return
+    }
+
+    ElMessage.success('删除成功')
+
+    showProjectDrawer.value = false
+    showDetailPanel.value = false
+
+    await fetchMapProjects()
+
+    if (selectedProject.value?.id === id) {
+      clearSelectionLayers()
+    }
+
+    if (projectList.value.length === 1 && pagination.page > 1) {
+      pagination.page -= 1
+    }
+
+    await Promise.all([
+      fetchProjectList(),
+      fetchOverviewStats(),
+      fetchCityStats(),
+    ])
+  } catch (err) {
+    ElMessage.error(err?.message || '删除失败')
+  } finally {
+    deletingId.value = null
+  }
+}
+
 function openDetailPanel(project, tab) {
   const p = allMapProjects.value.find(item => item.id === project.id)
   if (!p) { ElMessage.warning('地图上未找到该项目'); return }
-  const centroid = getProjectCentroid(p)
-  if (centroid) mapRef.value?.getMap?.()?.flyTo({ center: centroid, zoom: 13, duration: 1200 })
   showProjectDrawer.value = false; viewMode.value = 'map'
-  setTimeout(() => { onProjectClick(p.id); detailPanelTab.value = tab; showDetailPanel.value = true }, 1300)
+  setTimeout(() => { onProjectClick(p.id); detailPanelTab.value = tab; showDetailPanel.value = true }, 100)
 }
 
 function onAssignSuccess() { fetchProjectList(); fetchMapProjects() }
@@ -976,6 +1096,40 @@ function getProjectCentroid(project) {
   let sx = 0, sy = 0; for (const [lng, lat] of coords) { sx += lng; sy += lat }
   return [sx / coords.length, sy / coords.length]
 }
+
+// 飞行到场区范围
+function flyToProjectBounds(project) {
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+  const coords = getProjectCoords(project)
+  if (!coords.length) return
+
+  let minLng = Infinity, minLat = Infinity
+  let maxLng = -Infinity, maxLat = -Infinity
+  for (const [lng, lat] of coords) {
+    if (lng < minLng) minLng = lng
+    if (lng > maxLng) maxLng = lng
+    if (lat < minLat) minLat = lat
+    if (lat > maxLat) maxLat = lat
+  }
+
+  if (minLng === maxLng || minLat === maxLat) {
+    map.flyTo({
+      center: [(minLng + maxLng) / 2, (minLat + maxLat) / 2],
+      zoom: 15,
+      pitch: 0,
+      duration: 1200,
+    })
+    return
+  }
+
+  map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
+    padding: { top: 80, bottom: 80, left: 200, right: 120 },
+    maxZoom: 16,
+    duration: 1200,
+  })
+}
+
 function buildAreaFeature(project) {
   const coords = getProjectCoords(project); if (coords.length < 3) return null
   const f = coords[0], l = coords[coords.length - 1]; if (f[0] !== l[0] || f[1] !== l[1]) coords.push([f[0], f[1]])
@@ -1011,31 +1165,92 @@ function addProjectArea(project, highlighted = false) {
   const layerId = `project-area-${project.id}`
   const style = AREA_STYLE[project.itemType] || AREA_STYLE.FD
   const s = highlighted ? style.highlight : style
-  mapRef.value.addPolygon({ id: layerId, geojson: area, color: s.color, opacity: s.opacity, outlineColor: s.outlineColor })
+  mapRef.value.addPolygon({
+    id: layerId,
+    geojson: area,
+    color: s.color,
+    opacity: s.opacity,
+    outlineColor: s.outlineColor,
+    outlineWidth: s.outlineWidth,
+  })
   renderedLayerIds.add(layerId)
   const fillLayerId = `${layerId}-fill`
   mapRef.value.offClick(fillLayerId)
   mapRef.value.onClick(fillLayerId, () => onProjectClick(project.id))
 }
 
+// 清除选中项目的风机 / 升压站图标
+function clearSelectedProjectIcons() {
+  if (!mapRef.value) return
+  for (const layerId of SELECTED_ICON_LAYER_IDS) {
+    if (renderedLayerIds.has(layerId)) {
+      mapRef.value.removeLayer(layerId)
+      renderedLayerIds.delete(layerId)
+    }
+  }
+}
+
+// 只加载选中项目的风机 / 升压站图标
+async function renderSelectedProjectIcons(project) {
+  if (!mapReady.value || !mapRef.value || !project) return
+  clearSelectedProjectIcons()
+
+  const wf = buildWindFC(project)
+  const bf = buildBoosterFC(project)
+
+  if (wf.normal.features.length) {
+    await safeAddIcon({
+      layerId: 'project-wind-all',
+      featureCollection: wf.normal,
+      iconId: ICON_FENGJI,
+      iconUrl: fengjiIcon,
+      iconSize: ICON_SIZE_WIND,
+      iconAnchor: 'bottom',
+      fallbackColor: '#22c55e',
+      fallbackRadius: 3,
+    })
+  }
+  if (wf.reserve.features.length) {
+    await safeAddIcon({
+      layerId: 'project-wind-bx-all',
+      featureCollection: wf.reserve,
+      iconId: ICON_FENGJI_BX,
+      iconUrl: fengjiBxIcon,
+      iconSize: ICON_SIZE_WIND,
+      iconAnchor: 'bottom',
+      fallbackColor: '#f59e0b',
+      fallbackRadius: 3,
+    })
+  }
+  if (bf.features.length) {
+    await safeAddIcon({
+      layerId: 'project-booster-all',
+      featureCollection: bf,
+      iconId: ICON_SHENGYAZHAN,
+      iconUrl: shengyazhanIcon,
+      iconSize: ICON_SIZE_BOOSTER,
+      iconAnchor: 'bottom',
+      fallbackColor: '#ef4444',
+      fallbackRadius: 3,
+    })
+  }
+
+  syncAllProjectIcons()
+}
+
+// 只渲染场区；选中项目才渲染图标
 async function renderProjectsByStage(stage) {
   if (!mapReady.value || !mapRef.value) return
   clearProjectLayers()
   if (!allMapProjects.value.length || stage === 'overview') return
 
-  const allWindNormal = [], allWindReserve = [], allBoosterFeatures = []
-
   for (const p of allMapProjects.value) {
     addProjectArea(p, p.id === selectedProject.value?.id)
-    const wf = buildWindFC(p)
-    if (wf.normal.features.length) allWindNormal.push(...wf.normal.features)
-    if (wf.reserve.features.length) allWindReserve.push(...wf.reserve.features)
-    const bf = buildBoosterFC(p); if (bf.features.length) allBoosterFeatures.push(...bf.features)
   }
 
-  if (allWindNormal.length) await safeAddIcon({ layerId: 'project-wind-all', featureCollection: { type: 'FeatureCollection', features: allWindNormal }, iconId: ICON_FENGJI, iconUrl: fengjiIcon, iconSize: ICON_SIZE_WIND, iconAnchor: 'bottom', fallbackColor: '#22c55e', fallbackRadius: 3 })
-  if (allWindReserve.length) await safeAddIcon({ layerId: 'project-wind-bx-all', featureCollection: { type: 'FeatureCollection', features: allWindReserve }, iconId: ICON_FENGJI_BX, iconUrl: fengjiBxIcon, iconSize: ICON_SIZE_WIND, iconAnchor: 'bottom', fallbackColor: '#f59e0b', fallbackRadius: 3 })
-  if (allBoosterFeatures.length) await safeAddIcon({ layerId: 'project-booster-all', featureCollection: { type: 'FeatureCollection', features: allBoosterFeatures }, iconId: ICON_SHENGYAZHAN, iconUrl: shengyazhanIcon, iconSize: ICON_SIZE_BOOSTER, iconAnchor: 'bottom', fallbackColor: '#ef4444', fallbackRadius: 3 })
+  if (selectedProject.value) {
+    await renderSelectedProjectIcons(selectedProject.value)
+  }
 
   syncAllProjectIcons()
   syncMaskVisibility()
@@ -1054,27 +1269,42 @@ async function fetchMapProjects() {
 const windCount = computed(() => selectedProject.value?.windTurbinePoints?.length || 0)
 const altCount = computed(() => (selectedProject.value?.windTurbinePoints || []).filter((p) => Number(p.isReserve) === 1).length)
 
+// ★ 选中项目：只选中、不自动进编辑
 async function onProjectClick(projectId) {
   if (selectedProject.value?.id === projectId) return
   clearSelectionLayers()
   const project = allMapProjects.value.find((p) => p.id === projectId)
   if (!project) return
+
+  flyToProjectBounds(project)
+
   selectedProject.value = project
-  hasSaved.value = false // ★ 重置保存状态
+  hasSaved.value = false
+  isEditing.value = false
+  isDirty.value = false
   addProjectArea(project, true)
+  await renderSelectedProjectIcons(project)
   updateDetailCardPosition()
-  initEditBuffer(project)
-  enterEditMode('area')
 }
 
 function clearSelectionLayers() {
   if (!selectedProject.value) return
   const pid = selectedProject.value.id
-  showVerifyPanel.value = false; showDetailPanel.value = false
-  mapRef.value?.clearEditableAreas(); editBuffer.value = null; drawingNewPoint.value = false
+  showVerifyPanel.value = false
+  showDetailPanel.value = false
+  mapRef.value?.clearEditableAreas()
+  mapRef.value?.stopBoxSelect?.()
+  editBuffer.value = null
+  drawingNewPoint.value = false
+  isBoxSelecting.value = false
+  isEditing.value = false
+  isDirty.value = false
+  hasSaved.value = false
   const project = allMapProjects.value.find((p) => p.id === pid)
   if (project && isAreaView.value) addProjectArea(project, false)
-  selectedProject.value = null; detailCardPos.visible = false
+  clearSelectedProjectIcons()
+  selectedProject.value = null
+  detailCardPos.visible = false
 }
 
 function updateDetailCardPosition() {
@@ -1085,12 +1315,20 @@ function updateDetailCardPosition() {
   const pt = map.project(centroid); detailCardPos.x = pt.x; detailCardPos.y = pt.y; detailCardPos.visible = true
 }
 
+// ★ 点击空白：退出编辑模式（但保留选中，直到点击下一个场区）
 function handleMapBlankClick(e) {
   if (!isAreaView.value || !selectedProject.value) return
-  const map = mapRef.value?.getMap?.(); if (!map) return
-  const areaIds = []; for (const id of renderedLayerIds) { if (id.startsWith('project-area-')) areaIds.push(`${id}-fill`) }
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+  const areaIds = []
+  for (const id of renderedLayerIds) {
+    if (id.startsWith('project-area-')) areaIds.push(`${id}-fill`)
+  }
   if (!areaIds.length) return
-  if (!map.queryRenderedFeatures(e.point, { layers: areaIds }).length) clearSelectionLayers()
+  // 点在场区外
+  if (!map.queryRenderedFeatures(e.point, { layers: areaIds }).length) {
+    if (isEditing.value) exitEditMode()
+  }
 }
 
 function onVerifySaved(data) { console.log('[verify] 已保存:', data); showVerifyPanel.value = false }
@@ -1099,12 +1337,8 @@ function onVerifySaved(data) { console.log('[verify] 已保存:', data); showVer
 async function focusProject(project) {
   const p = allMapProjects.value.find((item) => item.id === project.id)
   if (!p) { ElMessage.warning('地图上未找到该项目'); return }
-  const centroid = getProjectCentroid(p)
-  if (!centroid) { ElMessage.warning('该项目缺少坐标信息'); return }
-  const map = mapRef.value?.getMap?.(); if (!map) return
   showProjectDrawer.value = false
-  map.flyTo({ center: centroid, zoom: 13, duration: 1200 })
-  setTimeout(() => onProjectClick(p.id), 1300)
+  onProjectClick(p.id)
 }
 function handleDrawerAction({ type, project }) { executeAction(type, allMapProjects.value.find((item) => item.id === project.id) || project) }
 function handleDrawerSortChange({ key, dir }) { drawerSort.key = key; drawerSort.dir = dir; pagination.page = 1; fetchProjectList() }
@@ -1135,7 +1369,7 @@ function syncDrawToBuffer() {
   if (!editBuffer.value) return
   const draw = mapRef.value?.getDraw?.()
   const all = draw?.getAll?.() || { type: 'FeatureCollection', features: [] }
-  
+
   const currentMode = editMode.value
 
   if (currentMode === 'area') {
@@ -1143,9 +1377,9 @@ function syncDrawToBuffer() {
     if (areaF) {
       editBuffer.value.area = areaF.geometry.coordinates[0].map(c => [c[0], c[1]])
     } else {
-      editBuffer.value.area = [] 
+      editBuffer.value.area = []
     }
-  } 
+  }
   else if (currentMode === 'wind') {
     editBuffer.value.wind = all.features
       .filter(f => f.properties?.kind === 'wind')
@@ -1154,7 +1388,7 @@ function syncDrawToBuffer() {
         lat: f.geometry.coordinates[1],
         isReserve: Number(f.properties?.isReserve) === 1 ? 1 : 0
       }))
-  } 
+  }
   else if (currentMode === 'booster') {
     editBuffer.value.booster = all.features
       .filter(f => f.properties?.kind === 'booster')
@@ -1163,7 +1397,7 @@ function syncDrawToBuffer() {
         lat: f.geometry.coordinates[1],
         isBest: Number(f.properties?.isBest) === 1 ? 1 : 0
       }))
-  } 
+  }
   else if (currentMode === 'unavailable') {
     editBuffer.value.unavailable = all.features
       .filter(f => f.properties?.kind === 'unavailable')
@@ -1175,6 +1409,32 @@ function syncDrawToBuffer() {
 function onDrawChange() {
   if (suppressDrawSync) return
   syncDrawToBuffer()
+  if (isEditing.value) isDirty.value = true
+}
+
+// ★ 进入编辑（点击「编辑」按钮触发）
+function startEdit() {
+  if (!selectedProject.value) return
+  isEditing.value = true
+  isDirty.value = false
+  editMode.value = 'area'
+  initEditBuffer(selectedProject.value)
+  enterEditMode('area')
+}
+
+// ★ 退出编辑（保留选中，恢复图标）
+function exitEditMode() {
+  if (!isEditing.value) return
+  mapRef.value?.clearEditableAreas()
+  mapRef.value?.stopBoxSelect?.()
+  editBuffer.value = null
+  drawingNewPoint.value = false
+  isBoxSelecting.value = false
+  isEditing.value = false
+  isDirty.value = false
+  if (selectedProject.value) {
+    renderSelectedProjectIcons(selectedProject.value)
+  }
 }
 
 function enterEditMode(mode) {
@@ -1187,7 +1447,7 @@ function enterEditMode(mode) {
     syncDrawToBuffer()
   }
 
-  refreshAllPointsLayers() 
+  refreshAllPointsLayers()
 
   suppressDrawSync = true
   editMode.value = mode
@@ -1202,29 +1462,29 @@ function enterEditMode(mode) {
 
   if (mode === 'area') {
     if (buf.area && buf.area.length >= 3) {
-      features.push({ 
-        type: 'Feature', 
-        id: 'edit-area', 
-        properties: { kind: 'area' }, 
-        geometry: { type: 'Polygon', coordinates: [closeRing(buf.area)] } 
+      features.push({
+        type: 'Feature',
+        id: 'edit-area',
+        properties: { kind: 'area' },
+        geometry: { type: 'Polygon', coordinates: [closeRing(buf.area)] }
       })
     }
   } else if (mode === 'wind') {
     buf.wind.forEach((p, i) => {
-      features.push({ 
-        type: 'Feature', 
-        id: `edit-wind-${i}`, 
-        properties: { kind: 'wind', index: i, isReserve: p.isReserve }, 
-        geometry: { type: 'Point', coordinates: [p.lng, p.lat] } 
+      features.push({
+        type: 'Feature',
+        id: `edit-wind-${i}`,
+        properties: { kind: 'wind', index: i, isReserve: p.isReserve },
+        geometry: { type: 'Point', coordinates: [p.lng, p.lat] }
       })
     })
   } else if (mode === 'booster') {
     buf.booster.forEach((p, i) => {
-      features.push({ 
-        type: 'Feature', 
-        id: `edit-booster-${i}`, 
-        properties: { kind: 'booster', index: i, isBest: p.isBest }, 
-        geometry: { type: 'Point', coordinates: [p.lng, p.lat] } 
+      features.push({
+        type: 'Feature',
+        id: `edit-booster-${i}`,
+        properties: { kind: 'booster', index: i, isBest: p.isBest },
+        geometry: { type: 'Point', coordinates: [p.lng, p.lat] }
       })
     })
   } else if (mode === 'unavailable') {
@@ -1263,6 +1523,20 @@ function startAddWindPoint() {
   ElMessage.info('点击地图添加风机，点击"标记备选"可切换备选状态')
 }
 
+// ★ 修复：升压站「新增点」切换
+function toggleAddPoint() {
+  const draw = mapRef.value?.getDraw?.()
+  if (!draw) return
+  if (drawingNewPoint.value) {
+    draw.changeMode('simple_select')
+    drawingNewPoint.value = false
+  } else {
+    draw.changeMode('draw_point')
+    drawingNewPoint.value = true
+    ElMessage.info('点击地图添加升压站')
+  }
+}
+
 function startBoxSelection() {
   if (editMode.value !== 'wind' && editMode.value !== 'booster') {
     ElMessage.warning('仅支持在编辑风机/升压站时框选')
@@ -1289,7 +1563,7 @@ function markReserve(isReserve) {
     ElMessage.warning('请先选中风机点位')
     return
   }
-  
+
   let count = 0
   ids.forEach(id => {
     draw.setFeatureProperty(id, 'isReserve', isReserve ? 1 : 0)
@@ -1298,7 +1572,7 @@ function markReserve(isReserve) {
       count++
     }
   })
-  
+
   if (count === 0) return
   syncDrawToBuffer()
   enterEditMode('wind')
@@ -1316,50 +1590,68 @@ function deleteSelectedPoints() {
   ElMessage.success(`已删除 ${ids.length} 个点`)
 }
 
+// 只刷新当前选中项目的场区 / 风机 / 升压站
 function refreshAllPointsLayers() {
   if (!mapRef.value || !editBuffer.value || !selectedProject.value) return
   const map = mapRef.value.getMap?.()
   if (!map) return
   const pid = selectedProject.value.id
-  const other = allMapProjects.value.filter(p => p.id !== pid)
 
   if (editBuffer.value.area && editBuffer.value.area.length >= 3) {
     const areaFeature = {
       type: 'Feature',
-      properties: { projectId: pid, projectCode: selectedProject.value.projectCode, projectName: selectedProject.value.projectName, itemType: selectedProject.value.itemType },
-      geometry: { type: 'Polygon', coordinates: [closeRing(editBuffer.value.area)] }
+      properties: {
+        projectId: pid,
+        projectCode: selectedProject.value.projectCode,
+        projectName: selectedProject.value.projectName,
+        itemType: selectedProject.value.itemType,
+      },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [closeRing(editBuffer.value.area)],
+      },
     }
     const layerId = `project-area-${pid}`
     const style = AREA_STYLE[selectedProject.value.itemType] || AREA_STYLE.FD
-    mapRef.value.addPolygon({ 
-      id: layerId, 
-      geojson: areaFeature, 
-      color: style.highlight.color, 
-      opacity: style.highlight.opacity, 
-      outlineColor: style.highlight.outlineColor 
+    mapRef.value.addPolygon({
+      id: layerId,
+      geojson: areaFeature,
+      color: style.highlight.color,
+      opacity: style.highlight.opacity,
+      outlineColor: style.highlight.outlineColor,
+      outlineWidth: style.highlight.outlineWidth,
     })
   }
 
-  const windNormal = [], windReserve = []
-  for (const p of other) {
-    const wf = buildWindFC(p)
-    if (wf.normal.features.length) windNormal.push(...wf.normal.features)
-    if (wf.reserve.features.length) windReserve.push(...wf.reserve.features)
-  }
+  const windNormal = []
+  const windReserve = []
   for (const p of editBuffer.value.wind) {
-    const f = { type: 'Feature', properties: { projectId: pid }, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } }
+    const f = {
+      type: 'Feature',
+      properties: { projectId: pid },
+      geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+    }
     ;(p.isReserve === 1 ? windReserve : windNormal).push(f)
   }
 
   const boosterFeatures = []
-  for (const p of other) { const fc = buildBoosterFC(p); if (fc.features.length) boosterFeatures.push(...fc.features) }
   for (const p of editBuffer.value.booster) {
-    boosterFeatures.push({ type: 'Feature', properties: { projectId: pid }, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } })
+    boosterFeatures.push({
+      type: 'Feature',
+      properties: { projectId: pid },
+      geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+    })
   }
 
-  if (map.getSource('project-wind-all')) map.getSource('project-wind-all').setData({ type: 'FeatureCollection', features: windNormal })
-  if (map.getSource('project-wind-bx-all')) map.getSource('project-wind-bx-all').setData({ type: 'FeatureCollection', features: windReserve })
-  if (map.getSource('project-booster-all')) map.getSource('project-booster-all').setData({ type: 'FeatureCollection', features: boosterFeatures })
+  if (map.getSource('project-wind-all')) {
+    map.getSource('project-wind-all').setData({ type: 'FeatureCollection', features: windNormal })
+  }
+  if (map.getSource('project-wind-bx-all')) {
+    map.getSource('project-wind-bx-all').setData({ type: 'FeatureCollection', features: windReserve })
+  }
+  if (map.getSource('project-booster-all')) {
+    map.getSource('project-booster-all').setData({ type: 'FeatureCollection', features: boosterFeatures })
+  }
 }
 
 async function saveEdit() {
@@ -1405,7 +1697,8 @@ async function saveEdit() {
     const res = await configApi.upDataLayer(pid, payload)
     if (res?.code === 200) {
       ElMessage.success('保存成功')
-      hasSaved.value = true // ★ 保存成功后，允许点击重新计算
+      hasSaved.value = true
+      isDirty.value = false
       const target = allMapProjects.value.find(p => p.id === pid)
       if (target) {
         target.coordinate = coordinate
@@ -1417,23 +1710,23 @@ async function saveEdit() {
       if (target) { initEditBuffer(target); enterEditMode('area') }
       fetchOverviewStats(); fetchCityStats()
     } else { ElMessage.error(res?.msg || '保存失败') }
-  } catch (err) { ElMessage.error(err?.message || '保存失败') } 
+  } catch (err) { ElMessage.error(err?.message || '保存失败') }
   finally { saving.value = false }
 }
 
-// ★ 新增：重新计算
+// 重新计算
 async function handleRecalculate() {
   if (!selectedProject.value || !hasSaved.value) return
-  
+
   try {
     recalculating.value = true
     const res = await configApi.updateCalculateStatus(selectedProject.value.id, {
       isReturnProject: 1
     })
-    
+
     if (res?.code === 200) {
       ElMessage.success('重新计算发起成功')
-      hasSaved.value = false 
+      hasSaved.value = false
       fetchMapProjects()
       fetchProjectList()
     } else {
@@ -1446,18 +1739,9 @@ async function handleRecalculate() {
   }
 }
 
+// ★ 取消 = 恢复数据 + 退出编辑
 function cancelEdit() {
-  mapRef.value?.clearEditableAreas()
-  drawingNewPoint.value = false
-  isBoxSelecting.value = false
-  mapRef.value.stopBoxSelect?.()
-  hasSaved.value = false // ★ 取消时重置
-  if (selectedProject.value) {
-    initEditBuffer(selectedProject.value)
-    editMode.value = 'area'
-    enterEditMode('area')
-    refreshAllPointsLayers()
-  }
+  exitEditMode()
 }
 
 // =================== 缩放阈值 ===================
@@ -1477,7 +1761,7 @@ async function onMapReady() {
   map.on('click', handleMapBlankClick)
   bindZoomListener()
   syncByZoom()
-  if (isAreaView.value) { hideCityStats(); renderProjectsByStage('area') } 
+  if (isAreaView.value) { hideCityStats(); renderProjectsByStage('area') }
   else { await renderCityStats() }
 
   map.on('zoom', syncMaskVisibility)
@@ -1637,7 +1921,9 @@ onUnmounted(() => {
   position: absolute; top: 50%; right: 0; z-index: 3; width: 25px; height: 54px;
   color: #fff; background: rgba(30,30,30,0.4); border: 0;
   border-radius: 5px 0 0 5px; cursor: pointer;
+  transition: right 0.25s ease, background 0.15s ease;
 }
+.expand-button:hover { background: rgba(30, 30, 30, 0.65); }
 
 .project-list-view {
   position: absolute; inset: 0; z-index: 4; height: 100%;

@@ -11,7 +11,30 @@ import MapboxDraw from '@mapbox/mapbox-gl-draw'
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
+// ===== 禁止 Polygon 整体拖动：把"选中状态的 Polygon"钉在 direct_select =====
+function ensurePolygonDirectSelect() {
+  if (!draw) return
+  if (draw.getMode() !== 'simple_select') return
+  const selectedIds = draw.getSelectedIds()
+  if (!selectedIds.length) return
 
+  const all = draw.getAll()
+  const polygonId = selectedIds.find((id) => {
+    const f = all.features.find((x) => x.id === id)
+    return f && f.geometry?.type === 'Polygon'
+  })
+  if (!polygonId) return
+
+  requestAnimationFrame(() => {
+    if (!draw) return
+    if (draw.getMode() !== 'simple_select') return
+    try {
+      draw.changeMode('direct_select', { featureId: polygonId })
+    } catch (err) {
+      console.warn('[draw] 切换到 direct_select 失败:', err)
+    }
+  })
+}
 if (typeof maplibregl.setWorkerUrl === 'function') {
   maplibregl.setWorkerUrl(workerUrl)
 }
@@ -57,55 +80,152 @@ let mousedownPoint = null
 let mousedownFeatureId = null
 
 const drawStyles = [
+  // ---- Polygon 填充：全部透明，避免盖住 AREA_STYLE 的视觉 ----
   {
-    id: 'gl-draw-polygon-fill-inactive', type: 'fill',
+    id: 'gl-draw-polygon-fill-inactive',
+    type: 'fill',
     filter: ['all', ['==', 'active', 'false'], ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
-    paint: { 'fill-color': '#2A9FFF', 'fill-outline-color': '#2A9FFF', 'fill-opacity': 0.35 },
+    paint: { 'fill-color': '#2A9FFF', 'fill-outline-color': '#2A9FFF', 'fill-opacity': 0 },
   },
   {
-    id: 'gl-draw-polygon-fill-active', type: 'fill',
+    id: 'gl-draw-polygon-fill-active',
+    type: 'fill',
     filter: ['all', ['==', 'active', 'true'], ['==', '$type', 'Polygon']],
-    paint: { 'fill-color': '#2A9FFF', 'fill-outline-color': '#2A9FFF', 'fill-opacity': 0.45 },
+    paint: { 'fill-color': '#2A9FFF', 'fill-outline-color': '#2A9FFF', 'fill-opacity': 0 },
   },
+
+  // ---- Polygon 描边：保留，作为编辑时的范围提示 ----
   {
-    id: 'gl-draw-polygon-stroke-inactive', type: 'line',
+    id: 'gl-draw-polygon-stroke-inactive',
+    type: 'line',
     filter: ['all', ['==', 'active', 'false'], ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: { 'line-color': '#2A9FFF', 'line-width': 2 },
   },
   {
-    id: 'gl-draw-polygon-stroke-active', type: 'line',
+    id: 'gl-draw-polygon-stroke-active',
+    type: 'line',
     filter: ['all', ['==', 'active', 'true'], ['==', '$type', 'Polygon']],
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: { 'line-color': '#FFD700', 'line-dasharray': [0.2, 2], 'line-width': 2 },
   },
+
+  // ---- Polygon 顶点（可拖动）+ 顶点光晕 ----
   {
-    id: 'gl-draw-polygon-and-line-vertex-halo-active', type: 'circle',
+    id: 'gl-draw-polygon-and-line-vertex-halo-active',
+    type: 'circle',
     filter: ['all', ['==', 'meta', 'vertex'], ['==', '$type', 'Point'], ['!=', 'mode', 'static']],
     paint: { 'circle-radius': 8, 'circle-color': '#FFFFFF' },
   },
   {
-    id: 'gl-draw-polygon-and-line-vertex-active', type: 'circle',
+    id: 'gl-draw-polygon-and-line-vertex-active',
+    type: 'circle',
     filter: ['all', ['==', 'meta', 'vertex'], ['==', '$type', 'Point'], ['!=', 'mode', 'static']],
     paint: { 'circle-radius': 5, 'circle-color': '#2A9FFF' },
   },
+
+  // ---- Polygon 中点（点击可插入新顶点） ----
   {
-    id: 'gl-draw-polygon-midpoint', type: 'circle',
+    id: 'gl-draw-polygon-midpoint',
+    type: 'circle',
     filter: ['all', ['==', '$type', 'Point'], ['==', 'meta', 'midpoint']],
     paint: { 'circle-radius': 3, 'circle-color': '#FFD700' },
   },
-  // ★ 把点的样式改大且加重描边，防止在密集图标里点不中
+
+  // ---- 单点（风机 / 升压站）：保持原来的绿色大点 + 黄色选中态 ----
   {
-    id: 'gl-draw-point-inactive', type: 'circle',
+    id: 'gl-draw-point-inactive',
+    type: 'circle',
     filter: ['all', ['==', 'active', 'false'], ['==', '$type', 'Point'], ['==', 'meta', 'feature']],
     paint: { 'circle-radius': 7, 'circle-color': '#22c55e', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 },
   },
   {
-    id: 'gl-draw-point-active', type: 'circle',
+    id: 'gl-draw-point-active',
+    type: 'circle',
     filter: ['all', ['==', 'active', 'true'], ['==', '$type', 'Point'], ['!=', 'meta', 'midpoint']],
     paint: { 'circle-radius': 9, 'circle-color': '#FFD700', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 },
   },
 ]
+
+// ===== 禁止 Polygon 整体拖动 =====
+let suppressGuard = false
+let suppressingMoveRevert = false
+const polygonCoordsCache = new Map() // String(featureId) -> 最近一次合法坐标
+
+// 缓存当前所有 Polygon 的合法坐标
+function cachePolygonCoords() {
+  if (!draw) return
+  const all = draw.getAll()
+  if (!all?.features?.length) return
+  for (const f of all.features) {
+    if (f.geometry?.type === 'Polygon') {
+      polygonCoordsCache.set(String(f.id), JSON.parse(JSON.stringify(f.geometry.coordinates)))
+    }
+  }
+}
+
+// 防线①：选中 Polygon 时，强制钉在 direct_select（同步，不再用 rAF）
+function forcePolygonDirectSelect() {
+  if (suppressGuard || !draw) return
+  if (draw.getMode() !== 'simple_select') return
+  const selectedIds = draw.getSelectedIds()
+  if (!selectedIds.length) return
+  const all = draw.getAll()
+  if (!all?.features?.length) return
+  const polygonFeature = all.features.find(f =>
+    f.geometry?.type === 'Polygon' &&
+    selectedIds.some(id => String(id) === String(f.id))
+  )
+  if (!polygonFeature) return
+
+  suppressGuard = true
+  try {
+    draw.changeMode('direct_select', { featureId: polygonFeature.id })
+  } catch (err) {
+    console.warn('[draw] 切 direct_select 失败:', err)
+  } finally {
+    suppressGuard = false
+  }
+}
+
+// 防线③：draw.update 里拦下 "整体平移"
+function revertPolygonMove(e) {
+  if (suppressingMoveRevert) return false
+  if (!draw) return false
+
+  const polygons = (e.features || []).filter(f => f.geometry?.type === 'Polygon')
+  if (!polygons.length) return false
+
+  // 只放行「拖顶点 / 拖中点」（change_coordinates）
+  // 其他任何 action（move / 未定义 / 未来新增）都回滚
+  if (e.action === 'change_coordinates') {
+    // 用户拖顶点是合法修改，更新快照，避免下次回滚到修改前
+    for (const f of polygons) {
+      polygonCoordsCache.set(String(f.id), JSON.parse(JSON.stringify(f.geometry.coordinates)))
+    }
+    return false
+  }
+
+  // 回滚
+  suppressingMoveRevert = true
+  try {
+    for (const f of polygons) {
+      const original = polygonCoordsCache.get(String(f.id))
+      if (!original) continue
+      draw.add({
+        type: 'Feature',
+        id: f.id,
+        properties: f.properties || {},
+        geometry: { type: 'Polygon', coordinates: original },
+      })
+    }
+  } catch (err) {
+    console.warn('[draw] 场区坐标回滚失败:', err)
+  } finally {
+    suppressingMoveRevert = false
+  }
+  return true
+}
 
 onMounted(() => {
   map = new maplibregl.Map({
@@ -125,13 +245,25 @@ onMounted(() => {
   })
   map.addControl(draw, 'top-left')
 
-  map.on('draw.update', (e) => {
+    map.on('draw.update', (e) => {
     handleDrawUpdate(e)
+    // 防线③：整体平移直接回滚，不回传上层
+    if (revertPolygonMove(e)) return
+    // 非平移（拖顶点）→ 更新快照，避免下次回滚到"拖顶点之前"的旧坐标
+    if (e?.action !== 'move') cachePolygonCoords()
     emit('draw-update', e.features)
   })
   map.on('draw.create', (e) => emit('draw-create', e.features))
   map.on('draw.delete', (e) => emit('draw-delete', e.features))
 
+  // 防线①：任何模式/选中变化都缓存坐标 + 把选中的 Polygon 拉回 direct_select
+  map.on('draw.modechange', () => {
+    cachePolygonCoords()
+    forcePolygonDirectSelect()
+  })
+  map.on('draw.selectionchange', () => {
+    forcePolygonDirectSelect()
+  })
   // 绑定自定义交互
   bindPointInteraction()
   bindBoxSelect()
@@ -158,6 +290,8 @@ onUnmounted(() => {
   imageCache.clear()
 
   map?.off('draw.update', handleDrawUpdate)
+  map?.off('draw.selectionchange', ensurePolygonDirectSelect)
+  map?.off('draw.modechange', ensurePolygonDirectSelect)
   map?.remove()
   map = null
   draw = null
@@ -368,7 +502,7 @@ function ensureFeatureIds(geojson) {
   })
 }
 
-function addPolygon({ id, geojson, color = '#4fc3ff', opacity = 0.7, outlineColor = '#4fc3ff' }) {
+function addPolygon({ id, geojson, color = '#4fc3ff', opacity = 0.7, outlineColor = '#4fc3ff', outlineWidth = 1.5 }) {
   if (!map) return
   if (map.getSource(id)) {
     map.getSource(id).setData(geojson)
@@ -378,6 +512,7 @@ function addPolygon({ id, geojson, color = '#4fc3ff', opacity = 0.7, outlineColo
     }
     if (map.getLayer(`${id}-outline`)) {
       map.setPaintProperty(`${id}-outline`, 'line-color', outlineColor)
+      map.setPaintProperty(`${id}-outline`, 'line-width', outlineWidth)
     }
     return
   }
@@ -388,7 +523,7 @@ function addPolygon({ id, geojson, color = '#4fc3ff', opacity = 0.7, outlineColo
   })
   map.addLayer({
     id: `${id}-outline`, type: 'line', source: id,
-    paint: { 'line-color': outlineColor, 'line-width': 1.5 },
+    paint: { 'line-color': outlineColor, 'line-width': outlineWidth },
   })
   addedLayers.add(`${id}-fill`)
   addedLayers.add(`${id}-outline`)
