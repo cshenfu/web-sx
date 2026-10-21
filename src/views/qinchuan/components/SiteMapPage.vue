@@ -66,21 +66,14 @@
           </el-input>
         </div>
 
+        <!-- 顶部编辑工具栏（保持原样，没有储备按钮） -->
         <div v-if="selectedProject && !showVerifyPanel && !showDetailPanel" class="edit-toolbar">
           <template v-if="!isEditing">
-            <button class="edit-tool-button" @click="startEdit"><el-icon><Edit /></el-icon>编辑</button>
+            <!-- <button class="edit-tool-button" @click="startEdit"><el-icon><Edit /></el-icon>编辑</button> -->
           </template>
           <template v-else>
             <button class="edit-tool-button" @click="openEditProjectForm">
               <el-icon><Edit /></el-icon>编辑
-            </button>
-            <!-- 储备按钮：放宽匹配条件 -->
-            <button 
-              v-if="selectedProject.projectStage === 'PRELIMINARY_SELECTION' || selectedProject.projectStage?.includes('选址')" 
-              class="edit-tool-button save" 
-              @click="showReserveDialog = true"
-            >
-              储备
             </button>
             <span class="edit-divider" />
 
@@ -116,7 +109,7 @@
           </template>
         </div>
 
-        <!-- 气泡窗：加宽到 320px，带关闭按钮 -->
+        <!-- 气泡窗：带关闭叉号，且操作列渲染 cardActions -->
         <div v-if="selectedProject && detailCardPos.visible && !cardClosed" class="detail-card" :style="{ left: detailCardPos.x + 'px', top: detailCardPos.y + 'px' }">
           <button class="detail-close" title="关闭" @click.stop="closeDetailCard">
             <el-icon><Close /></el-icon>
@@ -127,6 +120,8 @@
           <div class="detail-row"><span class="detail-label">推荐机型</span><span class="detail-value">{{ selectedProject.recommendedModel || '-' }}</span></div>
           <div class="detail-row"><span class="detail-label">资本金 IRR</span><span class="detail-value">{{ selectedProject.capitalFinancialRate != null ? selectedProject.capitalFinancialRate + '%' : '-' }}</span></div>
           <slot name="detail-card-extra" :project="selectedProject" />
+          
+          <!-- 气泡窗操作按钮 -->
           <div class="detail-actions">
             <button v-for="action in cardActions" :key="action" class="detail-action" :class="{ danger: action === 'delete' }" @click="executeAction(action, selectedProject)">
               {{ ACTION_LABELS[action] || action }}
@@ -165,7 +160,7 @@
           <el-table-column label="所属" min-width="120" show-overflow-tooltip><template #default="{ row }">{{ row.managerCompany || '-' }}</template></el-table-column>
           <el-table-column label="负责人" width="90"><template #default="{ row }">{{ row.managerName || '-' }}</template></el-table-column>
           <el-table-column label="创建时间" width="170"><template #default="{ row }">{{ row.createTime || '-' }}</template></el-table-column>
-          <el-table-column label="操作" width="180" fixed="right">
+          <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
               <div class="row-actions">
                 <el-button v-for="action in rowActions" :key="action" link :type="action === 'delete' ? 'danger' : 'primary'" size="small" @click="executeAction(action, row)">{{ ACTION_LABELS[action] || action }}</el-button>
@@ -270,14 +265,16 @@ const SELECTED_ICON_LAYER_IDS = ['project-wind-all', 'project-wind-bx-all', 'pro
 const DRAWER_WIDTH = 460
 const DRAWER_GAP = 12
 
+// ★ 核心配置：在智能选址（PRELIMINARY_SELECTION）加上 reserve
 const STAGE_ACTIONS = {
-  PRELIMINARY_SELECTION: ['assign', 'verify', 'edit', 'delete'],
+  PRELIMINARY_SELECTION: ['assign', 'verify', 'reserve', 'edit', 'delete'],
   PROJECT_RESERVE:       ['material', 'edit', 'assign', 'delete'],
   PROJECT_INITIATION:    ['establishMeeting', 'researchMaterial', 'edit', 'assign', 'delete'],
   FEASIBILITY_REVIEW:    ['researchReview', 'investMaterial', 'edit', 'assign', 'delete'],
   INVESTMENT_DECISION:   ['investMeeting', 'edit', 'assign', 'delete'],
 }
-const ACTION_LABELS = { material: '立项材料', researchMaterial: '可研材料', investMaterial: '投决材料', establishMeeting: '立项上会', researchReview: '可研审查', investMeeting: '投决上会', assign: '分配', verify: '核查', edit: '编辑', delete: '删除' }
+// ★ 加入储备标签
+const ACTION_LABELS = { material: '立项材料', researchMaterial: '可研材料', investMaterial: '投决材料', establishMeeting: '立项上会', researchReview: '可研审查', investMeeting: '投决上会', assign: '分配', verify: '核查', reserve: '储备', edit: '编辑', delete: '删除' }
 const CITY_OPTIONS = [
   { label: '西安市', value: '610100' }, { label: '铜川市', value: '610200' }, { label: '宝鸡市', value: '610300' },
   { label: '咸阳市', value: '610400' }, { label: '渭南市', value: '610500' }, { label: '延安市', value: '610600' },
@@ -484,11 +481,23 @@ function executeAction(action, project) {
   if (['material', 'researchMaterial', 'investMaterial'].includes(action)) { openDetailPanel(mapProject, 'material'); return }
   if (['establishMeeting', 'researchReview', 'investMeeting'].includes(action)) { openDetailPanel(mapProject, 'meeting'); return }
   if (action === 'assign') { assignTargetProject.value = mapProject; showAssignDialog.value = true; return }
+  
   if (action === 'verify') {
     showProjectDrawer.value = false; showDetailPanel.value = false; viewMode.value = 'map'
     setTimeout(() => { onProjectClick(mapProject.id); showVerifyPanel.value = true }, 100)
     return
   }
+  
+  // ★ 处理气泡窗点击「储备」
+  if (action === 'reserve') {
+    showProjectDrawer.value = false; showDetailPanel.value = false; viewMode.value = 'map'
+    setTimeout(async () => {
+      if (selectedProject.value?.id !== mapProject.id) await onProjectClick(mapProject.id)
+      showReserveDialog.value = true
+    }, 100)
+    return
+  }
+
   if (action === 'edit') {
     showProjectDrawer.value = false; showDetailPanel.value = false; viewMode.value = 'map'
     setTimeout(async () => {
@@ -970,7 +979,7 @@ onUnmounted(() => {
 .edit-tool-button:disabled { opacity: 0.6; cursor: not-allowed; }
 .edit-divider { width: 1px; height: 18px; margin: 0 4px; background: #e5e7eb; }
 
-/* ★ 气泡窗宽 320px，右上角带叉号 */
+/* 气泡窗 */
 .detail-card {
   position: absolute; z-index: 5; width: 320px; padding: 16px;
   color: #303133; background: rgba(255,255,255,0.98); border-radius: 8px;

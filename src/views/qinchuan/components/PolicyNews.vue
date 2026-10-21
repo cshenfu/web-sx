@@ -18,10 +18,10 @@
         </div>
 
         <!-- 新闻列表：支持滚动 -->
-        <div class="news-list">
+        <div ref="newsListRef" class="news-list" @scroll.passive="handleNewsScroll">
           <button
-            v-for="news in items"
-            :key="news.id"
+            v-for="(news, index) in loopedItems"
+            :key="`${news.id ?? 'news'}-${index}`"
             type="button"
             class="news-item"
             @click="emit('news-click', news)"
@@ -37,12 +37,33 @@
 </template>
 
 <script setup>
+import { computed, ref } from 'vue'
 import newsIcon from '@/assets/img/qinchuan/dashbord/zcxw.png'
 import { policyNewsData } from '../js/dashboardMcokData'
 
-defineProps({
+const props = defineProps({
   items: { type: Array, default: () => policyNewsData },
 })
+
+// 双份数据用于形成无缝循环；滚过第一轮后把 scrollTop 折回同一内容位置。
+const loopedItems = computed(() => {
+  const source = props.items || []
+  return source.length ? [...source, ...source] : []
+})
+const newsListRef = ref(null)
+
+function handleNewsScroll(event) {
+  const list = event.currentTarget
+  const count = props.items?.length || 0
+  const first = list.firstElementChild
+  const nextCycle = list.children[count]
+  if (!count || !first || !nextCycle) return
+
+  const cycleHeight = nextCycle.getBoundingClientRect().top - first.getBoundingClientRect().top
+  if (cycleHeight > 0 && list.scrollTop >= cycleHeight) {
+    list.scrollTop -= cycleHeight
+  }
+}
 
 const emit = defineEmits(['news-click', 'more-click'])
 </script>
@@ -57,14 +78,34 @@ const emit = defineEmits(['news-click', 'more-click'])
   display: flex; 
   flex-direction: column; 
   min-height: 0;
+  container-type: size;
+  isolation: isolate;
   
   /* 去除边框，使用你提供的渐变 */
   border: none;
   border-radius: 4px; 
-  background: linear-gradient(90deg, rgba(41, 145, 247, 0.3) 0%, rgba(41, 145, 247, 0) 100%);
+  background: transparent;
   
   margin-top: 0 !important;
-  /* 移除 overflow: hidden 以允许内部滚动 */
+  overflow: hidden;
+}
+
+/* 渐变从图标中心（约面板宽度 15%）向右淡出，不铺满左侧背景 */
+.news-panel::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  bottom: 0;
+  left: 15%;
+  width: 85%;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(41, 145, 247, 0.28) 0%,
+    rgba(41, 145, 247, 0.16) 44%,
+    rgba(41, 145, 247, 0) 100%
+  );
 }
 
 /* 左右布局 */
@@ -73,15 +114,19 @@ const emit = defineEmits(['news-click', 'more-click'])
   min-height: 0;
   display: flex;
   align-items: center; /* 垂直居中，图标自然占位 */
-  gap: 16px;
-  padding: 0 12px;
+  gap: clamp(8px, min(3.58cqw, 14.3cqh), 14.66px);
+  padding: 0 clamp(8px, min(3.64cqw, 14.55cqh), 14.91px) 0 0;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 /* 左侧图标（去除所有框） */
 .icon-wrapper {
   flex: 0 0 auto;
-  width: 80px; 
-  height: 80px; 
+  width: clamp(60px, min(21.65cqw, 86.6cqh), 88.77px);
+  height: auto;
+  aspect-ratio: 88.77 / 102.5;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -98,11 +143,11 @@ const emit = defineEmits(['news-click', 'more-click'])
 .news-content {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  padding-top: 10px;
-  padding-bottom: 10px;
+  height: calc(100% - clamp(4px, min(1.82cqw, 7.27cqh), 7.45px));
+  padding: 0;
   box-sizing: border-box;
 }
 
@@ -111,7 +156,8 @@ const emit = defineEmits(['news-click', 'more-click'])
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 6px;
+  height: clamp(18px, min(6.19cqw, 24.77cqh), 25.39px);
+  margin-bottom: clamp(4px, min(1.82cqw, 7.27cqh), 7.45px);
   flex-shrink: 0; /* 标题不允许被压缩 */
 }
 
@@ -155,8 +201,10 @@ const emit = defineEmits(['news-click', 'more-click'])
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  overflow-y: auto; /* 允许滚动 */
+  gap: clamp(4px, min(1.36cqw, 5.45cqh), 5.59px);
+  overflow-x: hidden;
+  overflow-y: auto; /* 内容限高，保留内部滚动 */
+  overscroll-behavior: contain;
   scrollbar-width: none; /* 隐藏滚动条但保持可滚动 */
 }
 
@@ -168,7 +216,7 @@ const emit = defineEmits(['news-click', 'more-click'])
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 22px;
+  min-height: clamp(14px, min(4.15cqw, 16.59cqh), 17px);
   padding: 0;
   border: 0;
   background: transparent;
@@ -216,60 +264,5 @@ const emit = defineEmits(['news-click', 'more-click'])
   font-family: 'PingFang SC', sans-serif;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.5);
-}
-
-.dashboard-panel {
-  container-type: size;
-  background: transparent;
-  isolation: isolate;
-}
-.news-panel::before {
-  content: "";
-  position: absolute;
-  z-index: 0;
-  top: 0;
-  bottom: 0;
-  left: 15%;
-  width: 85%;
-  pointer-events: none;
-  background: linear-gradient(
-    90deg,
-    rgba(41, 145, 247, 0.28) 0%,
-    rgba(41, 145, 247, 0.16) 44%,
-    rgba(41, 145, 247, 0) 100%
-  );
-}
-.news-body {
-  position: relative;
-  z-index: 1;
-  gap: clamp(8px, min(3.58cqw, 14.3cqh), 14.66px);
-  padding: 0 clamp(8px, min(3.64cqw, 14.55cqh), 14.91px) 0 0;
-}
-.icon-wrapper {
-  width: clamp(60px, min(21.65cqw, 86.6cqh), 88.77px);
-  height: auto;
-  aspect-ratio: 88.77 / 102.5;
-}
-.news-content {
-  flex: 1;
-  height: auto;
-  min-width: 0;
-  min-height: 0;
-  padding: 0;
-  align-self: center;
-}
-.news-header {
-  height: clamp(18px, min(6.19cqw, 24.77cqh), 25.39px);
-  margin-bottom: clamp(4px, min(1.82cqw, 7.27cqh), 7.45px);
-}
-.news-list {
-  flex: 1;
-  min-height: 0;
-  gap: clamp(4px, min(1.36cqw, 5.45cqh), 5.59px);
-  overflow-y: auto;
-}
-.news-item {
-  height: auto;
-  min-height: clamp(14px, min(4.15cqw, 16.59cqh), 17px);
 }
 </style>
