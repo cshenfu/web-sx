@@ -318,7 +318,6 @@ import { projectOverviewRows, stageCityData } from './js/dashboardMcokData'
 import { buildStageColorMap } from './js/mapStageColor'
 import { projectDetailMockData } from './js/areaPanelMockData'
 import { buildMainInfoFromAi } from './js/aiProjectAdapter'
-
 import * as newApi from '@/api/modules/project'
 
 import {
@@ -331,7 +330,7 @@ import { cloneValue } from './js/geoUtils'
 import { useZoomThresholdSwitch } from './js/useZoomThresholdSwitch'
 
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
-import shengyazhanIcon from '@/assets/img/mapIcon/shengyazhan.png'
+import shengyazhanIcon from '@/assets/img/mapIcon/syz.png'
 import shaanxiOutline610000 from '/public/geojson/610000.json'
 
 // ==================== 常量 ====================
@@ -346,7 +345,7 @@ const CITY_OPTIONS = [
 const ICON_FENGJI = 'icon-fengji-overview'
 const ICON_SHENGYAZHAN = 'icon-shengyazhan-overview'
 const ICON_SIZE_WIND = 0.16
-const ICON_SIZE_BOOSTER = 0.1
+const ICON_SIZE_BOOSTER = 0.5
 
 // 省级 3D 地图样式（取自 Figma：冰蓝顶面 + #0072FF→白 渐变侧面）
 const PROVINCE_MAP_STYLE = {
@@ -358,7 +357,8 @@ const PROVINCE_MAP_STYLE = {
   hoverLineColor: '#FFFFFF',
   borderWidth: 1000,   // 边界宽度(米)，想更粗/更细改这里
   borderHeight: 120,   // 边界凸出顶面的高度(米)
-  sideColors: ['#0072FF', '#2F8CFF', '#62A8FF', '#9AC7FF', '#D0E5FF', '#FFFFFF']
+  sideColors: ['#0072FF', '#2F8CFF', '#62A8FF', '#9AC7FF', '#D0E5FF', '#FFFFFF'],
+  sideBands: 10,       // 侧面渐变层数，globe 下 10 层足够平滑、深度冲突更少
 }
 
 const STAGE_GROUP = {
@@ -403,7 +403,7 @@ const mapReady = ref(false)
 const viewMode = ref('map')
 const showLayerPanel = ref(false)
 let whlnPlugin = null
-const layerVisibleIds = ref(['tdt-imagery'])
+const layerVisibleIds = ref(['hd-imagery'])
 const isDetailFullscreen = ref(false)
 
 const activeEditTool = ref('')

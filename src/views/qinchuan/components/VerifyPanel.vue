@@ -4,208 +4,261 @@
       <div class="verify-header">
         <span class="verify-title">核查信息</span>
         <div class="verify-actions">
-          <el-button size="small" :disabled="saving" @click="handleCancel">
-            取消
-          </el-button>
-          <el-button
-            size="small"
-            type="primary"
-            :loading="saving"
-            @click="handleSave"
-          >
-            保存
-          </el-button>
+          <el-button size="small" @click="handleCancel">取消</el-button>
+          <el-button size="small" type="primary" @click="handleSave">保存</el-button>
         </div>
       </div>
 
-      <div class="verify-body">
-        <el-form
-          ref="formRef"
-          :model="form"
-          :rules="rules"
-          label-position="top"
-          size="small"
-          class="verify-form"
+      <div class="verify-tip">
+        说明：设置为不可用的点位保存后系统会自动生成避让区域（范围以风机为中心点外扩25m的矩形范围），
+        后续如需调整该避让范围，可到【湖仓汇源-避让区域-查找该项目区域的范围数据】编辑或删除
+      </div>
+
+      <div class="verify-tabs">
+        <button
+          v-for="tab in TABS"
+          :key="tab.key"
+          class="verify-tab"
+          :class="{ active: activeTab === tab.key }"
+          @click="activeTab = tab.key"
         >
-          <el-form-item label="地貌特征" prop="landformFeature">
-            <el-input
-              v-model="form.landformFeature"
-              placeholder="如：黄土高原沟壑"
-              clearable
-            />
-          </el-form-item>
+          {{ tab.label }}
+        </button>
+      </div>
 
-          <el-form-item label="地貌类型" prop="horstType">
-            <el-input
-              v-model="form.horstType"
-              placeholder="如：园地"
-              clearable
-            />
-          </el-form-item>
+      <div class="verify-table-wrap">
+        <el-table
+          v-if="activeTab === 'wind'"
+          :data="windList"
+          :row-class-name="getRowClass"
+          border
+          size="small"
+          class="verify-table"
+          height="100%"
+        >
+          <el-table-column label="风机编号" width="110" align="center">
+            <template #default="{ row }">{{ row.code }}</template>
+          </el-table-column>
+          <el-table-column label="X" width="150" align="center">
+            <template #default="{ row }">{{ row.x }}</template>
+          </el-table-column>
+          <el-table-column label="Y" width="150" align="center">
+            <template #default="{ row }">{{ row.y }}</template>
+          </el-table-column>
+          <el-table-column label="可用状态" width="110" align="center">
+            <template #default="{ row }">
+              <el-checkbox v-model="row.isUnavailable">不可用</el-checkbox>
+            </template>
+          </el-table-column>
+          <el-table-column label="备注" min-width="160">
+            <template #default="{ row }">
+              <el-input
+                v-model="row.remark"
+                size="small"
+                class="remark-input"
+                placeholder=""
+              />
+            </template>
+          </el-table-column>
+        </el-table>
 
-          <el-form-item label="是否敏感" prop="isSensitive">
-            <el-radio-group v-model="form.isSensitive">
-              <el-radio :label="0">否</el-radio>
-              <el-radio :label="1">是</el-radio>
-            </el-radio-group>
-          </el-form-item>
-
-          <el-form-item label="核查结论" prop="verificationConclusion">
-            <el-input
-              v-model="form.verificationConclusion"
-              type="textarea"
-              :rows="3"
-              placeholder="请输入核查结论"
-              maxlength="500"
-              show-word-limit
-            />
-          </el-form-item>
-
-          <p class="verify-desc">
-            拟选场址范围及附近不涉及新版生态红线、环境保护、基本农田、林地禁区、压覆矿产、文物古迹、军事等限制项目开发的敏感性因素。
-          </p>
-
-          <el-form-item label="附件" prop="attachments" class="verify-attachment-item">
-            <el-upload
-              v-model:file-list="form.attachments"
-              :auto-upload="false"
-              :limit="5"
-              accept=".pdf,.doc,.docx"
-              multiple
-              class="verify-upload"
-            >
-              <el-button type="primary" link>上传附件</el-button>
-            </el-upload>
-            <div class="verify-upload-tip">
-              <span class="danger">严禁上传国家秘密文件，违规必究</span>
-              <span class="verify-upload-hint">支持pdf/docx文件格式（最多上传5个）</span>
-            </div>
-          </el-form-item>
-        </el-form>
+        <el-table
+          v-else
+          :data="boosterList"
+          :row-class-name="getRowClass"
+          border
+          size="small"
+          class="verify-table"
+          height="100%"
+        >
+          <el-table-column label="升压站编号" width="110" align="center">
+            <template #default="{ row }">{{ row.code }}</template>
+          </el-table-column>
+          <el-table-column label="X" width="150" align="center">
+            <template #default="{ row }">{{ row.x }}</template>
+          </el-table-column>
+          <el-table-column label="Y" width="150" align="center">
+            <template #default="{ row }">{{ row.y }}</template>
+          </el-table-column>
+          <el-table-column label="可用状态" width="110" align="center">
+            <template #default="{ row }">
+              <el-checkbox v-model="row.isUnavailable">不可用</el-checkbox>
+            </template>
+          </el-table-column>
+          <el-table-column label="备注" min-width="160">
+            <template #default="{ row }">
+              <el-input
+                v-model="row.remark"
+                size="small"
+                class="remark-input"
+                placeholder=""
+              />
+            </template>
+          </el-table-column>
+        </el-table>
       </div>
     </aside>
   </transition>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { updateInfo } from '@/api/modules/selectConfig'
+import * as configApi from '@/api/modules/selectConfig'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
   project: { type: Object, default: null },
 })
 
-const emit = defineEmits(['close', 'save'])
+const emit = defineEmits(['close', 'saved'])
 
-const formRef = ref(null)
+const TABS = [
+  { key: 'wind', label: '风机信息' },
+  { key: 'booster', label: '升压站' },
+]
+
+const activeTab = ref('wind')
+const windList = ref([])
+const boosterList = ref([])
 const saving = ref(false)
 
-const form = ref({
-  landformFeature: '',
-  horstType: '',
-  isSensitive: 0, // 0-否 1-是
-  verificationConclusion: '',
-  attachments: [],
-})
+function toBool(v) {
+  return v === 1 || v === true || v === '1'
+}
 
-// 是否敏感：选了"是" → 相关字段必填
-const isSensitiveYes = computed(() => form.value.isSensitive === 1)
-
-// 动态校验规则
-const rules = computed(() => {
-  const r = {
-    isSensitive: [
-      { required: true, message: '请选择是否敏感', trigger: 'change' },
-    ],
+/** 兼容两种来源：前端字段 isUnavailable / 后端字段 isAvailable(0=不可用) */
+function isUnavailableOf(p) {
+  if (p.isUnavailable !== undefined && p.isUnavailable !== null && p.isUnavailable !== '') {
+    return toBool(p.isUnavailable)
   }
-  if (isSensitiveYes.value) {
-    r.landformFeature = [
-      { required: true, message: '请输入地貌特征', trigger: 'blur' },
-    ]
-    r.horstType = [
-      { required: true, message: '请输入地貌类型', trigger: 'blur' },
-    ]
-    r.verificationConclusion = [
-      { required: true, message: '请输入核查结论', trigger: 'blur' },
-    ]
+  if (p.isAvailable !== undefined && p.isAvailable !== null && p.isAvailable !== '') {
+    return Number(p.isAvailable) === 0
   }
-  return r
-})
+  return false
+}
 
-// 每次打开时从项目读初始值
-watch(
-  () => props.visible,
-  (val) => {
-    if (val && props.project) {
-      form.value = {
-        landformFeature: props.project.landformFeature || '',
-        horstType: props.project.horstType || '',
-        isSensitive:
-          props.project.isSensitive === 1 ||
-          props.project.isSensitive === true ||
-          props.project.isSensitive === '1'
-            ? 1
-            : 0,
-        verificationConclusion: props.project.verificationConclusion || '',
-        attachments: Array.isArray(props.project.verificationAttachments)
-          ? props.project.verificationAttachments.map((f, i) => ({
-              name: f.fileName || `附件${i + 1}`,
-              url: f.filePath || '',
-              raw: f,
-            }))
-          : [],
+/** 统一取经纬度：x/y 优先，回退 longitude/latitude，再回退 lng/lat */
+function pickXY(point) {
+  const rawX = point.x ?? point.longitude ?? point.lng
+  const rawY = point.y ?? point.latitude ?? point.lat
+  const isNum = (v) => v !== null && v !== undefined && v !== '' && !Number.isNaN(Number(v))
+  const lng = isNum(rawX) ? Number(rawX) : null
+  const lat = isNum(rawY) ? Number(rawY) : null
+  return {
+    lng,
+    lat,
+    x: lng == null ? '-' : lng.toFixed(6),
+    y: lat == null ? '-' : lat.toFixed(6),
+  }
+}
+
+function buildWindList(project) {
+  const points = project?.windTurbinePoints || []
+  let normalSeq = 200
+  let reserveSeq = 0
+  return points.map((p) => {
+    const isReserve = Number(p.isReserve) === 1
+    let code = p.code || p.name || p.turbineCode
+    if (!code) {
+      if (isReserve) {
+        reserveSeq++
+        code = `备${String(reserveSeq).padStart(2, '0')}`
+      } else {
+        normalSeq++
+        code = `X${normalSeq}`
       }
-      setTimeout(() => formRef.value?.clearValidate(), 0)
     }
-  }
+    const { lng, lat, x, y } = pickXY(p)
+    return {
+      code, x, y,
+      lng, lat,
+      isReserve: isReserve ? 1 : 0,
+      isUnavailable: isUnavailableOf(p),
+      remark: p.remark || '',
+    }
+  })
+}
+
+function buildBoosterList(project) {
+  const points = project?.boosterStationLocations || []
+  let seq = 0
+  return points.map((p) => {
+    let code = p.code || p.name
+    if (!code) {
+      seq++
+      code = `SYZ${String(seq).padStart(2, '0')}`
+    }
+    const { lng, lat, x, y } = pickXY(p)
+    return {
+      code, x, y,
+      lng, lat,
+      isBest: Number(p.isBest) === 1 ? 1 : 0,
+      isUnavailable: isUnavailableOf(p),
+      remark: p.remark || '',
+    }
+  })
+}
+
+function loadFromProject(project) {
+  windList.value = buildWindList(project)
+  boosterList.value = buildBoosterList(project)
+  activeTab.value = 'wind'
+}
+
+watch(
+  () => [props.visible, props.project],
+  ([visible, project]) => {
+    if (visible && project) loadFromProject(project)
+  },
+  { immediate: true }
 )
 
-// 切换"是否敏感"时，实时清除校验红字
-watch(
-  () => form.value.isSensitive,
-  () => {
-    if (formRef.value) {
-      formRef.value.clearValidate([
-        'landformFeature',
-        'horstType',
-        'verificationConclusion',
-      ])
-    }
-  }
-)
+function getRowClass({ row }) {
+  return row.isUnavailable ? 'row-active' : ''
+}
 
 async function handleSave() {
+  if (saving.value) return
   if (!props.project?.id) {
     ElMessage.error('缺少项目信息，无法保存')
     return
   }
 
-  try {
-    await formRef.value.validate()
-  } catch {
+  // 坐标兜底校验
+  const missing = windList.value.some(r => r.lng == null || r.lat == null)
+    || boosterList.value.some(r => r.lng == null || r.lat == null)
+  if (missing) {
+    ElMessage.warning('存在坐标缺失的点位，请检查数据后再保存')
     return
   }
 
-  const sensitive = form.value.isSensitive === 1
+  // 按接口 DTO 精确构造，避免把 x/y/code 等前端字段带进去
+  const windTurbinePoints = windList.value.map((r) => ({
+    longitude: r.lng,
+    latitude: r.lat,
+    isReserve: r.isReserve ? 1 : 0,
+    isAvailable: r.isUnavailable ? 0 : 1, // ★ 反向映射
+    remark: r.remark || '',
+  }))
+  const boosterStationLocations = boosterList.value.map((r) => ({
+    lng: r.lng,
+    lat: r.lat,
+    isBest: r.isBest ? 1 : 0,             // ★ 别丢
+    isAvailable: r.isUnavailable ? 0 : 1, // ★ 反向映射
+    remark: r.remark || '',
+  }))
 
-const payload = {
-  id: props.project.id,
-  isVerified: 0,
-  isSensitive: form.value.isSensitive,
-  landformFeature: form.value.landformFeature || '',
-  horstType: form.value.horstType || '',
-  verificationConclusion: sensitive ? form.value.verificationConclusion : '',
-  verificationAttachments: [],
-}
+  // 全量更新：保留项目其余字段，只覆盖两个数组（id 走 path）
+  const { id: _id, ...rest } = props.project
+  const payload = { ...rest, windTurbinePoints, boosterStationLocations }
 
   saving.value = true
   try {
-    const res = await updateInfo(payload)
+    const res = await configApi.upDataLayer(props.project.id, payload)
     if (res?.code === 200) {
-      ElMessage.success('核查信息已保存')
-      emit('save', { ...payload })
+      ElMessage.success('保存成功')
+      emit('saved', payload)
     } else {
       ElMessage.error(res?.msg || '保存失败')
     }
@@ -217,18 +270,18 @@ const payload = {
 }
 
 function handleCancel() {
+  if (saving.value) return
   emit('close')
 }
 </script>
 
 <style scoped>
-/* ---- 面板主体 ---- */
 .verify-panel {
   position: fixed;
   top: 65px;
   right: 0;
   bottom: 0;
-  width: 400px;
+  width: 640px;
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -236,7 +289,6 @@ function handleCancel() {
   box-shadow: -4px 0 16px rgba(0, 0, 0, 0.08);
 }
 
-/* ---- 头部 ---- */
 .verify-header {
   display: flex;
   align-items: center;
@@ -244,6 +296,7 @@ function handleCancel() {
   height: 52px;
   padding: 0 16px;
   border-bottom: 1px solid #ebeef5;
+  flex-shrink: 0;
 }
 
 .verify-title {
@@ -257,60 +310,84 @@ function handleCancel() {
   gap: 8px;
 }
 
-/* ---- 内容区 ---- */
-.verify-body {
-  flex: 1;
-  padding: 16px;
-  overflow: auto;
-}
-
-.verify-form :deep(.el-form-item) {
-  margin-bottom: 16px;
-}
-
-.verify-form :deep(.el-form-item__label) {
-  padding-bottom: 4px;
-  color: #606266;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-/* ---- 描述文字 ---- */
-.verify-desc {
-  padding: 10px 12px;
-  margin: 8px 0 16px;
+/* 顶部说明 */
+.verify-tip {
+  padding: 10px 16px;
   color: #909399;
   font-size: 12px;
   line-height: 1.7;
-  background: #f7f8fa;
-  border-radius: 4px;
+  background: #fafbfc;
+  border-bottom: 1px solid #ebeef5;
+  flex-shrink: 0;
 }
 
-/* ---- 附件 ---- */
-.verify-attachment-item :deep(.el-form-item__content) {
-  display: block;
+/* Tab */
+.verify-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 16px;
+  border-bottom: 1px solid #ebeef5;
+  flex-shrink: 0;
 }
 
-.verify-upload {
-  display: inline-block;
+.verify-tab {
+  padding: 10px 16px 9px;
+  color: #606266;
+  font-size: 13px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
 }
 
-.verify-upload-tip {
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.8;
+.verify-tab:hover {
+  color: #1677ff;
 }
 
-.verify-upload-tip .danger {
-  color: #f56c6c;
+.verify-tab.active {
+  color: #1677ff;
+  border-bottom-color: #1677ff;
+  font-weight: 500;
 }
 
-.verify-upload-tip .verify-upload-hint {
-  display: block;
-  color: #909399;
+/* 表格容器 */
+.verify-table-wrap {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 16px 16px;
+  overflow: hidden;
 }
 
-/* ---- 过渡动画 ---- */
+.verify-table {
+  height: 100%;
+}
+
+.verify-table :deep(td),
+.verify-table :deep(th) {
+  color: #c0c4cc;
+}
+
+.verify-table :deep(.row-active td) {
+  color: #303133;
+}
+
+/* 备注输入：无边框 + 透明背景 */
+.verify-table :deep(.remark-input .el-input__wrapper) {
+  padding: 0 2px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.verify-table :deep(.remark-input .el-input__wrapper:hover),
+.verify-table :deep(.remark-input .el-input__wrapper.is-focus) {
+  box-shadow: inset 0 -1px 0 #1677ff;
+}
+
+.verify-table :deep(.remark-input .el-input__inner) {
+  color: inherit;
+}
+
+/* 过渡动画 */
 .verify-slide-enter-active,
 .verify-slide-leave-active {
   transition: transform 0.25s ease;

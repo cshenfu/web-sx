@@ -7,7 +7,7 @@ const requestConfig = {
         publicServiceUrl3: 'https://testapi.wh-ge.com/',
         publicServiceUrl4: 'http://172.16.14.71:10100/',
         publicServiceUrl5: 'http://172.16.14.71:10000/',
-        publicServiceUrl6: 'http://172.16.13.73:8000/',
+        publicServiceUrl6: 'http://172.16.14.71:9996//',
         // publicServiceUrl: 'http://120.46.205.206:10004/',
     },
     test: {
@@ -16,7 +16,7 @@ const requestConfig = {
         publicServiceUrl3: 'https://testapi.wh-ge.com/',
         publicServiceUrl4: 'http://172.16.14.71:10100/',
         publicServiceUrl5: 'http://172.16.14.71:10000/',
-        publicServiceUrl6: 'http://172.16.13.73:8000/',
+        publicServiceUrl6: 'http://172.16.14.71:9996//',
     },
     production: {
         publicServiceUrl: 'https://mapi.wh-ge.com/',

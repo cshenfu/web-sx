@@ -273,7 +273,7 @@ import {
 import { resolveRegionByPoints, isPolygonWithinRadius } from '../js/useTiandituGeocode'
 
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
-import shengyazhanIcon from '@/assets/img/mapIcon/shengyazhan.png'
+import shengyazhanIcon from '@/assets/img/mapIcon/syz.png'
 
 const MAX_SITE_RANGE_RADIUS_KM = 25
 

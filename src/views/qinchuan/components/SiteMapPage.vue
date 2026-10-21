@@ -2,8 +2,8 @@
   <div class="site-map-page">
     <section v-if="showConfigPage && showConfig" class="config-fullpage">
       <div class="config-header">
-        <button class="exit-button" @click="showConfig = false">
-          <el-icon><ArrowLeft /></el-icon>退出
+        <button class="exit-button" type="button" aria-label="退出选址配置" title="退出配置" @click="showConfig = false">
+          <el-icon><ArrowLeft /></el-icon>
         </button>
         <span class="config-header-title">选址配置</span>
       </div>
@@ -72,10 +72,10 @@
             <!-- <button class="edit-tool-button" @click="startEdit"><el-icon><Edit /></el-icon>编辑</button> -->
           </template>
           <template v-else>
-            <button class="edit-tool-button" @click="openEditProjectForm">
+            <!-- <button class="edit-tool-button" @click="openEditProjectForm">
               <el-icon><Edit /></el-icon>编辑
-            </button>
-            <span class="edit-divider" />
+            </button> -->
+            <!-- <span class="edit-divider" /> -->
 
             <button v-for="item in editTools" :key="item.key" class="edit-tool-button" :class="{ active: editMode === item.key }" @click="enterEditMode(item.key)">
               <el-icon><component :is="item.icon" /></el-icon>{{ item.label }}
@@ -194,8 +194,13 @@
       <CreateProjectForm ref="editProjectFormRef" :map-ref="mapRef" :panel-width="550" mode="edit" :project="editProjectTarget" @cancel="onEditProjectCancel" @saved="onProjectUpdated" />
     </section>
 
-    <VerifyPanel v-if="showVerifyPanelFlag" :visible="showVerifyPanel" :project="selectedProject" @close="showVerifyPanel = false" @save="onVerifySaved" />
-    <ProjectDrawer :visible="showProjectDrawer" :list="projectList" :total="pagination.total" :page="pagination.page" :page-size="pagination.pageSize" :selected-id="selectedProject?.id ?? null" :loading="listLoading" :row-actions="rowActions" @close="showProjectDrawer = false" @select="focusProject" @action="handleDrawerAction" @page-change="handlePageChange" @size-change="handleSizeChange" @sort-change="handleDrawerSortChange" />
+<VerifyPanel
+  v-if="showVerifyPanelFlag"
+  :visible="showVerifyPanel"
+  :project="selectedProject"
+  @close="showVerifyPanel = false"
+  @saved="onVerifySaved"
+/>    <ProjectDrawer :visible="showProjectDrawer" :list="projectList" :total="pagination.total" :page="pagination.page" :page-size="pagination.pageSize" :selected-id="selectedProject?.id ?? null" :loading="listLoading" :row-actions="rowActions" @close="showProjectDrawer = false" @select="focusProject" @action="handleDrawerAction" @page-change="handlePageChange" @size-change="handleSizeChange" @sort-change="handleDrawerSortChange" />
     <ProjectDetailPanel :visible="showDetailPanel" :project="selectedProject" :stage="stage" :initial-tab="detailPanelTab" @close="showDetailPanel = false" @action="onDetailPanelAction" />
     <GenerateReportPanel :visible="showGeneratePanel" :project="generatePanelProject" :action-key="generatePanelActionKey" :sub-code="generatePanelSubCode" @close="showGeneratePanel = false" @generated="onReportGenerated" />
     <AssignDialog v-model="showAssignDialog" :project="assignTargetProject" @success="onAssignSuccess" />
@@ -230,11 +235,12 @@ import * as api from '@/api/modules/project'
 import * as configApi from '@/api/modules/selectConfig'
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
 import fengjiBxIcon from '@/assets/img/mapIcon/fengji-bx.png'
-import shengyazhanIcon from '@/assets/img/mapIcon/shengyazhan.png'
+import shengyazhanIcon from '@/assets/img/mapIcon/syz.png'
 import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
 import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPanelConfig'
 import { attachSxLayers } from '@/components/site-map/attachSxLayers'
-
+import { addGradientExtrusion } from '@/utils/gradientExtrusion'
+// 或相对路径 './gradientExtrusion'
 const props = defineProps({
   stage: { type: String, default: '' },
   summaryTitle: { type: String, default: '项目通道概况' },
@@ -255,8 +261,8 @@ const emits = defineEmits(['featureVisibleChange'])
 const ICON_FENGJI = 'icon-fengji'
 const ICON_FENGJI_BX = 'icon-fengji-bx'
 const ICON_SHENGYAZHAN = 'icon-shengyazhan'
-const ICON_SIZE_WIND = 0.18
-const ICON_SIZE_BOOSTER = 0.08
+const ICON_SIZE_WIND = 0.25
+const ICON_SIZE_BOOSTER = 1
 const CITY_LAYER_ID = 'site-city-stats'
 const PROVINCE_CODE = '610000'
 const CITY_GEOJSON_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/610000_full.json'
@@ -761,7 +767,19 @@ function handleMapBlankClick(e) {
     if (isBoxSelecting.value) { mapRef.value?.stopBoxSelect?.(); isBoxSelecting.value = false }
   }
 }
-function onVerifySaved(data) { console.log('[verify] 已保存:', data); showVerifyPanel.value = false }
+async function onVerifySaved() {
+  showVerifyPanel.value = false
+  await fetchMapProjects()
+  const fresh = allMapProjects.value.find(p => p.id === selectedProject.value?.id)
+  if (fresh) {
+    selectedProject.value = fresh
+    initEditBuffer(fresh)
+    updateDetailCardPosition()
+  }
+  fetchProjectList()
+  fetchOverviewStats()
+  fetchCityStats()
+}
 async function focusProject(project) {
   const p = allMapProjects.value.find((item) => item.id === project.id)
   if (!p) { ElMessage.warning('地图上未找到该项目'); return }
@@ -816,7 +834,7 @@ function enterEditMode(mode) {
   else if (mode === 'booster') { buf.booster.forEach((p, i) => features.push({ type: 'Feature', id: `edit-booster-${i}`, properties: { kind: 'booster', index: i, isBest: p.isBest }, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } })) }
   else if (mode === 'unavailable') { buf.unavailable.forEach(f => features.push(f)) }
   if (features.length) draw.add({ type: 'FeatureCollection', features })
-  if (mode === 'area') { const areaFeat = features.find(f => f.properties.kind === 'area'); if (areaFeat) draw.changeMode('direct_select', { featureId: areaFeat.id }); else draw.changeMode('simple_select') }
+  if (mode === 'area') { const areaFeat = features.find(f => f.properties.kind === 'area'); if (areaFeat) draw.changeMode('vertex_only_direct_select', { featureId: areaFeat.id }); else draw.changeMode('simple_select') }
   else if (mode === 'unavailable') draw.changeMode('draw_polygon')
   else draw.changeMode('simple_select')
   nextTick(() => mapRef.value?.bringDrawPointsToTop?.())
@@ -933,12 +951,54 @@ onUnmounted(() => {
 <style scoped>
 .site-map-page { position: relative; width: 100%; height: 100%; overflow: hidden; background: #f5f7fa; }
 .map-layer { position: absolute; inset: 0; z-index: 1; overflow: hidden; }
-.config-fullpage { position: absolute; inset: 0; z-index: 10; overflow: auto; background: #fff; }
-.config-header { display: flex; align-items: center; gap: 14px; height: 48px; padding: 0 18px; border-bottom: 1px solid #ebeef5; }
-.exit-button { display: flex; align-items: center; gap: 4px; padding: 6px 11px; color: #333; font-size: 12px; background: #fff; border: 1px solid #dcdfe6; border-radius: 4px; cursor: pointer; }
-.exit-button:hover { color: #1677ff; border-color: #1677ff; }
-.config-header-title { color: #303133; font-size: 14px; font-weight: 600; }
-.config-fullpage .config-layout { display: grid; grid-template-columns: 43% 57%; max-width: 1200px; min-height: 535px; margin: 24px auto; padding: 0 28px; }
+.config-fullpage {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 10% 0%, rgba(255, 220, 232, 0.42), transparent 42%),
+    radial-gradient(ellipse at 96% 100%, rgba(176, 210, 250, 0.48), transparent 43%),
+    linear-gradient(122deg, #f1f4f9 0%, #e8f0fa 100%);
+}
+.config-header {
+  display: flex;
+  flex: 0 0 52px;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 14px;
+  border-bottom: 0;
+}
+.exit-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #667383;
+  font-size: 16px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.exit-button:hover { color: #1677ff; background: rgba(255, 255, 255, 0.65); }
+.config-header-title { color: #273443; font-size: 14px; font-weight: 600; }
+.config-fullpage .config-layout {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 10px 10px;
+  box-sizing: border-box;
+}
+.config-fullpage .config-layout > * { min-width: 0; min-height: 0; }
 .view-toolbar { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none; }
 .view-toolbar > * { pointer-events: auto; }
 .view-tabs { display: flex; height: 36px; padding: 3px; gap: 2px; background: #fff; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); flex-shrink: 0; }
@@ -1028,7 +1088,17 @@ onUnmounted(() => {
 :deep(.maplibregl-ctrl-top-right) { display: none; }
 @media (max-width: 1100px) {
   .project-list-view { padding-right: 10px; padding-left: 10px; }
-  .config-fullpage .config-layout { grid-template-columns: 1fr; padding: 0 16px; }
   .create-project-fullpage { flex-direction: column; }
+}
+@media (max-width: 760px) {
+  .config-fullpage { overflow-y: auto; }
+  .config-header { position: sticky; top: 0; z-index: 2; background: rgba(241, 245, 250, 0.92); backdrop-filter: blur(10px); }
+  .config-fullpage .config-layout {
+    display: grid;
+    flex: 0 0 auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(540px, auto);
+    padding: 0 8px 8px;
+  }
 }
 </style>

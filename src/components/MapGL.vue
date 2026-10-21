@@ -1,6 +1,10 @@
 <!-- MapGL.vue -->
 <template>
-  <div ref="mapContainer" class="map-container" />
+  <div
+    ref="mapContainer"
+    class="map-container"
+    :style="{ backgroundImage: `url(${bgImg})` }"
+  />
 </template>
 
 <script setup>
@@ -11,6 +15,10 @@ import MapboxDraw from '@mapbox/mapbox-gl-draw'
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
+import { addGradientExtrusion } from '@/utils/gradientExtrusion'
+
+// ★ 背景图（用 import 引入，避免 CSS 里 @/ 别名解析问题）
+import bgImg from '@/assets/img/qinchuan/dashbord/bg.png'
 
 if (typeof maplibregl.setWorkerUrl === 'function') {
   maplibregl.setWorkerUrl(workerUrl)
@@ -110,7 +118,18 @@ const drawStyles = [
     paint: { 'circle-radius': 9, 'circle-color': '#FFD700', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 },
   },
 ]
+const baseDirectSelectMode = MapboxDraw.modes.direct_select
 
+const vertexOnlyDirectSelectMode = {
+  ...baseDirectSelectMode,
+
+  onMouseDown(state, event) {
+    // 只把真正命中场区顶点的操作交给 Draw 原生处理
+    if (event.featureTarget?.properties?.meta !== 'vertex') return
+
+    return baseDirectSelectMode.onMouseDown.call(this, state, event)
+  },
+}
 onMounted(() => {
   // 已去掉 projection: 'globe'，省级 3D 地图用墨卡托投影
   map = new maplibregl.Map({
@@ -126,6 +145,10 @@ onMounted(() => {
     displayControlsDefault: false,
     userProperties: true,
     styles: drawStyles,
+    modes: {
+      ...MapboxDraw.modes,
+      vertex_only_direct_select: vertexOnlyDirectSelectMode,
+    },
   })
   map.addControl(draw, 'top-left')
 
@@ -140,10 +163,35 @@ onMounted(() => {
   bindBoxSelect()
 
   map.on('load', () => {
+    map.setProjection({ type: 'globe' })
+
+    // ★ 背景图：把 style 里的 background 层变透明，露出组件背景
+    try {
+      const styleLayers = map.getStyle()?.layers || []
+      styleLayers.forEach((layer) => {
+        if (layer.type === 'background') {
+          map.setPaintProperty(layer.id, 'background-opacity', 0)
+        }
+      })
+    } catch (e) { /* 忽略 */ }
+
+    // ★ 背景图：把 globe 的「太空 / 大气 / 雾」也变透明
+    try {
+      map.setSky({
+        'sky-color': 'rgba(0, 0, 0, 0)',
+        'horizon-color': 'rgba(0, 0, 0, 0)',
+        'fog-color': 'rgba(0, 0, 0, 0)',
+        'sky-horizon-blend': 0.5,
+        'horizon-fog-blend': 0.5,
+        'fog-ground-blend': 0.5,
+      })
+    } catch (e) { /* 低版本不支持 setSky 则忽略 */ }
+
     // 柔和的顶光，让挤出体侧面有明暗
     try {
       map.setLight({ anchor: 'viewport', color: '#ffffff', intensity: 0.4, position: [1.15, 200, 45] })
     } catch (e) { /* 低版本不支持则忽略 */ }
+
     flyToShaanxi()
     emit('ready')
   })
@@ -455,7 +503,8 @@ function addExtrusion(opts) {
     lineColor = 'transparent', hoverLineColor = '#FFFFFF',
     borderWidth = 1000,    // 边界细条宽度(米)
     borderHeight = 120,    // 边界细条凸出顶面的高度(米)
-    sideColors = null,     // 侧面渐变色，自下而上
+    sideColors = null,     // 侧面渐变色，自下而上；2~4 个关键色即可，内部自动插值
+    sideBands = undefined, // 可选：侧面渐变层数，默认 10
     topThickness = 300     // 顶面薄片厚度(米)，只有它会变悬停色
   } = opts
 
@@ -463,33 +512,27 @@ function addExtrusion(opts) {
   const mapData = cloneGeojson(geojson)
   ensureFeatureIds(mapData)
 
-  const expressions = createColorExpression({ heightField, heightMultiplier, defaultHeight, colorField, colorStops, colorMap, defaultColor, highlightColor })
+  const expressions = createColorExpression({
+    heightField, heightMultiplier, defaultHeight,
+    colorField, colorStops, colorMap, defaultColor, highlightColor,
+  })
 
   if (!map.getSource(id)) map.addSource(id, { type: 'geojson', data: mapData })
   else map.getSource(id).setData(mapData)
 
-  // ---- 侧面渐变：多层等高带，先于顶面添加 ----
-  const useSides = Array.isArray(sideColors) && sideColors.length > 0 && !heightField
-  const topBase = useSides ? defaultHeight - topThickness : 0
-  if (useSides) {
-    const bandH = topBase / sideColors.length
-    sideColors.forEach((c, i) => {
-      const sideId = `${id}-side-${i}`
-      const paint = {
-        'fill-extrusion-color': c,
-        'fill-extrusion-base': i * bandH,
-        'fill-extrusion-height': (i + 1) * bandH,
-        'fill-extrusion-opacity': 1,
-        'fill-extrusion-vertical-gradient': false,
-      }
-      if (!map.getLayer(sideId)) {
-        map.addLayer({ id: sideId, type: 'fill-extrusion', source: id, paint })
-        addedLayers.add(sideId)
-      } else {
-        Object.entries(paint).forEach(([k, v]) => map.setPaintProperty(sideId, k, v))
-      }
-    })
-  }
+  // ---- 侧面渐变：交给独立工具处理 ----
+  // 只在固定高度（无 heightField）时启用，保证侧面等高带总高度 = defaultHeight
+  const useSideColors =
+    Array.isArray(sideColors) && sideColors.length > 0 && !heightField
+
+  const { layerIds: sideLayerIds, topBase } = addGradientExtrusion(map, {
+    id,
+    defaultHeight,
+    topThickness,
+    sideColors: useSideColors ? sideColors : [],
+    bands: sideBands,
+  })
+  sideLayerIds.forEach((l) => addedLayers.add(l))
 
   // ---- 顶面 ----
   const topPaint = {
@@ -511,8 +554,9 @@ function addExtrusion(opts) {
   const borderPaint = {
     'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'hover'], false], hoverLineColor, lineColor],
     'fill-extrusion-base': borderTop,
-    // 悬停的边界略高一点，盖过相邻城市共用的那条边，避免闪烁
-    'fill-extrusion-height': ['case', ['boolean', ['feature-state', 'hover'], false], borderTop + borderHeight + 40, borderTop + borderHeight],
+    // ★ 去掉 hover 时的 +40 米高度变化：globe zoom 6.5 下 40 米小于深度缓冲精度，
+    //    会与相邻城市边界争夺深度值而闪烁。hover 只改颜色，视觉上足够区分。
+    'fill-extrusion-height': borderTop + borderHeight,
     'fill-extrusion-opacity': 1,
     'fill-extrusion-vertical-gradient': false,
   }
@@ -528,11 +572,25 @@ function addExtrusion(opts) {
 
   syncLabelLift() // 省级 3D 图层出现/更新后，同步标签抬升
 
-  // ---- 事件层 ----
+  // ---- 事件层：改成「顶面 fill-extrusion 薄片」----
+  // 原因：globe + pitch 50° 下，地面 fill 的屏幕位置与 3D 顶面差异很大，
+  // queryRenderedFeatures 会时而命中时而落空，导致 hover 状态抖动 → 视觉闪烁。
+  // 用顶面薄片作为查询面，与视觉面重合，hover 状态稳定。
   const eventLayerId = `${id}-event`
   if (useEventLayer) {
     if (map.getLayer(eventLayerId)) map.removeLayer(eventLayerId)
-    map.addLayer({ id: eventLayerId, type: 'fill', source: id, paint: { 'fill-color': '#ffffff', 'fill-opacity': 0 } })
+    map.addLayer({
+      id: eventLayerId,
+      type: 'fill-extrusion',
+      source: id,
+      paint: {
+        'fill-extrusion-color': '#ffffff',
+        'fill-extrusion-opacity': 0.01, // 不能为 0，否则图层被跳过、无法被 query 命中
+        'fill-extrusion-base': ['-', expressions.height, topThickness],
+        'fill-extrusion-height': expressions.height,
+        'fill-extrusion-vertical-gradient': false,
+      },
+    })
     addedLayers.add(eventLayerId)
   }
 
@@ -765,7 +823,19 @@ defineExpose({
 </script>
 
 <style scoped>
-.map-container { position: absolute; inset: 0; width: 100%; height: 100%; }
+.map-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* ★ 背景图铺满 */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: transparent;
+}
 :deep(.maplibregl-ctrl-top-right) { display: none; }
 :deep(.maplibregl-ctrl-bottom-right) { display: none; }
+/* canvas 本身保持透明，让容器背景透出 */
+:deep(.maplibregl-canvas) { background: transparent !important; }
 </style>

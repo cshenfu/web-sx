@@ -53,7 +53,7 @@ export const PANEL_GROUPS = [
     .map(it => it.id)
 
   export const DEFAULT_VISIBLE = [
-    'tdt-imagery',
+    'hd-imagery',
     'wind-farm',
     'booster',
   ]

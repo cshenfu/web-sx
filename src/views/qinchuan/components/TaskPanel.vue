@@ -1,9 +1,12 @@
 <template>
-  <div class="task-panel">
-    <div class="task-title">选址计算</div>
-    <div class="task-caption">计算区域</div>
+  <section class="task-panel" aria-label="选址计算">
+    <header class="task-title">
+      <span class="panel-title-icon" aria-hidden="true"><el-icon><Grid /></el-icon></span>
+      <h2>选址计算</h2>
+    </header>
 
     <div class="task-region-row">
+      <span class="task-caption">计算区域</span>
       <el-cascader
         v-model="selectedRegion"
         :options="regionOptions"
@@ -13,96 +16,72 @@
         clearable
         filterable
         :disabled="submitting"
-        style="width: 280px"
+        class="region-select"
       />
-      <el-button
-        type="primary"
-        size="small"
-        :loading="submitting"
-        :disabled="!canStart"
-        @click="handleStartCalculation"
-      >
-        开始计算
+      <el-button type="primary" size="small" :loading="submitting" :disabled="!canStart" @click="handleStartCalculation">
+        发起计算
       </el-button>
     </div>
 
-    <p class="task-tip">
-      说明：计算完成后会更新当前选址区域的数据。
-    </p>
-
+    <p class="task-tip">说明：计算完成后会更新当前选址区域的数据。</p>
     <div class="task-subtitle">计算任务</div>
-    <el-table
-      v-loading="loading"
-      :data="tasks"
-      size="small"
-      class="task-table"
-    >
-      <el-table-column prop="taskNo" label="任务编号" width="160" show-overflow-tooltip />
-      <el-table-column prop="regionName" label="计算区域" width="120" show-overflow-tooltip />
-      <el-table-column label="计算状态" width="90">
-        <template #default="{ row }">
-          <span :class="['task-status', row.statusClass]">
-            {{ row.statusLabel }}
-          </span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="startTimeText" label="发起时间" min-width="140" />
-      <el-table-column label="操作" width="80">
-        <template #default="{ row }">
-          <el-button
-            v-if="row.canCancel"
-            link
-            type="primary"
-            size="small"
-            @click="handleCancelTask(row)"
-          >
-            取消计算
-          </el-button>
-          <el-tooltip
-            v-else-if="row.failureReason"
-            :content="row.failureReason"
-            placement="top"
-          >
-            <span class="task-fail-tip">失败原因</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-    </el-table>
+
+    <div class="task-table-wrap">
+      <el-table v-loading="loading" :data="tasks" row-key="id" size="small" border stripe class="task-table" :max-height="460">
+        <el-table-column prop="taskNo" label="任务编号" width="100" show-overflow-tooltip />
+        <el-table-column prop="regionName" label="计算区域" width="84" show-overflow-tooltip />
+        <el-table-column label="计算状态" width="86" align="center">
+          <template #default="{ row }">
+            <span :class="['task-status', row.statusClass]">{{ row.statusLabel }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="elapsedText" label="已耗时" width="72" show-overflow-tooltip />
+        <el-table-column prop="remainingText" label="预计剩余时间" width="88" show-overflow-tooltip />
+        <el-table-column prop="estimatedTotalText" label="预计总耗时" width="86" show-overflow-tooltip />
+        <el-table-column prop="startTimeText" label="发起时间" min-width="142" show-overflow-tooltip />
+        <el-table-column prop="initiatorText" label="发起人" width="76" show-overflow-tooltip />
+        <el-table-column label="操作" width="78" align="center">
+          <template #default="{ row }">
+            <el-button v-if="row.canCancel" link type="danger" size="small" @click="handleCancelTask(row)">取消计算</el-button>
+            <el-tooltip v-else-if="row.failureReason" :content="row.failureReason" placement="top">
+              <span class="task-fail-tip">失败原因</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <template #empty><span class="empty-text">暂无计算任务</span></template>
+      </el-table>
+    </div>
 
     <div v-if="total > 0" class="task-pagination">
-      <!-- ★ 核心修改：去掉 v-model，改为单向绑定和显式事件 -->
       <el-pagination
         :current-page="page"
         :page-size="pageSize"
-        :page-sizes="[5, 10, 20, 50]"
+        :page-sizes="[10, 20, 50]"
         :total="total"
         small
-        layout="total, prev, pager, next"
+        layout="total, prev, pager, next, sizes"
         @current-change="handlePageChange"
         @size-change="handleSizeChange"
       />
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup>
-import { computed, ref, onMounted, shallowRef } from 'vue'
+import { computed, onMounted, ref, shallowRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Grid } from '@element-plus/icons-vue'
 import { regionData } from 'element-china-area-data'
 import * as configApi from '@/api/modules/selectConfig'
 
-// ---- 陕西省过滤 ----
-const regionOptions = shallowRef(
-  regionData.filter((p) => String(p.value) === '61')
-)
+const regionOptions = shallowRef(regionData.filter((province) => String(province.value) === '61'))
 
-// ---- 自建 code → 名称 映射 ----
 const REGION_NAME_MAP = (() => {
   const map = {}
   const walk = (nodes) => {
-    nodes.forEach((n) => {
-      map[String(n.value)] = n.label
-      if (Array.isArray(n.children)) walk(n.children)
+    nodes.forEach((node) => {
+      map[String(node.value)] = node.label
+      if (Array.isArray(node.children)) walk(node.children)
     })
   }
   walk(regionData)
@@ -110,15 +89,14 @@ const REGION_NAME_MAP = (() => {
 })()
 
 function getRegionName(code) {
-  const str = String(code ?? '')
-  if (!str) return '-'
-  if (REGION_NAME_MAP[str]) return REGION_NAME_MAP[str]
-  if (REGION_NAME_MAP[str.slice(0, 4)]) return REGION_NAME_MAP[str.slice(0, 4)]
-  if (REGION_NAME_MAP[str.slice(0, 2)]) return REGION_NAME_MAP[str.slice(0, 2)]
-  return str
+  const value = String(code ?? '')
+  if (!value) return '-'
+  if (REGION_NAME_MAP[value]) return REGION_NAME_MAP[value]
+  if (REGION_NAME_MAP[value.slice(0, 4)]) return REGION_NAME_MAP[value.slice(0, 4)]
+  if (REGION_NAME_MAP[value.slice(0, 2)]) return REGION_NAME_MAP[value.slice(0, 2)]
+  return value
 }
 
-// ---- cascader 配置 ----
 const cascaderProps = {
   value: 'value',
   label: 'label',
@@ -127,33 +105,60 @@ const cascaderProps = {
   emitPath: true,
 }
 
-// ---- 状态映射 ----
 function resolveStatus(rawStatus) {
-  const s = String(rawStatus ?? '').toUpperCase()
-  switch (s) {
-    case 'IN_PROGRESS':
-      return { label: '计算中', className: 'running', canCancel: true }
-    case 'COMPLETED':
-      return { label: '计算完成', className: 'done', canCancel: false }
-    case 'FAILED':
-      return { label: '计算失败', className: 'failed', canCancel: false }
-    case 'CANCELED':
-    case 'CANCELLED':
-      return { label: '取消计算', className: 'canceled', canCancel: false }
-    default:
-      return { label: rawStatus || '-', className: '', canCancel: false }
+  const status = String(rawStatus ?? '').toUpperCase()
+  if (['WAITING', 'PENDING', 'QUEUED', 'QUEUE'].includes(status)) {
+    return { label: '排队中', className: 'waiting', canCancel: true }
   }
+  if (['IN_PROGRESS', 'RUNNING', 'CALCULATING'].includes(status)) {
+    return { label: '计算中', className: 'running', canCancel: true }
+  }
+  if (['COMPLETED', 'SUCCESS', 'DONE'].includes(status)) {
+    return { label: '已完成', className: 'done', canCancel: false }
+  }
+  if (['FAILED', 'ERROR'].includes(status)) {
+    return { label: '计算失败', className: 'failed', canCancel: false }
+  }
+  if (['CANCELED', 'CANCELLED'].includes(status)) {
+    return { label: '已取消', className: 'canceled', canCancel: false }
+  }
+  const original = String(rawStatus ?? '-')
+  if (original.includes('排队')) return { label: original, className: 'waiting', canCancel: true }
+  if (original.includes('计算中')) return { label: original, className: 'running', canCancel: true }
+  if (original.includes('完成')) return { label: original, className: 'done', canCancel: false }
+  if (original.includes('失败')) return { label: original, className: 'failed', canCancel: false }
+  return { label: original, className: '', canCancel: false }
 }
 
-function formatTime(ts) {
-  if (ts === null || ts === undefined || ts === '') return '-'
-  const d = new Date(Number(ts))
-  if (Number.isNaN(d.getTime())) return '-'
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+function firstText(source, keys) {
+  for (const key of keys) {
+    const value = source?.[key]
+    if (value !== null && value !== undefined && value !== '') {
+      if (typeof value === 'object') continue
+      return String(value)
+    }
+  }
+  return '-'
 }
 
-// ---- 状态 ----
+function formatTime(value) {
+  if (value === null || value === undefined || value === '') return '-'
+  if (typeof value === 'string') {
+    const text = value.trim()
+    if (!text) return '-'
+    if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.replace('T', ' ').slice(0, 19)
+  }
+  const numeric = Number(value)
+  const date = new Date(Number.isFinite(numeric) && numeric > 0 ? numeric : value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  const pad = (number) => String(number).padStart(2, '0')
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds())
+}
+
+function isTrue(value) {
+  return value === true || value === 1 || value === '1' || String(value).toLowerCase() === 'true'
+}
+
 const selectedRegion = ref([])
 const tasks = ref([])
 const loading = ref(false)
@@ -162,45 +167,41 @@ const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 
-const canStart = computed(
-  () =>
-    Array.isArray(selectedRegion.value) &&
-    selectedRegion.value.length > 0 &&
-    !submitting.value
-)
+const canStart = computed(() => Array.isArray(selectedRegion.value) && selectedRegion.value.length > 0 && !submitting.value)
 
-// ---- 加载任务列表 ----
+function mapTask(task) {
+  const status = resolveStatus(task.calculationStatus ?? task.status)
+  const taskNo = task.taskId || task.id || '-'
+  const canCancel = task.canCancel === undefined && task.allowCancel === undefined
+    ? status.canCancel
+    : isTrue(task.canCancel ?? task.allowCancel)
+
+  // 如果接口字段名不同，只需调整下面这四组候选字段名；未返回的字段会显示为“-”。
+  return {
+    id: task.id ?? task.taskId ?? taskNo,
+    taskNo,
+    regionCode: task.calculationAreaCode,
+    regionName: getRegionName(task.calculationAreaCode ?? task.regionCode ?? task.regionName),
+    statusLabel: status.label,
+    statusClass: status.className,
+    canCancel,
+    failureReason: task.failureReason || '',
+    elapsedText: firstText(task, ['elapsedTimeText', 'elapsedText', 'usedTimeText', 'runTimeText', 'durationText', 'elapsedTime', 'usedTime', 'runTime', 'duration']),
+    remainingText: firstText(task, ['remainingTimeText', 'estimatedRemainingTimeText', 'remainTimeText', 'remainingText', 'remainingTime', 'estimatedRemainingTime', 'remainTime']),
+    estimatedTotalText: firstText(task, ['estimatedTotalTimeText', 'totalEstimatedTimeText', 'totalDurationText', 'expectedDurationText', 'estimatedTimeText', 'estimateTimeText', 'totalEstimatedTime', 'estimatedTotalTime', 'expectedDuration', 'estimatedTime']),
+    startTimeText: formatTime(task.startTime ?? task.createTime ?? task.createdAt),
+    initiatorText: firstText(task, ['initiatorName', 'createByName', 'createdByName', 'creatorName', 'userName', 'operatorName', 'applicantName', 'createUserName', 'initiatedBy']),
+  }
+}
+
 async function loadTasks() {
   loading.value = true
   try {
-    // 打印当前请求参数
-    console.log(`🔥 触发了请求，当前页码: ${page.value}, 每页条数: ${pageSize.value}`)
-    
-    const res = await configApi.pageListConfig({
-      pageNo: page.value,
-      pageSize: pageSize.value,
-    })
+    const res = await configApi.pageListConfig({ pageNo: page.value, pageSize: pageSize.value })
     const data = res?.data ?? {}
     const list = Array.isArray(data.list) ? data.list : []
-
-    tasks.value = list.map((t) => {
-      const failureReason = t.failureReason || ''
-      const status = resolveStatus(t.calculationStatus, failureReason)
-      return {
-        id: t.id,
-        taskNo: t.taskId || t.id || '-',
-        regionCode: t.calculationAreaCode,
-        regionName: getRegionName(t.calculationAreaCode),
-        statusLabel: status.label,
-        statusClass: status.className,
-        canCancel: status.canCancel,
-        failureReason,
-        startTimeText: formatTime(t.startTime),
-      }
-    })
-    // 更新总条数，驱动分页组件
+    tasks.value = list.map(mapTask)
     total.value = Number(data.total ?? tasks.value.length)
-    console.log('🔥 后端返回的总条数 total:', total.value)
   } catch (err) {
     console.error('[task] pageListConfig 失败:', err)
     ElMessage.error(err?.message || '计算任务加载失败')
@@ -211,31 +212,23 @@ async function loadTasks() {
   }
 }
 
-// ---- 分页事件处理 ----
 function handlePageChange(newPage) {
-  console.log('🔥 用户点击了翻页，目标页码:', newPage)
   page.value = newPage
   loadTasks()
 }
 
 function handleSizeChange(newSize) {
-  console.log('🔥 用户改变了每页条数:', newSize)
   pageSize.value = newSize
-  page.value = 1 // 改变条数时重置到第一页
+  page.value = 1
   loadTasks()
 }
 
-// ---- 点击"开始计算" ----
 async function handleStartCalculation() {
   if (!canStart.value) {
     ElMessage.warning('请先选择计算区域')
     return
   }
-
   const code = selectedRegion.value[selectedRegion.value.length - 1]
-  const regionName = getRegionName(code)
-  console.log('[task] 发起计算 code =', code, 'name =', regionName)
-
   try {
     submitting.value = true
     const res = await configApi.calculationTask(code)
@@ -255,18 +248,16 @@ async function handleStartCalculation() {
   }
 }
 
-// ---- 取消任务 ----
 async function handleCancelTask(row) {
   try {
-    await ElMessageBox.confirm(
-      `确认取消任务「${row.taskNo}」吗？`,
-      '提示',
-      { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
-    )
+    await ElMessageBox.confirm('确认取消任务「' + row.taskNo + '」吗？', '提示', {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+    })
   } catch {
     return
   }
-
   try {
     const res = await configApi.cancelTask(row.taskNo)
     if (res?.code === 200) {
@@ -282,65 +273,54 @@ async function handleCancelTask(row) {
 }
 
 defineExpose({ loadTasks })
-
-onMounted(() => {
-  loadTasks()
-})
+onMounted(() => loadTasks())
 </script>
 
 <style scoped>
 .task-panel {
-  padding: 8px 0 20px 28px;
-}
-
-.task-title {
-  margin-bottom: 24px;
-  color: #303133;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.task-caption,
-.task-subtitle {
-  margin: 12px 0 8px;
-  color: #303133;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.task-region-row {
+  box-sizing: border-box;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding: 14px 14px 10px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(219, 228, 239, 0.82);
+  border-radius: 9px;
+  box-shadow: 0 1px 4px rgba(20, 47, 78, 0.05);
 }
-
-.task-tip {
-  color: #a0a5ad;
-  font-size: 11px;
-  line-height: 1.6;
-}
-
-.task-table {
-  width: 100%;
-  margin-top: 12px;
-}
-
-.task-status.waiting  { color: #e6a23c; }
-.task-status.running  { color: #1677ff; }
-.task-status.done     { color: #24b26b; }
-.task-status.failed   { color: #f56c6c; }
-.task-status.canceled { color: #909399; }
-
-.task-fail-tip {
-  color: #f56c6c;
-  font-size: 12px;
-  cursor: help;
-  text-decoration: underline dotted;
-}
-
-.task-pagination {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
+.task-title { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; margin-bottom: 13px; }
+.task-title h2 { margin: 0; color: #273443; font-size: 13px; font-weight: 600; }
+.panel-title-icon { display: inline-flex; align-items: center; justify-content: center; width: 19px; height: 19px; color: #3987ec; background: #edf5ff; border-radius: 5px; }
+.task-region-row { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; min-width: 0; }
+.task-caption { flex: 0 0 76px; color: #7e8997; font-size: 11px; }
+.region-select { flex: 0 1 280px; min-width: 120px; }
+.task-tip { flex: 0 0 auto; margin: 5px 0 11px 84px; color: #a0aab6; font-size: 10px; line-height: 1.5; }
+.task-subtitle { flex: 0 0 auto; margin: 0 0 7px; color: #697686; font-size: 11px; font-weight: 500; }
+.task-table-wrap { flex: 0 1 auto; min-width: 0; min-height: 0; overflow: auto; }
+.task-table { width: 100%; min-width: 780px; font-size: 10px; }
+:deep(.task-table .el-table__header-wrapper th) { height: 30px; padding: 3px 0; color: #667383; font-size: 10px; font-weight: 500; background: #f6f8fb; }
+:deep(.task-table .el-table__body tr) { height: 29px; }
+:deep(.task-table .el-table__body td) { padding: 3px 0; color: #384555; font-size: 10px; }
+:deep(.task-table .cell) { padding-right: 5px; padding-left: 5px; line-height: 1.4; }
+:deep(.task-table .el-table__inner-wrapper::before) { height: 0; }
+.task-status { display: inline-block; max-width: 100%; padding: 2px 7px; overflow: hidden; color: #637487; font-size: 10px; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; background: #f0f2f5; border-radius: 10px; }
+.task-status.waiting { color: #a76b06; background: #fff3d8; }
+.task-status.running { color: #1677ff; background: #e3f2ff; }
+.task-status.done { color: #43846b; background: #eaf6ef; }
+.task-status.failed { color: #d94d4d; background: #fff0f0; }
+.task-status.canceled { color: #747d88; background: #f0f2f5; }
+.task-fail-tip { color: #e36b6b; font-size: 10px; cursor: help; text-decoration: underline dotted; }
+.empty-text { color: #9aa5b1; font-size: 11px; }
+.task-pagination { display: flex; flex: 0 0 auto; justify-content: flex-end; min-width: 0; padding-top: 9px; }
+:deep(.task-pagination .el-pagination) { gap: 2px; }
+@media (max-width: 760px) {
+  .task-panel { min-height: 540px; }
+  .task-region-row { flex-wrap: wrap; }
+  .task-caption { flex-basis: 68px; }
+  .region-select { flex: 1 1 180px; }
+  .task-tip { margin-left: 76px; }
+  .task-pagination { overflow-x: auto; }
 }
 </style>
