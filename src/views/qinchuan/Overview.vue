@@ -74,8 +74,6 @@
           @submit="handleWizardSubmit"
         />
 
-        <!-- 右侧完整的详情面板（点击查看详情后出现） -->
-                <!-- 右侧面板/列表容器 -->
         <div class="area-view-layer" v-show="!popoverProject">
           <template v-if="!selectedProject">
             <ProjectListPanel
@@ -115,7 +113,6 @@
           @mouseenter="clearHideTimer"
           @mouseleave="startHideTimer"
         >
-          <!-- 动态颜色的边角 -->
           <span class="corner top-left" :style="{ borderColor: getHoverThemeColor(hoverProject.projectStage) }"></span>
           <span class="corner bottom-left" :style="{ borderColor: getHoverThemeColor(hoverProject.projectStage) }"></span>
 
@@ -144,7 +141,7 @@
           </div>
         </div>
 
-        <!-- 🌟 2. 右上角白色卡片（点击场区出现） -->
+        <!-- 🌟 2. 点击后右上角白色卡片 -->
         <div
           v-if="popoverProject && !isDetailFullscreen && !selectedProject"
           class="right-top-card"
@@ -158,7 +155,7 @@
             </div>
             <div class="tooltip-title">{{ popoverProject.projectName }}</div>
           </div>
-          
+
           <div class="tooltip-grid">
             <div class="grid-item border-right border-bottom">
               <div class="grid-label">装机容量</div>
@@ -337,8 +334,21 @@ const CITY_OPTIONS = [
 
 const ICON_FENGJI = 'icon-fengji-overview'
 const ICON_SHENGYAZHAN = 'icon-shengyazhan-overview'
-const ICON_SIZE_WIND = 0.16 // 🌟 调大风机
-const ICON_SIZE_BOOSTER = 0.1 // 🌟 调大升压站
+const ICON_SIZE_WIND = 0.16
+const ICON_SIZE_BOOSTER = 0.1
+
+// 省级 3D 地图样式（取自 Figma：冰蓝顶面 + #0072FF→白 渐变侧面）
+const PROVINCE_MAP_STYLE = {
+  defaultHeight: 20000,
+  defaultColor: '#8CCBF5',
+  highlightColor: '#EFA83D',
+  opacity: 1,
+  lineColor: '#E6F9FF',
+  hoverLineColor: '#FFFFFF',
+  borderWidth: 1000,   // 边界宽度(米)，想更粗/更细改这里
+  borderHeight: 120,   // 边界凸出顶面的高度(米)
+  sideColors: ['#0072FF', '#2F8CFF', '#62A8FF', '#9AC7FF', '#D0E5FF', '#FFFFFF']
+}
 
 const STAGE_GROUP = {
   PRELIMINARY_SELECTION: 'selection',
@@ -375,8 +385,8 @@ function getAreaStyleByStage(projectStage) {
 
 // ==================== 基础状态 ====================
 const mapRef = ref(null)
-const selectedStage = ref(projectOverviewRows[0]?.key || null)
-const activeProject = ref(projectOverviewRows[0] || null)
+const selectedStage = ref(null)          // 初始无选中
+const activeProject = ref(null)          // 初始无选中 → 地图为默认态
 const mapReady = ref(false)
 
 const viewMode = ref('map')
@@ -419,7 +429,6 @@ const sortDir = ref('desc')
 const stageOptions = ref([])
 const stageMap = computed(() => Object.fromEntries(stageOptions.value.map((item) => [item.code, item.desc])))
 
-// 计算右上角卡片的风机数量
 const popoverWindCount = computed(() => {
   const pts = popoverProject.value?.windTurbinePoints || []
   return pts.filter((p) => !p.isAlternative).length
@@ -487,12 +496,11 @@ function getProjectBounds(project) {
 }
 
 // ==================== 核心点击事件 ====================
-// 1. 点击场区 -> 打开右上角白卡 + 视角飞行 + 加载图标
 function handleProjectSelect(item) {
   hoverProject.value = null
   detailCardPos.visible = false
   clearHideTimer()
-  
+
   popoverProject.value = item
 
   const map = mapRef.value?.getMap()
@@ -507,16 +515,14 @@ function handleProjectSelect(item) {
     }
   }
 
-  // 高亮场区并加载图标
   addProjectArea(item, true)
   renderSelectedProjectIcons(item)
 }
 
-// 2. 点击“查看详情” -> 关闭白卡，打开右侧完整面板
 async function handleOpenDetailPanel(item) {
   popoverProject.value = null
   selectedProject.value = item
-  
+
   activeAreaId.value = item.id
   activeProjectDetail.value = buildDetailFromListItem(item)
 
@@ -681,7 +687,7 @@ function addProjectArea(project, highlighted = false) {
   mapRef.value.addPolygon({ id: layerId, geojson: area, color: style.color, opacity: style.opacity, outlineColor: style.outlineColor })
   renderedMapLayerIds.add(layerId)
   const fillLayerId = `${layerId}-fill`
-  
+
   mapRef.value.offClick(fillLayerId)
   mapRef.value.onClick(fillLayerId, () => handleProjectSelect(project))
 
@@ -692,7 +698,7 @@ function addProjectArea(project, highlighted = false) {
       map.off('mouseenter', fillLayerId, old.onEnter)
       map.off('mouseleave', fillLayerId, old.onLeave)
     }
-    
+
     const onEnter = () => {
       clearHideTimer()
       if (hoverProject.value?.id !== project.id) {
@@ -701,12 +707,12 @@ function addProjectArea(project, highlighted = false) {
       }
       map.getCanvas().style.cursor = 'pointer'
     }
-    
+
     const onLeave = () => {
       map.getCanvas().style.cursor = ''
       startHideTimer()
     }
-    
+
     map.on('mouseenter', fillLayerId, onEnter)
     map.on('mouseleave', fillLayerId, onLeave)
     hoverHandlers.set(fillLayerId, { onEnter, onLeave })
@@ -829,17 +835,26 @@ function handleMapBlankClick(e) {
 }
 
 // ==================== 阶段选择 ====================
+// row 为 null 时：渲染默认态（所有城市统一底色，无阶段着色）
 function renderSelectedProject(row) {
-  if (!row || !mapRef.value) return
-  const cityValues = stageCityData[row.key] || {}
-  const colorMap = buildStageColorMap(cityValues, row.color)
-  mapRef.value.addExtrusion({ id: PROVINCE_EXTRUSION_ID, geojson: shaanxiBoundary, colorMap, defaultHeight: 10000, defaultColor: row.color || '#2A9FFF', highlightColor: '#FFFF00', opacity: 0.9, enableHover: true })
+  if (!mapRef.value) return
+  const colorMap = row
+    ? buildStageColorMap(stageCityData[row.key] || {}, row.color)
+    : {}
+
+  mapRef.value.addExtrusion({
+    id: PROVINCE_EXTRUSION_ID,
+    geojson: shaanxiBoundary,
+    colorMap,
+    enableHover: true,
+    ...PROVINCE_MAP_STYLE
+  })
 }
 
 function onProjectStageSelect(row) {
-  activeProject.value = row
-  selectedStage.value = row.key || row.stage
-  if (mapReady.value && !isAreaView.value) renderSelectedProject(row)
+  activeProject.value = row || null
+  selectedStage.value = row ? (row.key || row.stage) : null
+  if (mapReady.value && !isAreaView.value) renderSelectedProject(row || null)
 }
 
 // ==================== 遮罩与阈值 ====================
@@ -974,8 +989,8 @@ function handleWizardSubmit(payload) { wizardVisible.value = false }
 // ==================== 生命周期 ====================
 function onMapReady() {
   mapReady.value = true
-  renderSelectedProject(activeProject.value)
-  mapRef.value?.addCentroidLabels({ id: 'shaanxi-labels', geojson: shaanxiBoundary, labelField: 'name', subLabelField: 'value', textColor: '#FFFFFF', textSize: 14, subTextSize: 10, textOffset: [0, 0] })
+  renderSelectedProject(activeProject.value) // 初始为 null → 默认态
+  mapRef.value?.addCentroidLabels({ id: 'shaanxi-labels', geojson: shaanxiBoundary, labelField: 'name', subLabelField: 'value', textColor: '#FFFFFF', textSize: 14, subTextSize: 10, textOffset: [0, 0], height: PROVINCE_MAP_STYLE.defaultHeight, followLayer: PROVINCE_EXTRUSION_ID })
   const map = mapRef.value.getMap()
   map.on('move', updateDetailCardPosition)
   map.on('zoom', updateDetailCardPosition)
@@ -1021,9 +1036,21 @@ onUnmounted(() => {
   overflow: hidden;
   background: #03162e;
 }
+
+/* 地图边缘内发光（已去掉径向压暗，避免地图发灰） */
+.dashboard-page::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3; /* 在地图上面，UI 下面 */
+  box-shadow: inset 0 0 60px rgba(47, 218, 255, 0.12);
+  background: none;
+}
+
 .map-overlay {
   position: absolute; z-index: 2; inset: 0; pointer-events: none;
-  background: radial-gradient(circle at 53% 52%, transparent 0 21%, rgba(1, 17, 41, 0.06) 43%, rgba(1, 10, 27, 0.35) 100%), linear-gradient(180deg, rgba(0, 16, 44, 0.12), rgba(0, 10, 30, 0.2));
+  background: radial-gradient(circle at 53% 52%, transparent 0 30%, rgba(1, 17, 41, 0.04) 55%, rgba(1, 10, 27, 0.25) 100%);
 }
 .head-layer { position: absolute; z-index: 10; top: 0; right: 0; left: 0; }
 .left-layer, .right-layer { position: absolute; z-index: 20; bottom: 20px; height: 85vh; max-height: 85vh; overflow-x: hidden; overflow-y: auto; }
@@ -1069,7 +1096,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 10px;
   pointer-events: none;
-  border: 1px solid rgba(255, 255, 255, 0.1); 
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 .corner {
   position: absolute; width: 8px; height: 8px; pointer-events: none;
@@ -1091,7 +1118,7 @@ onUnmounted(() => {
 .right-top-card {
   position: absolute;
   z-index: 25;
-  top: 60px; /* 与左侧看板对齐 */
+  top: 60px;
   right: 12px;
   width: 340px;
   background: rgba(235, 240, 245, 0.85);

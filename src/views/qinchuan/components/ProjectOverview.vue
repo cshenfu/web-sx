@@ -7,7 +7,6 @@
       </div>
       <div class="panel-location">
         <span>陕西省</span>
-        <!-- ⭐️ 加上了 style 绝对限制宽高 -->
         <svg class="location-icon" viewBox="0 0 24 24" fill="currentColor" style="width: 14px !important; height: 14px !important;">
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
         </svg>
@@ -79,13 +78,22 @@ const props = defineProps({
   modelValue: { type: [String, Number], default: null },
 })
 const emit = defineEmits(['select', 'update:modelValue'])
-const selectedKey = ref(props.modelValue || props.rows[0]?.key || props.rows[0]?.stage || null)
 
-watch(() => props.modelValue, (val) => { if (val !== null) selectedKey.value = val })
+// 初始无选中；外部置为 null 时也能同步清空
+const selectedKey = ref(props.modelValue ?? null)
+watch(() => props.modelValue, (val) => { selectedKey.value = val ?? null })
 
 function selectRow(row) {
-  selectedKey.value = row.key || row.stage
-  emit('update:modelValue', selectedKey.value)
+  const key = row.key || row.stage
+  // 再点一次已选中的行 → 取消选中
+  if (selectedKey.value === key) {
+    selectedKey.value = null
+    emit('update:modelValue', null)
+    emit('select', null)
+    return
+  }
+  selectedKey.value = key
+  emit('update:modelValue', key)
   emit('select', row)
 }
 </script>
@@ -97,26 +105,26 @@ function selectRow(row) {
   box-sizing: border-box;
   border: 0.93px solid transparent;
   border-image: linear-gradient(162.05deg, rgba(165, 199, 238, 0.0001) 21.01%, #0077FF 51.91%, rgba(165, 199, 238, 0.2) 91.52%) 1;
-  border-top: none; 
+  border-top: none;
   border-radius: 0px 0px 11px 11px;
   background: linear-gradient(180deg, rgba(16, 98, 222, 0.12) 0%, rgba(57, 126, 233, 0.11) 54.88%, rgba(19, 98, 215, 0.05) 75.82%, rgba(0, 95, 223, 0.03) 100%),
               linear-gradient(180deg, rgba(0, 40, 96, 0) 0%, rgba(0, 42, 95, 0.09) 23.24%, rgba(0, 42, 97, 0.23) 44.61%, rgba(0, 40, 96, 0.27) 100%);
   backdrop-filter: blur(14px);
   box-shadow: inset 0 0 24px rgba(20, 136, 237, 0.1), 0 0 16px rgba(0, 116, 224, 0.13);
-  margin-top: 14px; 
+  margin-top: 14px;
 }
 
 .panel-heading {
   position: absolute;
-  top: -14px; 
-  left: 0; /* ⭐️ 修正：避免使用 calc 导致横向溢出 */
+  top: -14px;
+  left: 0;
   width: 100%;
-  height: 42px; 
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 12px;
-  box-sizing: border-box; /* ⭐️ 修正：确保 padding 不撑大容器 */
+  box-sizing: border-box;
   background-size: 100% 100%;
   background-repeat: no-repeat;
   background-position: center;
@@ -125,10 +133,10 @@ function selectRow(row) {
 .heading-left { display: flex; align-items: center; gap: 6px; transform: translateY(-4px); }
 .heading-img { height: 26px; width: auto; object-fit: contain; }
 .panel-title {
-  font-family: 'YouSheBiaoTiHei', sans-serif; font-size: 20px; line-height: 17px; 
+  font-family: 'YouSheBiaoTiHei', sans-serif; font-size: 20px; line-height: 17px;
   background: linear-gradient(180deg, #FFFFFF 24.68%, #CAE2FF 69.7%, #8FACD7 86.96%);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  transform: matrix(1, 0, -0.16, 0.99, 0, 0); 
+  transform: matrix(1, 0, -0.16, 0.99, 0, 0);
 }
 
 .panel-location { display: flex; align-items: center; gap: 4px; font-family: 'PingFang SC', sans-serif; font-size: 13px; font-weight: 500; color: #fff; opacity: 0.9; transform: translateY(-4px); }
@@ -142,7 +150,7 @@ function selectRow(row) {
 .project-type img { width: 14px; height: 14px; }
 
 .project-row {
-  position: relative; width: 100%; min-height: 32px; margin-top: 2px; padding: 2px 6px; 
+  position: relative; width: 100%; min-height: 32px; margin-top: 2px; padding: 2px 6px;
   border: 1px solid transparent; border-radius: 2px; background: transparent; cursor: pointer; transition: all 0.2s; box-sizing: border-box;
 }
 .project-row.is-selected { background: rgba(91, 137, 254, 0.2); border-radius: 7.45px; }

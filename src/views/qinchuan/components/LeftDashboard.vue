@@ -7,7 +7,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed } from 'vue'
 import ProjectOverview from './ProjectOverview.vue'
 import AnnualTarget from './AnnualTarget.vue'
 import ProgressWarning from './ProgressWarning.vue'
@@ -21,11 +21,15 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['project-select', 'update:modelValue'])
-const selectedStage = ref(props.modelValue || props.projectRows[0]?.key || null)
 
+// 不再自己存一份副本，直接用父组件的值；默认（null）即无选中
+const selectedStage = computed({
+  get: () => props.modelValue,
+  set: (val) => emit('update:modelValue', val),
+})
+
+// row 可能为 null（取消选中）
 function handleProjectSelect(row) {
-  selectedStage.value = row.key || row.stage
-  emit('update:modelValue', selectedStage.value)
   emit('project-select', row)
 }
 </script>
@@ -35,11 +39,11 @@ function handleProjectSelect(row) {
   display: flex;
   flex-direction: column;
   width: clamp(240px, 23vw, 320px);
-  height: 100%; 
+  height: 100%;
   box-sizing: border-box;
-  padding-top: 20px; /* ⭐️ 关键：给凸出面板的头部留出安全空间 */
+  padding-top: 20px; /* 给凸出面板的头部留出安全空间 */
   padding-bottom: 10px;
-  gap: 20px; 
+  gap: 20px;
 }
 
 /* 按比例分配高度 */
@@ -52,7 +56,6 @@ function handleProjectSelect(row) {
   width: 100%;
   display: flex;
   flex-direction: column;
-  /* ⭐️ 去掉 overflow: hidden，避免切掉头部 */
-  min-height: 0; 
+  min-height: 0;
 }
 </style>
