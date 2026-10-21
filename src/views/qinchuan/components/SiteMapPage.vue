@@ -238,7 +238,7 @@ import fengjiBxIcon from '@/assets/img/mapIcon/fengji-bx.png'
 import shengyazhanIcon from '@/assets/img/mapIcon/shengyazhan.png'
 import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
 import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPanelConfig'
-import { attachLayerControl } from '@whln/layer-control'
+import { attachSxLayers } from '@/components/site-map/attachSxLayers'
 
 const props = defineProps({
   stage: { type: String, default: '' },
@@ -375,14 +375,12 @@ function onLayerToggle(item) {
     return
   }
   if (item.type === 'project') setProjectIconVisible(item.id, !isOn)
-  else if (item.type === 'base') toggleBaseMap(item.id)
   else if (item.type === 'terrain') toggleTerrain(item.id)
   else if (item.type === 'custom') toggleCustomLayer(item.id)
   customLayerState[item.id] = !isOn
   layerVisibleIds.value = isOn ? layerVisibleIds.value.filter((id) => id !== item.id) : [...layerVisibleIds.value, item.id]
 }
 function onLayerInputChange({ id, value }) { layerInputs[id] = value }
-function toggleBaseMap(id) {}
 function toggleTerrain(id) {}
 function toggleCustomLayer(id) {}
 
@@ -909,20 +907,13 @@ async function onMapReady() {
   map.on('zoom', syncMaskVisibility); map.on('move', syncMaskVisibility); map.on('style.load', ensureShaanxiMask)
   await ensureShaanxiMask()
   try {
-    whlnPlugin = attachLayerControl(map, { beforeId: 'site-city-stats', placement: 'control', position: 'bottom-left', showLayerDetail: false })
-    await nextTick()
-    const hideWhlnUI = () => { document.querySelectorAll('.maplibregl-ctrl-bottom-left .whln-lc').forEach((el) => el.remove()) }
-    hideWhlnUI()
-    const ctrlHost = document.querySelector('.maplibregl-ctrl-bottom-left')
-    if (ctrlHost) { window.__whlnLcHider = new MutationObserver(() => { hideWhlnUI(); syncMaskVisibility() }); window.__whlnLcHider.observe(ctrlHost, { childList: true }) }
-    whlnPlugin.setVisibleIds?.(layerVisibleIds.value.filter((id) => WHLN_LAYER_IDS.includes(id)))
+    whlnPlugin = attachSxLayers(map, { initialVisibleIds: layerVisibleIds.value.filter((id) => WHLN_LAYER_IDS.includes(id)) })
     whlnPlugin.subscribe?.((ids) => { layerVisibleIds.value = [...layerVisibleIds.value.filter((id) => !WHLN_LAYER_IDS.includes(id)), ...ids]; emits('featureVisibleChange', ids); syncMaskVisibility() })
   } catch (err) { console.warn('[whln] 图层控制挂载失败:', err) }
 }
 
 onMounted(() => { fetchStageList(); fetchProjectList(); fetchMapProjects(); fetchOverviewStats(); fetchCityStats() })
 onUnmounted(() => {
-  if (window.__whlnLcHider) { window.__whlnLcHider.disconnect(); window.__whlnLcHider = null }
   whlnPlugin?.destroy?.(); whlnPlugin = null
   unbindZoomListener()
   const map = mapRef.value?.getMap?.()
