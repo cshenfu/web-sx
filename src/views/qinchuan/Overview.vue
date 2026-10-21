@@ -5,6 +5,14 @@
 
     <div class="map-overlay" aria-hidden="true" />
 
+    <LayerChipPanel
+      v-if="!isAreaView || viewMode === 'map'"
+      :visible-ids="layerVisibleIds"
+      :offset="layerPanelOffset"
+      :z-index="layerPanelZIndex"
+      @toggle="onLayerToggle"
+    />
+
     <!-- ===================== 缩小时：head + 左右 dashboard ===================== -->
     <template v-if="!isAreaView">
       <DashboardHead class="head-layer" />
@@ -294,6 +302,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { List, MapLocation, Plus, Search, Edit, ArrowRight } from '@element-plus/icons-vue'
 
 import MapGL from '@/components/MapGL.vue'
+import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
+import { WHLN_LAYER_IDS } from '@/components/site-map/layerPanelConfig'
+import { attachSxLayers } from '@/components/site-map/attachSxLayers'
 import DashboardHead from './components/DashboardHead.vue'
 import LeftDashboard from './components/LeftDashboard.vue'
 import RightDashboard from './components/RightDashboard.vue'
@@ -391,6 +402,8 @@ const mapReady = ref(false)
 
 const viewMode = ref('map')
 const showLayerPanel = ref(false)
+let whlnPlugin = null
+const layerVisibleIds = ref(['tdt-imagery'])
 const isDetailFullscreen = ref(false)
 
 const activeEditTool = ref('')
@@ -911,6 +924,17 @@ function ensureShaanxiMask() {
   } catch (err) { console.error('[mask] 陕西省遮罩加载失败:', err) }
 }
 
+function onLayerToggle(item) {
+  const isOn = layerVisibleIds.value.includes(item.id)
+  const next = isOn
+    ? layerVisibleIds.value.filter((id) => id !== item.id)
+    : [...layerVisibleIds.value, item.id]
+  layerVisibleIds.value = next
+  if (item.type === 'whln') {
+    whlnPlugin?.setVisibleIds?.(next.filter((id) => WHLN_LAYER_IDS.includes(id)))
+  }
+}
+
 const provinceEventLayerId = `${PROVINCE_EXTRUSION_ID}-event`
 const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoomThresholdSwitch({
   mapRef, zoomThreshold: AREA_ZOOM_THRESHOLD,
@@ -941,6 +965,15 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
     renderProjectsByStage('overview')
   }
 })
+
+const layerPanelOffset = computed(() => {
+  if (isAreaView.value) return { left: '16px', bottom: '24px' }
+  return {
+    left: 'calc(clamp(12px, 1.35vw, 26px) + clamp(240px, 23vw, 320px) + 16px)',
+    bottom: '24px',
+  }
+})
+const layerPanelZIndex = computed(() => (isAreaView.value ? 26 : 21))
 
 // ==================== 城市点击 ====================
 function focusCity(cityName) {
@@ -1003,6 +1036,20 @@ function onMapReady() {
   map.on('style.load', ensureShaanxiMask)
   ensureShaanxiMask()
   nextTick(() => { syncByZoom() })
+  try {
+    whlnPlugin = attachSxLayers(map, {
+      initialVisibleIds: layerVisibleIds.value.filter((id) => WHLN_LAYER_IDS.includes(id)),
+    })
+    whlnPlugin.subscribe?.((ids) => {
+      layerVisibleIds.value = [
+        ...layerVisibleIds.value.filter((id) => !WHLN_LAYER_IDS.includes(id)),
+        ...ids,
+      ]
+      syncMaskVisibility()
+    })
+  } catch (err) {
+    console.warn('[whln] 图层控制挂载失败:', err)
+  }
 }
 
 onMounted(async () => { await Promise.all([fetchStageList(), fetchProjectList(), fetchMapProjects()]) })
@@ -1010,6 +1057,8 @@ onMounted(async () => { await Promise.all([fetchStageList(), fetchProjectList(),
 onUnmounted(() => {
   clearHideTimer()
   unbindZoomListener()
+  whlnPlugin?.destroy?.()
+  whlnPlugin = null
   const map = mapRef.value?.getMap?.()
   if (map) {
     map.off('move', updateDetailCardPosition)

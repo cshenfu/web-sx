@@ -1,5 +1,5 @@
 <template>
-    <div class="layer-panel" :class="{ expanded: !collapsed }">
+    <div class="layer-panel" :class="{ expanded: !collapsed }" :style="panelStyle">
       <!-- ★ 小按钮：始终显示，点击切换展开/收起 -->
       <button
         class="layer-toggle"
@@ -68,6 +68,7 @@
   import { computed, ref } from 'vue'
   import {
     Bell,
+    Camera,
     Compass,
     Connection,
     Files,
@@ -83,9 +84,8 @@
   } from '@element-plus/icons-vue'
   import { PANEL_GROUPS } from './layerPanelConfig'
   
-  // ★ 图标名 -> 组件 映射
   const ICON_MAP = {
-    MapLocation, Compass, Grid, Guide, Odometer, Picture,
+    MapLocation, Compass, Camera, Grid, Guide, Odometer, Picture,
     Lightning, Connection, Share, Bell,
     WindPower, Sunny,
   }
@@ -93,15 +93,38 @@
   const props = defineProps({
     visibleIds: { type: Array, default: () => [] },
     inputs: { type: Object, default: () => ({}) },
+    offset: { type: Object, default: null },
+    zIndex: { type: [Number, String], default: null },
   })
   const emit = defineEmits(['toggle', 'input-change'])
   
   const groups = PANEL_GROUPS
   const collapsed = ref(true)
   
+  const panelStyle = computed(() => buildPanelStyle(props.offset, props.zIndex))
+  
   const activeCount = computed(() =>
     groups.flatMap(g => g.items).filter(it => props.visibleIds.includes(it.id)).length
   )
+  
+  /**
+   * 把可选定位转成内联样式；未传时沿用默认左下。
+   *
+   * @param {{left?: string|number, bottom?: string|number}|null} offset 偏移
+   * @param {number|string|null} zIndex 叠放层级
+   * @returns {Record<string, string|number>} 样式对象
+   */
+  function buildPanelStyle(offset, zIndex) {
+    const style = {}
+    if (offset?.left != null && offset.left !== '') {
+      style.left = typeof offset.left === 'number' ? `${offset.left}px` : offset.left
+    }
+    if (offset?.bottom != null && offset.bottom !== '') {
+      style.bottom = typeof offset.bottom === 'number' ? `${offset.bottom}px` : offset.bottom
+    }
+    if (zIndex != null && zIndex !== '') style.zIndex = zIndex
+    return style
+  }
   
   function isActive(id) {
     return props.visibleIds.includes(id)
