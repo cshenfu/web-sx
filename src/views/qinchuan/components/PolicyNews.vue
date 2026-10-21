@@ -217,4 +217,59 @@ const emit = defineEmits(['news-click', 'more-click'])
   font-size: 11px;
   color: rgba(255, 255, 255, 0.5);
 }
+
+.dashboard-panel {
+  container-type: size;
+  background: transparent;
+  isolation: isolate;
+}
+.news-panel::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  bottom: 0;
+  left: 15%;
+  width: 85%;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(41, 145, 247, 0.28) 0%,
+    rgba(41, 145, 247, 0.16) 44%,
+    rgba(41, 145, 247, 0) 100%
+  );
+}
+.news-body {
+  position: relative;
+  z-index: 1;
+  gap: clamp(8px, min(3.58cqw, 14.3cqh), 14.66px);
+  padding: 0 clamp(8px, min(3.64cqw, 14.55cqh), 14.91px) 0 0;
+}
+.icon-wrapper {
+  width: clamp(60px, min(21.65cqw, 86.6cqh), 88.77px);
+  height: auto;
+  aspect-ratio: 88.77 / 102.5;
+}
+.news-content {
+  flex: 1;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  align-self: center;
+}
+.news-header {
+  height: clamp(18px, min(6.19cqw, 24.77cqh), 25.39px);
+  margin-bottom: clamp(4px, min(1.82cqw, 7.27cqh), 7.45px);
+}
+.news-list {
+  flex: 1;
+  min-height: 0;
+  gap: clamp(4px, min(1.36cqw, 5.45cqh), 5.59px);
+  overflow-y: auto;
+}
+.news-item {
+  height: auto;
+  min-height: clamp(14px, min(4.15cqw, 16.59cqh), 17px);
+}
 </style>

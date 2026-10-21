@@ -104,4 +104,28 @@ function completionPercent(item) { return !item.target ? 0 : Math.min(100, Math.
 .is-normal .decor-line .line { border-left: 1px solid rgba(27, 126, 242, 0.3); }
 .is-lagging .decor-line .dot { border-color: #FF003D; border-width: 1.5px; }
 .is-lagging .decor-line .line { border-left: 1px solid rgba(255, 56, 107, 0.3); }
+.dashboard-panel { container-type: size; }
+.warning-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  gap: clamp(5px, min(2.73cqw, 3.76cqh), 11.18px);
+  padding:
+    clamp(22px, min(10cqw, 13.79cqh), 41px)
+    clamp(8px, min(3.64cqw, 5.02cqh), 14.91px)
+    clamp(5px, min(3.41cqw, 4.71cqh), 14px);
+}
+.warning-item {
+  flex: 1 1 52.09px;
+  height: auto;
+  min-height: 32px;
+  margin-bottom: 0;
+  padding: clamp(2px, min(.98cqw, 1.35cqh), 4px)
+           clamp(5px, min(1.95cqw, 2.69cqh), 8px);
+}
+.warning-icon {
+  width: clamp(26px, min(10cqw, 13.8cqh), 41px);
+  height: clamp(26px, min(10cqw, 13.8cqh), 41px);
+}
 </style>

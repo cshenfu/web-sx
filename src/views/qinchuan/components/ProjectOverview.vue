@@ -174,32 +174,37 @@ function selectRow(row) {
 .decor-line.left { left: 0px; } .decor-line.right { right: 0px; }
 .decor-line .dot { width: 4px; height: 4px; border: 1px solid #FFFFFF; }
 .decor-line .line { width: 0; flex: 1; border-left: 1px solid rgba(255, 255, 255, 0.2); }
+.dashboard-panel { container-type: size; }
 .project-table {
-  padding: 43.82px 14.91px 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  padding:
+    clamp(18px, min(10.69cqw, 14.25cqh), 43.82px)
+    clamp(8px, min(3.64cqw, 4.85cqh), 14.91px)
+    4px;
+  overflow-y: auto;
 }
 .project-header {
-  height: 27px;
-  font-size: 13.05px;
+  flex: 0 0 auto;
+  height: clamp(20px, min(6.59cqw, 8.78cqh), 27px);
+  font-size: clamp(10px, min(3.18cqw, 4.25cqh), 13.05px);
 }
 .project-row {
-  min-height: 36.34px;
-  margin-top: 0;
-}
-.project-header + .project-row {
+  flex: 0 1 36.34px;
+  min-height: clamp(24px, min(8.86cqw, 11.82cqh), 36.34px);
   margin-top: 0;
 }
 .project-row + .project-row {
-  margin-top: 9.32px;
+  margin-top: clamp(4px, min(2.27cqw, 3.03cqh), 9.32px);
 }
 .capacity-box img {
-  width: 33.55px;
-  height: 33.55px;
+  width: clamp(20px, min(8.18cqw, 10.91cqh), 33.55px);
+  height: clamp(20px, min(8.18cqw, 10.91cqh), 33.55px);
 }
-.val-wind,
-.val-solar {
-  font-size: 14.91px;
-}
-.capacity-box small {
-  font-size: 11.18px;
+.stage-cell { font-size: clamp(10px, min(3.18cqw, 4.25cqh), 13.05px); }
+.val-wind, .val-solar {
+  font-size: clamp(11px, min(3.64cqw, 4.85cqh), 14.91px);
 }
 </style>

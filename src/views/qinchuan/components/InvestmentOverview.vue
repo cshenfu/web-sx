@@ -312,4 +312,30 @@ function formatValue(value, digits = 2) {
 .s-val { font-family: 'Bebas Neue', 'YouSheBiaoTiHei', sans-serif; font-size: 18px; color: #fff; }
 .s-target { color: #00BBFF; font-size: 16px; }
 .s-unit { color: rgba(255,255,255,0.6); font-family: 'PingFang SC', sans-serif; font-size: 11px; margin-left: 2px;}
+.dashboard-panel { container-type: size; }
+.investment-body {
+  padding:
+    clamp(22px, min(10.91cqw, 9.51cqh), 44.73px)
+    clamp(8px, min(3.64cqw, 3.17cqh), 14.91px)
+    clamp(6px, min(2.44cqw, 2.13cqh), 10px);
+  gap: clamp(6px, min(1.82cqw, 1.58cqh), 7.45px);
+  min-height: 0;
+  overflow-y: auto;
+}
+.summary-header-block.no-padding {
+  width: 100%;
+  margin: 0;
+}
+.rate-bg-box {
+  width: clamp(106px, min(37.31cqw, 32.51cqh), 152.98px);
+  height: clamp(26px, min(8.13cqw, 7.08cqh), 33.32px);
+}
+.energy-list {
+  gap: clamp(7px, min(2.93cqw, 2.55cqh), 12px);
+}
+.icon-wrapper {
+  width: clamp(40px, min(13.66cqw, 11.9cqh), 56px);
+  height: clamp(40px, min(13.66cqw, 11.9cqh), 56px);
+}
+
 </style>

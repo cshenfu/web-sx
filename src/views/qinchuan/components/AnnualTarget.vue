@@ -120,4 +120,32 @@ function fillStyle(item) {
 .target-meta { color: rgba(255, 255, 255, 0.6); font-size: 11px; }
 .meta-item { display: flex; align-items: center; gap: 4px; }
 .meta-dot { width: 4px; height: 4px; border-radius: 50%; }
+.dashboard-panel { container-type: size; }
+.target-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  box-sizing: border-box;
+  padding:
+    clamp(20px, min(10cqw, 17.32cqh), 41px)
+    clamp(8px, min(3.64cqw, 6.3cqh), 14.91px)
+    clamp(6px, min(3.18cqw, 5.5cqh), 13.04px);
+}
+.target-item {
+  flex: 1 1 91.32px;
+  min-height: 0;
+  gap: clamp(10px, min(9.26cqw, 16.04cqh), 37.97px);
+}
+.target-item + .target-item { margin-top: 0; }
+.target-icon-wrap {
+  flex: 0 0 clamp(64px, min(29.82cqw, 51.66cqh), 122.27px);
+  width: clamp(64px, min(29.82cqw, 51.66cqh), 122.27px);
+  height: min(100%, clamp(56px, 38.59cqh, 91.32px));
+}
+.target-icon-bg {
+  width: clamp(48px, min(20.73cqw, 35.91cqh), 85px);
+  height: clamp(48px, min(20.73cqw, 35.91cqh), 85px);
+}
+
 </style>

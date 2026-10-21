@@ -193,4 +193,28 @@ function formatValue(value, digits = 0) {
 
 /* 底部备注（户用光伏） */
 .structure-note { color: #00E5FF; font-family: 'PingFang SC', sans-serif; font-size: 11px; margin-top: 4px; white-space: nowrap;}
+.dashboard-panel { container-type: size; }
+.strategy-body {
+  padding:
+    clamp(22px, min(11.14cqw, 16.84cqh), 45.66px)
+    clamp(8px, min(3.64cqw, 5.5cqh), 14.91px)
+    10px;
+  gap: clamp(6px, min(1.82cqw, 2.75cqh), 7.45px);
+  min-height: 0;
+  overflow-y: auto;
+}
+.strategy-targets {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(8px, min(3.41cqw, 5.16cqh), 14px);
+}
+.target-card {
+  box-sizing: border-box;
+  height: auto;
+  min-height: clamp(54px, min(20.16cqw, 30.48cqh), 82.66px);
+  padding: clamp(6px, min(2.44cqw, 3.69cqh), 10px);
+}
+.structure-columns {
+  min-height: 0;
+  gap: clamp(6px, min(2.44cqw, 3.69cqh), 10px);
+}
 </style>
