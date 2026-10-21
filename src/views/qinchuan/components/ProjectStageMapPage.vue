@@ -24,6 +24,11 @@
       <section v-if="viewMode === 'map'" class="map-view">
         <MapGL ref="mapRef" :style="satelliteStyle" @ready="onMapReady" />
   
+        <LayerChipPanel
+          :visible-ids="layerVisibleIds"
+          @toggle="onLayerToggle"
+        />
+  
         <!-- 默认视图：项目通道概况 -->
         <div v-if="!isAreaView" class="map-summary">
           <div class="summary-title">
@@ -162,6 +167,9 @@
   import MapGL from '@/components/MapGL.vue'
   import SearchBar from '@/components/common/SearchBar.vue'
   import AreaDetailPanel from './AreaDetailPanel.vue'
+  import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
+  import { WHLN_LAYER_IDS } from '@/components/site-map/layerPanelConfig'
+  import { attachSxLayers } from '@/components/site-map/attachSxLayers'
   import { satelliteStyle, shaanxiBoundary } from '../js/mapConfig'
   import { useProvinceAreaData } from '../js/useProvinceAreaData'
   import { useZoomThresholdSwitch } from '../js/useZoomThresholdSwitch'
@@ -179,6 +187,8 @@
   
   const mapRef = ref(null)
   const viewMode = ref('map')
+  let whlnPlugin = null
+  const layerVisibleIds = ref(['tdt-imagery'])
   const currentPage = ref(1)
   const selectedAreaInfo = ref(null)
   
@@ -233,6 +243,17 @@
     }
   }
   
+  function onLayerToggle(item) {
+    const isOn = layerVisibleIds.value.includes(item.id)
+    const next = isOn
+      ? layerVisibleIds.value.filter((id) => id !== item.id)
+      : [...layerVisibleIds.value, item.id]
+    layerVisibleIds.value = next
+    if (item.type === 'whln') {
+      whlnPlugin?.setVisibleIds?.(next.filter((id) => WHLN_LAYER_IDS.includes(id)))
+    }
+  }
+  
   function onMapReady() {
     mapRef.value.addPolygon({
       id: 'stage-shaanxi',
@@ -247,6 +268,21 @@
   
     bindZoomListener()
     syncByZoom()
+  
+    try {
+      const map = mapRef.value.getMap()
+      whlnPlugin = attachSxLayers(map, {
+        initialVisibleIds: layerVisibleIds.value.filter((id) => WHLN_LAYER_IDS.includes(id)),
+      })
+      whlnPlugin.subscribe?.((ids) => {
+        layerVisibleIds.value = [
+          ...layerVisibleIds.value.filter((id) => !WHLN_LAYER_IDS.includes(id)),
+          ...ids,
+        ]
+      })
+    } catch (err) {
+      console.warn('[whln] 图层控制挂载失败:', err)
+    }
   }
   
   function handleSearch() {
@@ -270,6 +306,8 @@
   
   onUnmounted(() => {
     unbindZoomListener()
+    whlnPlugin?.destroy?.()
+    whlnPlugin = null
   })
   </script>
   
