@@ -14,14 +14,14 @@
         </div>
       </div>
       <div class="header-right">
-        <!-- ⭐ 全屏切换按钮 -->
+        <!-- 全屏切换按钮 -->
         <button type="button" class="icon-btn" :title="isFullscreen ? '退出全屏' : '全屏'" @click="$emit('toggle-fullscreen')">
           <svg v-if="!isFullscreen" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
           <svg v-else viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg>
         </button>
         <button type="button" class="report-btn" @click="$emit('generate-report')">
           <svg viewBox="0 0 16 16" class="report-icon"><rect x="3" y="2" width="10" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
-          报告/函件生成
+          报告 / 函件生成
         </button>
       </div>
     </header>
@@ -101,11 +101,11 @@ import { useRouter } from 'vue-router'
 
 const props = defineProps({
   project: { type: Object, required: true },
-  isFullscreen: { type: Boolean, default: false } // ⭐ 接收全屏状态
+  isFullscreen: { type: Boolean, default: false }
 })
 
 defineEmits([
-  'back', 'generate-report', 'toggle-fullscreen', // ⭐ 新增抛出全屏事件
+  'back', 'generate-report', 'toggle-fullscreen',
   'survey-add-data', 'survey-file-action',
   'support-add-data', 'support-file-action',
   'report-row-action',
@@ -241,78 +241,109 @@ watch(() => props.project?.id, (id) => { if (id) refreshSurveyData() })
 </script>
 
 <style scoped>
+/* ================= 最外层玻璃质感外框 ================= */
 .detail-panel {
   position: relative;
-  bottom:20px;
-  height:90%;
+  bottom: 20px;
+  height: 90%;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  /* 默认宽度 780px */
-  width: 780px; 
+  width: 779px; 
   max-width: 100%;
   max-height: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 8px;
+  padding: 16px 0px 24px 0px;
+  gap: 16px;
+  
+  /* 你提供的长串线性渐变背景 */
+  background: linear-gradient(149.65deg, rgba(255, 255, 255, 0.2) 4.61%, rgba(255, 255, 255, 0.15) 29.07%, rgba(255, 255, 255, 0.3) 49.01%, rgba(255, 255, 255, 0.1) 61.4%, rgba(255, 255, 255, 0.2) 74.74%, rgba(255, 255, 255, 0.22) 97.19%);
+  
+  /* 毛玻璃与边框 */
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  border-radius: 10px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  
+  /* 设计稿指定的双层阴影 */
+  box-shadow: 5px 5px 0px rgba(207, 234, 255, 0.5), -10px 0px 30px rgba(0, 0, 0, 0.1);
+  
   color: #303133;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  
+  /* 🌟 关键：禁止最外层出现滚动条，所有滚动交给内部 content */
+  overflow: hidden; 
 }
 
 /* ⭐ 全屏状态 */
 .detail-panel.is-fullscreen {
   position: fixed;
-  /* left: 130px; 避开左上角的按钮 */
   right: 12px;
   bottom: 20px;
   width: 50%;
-  height:90%;
+  height: 90%;
   max-height: none;
   z-index: 99;
 }
 
+/* ================= 左侧返回按钮 ================= */
 .collapse-btn {
   position: absolute;
   top: 50%;
-  left: -14px;
+  left: -17px;
   z-index: 5;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 44px;
-  border: 1px solid #dcdfe6;
+  border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: 4px;
   cursor: pointer;
   color: #606266;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   transform: translateY(-50%);
+  transition: all 0.2s;
 }
-.collapse-btn:hover { color: #1677ff; border-color: #1677ff; }
+.collapse-btn:hover { 
+  color: #2563EB; 
+  border-color: #2563EB; 
+  background: #fff;
+}
 .chevron { width: 14px; height: 14px; }
 
+/* ================= 头部 ================= */
 .detail-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid rgba(235, 238, 245, 0.8);
+  padding: 0 25px;
 }
-.header-left { flex: 1; }
-.project-name { color: #1f2d3d; font-size: 17px; font-weight: 600; }
+.header-left { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+
+.project-name { 
+  color: #111827; 
+  font-size: 24px; 
+  font-weight: 700; 
+  line-height: 28px;
+  letter-spacing: 0.5px;
+  font-family: 'Inter', 'PingFang SC', sans-serif;
+}
+
 .project-company {
   display: flex;
   align-items: center;
-  gap: 5px;
-  margin-top: 6px;
-  color: #606266;
-  font-size: 12px;
+  gap: 6px;
+  color: #2563EB;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 16px;
 }
-.company-icon { width: 12px; height: 12px; }
+.company-icon { width: 14px; height: 14px; }
 
 .header-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
 .icon-btn {
   display: flex;
   align-items: center;
@@ -320,63 +351,99 @@ watch(() => props.project?.id, (id) => { if (id) refreshSurveyData() })
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  background: #fff;
-  color: #606266;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.3);
+  color: #4B5563;
   cursor: pointer;
   transition: all 0.2s;
 }
-.icon-btn:hover { color: #1677ff; border-color: #1677ff; }
+.icon-btn:hover { color: #2563EB; border-color: #2563EB; background: #fff; }
 
 .report-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 0 12px;
-  height: 32px;
+  gap: 6px;
+  padding: 0 16px;
+  height: 36px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  color: #fff;
-  background: #1677ff;
-  font-size: 12px;
+  color: #FFFFFF;
+  background: #2563EB;
+  font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
+  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1), 0px 1px 2px -1px rgba(0, 0, 0, 0.1);
+  transition: background 0.2s;
 }
-.report-btn:hover { background: #4096ff; }
-.report-icon { width: 12px; height: 12px; }
+.report-btn:hover { background: #1D4ED8; }
+.report-icon { width: 14px; height: 14px; }
 
+/* ================= 主 Tab 栏 ================= */
 .main-tabs {
   display: flex;
-  padding: 0 20px;
-  border-bottom: 1px solid rgba(235, 238, 245, 0.8);
-  background-color: rgba(255, 255, 255, 0.7);
+  justify-content: space-between;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.5);
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
 }
+
 .main-tab {
-  padding: 12px 14px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  margin: 0;
+  padding: 0;
   border: none;
-  background: none;
-  color: #606266;
-  font-size: 13px;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: #4B5563;
+  font-family: 'PingFang SC', 'Inter', sans-serif;
+  font-size: 16px;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  white-space: nowrap;
-  transition: color 0.15s, border-color 0.15s;
+  transition: all 0.2s;
 }
-.main-tab:hover { color: #1677ff; }
-.main-tab.active { color: #1677ff; border-bottom-color: #1677ff; font-weight: 600; }
 
-/* 全屏时主 Tab 均匀分布 */
-.detail-panel.is-fullscreen .main-tabs { justify-content: space-around; }
-.detail-panel.is-fullscreen .main-tab { flex: 1; text-align: center; }
+.main-tab:hover { color: #1D4ED8; }
 
+.main-tab.active {
+  background: rgba(19, 55, 134, 0.05);
+  border-bottom-color: #2563EB;
+  color: #1D4ED8;
+  font-weight: 500;
+}
+
+/* ================= 内容区 ================= */
 .tab-content {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  background: rgba(0, 0, 0, 0);
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  background: transparent;
+  padding-bottom: 8px;
 }
-.tab-content::-webkit-scrollbar { display: none; }
+
+/* 🌟 美化滚动条：极细半透明 */
+.tab-content::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.tab-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tab-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+.tab-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+/* 兼容 Firefox */
+.tab-content {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
 </style>

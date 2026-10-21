@@ -51,26 +51,27 @@ defineProps({
 
 <style scoped>
 .review-info-tab {
-  padding: 16px 20px;
+  padding: 16px 24px;
   overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
 }
 
+/* ============ 顶部进度条 ============ */
 .progress-bar {
   display: flex;
-  padding: 12px 8px;
-  border: 1px solid rgba(118, 213, 255, 0.18);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.02);
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
-.progress-step {
-  flex: 1;
-  text-align: center;
-}
+.progress-step { flex: 1; text-align: center; }
 
 .progress-label {
-  color: #9bdfff;
-  font-size: 12px;
+  color: #6B7280;
+  font-size: 13px;
 }
 
 .progress-track {
@@ -82,15 +83,15 @@ defineProps({
 
 .progress-dot {
   z-index: 1;
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   margin: 0 auto;
   border-radius: 50%;
-  background: rgba(155, 223, 255, 0.3);
+  background: #BFDBFE;
 }
 
 .progress-dot.done {
-  background: #52c1ff;
+  background: #2563EB;
 }
 
 .progress-line {
@@ -98,24 +99,25 @@ defineProps({
   top: 50%;
   left: 50%;
   width: 100%;
-  height: 1px;
-  background: rgba(118, 213, 255, 0.25);
+  height: 2px;
+  background: #E5E7EB;
   transform: translateY(-50%);
 }
 
 .progress-date {
   margin-top: 6px;
-  color: #7fa8bb;
-  font-size: 11px;
+  color: #9CA3AF;
+  font-size: 12px;
 }
 
+/* ============ 时间轴分组 ============ */
 .groups {
-  margin-top: 18px;
+  margin-top: 20px;
 }
 
 .group-row {
   display: flex;
-  gap: 12px;
+  gap: 16px;
 }
 
 .group-axis {
@@ -127,50 +129,54 @@ defineProps({
 }
 
 .axis-stage {
-  color: #7fa8bb;
-  font-size: 12px;
+  color: #6B7280;
+  font-size: 13px;
   white-space: nowrap;
+  font-weight: 500;
 }
 
 .axis-dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   margin-top: 6px;
   border-radius: 50%;
-  background: rgba(155, 223, 255, 0.5);
+  background: #9CA3AF;
 }
 
 .axis-line {
   flex: 1;
-  width: 1px;
+  width: 2px;
   margin-top: 4px;
-  background: rgba(118, 213, 255, 0.2);
+  background: #E5E7EB;
 }
 
 .group-content {
   flex: 1;
   min-width: 0;
-  padding: 12px;
-  margin-bottom: 14px;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
 .group-content.active {
-  border-color: #49d5ff;
-  background: rgba(82, 190, 245, 0.08);
+  border-color: #2563EB;
+  background: rgba(37, 99, 235, 0.05);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.1);
 }
 
 .group-meta {
-  color: #effbff;
-  font-size: 13px;
-  font-weight: 600;
+  color: #1F2937;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .group-item {
-  padding-top: 10px;
-  margin-top: 10px;
-  border-top: 1px solid rgba(118, 213, 255, 0.1);
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid rgba(209, 213, 219, 0.5);
 }
 
 .group-item:first-of-type {
@@ -181,35 +187,36 @@ defineProps({
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   font-size: 12px;
 }
 
 .tag {
-  padding: 1px 6px;
-  border-radius: 3px;
-  color: #9bdfff;
-  background: rgba(43, 130, 179, 0.35);
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #1D4ED8;
+  background: rgba(37, 99, 235, 0.1);
   font-size: 11px;
+  font-weight: 500;
 }
 
 .item-org,
 .item-doc,
 .item-date {
-  color: #8fb9cc;
+  color: #6B7280;
 }
 
 .item-name {
-  margin-top: 6px;
-  color: #effbff;
+  margin-top: 8px;
+  color: #374151;
   font-size: 13px;
 }
 
 .item-footer {
   display: flex;
-  gap: 12px;
-  margin-top: 6px;
-  color: #7fa8bb;
-  font-size: 11px;
+  gap: 16px;
+  margin-top: 8px;
+  color: #9CA3AF;
+  font-size: 12px;
 }
 </style>

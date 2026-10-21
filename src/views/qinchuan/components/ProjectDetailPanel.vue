@@ -106,7 +106,7 @@ import * as fileApi from '@/api/modules/projectFile'
 const props = defineProps({
   visible: { type: Boolean, default: false },
   project: { type: Object, default: null },
-  stage: { type: String, default: '' },
+  stage: { type: String, default: '' }, // ⚠️ 注意检查这里传的是不是 FEASIBILITY_REVIEW
   initialTab: { type: String, default: 'main' },
 })
 
@@ -133,7 +133,7 @@ const meetingUploadConfig = ref({
   record: null,
 })
 
-// ★ 走全屏生成面板的 action（把投决相关拦截掉暂不支持）
+// ★ 走全屏生成面板的 action
 const GENERATE_REPORT_ACTIONS = new Set([
   'gen-application',
   'gen-letter',
@@ -151,8 +151,10 @@ const MEETING_UPLOAD_ACTIONS = new Set([
 // ★ 阶段推进配置（header 右上角按钮）
 // ========================================================
 const STAGE_ADVANCE = {
-  PROJECT_RESERVE:    { label: '开始立项', next: 'PROJECT_INITIATION' },
-  PROJECT_INITIATION: { label: '开始审查', next: 'FEASIBILITY_REVIEW' },
+  PROJECT_RESERVE:    { label: '开始立项', next: 'PROJECT_INITIATION',  fileCode: 'PROJECT_INITIATION_MATERIALS' },
+  PROJECT_INITIATION: { label: '开始审查', next: 'FEASIBILITY_REVIEW',  fileCode: 'PROJECT_INITIATION_MATERIALS' },
+  // 🌟 新增这一行：科研阶段 -> 投决阶段
+  FEASIBILITY_REVIEW: { label: '开始投决', next: 'INVESTMENT_DECISION', fileCode: 'PROJECT_FEASIBILITY_MATERIALS' },
 }
 const advanceConfig = computed(() => STAGE_ADVANCE[props.stage] || null)
 
@@ -189,10 +191,13 @@ async function loadNecessaryFiles() {
   try {
     const res = await fileApi.getFileListByProjectid({
       aiProjectId: props.project.id,
-      firstBusinessTitle: 'PROJECT_INITIATION_MATERIALS',
+      // 🌟 动态读取当前阶段配置的 fileCode
+      firstBusinessTitle: advanceConfig.value.fileCode || 'PROJECT_INITIATION_MATERIALS',
     })
     const list = (res?.data || []).map(normalizeRecord)
     const required = list.filter(isRequired)
+    
+    // 必须有必填文件，并且每一个必填文件都有至少一个 URL，才能点亮按钮
     necessaryFilesDone.value =
       required.length > 0 && required.every(f => f.fileUrlList.length > 0)
   } catch (err) {
@@ -363,14 +368,12 @@ function handleUploadSaved() {
 function handleMeetingAction(payload) {
   console.log('[panel] meeting action =', payload)
 
-  // 设置负责人
   if (payload.key === 'set-owner') {
     ElMessage.info(`点击了「设置负责人」：${payload.step || ''}（弹窗待接）`)
     emit('action', { type: 'meeting', ...payload })
     return
   }
 
-  // ★ 生成报告：抛给上层打开全屏面板
   if (GENERATE_REPORT_ACTIONS.has(payload.key)) {
     emit('action', {
       type: 'generate-report',
@@ -382,7 +385,6 @@ function handleMeetingAction(payload) {
     return
   }
 
-  // 上传 / 替换 → 打开会议纪要上传弹窗
   if (MEETING_UPLOAD_ACTIONS.has(payload.key)) {
     meetingUploadConfig.value = {
       tagName: payload.label?.replace(/^(生成|上传)/, '') || '会议纪要',
@@ -393,7 +395,6 @@ function handleMeetingAction(payload) {
     return
   }
 
-  // 其他 action 直接向上抛
   ElMessage.info(`点击了：${payload.label || ''}`)
   emit('action', { type: 'meeting', ...payload })
 }

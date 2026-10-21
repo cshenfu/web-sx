@@ -50,18 +50,24 @@ function handleFileClick(file, sectionKey) {
 
 <style scoped>
 .survey-info-tab {
-  padding: 16px 20px;
+  padding: 16px 24px;
   overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
 }
 
+/* 背景为浅色玻璃质感 */
 .section-block {
-  padding-bottom: 16px;
+  padding: 16px;
   margin-bottom: 16px;
-  border-bottom: 1px solid rgba(118, 213, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
 .section-block:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .section-header {
@@ -74,60 +80,62 @@ function handleFileClick(file, sectionKey) {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #effbff;
-  font-size: 14px;
-  font-weight: 600;
+  color: #1F2937;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .bar {
-  width: 3px;
-  height: 14px;
+  width: 4px;
+  height: 16px;
   border-radius: 2px;
-  background: #52c1ff;
+  background: #2563EB;
 }
 
 .add-btn {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: #52c1ff;
+  gap: 4px;
+  padding: 4px 12px;
+  border: 1px solid #2563EB;
+  border-radius: 4px;
+  background: #2563EB;
+  color: #fff;
   font-size: 12px;
   cursor: pointer;
+  transition: all 0.2s;
 }
+.add-btn:hover { background: #1D4ED8; }
 
-.add-icon {
-  width: 12px;
-  height: 12px;
-}
+.add-icon { width: 12px; height: 12px; }
 
 .section-extra {
-  margin-top: 8px;
-  color: #9bdfff;
-  font-size: 12px;
+  margin-top: 10px;
+  color: #6B7280;
+  font-size: 13px;
 }
 
 .extra-link {
-  color: #52c1ff;
+  color: #2563EB;
   text-decoration: none;
 }
+.extra-link:hover { text-decoration: underline; }
 
 .section-desc {
-  margin-top: 8px;
-  color: #bcecff;
-  font-size: 12px;
+  margin-top: 10px;
+  color: #6B7280;
+  font-size: 13px;
   line-height: 1.7;
 }
 
 .file-list {
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .empty-state {
-  padding: 14px 0;
-  color: #6f93a6;
+  padding: 24px 0;
+  color: #9CA3AF;
   font-size: 12px;
+  text-align: center;
 }
 </style>

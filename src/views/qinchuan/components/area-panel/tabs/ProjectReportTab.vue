@@ -29,29 +29,27 @@
             <th>状态</th>
             <th>备注</th>
             <th>创建时间</th>
-            <th class="sticky-col" style="width: 130px; min-width: 130px;">操作</th>
+            <th class="sticky-col" style="width: 140px; min-width: 140px;">操作</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="row in list" :key="row.id">
-            <td>{{ row.id }}</td>
+            <td class="font-bold">{{ row.id }}</td>
             <td>{{ row.sourceTypeDesc || '-' }}</td>
             <td>{{ row.reportTypeDesc || '-' }}</td>
             <td class="ellipsis" :title="row.declaringUnit">{{ row.declaringUnit || '-' }}</td>
             <td>{{ row.currentCapacityMw ?? '-' }}</td>
             <td>
-              <!-- 使用行内样式强制上色 -->
-              <span 
-                class="status-tag" 
-                :style="{ color: getStatusColor(row.status, row.statusDesc) }"
-              >
+              <span class="status-tag" :style="{ color: getStatusColor(row.status, row.statusDesc) }">
                 {{ row.statusDesc || '-' }}
               </span>
             </td>
             <td class="ellipsis" :title="row.remark">{{ row.remark || '--' }}</td>
-            <td>{{ row.createTime || '-' }}</td>
+            <!-- 时间格式化 -->
+            <td class="text-gray">{{ formatDateTime(row.createTime) }}</td>
+            
             <!-- 内容固定列 -->
-            <td class="sticky-col" style="width: 130px; min-width: 130px;">
+            <td class="sticky-col" style="width: 140px; min-width: 140px;">
               <div class="action-cell">
                 <button 
                   v-if="row.fileUrl" 
@@ -65,7 +63,13 @@
                   @click="handleTerminate(row)"
                 >终止计算</button>
                 
-                <button class="action-btn more" @click="$emit('row-action', row)">···</button>
+                <!-- 只有明确有更多操作时才显示三个点 -->
+                <button 
+                  v-if="row.hasMoreActions" 
+                  class="action-btn more" 
+                  title="更多"
+                  @click="$emit('row-action', row)"
+                >···</button>
               </div>
             </td>
           </tr>
@@ -199,16 +203,34 @@ function handleTerminate(row) {
   }).catch(() => {})
 }
 
+// 🌟 新增：时间格式化方法
+function formatDateTime(val) {
+  if (!val) return '-'
+  // 纯数字或数字字符串（时间戳）
+  if (typeof val === 'number' || /^\d+$/.test(String(val))) {
+    const d = new Date(Number(val))
+    if (!isNaN(d.getTime())) {
+      const pad = (n) => String(n).padStart(2, '0')
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+    }
+  }
+  // 字符串形式（如带 T 的 ISO）
+  if (typeof val === 'string') {
+    return val.replace('T', ' ').substring(0, 19)
+  }
+  return val
+}
+
 // 直接返回色值，无视一切 CSS 污染
 function getStatusColor(status, desc) {
   const s = status || ''
   const d = desc || ''
   
-  if (d.includes('完成') || d.includes('成功') || s === 'COMPLETED') return '#67c23a'
-  if (d.includes('计算') || d.includes('解析') || d.includes('生成') || s === 'GENERATING' || s === 'PARSING') return '#1677ff'
-  if (d.includes('排队') || d.includes('等待') || d.includes('待') || s === 'PENDING' || s === 'QUEUING') return '#e6a23c'
-  if (d.includes('失败') || s === 'FAILED') return '#f56c6c'
-  if (d.includes('终止') || s === 'TERMINATED') return '#909399'
+  if (d.includes('完成') || d.includes('成功') || s === 'COMPLETED') return '#00AE0F' // 绿色
+  if (d.includes('计算') || d.includes('解析') || d.includes('生成') || s === 'GENERATING' || s === 'PARSING') return '#2664EB' // 蓝色
+  if (d.includes('排队') || d.includes('等待') || d.includes('待') || s === 'PENDING' || s === 'QUEUING') return '#EF9600' // 橙色
+  if (d.includes('失败') || s === 'FAILED') return '#D81D1D' // 红色
+  if (d.includes('终止') || s === 'TERMINATED') return '#8D8D8D' // 灰色
   
   return '#303133'
 }
@@ -228,112 +250,169 @@ watch(() => props.project?.id, async (newId) => {
 </script>
 
 <style scoped>
+/* ================= 容器 ================= */
 .project-report-tab {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 16px 20px;
+  padding: 16px 24px;
   overflow: hidden;
   background: transparent;
 }
 
-/* ============ 子 Tab ============ */
+/* ================= 1. 子 Tab 栏 ================= */
 .sub-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 16px;
 }
 
 .sub-tab {
-  padding: 6px 16px;
-  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.8);
-  color: #606266;
-  font-size: 13px;
+  font-family: 'PingFang SC', sans-serif;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #000000;
 }
 
-.sub-tab:hover { color: #1677ff; border-color: #a9cfff; }
+.sub-tab:hover {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.sub-tab .count {
+  margin-left: 4px;
+  color: #6E8ADC;
+  font-size: 12px;
+}
 
 .sub-tab.active {
-  color: #1677ff;
-  border-color: #1677ff;
-  background: rgba(255, 255, 255, 1);
-  font-weight: 500;
-  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.15);
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #1D4ED8;
+  box-shadow: 0px 2px 4px rgba(29, 78, 216, 0.3);
+  color: #1D4ED8;
+  font-weight: 600;
+}
+.sub-tab.active .count {
+  color: #1D4ED8;
 }
 
-.count { margin-left: 2px; font-size: 12px; opacity: 0.8; }
-
-/* ============ 表格 ============ */
+/* ================= 2. 表格外框 ================= */
 .table-wrap {
   flex: 1;
   min-height: 0;
   overflow: auto;
   position: relative;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
 }
 
-/* 强制固定表格布局 */
+.table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+.table-wrap::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
+
+/* ================= 3. 表格样式 ================= */
 .report-table {
   width: 100%;
-  min-width: 900px;
+  /* 🌟 加大了最小宽度，确保滚动到最右边时空间依然宽裕，不被操作列盖住 */
+  min-width: 1050px; 
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 13px;
+  font-size: 12px;
 }
 
+/* 表头 */
 .report-table th {
   position: sticky;
   top: 0;
-  padding: 10px 8px;
-  color: #909399;
+  padding: 8px;
+  color: #1F2937;
   text-align: center;
-  font-weight: 500;
-  background: #f5f7fa;
-  border-bottom: 1px solid #ebeef5;
+  font-weight: 400;
+  background: rgba(241, 245, 249, 0.6);
+  border-bottom: 1px solid rgba(209, 213, 219, 0.4);
+  border-right: 1px solid rgba(209, 213, 219, 0.4);
   white-space: nowrap;
   z-index: 2;
 }
 
+/* 单元格 */
 .report-table td {
-  padding: 10px 8px;
-  color: #303133;
+  padding: 8px;
+  color: #374151;
   text-align: center;
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid rgba(209, 213, 219, 0.4);
+  border-right: 1px solid rgba(209, 213, 219, 0.5);
   white-space: nowrap;
   background: transparent; 
 }
 
+.report-table th:last-child,
+.report-table td:last-child {
+  border-right: none;
+}
+
+/* 斑马纹 */
+.report-table tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* 悬浮高亮 */
+.report-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* 文本样式 */
 .report-table td.ellipsis { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.report-table td.font-bold { font-weight: 700; color: #111827; }
+.report-table td.text-gray { color: #374151; }
 
 /* ⭐ 右侧固定列 */
 .sticky-col {
   position: sticky !important;
   right: 0 !important;
-  background: rgba(255, 255, 255, 0.95) !important;
-  box-shadow: -4px 0 8px rgba(0, 0, 0, 0.05);
+  /* 🌟 使用了 backdrop-filter 增加磨砂玻璃质感，防止底下文字穿透，同时加高不透明度 */
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: -6px 0 10px rgba(0, 0, 0, 0.05);
   z-index: 9 !important;
 }
 
 .report-table th.sticky-col {
-  background: #f5f7fa !important;
+  background: rgba(241, 245, 249, 0.95) !important;
   z-index: 10 !important;
 }
 
+/* 处理斑马纹和 Hover 时的固定列背景 */
+.report-table tbody tr:nth-child(even) td.sticky-col {
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+.report-table tbody tr:hover td.sticky-col {
+  background: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* 状态颜色 */
+.status-tag { font-weight: 500; font-size: 12px; }
+
 /* 操作按钮 */
 .action-cell { display: flex; align-items: center; justify-content: center; gap: 8px; }
-.action-btn { padding: 0; border: none; background: none; font-size: 13px; cursor: pointer; }
+.action-btn { padding: 0; border: none; background: none; font-size: 12px; cursor: pointer; }
 .action-btn:hover { text-decoration: underline; }
-.action-btn.primary { color: #1677ff; }
-.action-btn.danger { color: #f56c6c; }
-.action-btn.more { color: #909399; font-weight: bold; }
+.action-btn.primary { color: #1D4ED8; }
+.action-btn.danger { color: #D81D1D; }
+.action-btn.more { color: #333333; font-weight: bold; font-size: 14px; }
 
-.empty-state { padding: 32px 0; color: #a8abb2; text-align: center; }
-.pagination-wrap { display: flex; justify-content: flex-end; padding-top: 12px; border-top: 1px solid #ebeef5; margin-top: 8px; }
+.empty-state { padding: 32px 0; color: #9CA3AF; text-align: center; font-size: 12px; }
+.pagination-wrap { display: flex; justify-content: flex-end; padding-top: 12px; margin-top: 8px; }
 </style>

@@ -1,6 +1,7 @@
 <!-- components/area-panel/tabs/SupportDocsTab.vue -->
 <template>
   <div class="support-docs-tab">
+    <!-- 阶段 Tabs -->
     <div class="stage-tabs">
       <button
         v-for="stage in data.stages"
@@ -14,6 +15,7 @@
       </button>
     </div>
 
+    <!-- 类型筛选 Pills -->
     <div class="type-filters">
       <span
         v-for="filter in data.typeFilters"
@@ -26,6 +28,7 @@
       </span>
     </div>
 
+    <!-- 列表头 -->
     <div class="file-list-header">
       <span class="file-list-title">文件列表</span>
       <button type="button" class="add-btn" @click="$emit('add-data')">
@@ -34,6 +37,7 @@
       </button>
     </div>
 
+    <!-- 文件列表 -->
     <div class="file-list">
       <FileListItem
         v-for="(file, idx) in filteredFiles"
@@ -68,102 +72,112 @@ const filteredFiles = computed(() => {
 
 <style scoped>
 .support-docs-tab {
-  padding: 16px 20px;
+  padding: 16px 24px;
   overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
 }
 
+/* ============ 阶段 Tabs ============ */
 .stage-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  border-bottom: 1px solid rgba(118, 213, 255, 0.18);
+  gap: 12px;
+  border-bottom: 1px solid rgba(209, 213, 219, 0.6);
+  padding-bottom: 8px;
 }
 
 .stage-tab {
-  padding: 8px 10px;
-  border: none;
-  background: none;
-  color: #9bdfff;
-  font-size: 13px;
+  padding: 6px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  color: #000;
+  font-size: 14px;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
   white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.stage-tab:hover {
+  background: rgba(255, 255, 255, 0.8);
 }
 
 .stage-tab.active {
-  color: #52c1ff;
-  border-bottom-color: #52c1ff;
+  color: #1D4ED8;
+  border-color: #1D4ED8;
+  background: rgba(255, 255, 255, 0.8);
   font-weight: 600;
+  box-shadow: 0 2px 4px rgba(29, 78, 216, 0.3);
 }
 
+/* ============ 类型筛选 ============ */
 .type-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .type-pill {
-  padding: 5px 12px;
+  padding: 4px 12px;
   border-radius: 999px;
   cursor: pointer;
-  color: #d9f5ff;
+  color: #374151;
   font-size: 12px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  transition: all 0.2s;
 }
 
-.pill-pink {
-  color: #ffb3c6;
-  background: rgba(180, 60, 90, 0.25);
-}
-
-.pill-green {
-  color: #8de7b0;
-  background: rgba(45, 145, 90, 0.25);
+.type-pill:hover {
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .type-pill.active {
-  border-color: currentColor;
+  border-color: #1D4ED8;
+  color: #1D4ED8;
+  background: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
 }
 
+/* 特殊分类的颜色（可选，这里保留了一点点色彩，但去掉了深色底） */
+.pill-pink { color: #db2777; }
+.pill-green { color: #059669; }
+
+/* ============ 列表头 ============ */
 .file-list-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 16px;
+  margin-top: 20px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(209, 213, 219, 0.4);
 }
 
 .file-list-title {
-  color: #effbff;
-  font-size: 13px;
+  color: #1F2937;
+  font-size: 14px;
   font-weight: 600;
 }
 
 .add-btn {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: #52c1ff;
+  gap: 4px;
+  padding: 4px 12px;
+  border: 1px solid #2563EB;
+  border-radius: 4px;
+  background: #2563EB;
+  color: #fff;
   font-size: 12px;
   cursor: pointer;
+  transition: all 0.2s;
 }
+.add-btn:hover { background: #1D4ED8; }
 
-.add-icon {
-  width: 12px;
-  height: 12px;
-}
+.add-icon { width: 12px; height: 12px; }
 
-.file-list {
-  margin-top: 6px;
-}
-
-.empty-state {
-  padding: 14px 0;
-  color: #6f93a6;
-  font-size: 12px;
-}
+.file-list { margin-top: 12px; }
+.empty-state { padding: 24px 0; color: #9CA3AF; font-size: 12px; text-align: center; }
 </style>
