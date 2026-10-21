@@ -174,4 +174,32 @@ function selectRow(row) {
 .decor-line.left { left: 0px; } .decor-line.right { right: 0px; }
 .decor-line .dot { width: 4px; height: 4px; border: 1px solid #FFFFFF; }
 .decor-line .line { width: 0; flex: 1; border-left: 1px solid rgba(255, 255, 255, 0.2); }
+.project-table {
+  padding: 43.82px 14.91px 0;
+}
+.project-header {
+  height: 27px;
+  font-size: 13.05px;
+}
+.project-row {
+  min-height: 36.34px;
+  margin-top: 0;
+}
+.project-header + .project-row {
+  margin-top: 0;
+}
+.project-row + .project-row {
+  margin-top: 9.32px;
+}
+.capacity-box img {
+  width: 33.55px;
+  height: 33.55px;
+}
+.val-wind,
+.val-solar {
+  font-size: 14.91px;
+}
+.capacity-box small {
+  font-size: 11.18px;
+}
 </style>

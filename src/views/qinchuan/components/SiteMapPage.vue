@@ -29,7 +29,7 @@
     </div>
 
     <!-- 默认视图 -->
-    <template v-if="!showConfig && !showCreateProject">
+    <template v-if="!showConfig && !showCreateProject && !showEditProject">
       <!-- 顶部两颗浮动卡片 -->
       <div v-if="!showVerifyPanel && !showDetailPanel" class="view-toolbar">
         <div class="view-tabs">
@@ -154,9 +154,9 @@
           </el-input>
         </div>
 
-        <!-- 右上：编辑工具栏（两种状态：未进入编辑 = 只显示「编辑」；已进入编辑 = 完整工具栏） -->
+        <!-- 右上：编辑工具栏（选中场区即展开） -->
         <div v-if="selectedProject && !showVerifyPanel && !showDetailPanel" class="edit-toolbar">
-          <!-- 未进入编辑 -->
+          <!-- 兜底：正常不会走到 -->
           <template v-if="!isEditing">
             <button class="edit-tool-button" @click="startEdit">
               <el-icon><Edit /></el-icon>
@@ -164,8 +164,14 @@
             </button>
           </template>
 
-          <!-- 已进入编辑 -->
           <template v-else>
+            <!-- ★ 改动：「编辑」按钮打开项目信息编辑表单 -->
+            <button class="edit-tool-button" @click="openEditProjectForm">
+              <el-icon><Edit /></el-icon>
+              编辑
+            </button>
+            <span class="edit-divider" />
+
             <button
               v-for="item in editTools"
               :key="item.key"
@@ -446,6 +452,19 @@
       />
     </section>
 
+    <!-- ★ 改动：编辑项目信息（回显 + 保存走 updateSXProject） -->
+    <section v-if="showEditProject" class="create-project-fullpage">
+      <CreateProjectForm
+        ref="editProjectFormRef"
+        :map-ref="mapRef"
+        :panel-width="550"
+        mode="edit"
+        :project="editProjectTarget"
+        @cancel="onEditProjectCancel"
+        @saved="onProjectUpdated"
+      />
+    </section>
+
     <!-- 核查面板 -->
     <VerifyPanel
       v-if="showVerifyPanelFlag"
@@ -510,7 +529,7 @@ import {
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  ArrowLeft, ArrowRight, CircleCheck, Edit, Files, Fold, InfoFilled, List, Location,
+  ArrowLeft, ArrowRight, CircleCheck, Close, Edit, Files, Fold, InfoFilled, List, Location,
   LocationFilled, MapLocation, Plus, Search, Setting,
 } from '@element-plus/icons-vue'
 import MapGL from '@/components/MapGL.vue'
@@ -682,7 +701,7 @@ const isBoxSelecting = ref(false)
 const hasSaved = ref(false)
 const recalculating = ref(false)
 
-// ★ 新增：编辑态 / 脏标记
+// ★ 编辑态 / 脏标记
 const isEditing = ref(false)
 const isDirty = ref(false)
 
@@ -775,6 +794,45 @@ async function handlePlaceSearch() {
     const { lng, lat } = await searchPlaceName(placeSearchKeyword.value.trim())
     mapRef.value?.getMap?.()?.flyTo({ center: [lng, lat], zoom: 11, duration: 1500 })
   } catch (err) { ElMessage.warning(err.message || '未找到匹配的地名') }
+}
+
+// =================== 编辑项目信息表单 ===================
+// ★ 改动：新增编辑表单状态
+const showEditProject = ref(false)
+const editProjectTarget = ref(null)
+const editProjectFormRef = ref(null)
+
+function openEditProjectForm() {
+  if (!selectedProject.value) return
+  if (isDirty.value) { ElMessage.warning('请先保存或取消地图上的修改'); return }
+  // 清掉地图上选中项目的图标，避免和表单内部渲染的图层重复
+  clearSelectedProjectIcons()
+  editProjectTarget.value = selectedProject.value
+  showEditProject.value = true
+}
+
+async function onProjectUpdated() {
+  showEditProject.value = false
+  editProjectTarget.value = null
+  await Promise.all([
+    fetchMapProjects(),
+    fetchProjectList(),
+    fetchOverviewStats(),
+    fetchCityStats(),
+  ])
+  const fresh = allMapProjects.value.find((p) => p.id === selectedProject.value?.id)
+  if (fresh) {
+    selectedProject.value = fresh
+    initEditBuffer(fresh)
+    await renderProjectsByStage('area')
+    updateDetailCardPosition()
+  }
+}
+
+function onEditProjectCancel() {
+  showEditProject.value = false
+  editProjectTarget.value = null
+  if (selectedProject.value) renderSelectedProjectIcons(selectedProject.value)
 }
 
 // =================== 筛选 & 列表 ===================
@@ -872,20 +930,18 @@ function executeAction(action, project) {
     return
   }
   if (action === 'edit') {
-  // 直接进入编辑模式，不打开右侧详情面板
-  showProjectDrawer.value = false
-  showDetailPanel.value = false
-  viewMode.value = 'map'
-  setTimeout(async () => {
-    // 若目标项目尚未选中，先选中（onProjectClick 内部会飞到场区、加载图标）
-    if (selectedProject.value?.id !== mapProject.id) {
-      await onProjectClick(mapProject.id)
-    }
-    // 进入编辑（若尚未进入）
-    if (!isEditing.value) startEdit()
-  }, 100)
-  return
-}
+    // ★ 改动：进入编辑模式并直接打开项目信息编辑表单
+    showProjectDrawer.value = false
+    showDetailPanel.value = false
+    viewMode.value = 'map'
+    setTimeout(async () => {
+      if (selectedProject.value?.id !== mapProject.id) {
+        await onProjectClick(mapProject.id)
+      }
+      openEditProjectForm()
+    }, 100)
+    return
+  }
   if (action === 'delete') {
     handleDeleteProject(mapProject)
     return
@@ -904,9 +960,7 @@ async function handleDeleteProject(project) {
       '提示',
       { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
     )
-  } catch {
-    return
-  }
+  } catch { return }
 
   deletingId.value = id
   try {
@@ -1269,7 +1323,7 @@ async function fetchMapProjects() {
 const windCount = computed(() => selectedProject.value?.windTurbinePoints?.length || 0)
 const altCount = computed(() => (selectedProject.value?.windTurbinePoints || []).filter((p) => Number(p.isReserve) === 1).length)
 
-// ★ 选中项目：只选中、不自动进编辑
+// ★ 改动：选中项目后直接展开编辑工具栏（但不自动进入地图绘制）
 async function onProjectClick(projectId) {
   if (selectedProject.value?.id === projectId) return
   clearSelectionLayers()
@@ -1280,8 +1334,11 @@ async function onProjectClick(projectId) {
 
   selectedProject.value = project
   hasSaved.value = false
-  isEditing.value = false
+  isEditing.value = true          // ← 选中即展开工具栏
   isDirty.value = false
+  editMode.value = 'area'
+  initEditBuffer(project)         // ← 预置 buffer，点「编辑场区」等按钮可立即使用
+
   addProjectArea(project, true)
   await renderSelectedProjectIcons(project)
   updateDetailCardPosition()
@@ -1315,9 +1372,10 @@ function updateDetailCardPosition() {
   const pt = map.project(centroid); detailCardPos.x = pt.x; detailCardPos.y = pt.y; detailCardPos.visible = true
 }
 
-// ★ 点击空白：退出编辑模式（但保留选中，直到点击下一个场区）
+// ★ 改动：点击空白只清理绘制/框选状态，保留选中和工具栏（选中即编辑，不再"退出编辑"）
 function handleMapBlankClick(e) {
   if (!isAreaView.value || !selectedProject.value) return
+  if (showEditProject.value) return
   const map = mapRef.value?.getMap?.()
   if (!map) return
   const areaIds = []
@@ -1325,9 +1383,15 @@ function handleMapBlankClick(e) {
     if (id.startsWith('project-area-')) areaIds.push(`${id}-fill`)
   }
   if (!areaIds.length) return
-  // 点在场区外
   if (!map.queryRenderedFeatures(e.point, { layers: areaIds }).length) {
-    if (isEditing.value) exitEditMode()
+    if (drawingNewPoint.value) {
+      mapRef.value?.getDraw?.()?.changeMode('simple_select')
+      drawingNewPoint.value = false
+    }
+    if (isBoxSelecting.value) {
+      mapRef.value?.stopBoxSelect?.()
+      isBoxSelecting.value = false
+    }
   }
 }
 
@@ -1412,7 +1476,7 @@ function onDrawChange() {
   if (isEditing.value) isDirty.value = true
 }
 
-// ★ 进入编辑（点击「编辑」按钮触发）
+// ★ 进入编辑（点击工具栏「编辑场区」等按钮触发）
 function startEdit() {
   if (!selectedProject.value) return
   isEditing.value = true
@@ -1523,7 +1587,6 @@ function startAddWindPoint() {
   ElMessage.info('点击地图添加风机，点击"标记备选"可切换备选状态')
 }
 
-// ★ 修复：升压站「新增点」切换
 function toggleAddPoint() {
   const draw = mapRef.value?.getDraw?.()
   if (!draw) return

@@ -1,7 +1,8 @@
 <template>
   <aside class="create-project-form">
     <div class="cp-header">
-      <span class="cp-title">创建项目</span>
+      <!-- ★ 改动：标题按模式动态 -->
+      <span class="cp-title">{{ isEditMode ? '编辑项目' : '创建项目' }}</span>
       <div class="cp-header-actions">
         <el-button size="small" @click="handleCancel">取消</el-button>
         <el-button type="primary" size="small" :loading="submitting" @click="handleSave">保存</el-button>
@@ -258,7 +259,7 @@
 
 <script setup>
 import {
-  reactive, ref, computed, watch, onMounted, onUnmounted
+  reactive, ref, computed, watch, onMounted, onUnmounted, nextTick
 } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Close } from '@element-plus/icons-vue'
@@ -276,10 +277,16 @@ import shengyazhanIcon from '@/assets/img/mapIcon/shengyazhan.png'
 
 const MAX_SITE_RANGE_RADIUS_KM = 25
 
+// ★ 改动：新增 mode / project
 const props = defineProps({
-  mapRef: { type: Object, required: true }
+  mapRef: { type: Object, required: true },
+  mode: { type: String, default: 'create' },   // 'create' | 'edit'
+  project: { type: Object, default: null },    // 编辑时的回显数据
 })
 const emit = defineEmits(['cancel', 'saved', 'site-range-mode-change'])
+
+// ★ 改动
+const isEditMode = computed(() => props.mode === 'edit')
 
 function resolveMapInstance(mapRefProp) {
   if (!mapRefProp) return null
@@ -331,6 +338,9 @@ const boosterFileModel = ref(null)
 const boosterFileDto = ref(null)
 const boosterOutOfRangeList = ref([])
 
+// ★ 改动：编辑时的原始文件集合，保存时与新增文件合并
+const originalFileCollection = ref([])
+
 function addBoosterPoint() {
   if (boosterPoints.value.length >= 2) {
     ElMessage.warning('最多只能添加2个升压站点位')
@@ -351,7 +361,7 @@ function removeBoosterPoint(idx) {
 
 let boosterInputTimer = null
 function onBoosterCoordInput() {
-   renderBoosterOnMap()
+  renderBoosterOnMap()
   checkBoosterPointsInRange()
 }
 
@@ -387,10 +397,6 @@ function withName(blob, name) {
   return blob
 }
 
-/**
- * 拿到可被解析器读取的 File/Blob。
- * 优先用 @success 第二参；拿不到时用 dto.url 下载并补 name。
- */
 async function resolveUploadFile(dto, file) {
   const raw = (typeof file?.text === 'function' && file)
     || (typeof file?.raw?.text === 'function' && file.raw)
@@ -406,7 +412,6 @@ async function resolveUploadFile(dto, file) {
   throw new Error('未获取到可解析的文件内容')
 }
 
-// 相邻重复点去重，并保证首尾闭合（面用）
 function dedupeRing(points) {
   const out = []
   for (const p of points) {
@@ -769,7 +774,6 @@ function removeAllOutOfRangeWindPoints() {
   }).catch(() => {})
 }
 
-// ★ 升压站上传：按结构判定面/点，不依赖文件名和首尾坐标
 async function handleBoosterUploadSuccess(dto, file) {
   boosterFileDto.value = { ...dto }
   try {
@@ -790,7 +794,7 @@ async function handleBoosterUploadSuccess(dto, file) {
       activeBoosterIndex.value = 0
       renderBoosterOnMap()
       checkBoosterPointsInRange()
-      flyToBounds(ring) // ★ 跳转到升压站区域视角
+      flyToBounds(ring)
     } else {
       const pts = parsed.points || []
       if (!pts.length) throw new Error('文件内无坐标数据')
@@ -811,7 +815,7 @@ async function handleBoosterUploadSuccess(dto, file) {
       renderBoosterOnMap()
       checkBoosterPointsInRange()
       if (uniq.length) {
-        flyToBounds(uniq.map(p => [Number(p.lng), Number(p.lat)])) // 点位也跳一下
+        flyToBounds(uniq.map(p => [Number(p.lng), Number(p.lat)]))
       }
     }
 
@@ -834,12 +838,14 @@ function handleUploadError(err) { ElMessage.error(`上传失败：${err?.message
 function downloadTemplate(type) { ElMessage.info(`下载 ${type} 数据模板`) }
 
 /* ==================== 监听 & 生命周期 ==================== */
-watch(() => form.siteRangeMode, (mode) => {
+// ★ 改动：去掉 immediate，避免初始化时冲掉编辑回显；仅在用户切换时触发
+watch(() => form.siteRangeMode, (mode, oldMode) => {
+  if (oldMode === undefined) return
   emit('site-range-mode-change', mode)
   const mapInstance = resolveMapInstance(props.mapRef)
   if (mode === 'draw') { clearSiteRange(); startPolygonDrawing() }
   else { clearSiteRange(); mapInstance?.getDraw?.()?.changeMode?.('simple_select') }
-}, { immediate: true })
+})
 
 watch(() => form.windTurbineMode, (mode) => {
   if (mode !== 'has') { windTurbinePoints.value = []; windOutOfRangeList.value = []; renderWindPointsOnMap() }
@@ -848,7 +854,7 @@ watch(() => form.boosterMode, (mode) => {
   if (mode !== 'has') { boosterPoints.value = [createBoosterPoint()]; boosterOutOfRangeList.value = []; renderBoosterOnMap() }
 })
 
-// ★ 从「导入数据」切到「手动录入」时，把 closure 转成 center
+// 从「导入数据」切到「手动录入」时，把 closure 转成 center
 watch(boosterEntryMode, (mode) => {
   if (mode === 'manual') {
     boosterPoints.value = boosterPoints.value.map(p => ({
@@ -867,7 +873,18 @@ watch(boosterEntryMode, (mode) => {
 
 watch(() => resolveMapInstance(props.mapRef), (mapInstance) => { if (mapInstance) bindSiteRangeDrawEvents() }, { immediate: true })
 
-onMounted(() => { bindSiteRangeDrawEvents(); loadProjectStages() })
+onMounted(() => {
+  bindSiteRangeDrawEvents()
+  loadProjectStages()
+
+  // ★ 改动：编辑模式回显；创建模式保持"打开即开始绘制"
+  if (props.mode === 'edit' && props.project) {
+    initFromProject(props.project)
+  } else if (form.siteRangeMode === 'draw') {
+    nextTick(() => startPolygonDrawing())
+  }
+})
+
 onUnmounted(() => {
   if (boosterInputTimer) clearTimeout(boosterInputTimer)
   unbindDrawCreate?.()
@@ -914,12 +931,190 @@ function validate() {
   return ''
 }
 
+// ★ 改动：更安全的 id 生成
+function genId() {
+  try { return crypto.randomUUID() }
+  catch { return `f-${Date.now()}-${Math.random().toString(16).slice(2, 10)}` }
+}
+
 function buildFileCollection() {
   const list = []
-  if (siteRangeFileDto.value) list.push({ fileBusinessType: '场区范围', fileId: crypto.randomUUID(), fileName: siteRangeFileDto.value.fileName, filePath: siteRangeFileDto.value.filePath || siteRangeFileDto.value.objectKey, fileSuffix: siteRangeFileDto.value.fileSuffix })
-  if (windTurbineFileDto.value) list.push({ fileBusinessType: '风机点位', fileId: crypto.randomUUID(), fileName: windTurbineFileDto.value.fileName, filePath: windTurbineFileDto.value.filePath || windTurbineFileDto.value.objectKey, fileSuffix: windTurbineFileDto.value.fileSuffix })
-  if (boosterFileDto.value) list.push({ fileBusinessType: '升压站点位', fileId: crypto.randomUUID(), fileName: boosterFileDto.value.fileName, filePath: boosterFileDto.value.filePath || boosterFileDto.value.objectKey, fileSuffix: boosterFileDto.value.fileSuffix })
+  if (siteRangeFileDto.value) list.push({ fileBusinessType: '场区范围', fileId: genId(), fileName: siteRangeFileDto.value.fileName, filePath: siteRangeFileDto.value.filePath || siteRangeFileDto.value.objectKey, fileSuffix: siteRangeFileDto.value.fileSuffix })
+  if (windTurbineFileDto.value) list.push({ fileBusinessType: '风机点位', fileId: genId(), fileName: windTurbineFileDto.value.fileName, filePath: windTurbineFileDto.value.filePath || windTurbineFileDto.value.objectKey, fileSuffix: windTurbineFileDto.value.fileSuffix })
+  if (boosterFileDto.value) list.push({ fileBusinessType: '升压站点位', fileId: genId(), fileName: boosterFileDto.value.fileName, filePath: boosterFileDto.value.filePath || boosterFileDto.value.objectKey, fileSuffix: boosterFileDto.value.fileSuffix })
   return list
+}
+
+// ★ 改动：编辑保存时合并原有文件
+function mergeFileCollection(original, newFiles) {
+  const out = []
+  const seen = new Set()
+  const newBizTypes = new Set(newFiles.map((f) => f.fileBusinessType))
+  for (const f of original || []) {
+    if (f.fileBusinessType && newBizTypes.has(f.fileBusinessType)) continue
+    const key = f.fileId || f.filePath || `${f.fileBusinessType}-${f.fileName}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(f)
+  }
+  for (const f of newFiles) {
+    const key = f.fileId || f.filePath || `${f.fileBusinessType}-${f.fileName}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(f)
+  }
+  return out
+}
+
+// ★ 改动：回显
+function initFromProject(project) {
+  if (!project) return
+
+  // ---- 基本信息 ----
+  form.itemType = project.itemType || 'FD'
+  form.projectCode = project.projectCode || ''
+  form.projectName = project.projectName || ''
+  form.projectStage = project.projectStage || ''
+  form.notes = project.notes || ''
+
+  // ---- 场区范围（coordinate: [{longitude, latitude, regionCode}]）----
+  const coords = (project.coordinate || [])
+    .map((p) => ({ lng: Number(p.longitude ?? p.lng), lat: Number(p.latitude ?? p.lat) }))
+    .filter((p) => Number.isFinite(p.lng) && Number.isFinite(p.lat))
+  if (coords.length >= 3) {
+    siteRangePoints.value = coords
+    form.siteRangeMode = 'draw'
+  }
+
+  // ---- 风机（windTurbinePoints: [{longitude, latitude, isReserve}]）----
+  const wind = (project.windTurbinePoints || [])
+    .map((p) => ({
+      lng: Number(p.longitude ?? p.lng),
+      lat: Number(p.latitude ?? p.lat),
+      isAlternative: Number(p.isReserve ?? p.isAlternative ?? 0),
+    }))
+    .filter((p) => Number.isFinite(p.lng) && Number.isFinite(p.lat))
+  if (wind.length) {
+    windTurbinePoints.value = wind
+    form.windTurbineMode = 'has'
+  }
+
+  // ---- 升压站（boosterStationLocations: [{lng, lat, isBest}]，兼容 closure/geometry）----
+  const booster = (project.boosterStationLocations || [])
+    .map((p) => ({
+      lng: Number(p.lng),
+      lat: Number(p.lat),
+      isBest: Number(p.isBest ?? 0),
+      placement: p.placement === 'closure' ? 'closure' : 'center',
+      geometry: p.geometry || null,
+    }))
+    .filter((p) => Number.isFinite(p.lng) && Number.isFinite(p.lat))
+  if (booster.length) {
+    boosterPoints.value = booster
+    form.boosterMode = 'has'
+    boosterEntryMode.value = 'manual'
+    activeBoosterIndex.value = 0
+  }
+
+  // ---- 接入站 ----
+  if (project.accessSubstationName) {
+    form.accessMode = 'has'
+    form.accessName = project.accessSubstationName || ''
+    const acc = (project.accessSubstationPoints || [])[0]
+    if (acc) {
+      form.accessLng = acc.lng != null ? String(acc.lng) : ''
+      form.accessLat = acc.lat != null ? String(acc.lat) : ''
+    }
+    form.sendOutType = Number(project.sendOutType ?? 1)
+  } else {
+    form.accessMode = 'none'
+  }
+
+  // ---- 原始文件集合（编辑保存时合并）----
+  originalFileCollection.value = Array.isArray(project.fileCollection)
+    ? project.fileCollection.map((f) => ({ ...f }))
+    : []
+
+  // ---- 地图渲染 ----
+  nextTick(() => {
+    renderSiteRangeOnMap()
+    checkWindPointsInRange()
+    checkBoosterPointsInRange()
+    renderBoosterOnMap()
+    bringCustomLayersToFront()
+  })
+}
+
+// ★ 改动：统一 payload 构造
+function buildPayload(region, isEdit) {
+  const regionPayload = {
+    province: String(region.provinceCode || '').trim(),
+    city: String(region.cityCode || '').trim(),
+    district: String(region.districtCode || '').trim(),
+    provinceName: String(region.provinceName || '').trim(),
+    cityName: String(region.cityName || '').trim(),
+    districtName: String(region.districtName || '').trim(),
+    address: String(region.address || '').trim(),
+  }
+
+  const newFiles = buildFileCollection()
+  const fileCollection = isEdit
+    ? mergeFileCollection(originalFileCollection.value, newFiles)
+    : newFiles
+
+  const payload = {
+    itemType: form.itemType,
+    projectCode: form.projectCode.trim(),
+    projectName: form.projectName.trim(),
+    projectStage: form.projectStage,
+
+    // 编辑接口 AiProjectUpdateByUserReqVO 示例传名称；create 保持原编码 + name 字段
+    province: isEdit ? regionPayload.provinceName : regionPayload.province,
+    city:     isEdit ? regionPayload.cityName     : regionPayload.city,
+    district: isEdit ? regionPayload.districtName : regionPayload.district,
+    address:  regionPayload.address,
+
+    coordinate: siteRangePoints.value.map((p) => ({
+      longitude: String(p.lng),
+      latitude: String(p.lat),
+      regionCode: Number(region.regionCode) || Number(region.cityCode) || null,
+    })),
+
+    windTurbinePoints: form.windTurbineMode === 'has'
+      ? windTurbinePoints.value.map((p) => ({
+          longitude: Number(p.lng),
+          latitude: Number(p.lat),
+          isReserve: Number(p.isAlternative || 0),
+        }))
+      : [],
+
+    boosterStationLocations: form.boosterMode === 'has'
+      ? boosterPoints.value.map((p) => {
+          const base = { lng: Number(p.lng), lat: Number(p.lat), isBest: Number(p.isBest || 0) }
+          if (p.placement === 'closure' && p.geometry) {
+            return { ...base, geometry: p.geometry, placement: 'closure' }
+          }
+          return base
+        })
+      : [],
+
+    accessSubstationName: form.accessMode === 'has' ? form.accessName.trim() : null,
+    accessSubstationPoints: form.accessMode === 'has'
+      ? [{ lng: Number(form.accessLng), lat: Number(form.accessLat) }]
+      : [],
+    sendOutType: form.accessMode === 'has' ? Number(form.sendOutType) : null,
+
+    fileCollection,
+    notes: form.notes,
+  }
+
+  if (!isEdit) {
+    payload.province_name = regionPayload.provinceName
+    payload.city_name = regionPayload.cityName
+    payload.district_name = regionPayload.districtName
+  }
+
+  return payload
 }
 
 async function handleSave() {
@@ -928,32 +1123,23 @@ async function handleSave() {
   submitting.value = true
   try {
     const region = await resolveRegionByPoints(siteRangePoints.value)
-    const regionPayload = {
-      province: String(region.provinceCode || '').trim(), city: String(region.cityCode || '').trim(), district: String(region.districtCode || '').trim(),
-      provinceName: String(region.provinceName || '').trim(), cityName: String(region.cityName || '').trim(), districtName: String(region.districtName || '').trim(), address: String(region.address || '').trim()
-    }
-    if (!regionPayload.province || !regionPayload.city) throw new Error('无法识别省、市行政区划编码')
+    if (!region.provinceCode || !region.cityCode) throw new Error('无法识别省、市行政区划编码')
 
-    const payload = {
-      itemType: form.itemType, projectCode: form.projectCode.trim(), projectName: form.projectName.trim(), projectStage: form.projectStage,
-      province: regionPayload.province, city: regionPayload.city, district: regionPayload.district,
-      province_name: regionPayload.provinceName, city_name: regionPayload.cityName, district_name: regionPayload.districtName, address: regionPayload.address,
-      coordinate: siteRangePoints.value.map(p => ({ longitude: String(p.lng), latitude: String(p.lat), regionCode: Number(region.regionCode) })),
-      windTurbinePoints: form.windTurbineMode === 'has' ? windTurbinePoints.value.map(p => ({ longitude: Number(p.lng), latitude: Number(p.lat), isAlternative: Number(p.isAlternative || 0) })) : [],
-      boosterStationLocations: form.boosterMode === 'has' ? boosterPoints.value.map(p => {
-        if (p.placement === 'closure' && p.geometry) {
-          return { lng: Number(p.lng), lat: Number(p.lat), isBest: Number(p.isBest || 0), geometry: p.geometry, placement: 'closure' }
-        }
-        return { lng: Number(p.lng), lat: Number(p.lat), isBest: Number(p.isBest || 0), placement: 'center' }
-      }) : [],
-      accessSubstationName: form.accessMode === 'has' ? form.accessName.trim() : undefined,
-      accessSubstationPoints: form.accessMode === 'has' ? [{ lng: Number(form.accessLng), lat: Number(form.accessLat) }] : [],
-      sendOutType: form.accessMode === 'has' ? Number(form.sendOutType) : undefined,
-      fileCollection: buildFileCollection(), notes: form.notes
+    const isEdit = isEditMode.value
+    const payload = buildPayload(region, isEdit)
+
+    if (isEdit) {
+      const id = props.project?.id
+      if (!id) throw new Error('缺少项目ID，无法保存')
+      const res = await api.updateSXProject(id, payload)
+      if (res?.code !== 200) throw new Error(res?.msg || '保存失败')
+      ElMessage.success('保存成功')
+      emit('saved', { id, payload })
+    } else {
+      await api.createProject(payload)
+      ElMessage.success('项目创建成功')
+      emit('saved', payload)
     }
-    await api.createProject(payload)
-    ElMessage.success('项目创建成功')
-    emit('saved', payload)
   } catch (err) { ElMessage.error(err?.message || '保存失败') } finally { submitting.value = false }
 }
 

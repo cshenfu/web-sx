@@ -64,3 +64,10 @@ export async function getAiProjectData(projectId) {
 export async function updateProjectStage(data) {
     return await publicService4.put(`/ai/api/aiProject/update-stage`,data);
 }
+
+
+
+//更新项目
+export async function updateSXProject(projectId,data) {
+    return await publicService4.put(`/ai/api/aiProject/update/${projectId}`,data);
+}
