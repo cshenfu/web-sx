@@ -389,6 +389,7 @@
 
     .my-project-list {
         >h3 {
+            color:#ffffff;
             font-weight: bold;
             margin-top: 8px;
             margin-bottom: 20px;
