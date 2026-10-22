@@ -252,76 +252,72 @@
     }
   }
   
-  async function handleSave() {
-    if (!selectedFile.value) {
-      ElMessage.warning('请先选择文件')
-      return
-    }
-    if (!filePath.value) {
-      ElMessage.warning('文件还在上传中，请稍候')
-      return
-    }
-  
-    const fileName = selectedFile.value.name
-    const fileSuffix = fileName.split('.').pop().toLowerCase()
-  
-    const newFile = {
-      fileName,
-      filePath: filePath.value,
-      fileSuffix,
-      recognitionContent: buildRecognitionContent(),
-    }
-  
-    saving.value = true
-    try {
-      let res
-  
-      if (props.record?.id) {
-        const existing = (props.record.fileUrlList || []).map(f => ({
-          fileName: f.fileName,
-          filePath: f.filePath,
-          fileSuffix: f.fileSuffix,
-          recognitionContent: f.recognitionContent,
-        }))
-        const payload = {
-          id: props.record.id,
-          aiProjectId: props.project?.id,
-          firstBusinessTitle: props.record.firstBusinessTitle || props.fileCode,
-          secondaryBusinessTitle: props.record.secondaryBusinessTitle || props.secondaryBusinessTitle,
-          fileTypeTag: props.record.fileTypeTag || props.tagName,
-          isRequiredUpload: props.record.isRequiredUpload ?? 0,
-          notes: props.record.notes,
-          fileUrlList: [...existing, newFile],
-        }
-        console.log('[meeting-upload] update payload:', payload)
-        res = await updateFile(payload)
-      } else {
-        const payload = {
-          aiProjectId: props.project?.id,
-          firstBusinessTitle: props.fileCode,
-          secondaryBusinessTitle: props.secondaryBusinessTitle,
-          fileTypeTag: props.tagName,
-          isRequiredUpload: 0,
-          fileUrlList: [newFile],
-        }
-        console.log('[meeting-upload] add payload:', payload)
-        res = await addFileType(payload)
-      }
-  
-      if (res?.code === 200) {
-        ElMessage.success('上传成功')
-        emit('saved')
-        emit('close')
-      } else {
-        ElMessage.error(res?.msg || '上传失败')
-      }
-    } catch (err) {
-      console.error('[meeting-upload] 提交失败:', err)
-      ElMessage.error(err?.message || '上传失败')
-    } finally {
-      saving.value = false
-    }
+async function handleSave() {
+  if (!selectedFile.value) {
+    ElMessage.warning('请先选择文件')
+    return
   }
+  if (!filePath.value) {
+    ElMessage.warning('文件还在上传中，请稍候')
+    return
+  }
+
+  const fileName = selectedFile.value.name
+  const fileSuffix = fileName.split('.').pop().toLowerCase()
+
+  // ★ 解析结果只构建一次，文件级 + 记录级共用
+  const recognitionContent = buildRecognitionContent()
+
+  const newFile = {
+    fileName,
+    filePath: filePath.value,
+    fileSuffix,
+    recognitionContent, // 文件级
+  }
+
+  saving.value = true
+  try {
+    let res
+    if (props.record?.id) {
+      const payload = {
+        id: props.record.id,
+        aiProjectId: props.project?.id,
+        firstBusinessTitle: props.record.firstBusinessTitle || props.fileCode,
+        secondaryBusinessTitle: props.record.secondaryBusinessTitle || props.secondaryBusinessTitle,
+        fileTypeTag: props.record.fileTypeTag || props.tagName,
+        isRequiredUpload: normalizeBool(props.record.isRequiredUpload),
+        notes: props.record.notes,
+        recognitionContent, // ★ 记录级
+        fileUrlList: [newFile],
+      }
+      res = await updateFile(payload)
+    } else {
+      const payload = {
+        aiProjectId: props.project?.id,
+        firstBusinessTitle: props.fileCode,
+        secondaryBusinessTitle: props.secondaryBusinessTitle,
+        fileTypeTag: props.tagName,
+        isRequiredUpload: false,
+        recognitionContent, // ★ 记录级
+        fileUrlList: [newFile],
+      }
+      res = await addFileType(payload)
+    }
+
+    if (res?.code === 200) {
+      ElMessage.success('上传成功')
+      emit('saved')
+      emit('close')
+    } else {
+      ElMessage.error(res?.msg || '上传失败')
+    }
+  } catch (err) {
+    console.error('[meeting-upload] 提交失败:', err)
+    ElMessage.error(err?.message || '上传失败')
+  } finally {
+    saving.value = false
+  }
+}
   </script>
   
   <style scoped>

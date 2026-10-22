@@ -5,7 +5,7 @@
 
     <div class="layout-body">
       <!-- 全屏时隐藏侧边栏 -->
-      <Sidebar v-show="!isFullScreen && hasSidebar" />
+      <Sidebar v-if="!isFullScreen && hasSidebar" />
 
       <div class="page-content" :class="{ 'no-sidebar': !hasSidebar || isFullScreen }">
         <RouterView v-slot="{ Component, route }">

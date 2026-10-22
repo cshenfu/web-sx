@@ -52,6 +52,7 @@
             :stage-code="activeTabConfig.stageCode"
             @open-setting="openSetting"
             @upload="handleUpload"
+            @deleted="handleFileDeleted"
           />
           <DetailMeetingTab
             v-else-if="activeTab === 'meeting'"
@@ -60,6 +61,7 @@
             :stage-code="activeTabConfig.stageCode"
             :file-code="activeTabConfig.fileCode"
             @action="handleMeetingAction"
+            @deleted="handleMeetingFileDeleted"
           />
         </div>
       </template>
@@ -196,7 +198,7 @@ async function loadNecessaryFiles() {
     })
     const list = (res?.data || []).map(normalizeRecord)
     const required = list.filter(isRequired)
-    
+
     // 必须有必填文件，并且每一个必填文件都有至少一个 URL，才能点亮按钮
     necessaryFilesDone.value =
       required.length > 0 && required.every(f => f.fileUrlList.length > 0)
@@ -362,6 +364,11 @@ function handleUploadSaved() {
   loadNecessaryFiles()          // ★ 同步刷新 header 按钮可用态
 }
 
+// ★ 材料删除后刷新 header 按钮可用态
+function handleFileDeleted() {
+  loadNecessaryFiles()
+}
+
 // ========================================================
 // 上会流程（DetailMeetingTab → MeetingMinutesUploadDialog）
 // ========================================================
@@ -402,6 +409,12 @@ function handleMeetingAction(payload) {
 function handleMeetingUploadSaved() {
   showMeetingUpload.value = false
   meetingTabRef.value?.loadMeeting()
+  loadNecessaryFiles()
+}
+
+// ★ 会议文件删除后刷新（上会材料一般不影响 header 按钮，但保持一致刷新）
+function handleMeetingFileDeleted() {
+  loadNecessaryFiles()
 }
 </script>
 

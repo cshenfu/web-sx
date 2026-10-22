@@ -345,181 +345,37 @@ const routes = [
   // ─────────────────────────────────────────────
   // 湖仓汇源
   // ─────────────────────────────────────────────
+    // ─────────────────────────────────────────────
+  // 湖仓汇源
+  // ─────────────────────────────────────────────
   {
     path: '/hucang',
     component: MainLayout,
-    redirect: '/hucang/geology/list',
+    redirect: '/hucang/weather/list', // 默认进第一个菜单「气象」
     children: [
       // ─────────────────────────────────────────
-      // 地质
+      // 1. 气象（新建，先占位）
       // ─────────────────────────────────────────
       {
-        path: 'geology',
-        redirect: '/hucang/geology/list',
+        path: 'weather',
+        redirect: '/hucang/weather/list',
         children: [
           {
             path: 'list',
-            name: 'HucangGeologyList',
-            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyHome.vue'),
+            name: 'HucangWeatherList',
+            component: () => import('@/views/hucang/ComingSoon.vue'),
             meta: {
-              title: '地质数据库',
+              title: '气象数据库',
               module: 'hucang',
               sidebar: 'hucang',
-              key: 'geology'
-            }
-          },
-          {
-            path: '/hucang/geology/import',
-            name: 'GeologyDataImport',
-            component: () =>
-              import('@/views/hucang/commonDataManage/geologyData/geologyImport.vue'),
-          },
-          {
-            path: '/geology/detail',
-            name: 'HucangGeologyDetail',
-            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyDetail.vue'),
-            meta: {
-              title: '地质数据库数据详情',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'geology'
-            }
-          },
-          {
-            path: 'edit',
-            name: 'HucangGeologyEdit',
-            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyEdit.vue'),
-            meta: {
-              title: '地质数据库数据管理',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'geology'
-            }
-          },
-          {
-            path: 'linkage',
-            name: 'HucangGeologyLinkage',
-            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyLinkage.vue'),
-            meta: {
-              title: '项目关联信息',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'geology'
-            }
-          },
-          {
-            path: 'map',
-            name: 'HucangGeologyMap',
-            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyMap.vue'),
-            meta: {
-              title: '地质数据管理',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'geology'
-            }
-          },
-          {
-            path: 'geography',
-            name: 'HucangGeographyManage',
-            component: () => import('@/views/hucang/commonDataManage/geologyData/geographyManage.vue'),
-            meta: {
-              title: '地形数据管理',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'geology'
+              key: 'weather'
             }
           }
         ]
       },
 
       // ─────────────────────────────────────────
-      // 设备（先只接入风电设备，后续再扩展逆变器/光伏组件/电气设备）
-      // ─────────────────────────────────────────
-      {
-        path: 'equipment',
-        redirect: '/hucang/equipment/list',
-        children: [
-          {
-            path: 'list',
-            name: 'HucangEquipmentList',
-            component: () => import('@/views/hucang/commonDataManage/windPowerEquipment/WindPowerEquipmentList.vue'),
-            meta: {
-              title: '风电设备库',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'equipment'
-            }
-          },
-          {
-            path: 'detail',
-            name: 'HucangEquipmentDetail',
-            component: () => import('@/views/hucang/commonDataManage/windPowerEquipment/detail/Detail.vue'),
-            meta: {
-              title: '设备详情',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'equipment'
-            }
-          },
-          {
-            path: 'add',
-            name: 'HucangEquipmentAdd',
-            component: () => import('@/views/hucang/commonDataManage/windPowerEquipment/addWindDevice.vue'),
-            meta: {
-              title: '新增设备',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'equipment'
-            }
-          }
-        ]
-      },
-
-      // ─────────────────────────────────────────
-      // 电网
-      // ─────────────────────────────────────────
-      {
-        path: 'grid',
-        redirect: '/hucang/grid/list',
-        children: [
-          {
-            path: 'list',
-            name: 'HucangGridList',
-            component: () => import('@/views/hucang/commonDataManage/currentPower/CurrentPower.vue'),
-            meta: {
-              title: '电网现状数据库',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'grid'
-            }
-          },
-          {
-            path: 'add',
-            name: 'HucangGridAdd',
-            component: () => import('@/views/hucang/commonDataManage/currentPower/AddCurrentPower.vue'),
-            meta: {
-              title: '电网现状数据管理',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'grid'
-            }
-          },
-          {
-            path: 'detail',
-            name: 'HucangGridDetail',
-            component: () => import('@/views/hucang/commonDataManage/currentPower/CurrentPowerDetail.vue'),
-            meta: {
-              title: '电网数据详情',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'grid'
-            }
-          }
-        ]
-      },
-
-      // ─────────────────────────────────────────
-      // 气候
+      // 2. 气候
       // ─────────────────────────────────────────
       {
         path: 'climate',
@@ -562,28 +418,7 @@ const routes = [
       },
 
       // ─────────────────────────────────────────
-      // 价格
-      // ─────────────────────────────────────────
-      {
-        path: 'price',
-        redirect: '/hucang/price/list',
-        children: [
-          {
-            path: 'list',
-            name: 'HucangPriceList',
-            component: () => import('@/views/hucang/commonDataManage/costLibrary/components/costLibraryList.vue'),
-            meta: {
-              title: '造价数据',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'price'
-            }
-          }
-        ]
-      },
-
-      // ─────────────────────────────────────────
-      // 测风塔
+      // 3. 测风塔
       // ─────────────────────────────────────────
       {
         path: 'windtower',
@@ -615,7 +450,109 @@ const routes = [
       },
 
       // ─────────────────────────────────────────
-      // 避让区域（占位页，待开发）
+      // 4. 地质（带子菜单：地勘数据库 / 地形数据 / 公共数据）
+      // ─────────────────────────────────────────
+      {
+        path: 'geology',
+        redirect: '/hucang/geology/list', // 默认进「地勘数据库」
+        children: [
+          // 子菜单 1：地勘数据库
+          {
+            path: 'list',
+            name: 'HucangGeologyList',
+            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyHome.vue'),
+            meta: {
+              title: '地勘数据库',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'geology-survey'
+            }
+          },
+          // 子菜单 2：地形数据
+          {
+            path: 'geography',
+            name: 'HucangGeographyManage',
+            component: () => import('@/views/hucang/commonDataManage/geologyData/geographyManage.vue'),
+            meta: {
+              title: '地形数据',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'geology-terrain'
+            }
+          },
+          // 子菜单 3：公共数据（新建，先占位）
+          {
+            path: 'common',
+            name: 'HucangGeologyCommon',
+            component: () => import('@/views/hucang/ComingSoon.vue'),
+            meta: {
+              title: '公共数据',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'geology-common'
+            }
+          },
+          // ===== 以下为地勘数据库的子页面（不在菜单显示，高亮归到地勘数据库）=====
+          {
+            path: 'import',
+            name: 'GeologyDataImport',
+            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyImport.vue'),
+            meta: {
+              title: '地质数据导入',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'geology-survey'
+            }
+          },
+          {
+            path: 'detail',
+            name: 'HucangGeologyDetail',
+            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyDetail.vue'),
+            meta: {
+              title: '地质数据库数据详情',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'geology-survey'
+            }
+          },
+          {
+            path: 'edit',
+            name: 'HucangGeologyEdit',
+            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyEdit.vue'),
+            meta: {
+              title: '地质数据库数据管理',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'geology-survey'
+            }
+          },
+          {
+            path: 'linkage',
+            name: 'HucangGeologyLinkage',
+            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyLinkage.vue'),
+            meta: {
+              title: '项目关联信息',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'geology-survey'
+            }
+          },
+          {
+            path: 'map',
+            name: 'HucangGeologyMap',
+            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyMap.vue'),
+            meta: {
+              title: '地质数据管理',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'geology-survey'
+            }
+          }
+        ]
+      },
+
+      // ─────────────────────────────────────────
+      // 5. 避让区域（占位页）
       // ─────────────────────────────────────────
       {
         path: 'avoidzone',
@@ -630,18 +567,136 @@ const routes = [
       },
 
       // ─────────────────────────────────────────
-      // 制度（占位页，待开发）
+      // 6. 电网
       // ─────────────────────────────────────────
       {
-        path: 'rule',
-        name: 'HucangRule',
-        component: () => import('@/views/hucang/ComingSoon.vue'),
-        meta: {
-          title: '制度',
-          module: 'hucang',
-          sidebar: 'hucang',
-          key: 'rule'
-        }
+        path: 'grid',
+        redirect: '/hucang/grid/list',
+        children: [
+          {
+            path: 'list',
+            name: 'HucangGridList',
+            component: () => import('@/views/hucang/commonDataManage/currentPower/CurrentPower.vue'),
+            meta: {
+              title: '电网现状数据库',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'grid'
+            }
+          },
+          {
+            path: 'add',
+            name: 'HucangGridAdd',
+            component: () => import('@/views/hucang/commonDataManage/currentPower/AddCurrentPower.vue'),
+            meta: {
+              title: '电网现状数据管理',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'grid'
+            }
+          },
+          {
+            path: 'detail',
+            name: 'HucangGridDetail',
+            component: () => import('@/views/hucang/commonDataManage/currentPower/CurrentPowerDetail.vue'),
+            meta: {
+              title: '电网数据详情',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'grid'
+            }
+          }
+        ]
+      },
+
+      // ─────────────────────────────────────────
+      // 7. 设备（带子菜单：风机库 / 光伏库 / 逆变设备）
+      // ─────────────────────────────────────────
+      {
+        path: 'equipment',
+        redirect: '/hucang/equipment/list', // 默认进「风机库」
+        children: [
+          // 子菜单 1：风机库
+          {
+            path: 'list',
+            name: 'HucangEquipmentList',
+            component: () => import('@/views/hucang/commonDataManage/windPowerEquipment/WindPowerEquipmentList.vue'),
+            meta: {
+              title: '风机库',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'equipment-wind'
+            }
+          },
+          // 子菜单 2：光伏库（新建，先占位）
+          {
+            path: 'pv',
+            name: 'HucangEquipmentPv',
+            component: () => import('@/views/hucang/ComingSoon.vue'),
+            meta: {
+              title: '光伏库',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'equipment-pv'
+            }
+          },
+          // 子菜单 3：逆变设备（新建，先占位）
+          {
+            path: 'inverter',
+            name: 'HucangEquipmentInverter',
+            component: () => import('@/views/hucang/ComingSoon.vue'),
+            meta: {
+              title: '逆变设备',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'equipment-inverter'
+            }
+          },
+          // ===== 以下为风机库的子页面（不在菜单显示，高亮归到风机库）=====
+          {
+            path: 'detail',
+            name: 'HucangEquipmentDetail',
+            component: () => import('@/views/hucang/commonDataManage/windPowerEquipment/detail/Detail.vue'),
+            meta: {
+              title: '设备详情',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'equipment-wind'
+            }
+          },
+          {
+            path: 'add',
+            name: 'HucangEquipmentAdd',
+            component: () => import('@/views/hucang/commonDataManage/windPowerEquipment/addWindDevice.vue'),
+            meta: {
+              title: '新增设备',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'equipment-wind'
+            }
+          }
+        ]
+      },
+
+      // ─────────────────────────────────────────
+      // 8. 造价（原「价格」改名，path/key 保持不动）
+      // ─────────────────────────────────────────
+      {
+        path: 'price',
+        redirect: '/hucang/price/list',
+        children: [
+          {
+            path: 'list',
+            name: 'HucangPriceList',
+            component: () => import('@/views/hucang/commonDataManage/costLibrary/components/costLibraryList.vue'),
+            meta: {
+              title: '造价数据',
+              module: 'hucang',
+              sidebar: 'hucang',
+              key: 'price'
+            }
+          }
+        ]
       }
     ]
   },

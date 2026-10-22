@@ -39,6 +39,9 @@
                 下载
               </el-button>
               <el-button link type="primary" size="small" @click="onUploadClick(item)">编辑</el-button>
+              <el-icon class="file-delete" title="删除" @click="handleDelete(item)">
+                <Delete />
+              </el-icon>
             </div>
           </div>
           <div class="file-card-meta">
@@ -82,6 +85,9 @@
                 下载
               </el-button>
               <el-button link type="primary" size="small" @click="onUploadClick(item)">编辑</el-button>
+              <el-icon class="file-delete" title="删除" @click="handleDelete(item)">
+                <Delete />
+              </el-icon>
             </div>
           </div>
         </div>
@@ -96,8 +102,8 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { CircleCheckFilled, CircleClose } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { CircleCheckFilled, CircleClose, Delete } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import * as fileApi from '@/api/modules/projectFile'
 import { useOssUpload } from '@/components/ossClient/index'
 
@@ -107,7 +113,7 @@ const props = defineProps({
   stageCode: { type: String, default: '' },
 })
 
-const emit = defineEmits(['open-setting', 'upload'])
+const emit = defineEmits(['open-setting', 'upload', 'deleted'])
 
 const ossUpload = useOssUpload()
 
@@ -227,6 +233,44 @@ async function handleDownload(item) {
   }
 }
 
+// ★ 删除：文件级 + 记录级 recognitionContent 一起清空
+// ★ 删除：文件级 + 记录级 recognitionContent 一起清空（传空对象，不能传 null）
+async function handleDelete(item) {
+  const record = item?.record
+  if (!record?.id) {
+    ElMessage.warning('缺少文件记录，无法删除')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确认删除「${item.file?.fileName || item.label}」吗？删除后需重新上传`,
+      '提示',
+      { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
+    )
+  } catch { return }
+
+  try {
+    await fileApi.updateFile({
+      id: record.id,
+      aiProjectId: record.aiProjectId ?? props.project?.id,
+      firstBusinessTitle: record.firstBusinessTitle || props.fileCode,
+      secondaryBusinessTitle: record.secondaryBusinessTitle || '',
+      fileTypeTag: record.fileTypeTag,
+      isRequiredUpload: isRequired(record),
+      notes: record.notes,
+      recognitionContent: {}, // ★ 清空记录级解析数据（空对象，不能 null）
+      fileUrlList: [],        // ★ 文件级随数组清空
+    })
+    ElMessage.success('删除成功')
+    await loadFiles()
+    emit('deleted', item)
+  } catch (err) {
+    console.error('[material] 删除失败:', err)
+    ElMessage.error(err?.message || '删除失败')
+  }
+}
+
 defineExpose({ loadFiles })
 </script>
 
@@ -282,7 +326,18 @@ defineExpose({ loadFiles })
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.file-card-actions { display: flex; gap: 4px; }
+.file-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.file-delete {
+  color: #c0c4cc;
+  cursor: pointer;
+  font-size: 14px;
+}
+.file-delete:hover { color: #f56c6c; }
+
 .file-card-meta {
   display: flex;
   gap: 16px;

@@ -481,24 +481,21 @@ async function handleSave() {
   const fileName = selectedFile.value.name
   const fileSuffix = fileName.split('.').pop().toLowerCase()
 
+  // ★ 解析结果只构建一次，文件级 + 记录级共用同一份
+  const recognitionContent = buildRecognitionContent()
+
   const newFile = {
     fileName,
     filePath: filePath.value,
     fileSuffix,
-    recognitionContent: buildRecognitionContent(),
+    recognitionContent, // 文件级 FileInfoDTO.recognitionContent
   }
 
   saving.value = true
   try {
     let res
     if (props.record?.id) {
-      // 有记录，追加或更新
-      const existing = (props.record.fileUrlList || []).map(f => ({
-        fileName: f.fileName,
-        filePath: f.filePath,
-        fileSuffix: f.fileSuffix,
-        recognitionContent: f.recognitionContent,
-      }))
+      // 编辑：每种只有一个文件，替换
       const payload = {
         id: props.record.id,
         aiProjectId: props.project?.id,
@@ -507,17 +504,18 @@ async function handleSave() {
         fileTypeTag: props.record.fileTypeTag || props.tagName,
         isRequiredUpload: normalizeBool(props.record.isRequiredUpload),
         notes: props.record.notes,
-        fileUrlList: [...existing, newFile],
+        recognitionContent, // ★ 记录级 AiProjectFileSaveReqVO.recognitionContent
+        fileUrlList: [newFile],
       }
       res = await updateFile(payload)
     } else {
-      // 无记录，走新增
       const payload = {
         aiProjectId: props.project?.id,
         firstBusinessTitle: props.fileCode,
         secondaryBusinessTitle: props.secondaryBusinessTitle,
         fileTypeTag: props.tagName,
-        isRequiredUpload: 0,
+        isRequiredUpload: false,
+        recognitionContent, // ★ 记录级
         fileUrlList: [newFile],
       }
       res = await addFileType(payload)

@@ -25,8 +25,6 @@
           {{ step.subDesc }}
         </span>
 
-        
-
         <div class="step-meta">
           <span v-if="step.owner">@{{ step.owner }}</span>
           <span v-if="step.time">{{ formatTime(step.time) }}</span>
@@ -60,7 +58,7 @@
             >
               {{ group.fileName }}
             </span>
-            <el-icon class="file-delete" @click="handleRemoveFile(group, step)">
+            <el-icon class="file-delete" title="删除" @click="handleRemoveFile(group, step)">
               <Delete />
             </el-icon>
           </div>
@@ -111,7 +109,7 @@ const props = defineProps({
   fileCode: { type: String, default: '' },
 })
 
-const emit = defineEmits(['action'])
+const emit = defineEmits(['action', 'deleted'])
 
 const loading = ref(false)
 const steps = ref([])
@@ -172,6 +170,10 @@ const NEED_SET_OWNER_STEPS = new Set([
 
 function hasSetOwner(step) {
   return NEED_SET_OWNER_STEPS.has(step.subCode)
+}
+
+function normalizeBool(v) {
+  return v === 1 || v === '1' || v === true || v === 'true'
 }
 
 function formatTime(t) {
@@ -321,7 +323,14 @@ function handleDownload(group) {
   ElMessage.info(`下载：${group.fileName}`)
 }
 
+// ★ 删除：文件级 + 记录级 recognitionContent 一起清空（传空对象，不能传 null）
 async function handleRemoveFile(group, step) {
+  const record = group?.record
+  if (!record?.id) {
+    ElMessage.warning('缺少文件记录，无法删除')
+    return
+  }
+
   try {
     await ElMessageBox.confirm(`确认删除「${group.fileName}」吗？`, '提示', {
       type: 'warning',
@@ -330,8 +339,25 @@ async function handleRemoveFile(group, step) {
     })
   } catch { return }
 
-  ElMessage.success('删除成功（接口待接）')
-  loadMeeting()
+  try {
+    await fileApi.updateFile({
+      id: record.id,
+      aiProjectId: record.aiProjectId ?? props.project?.id,
+      firstBusinessTitle: record.firstBusinessTitle || props.fileCode,
+      secondaryBusinessTitle: record.secondaryBusinessTitle || '',
+      fileTypeTag: record.fileTypeTag,
+      isRequiredUpload: normalizeBool(record.isRequiredUpload),
+      notes: record.notes,
+      recognitionContent: {}, // ★ 清空记录级解析数据（空对象，不能 null）
+      fileUrlList: [],        // ★ 文件级随数组清空
+    })
+    ElMessage.success('删除成功')
+    await loadMeeting()
+    emit('deleted', step)
+  } catch (err) {
+    console.error('[meeting] 删除失败:', err)
+    ElMessage.error(err?.message || '删除失败')
+  }
 }
 
 function handleReplace(group, step) {
@@ -412,7 +438,6 @@ defineExpose({ loadMeeting })
 }
 .step-title.has-file { cursor: pointer; }
 .step-title.has-file:hover { color: #1677ff; }
-
 
 .step-meta {
   display: flex;

@@ -186,62 +186,75 @@
   // ─────────────────────────────────────────────
   // 湖仓汇源
   // ─────────────────────────────────────────────
+   // ─────────────────────────────────────────────
+  // 湖仓汇源
+  // ─────────────────────────────────────────────
   hucang: [
     {
-      key: 'geology',
-      icon: 'MapLocation',
-      label: '地质',
-      path: '/hucang/geology',
-      roles: ['admin', 'user', 'viewer']
-    },
-    {
-      key: 'equipment',
-      icon: 'Box',
-      label: '设备',
-      path: '/hucang/equipment',
-      roles: ['admin', 'user', 'viewer']
-    },
-    {
-      key: 'grid',
-      icon: 'Connection',
-      label: '电网',
-      path: '/hucang/grid',
+      key: 'weather',
+      icon: 'Weather',
+      label: '气象',
+      path: '/hucang/weather/list',
       roles: ['admin', 'user', 'viewer']
     },
     {
       key: 'climate',
-      icon: 'Cloudy',
+      icon: 'Climate',
       label: '气候',
-      path: '/hucang/climate',
-      roles: ['admin', 'user', 'viewer']
-    },
-    {
-      key: 'price',
-      icon: 'Money',
-      label: '价格',
-      path: '/hucang/price',
+      path: '/hucang/climate/list',
       roles: ['admin', 'user', 'viewer']
     },
     {
       key: 'windtower',
-      icon: 'Upload',
+      icon: 'WindTower',
       label: '测风塔',
-      path: '/hucang/windtower',
+      path: '/hucang/windtower/list',
       roles: ['admin', 'user', 'viewer']
     },
     {
+      key: 'geology',
+      icon: 'Geology',
+      label: '地质',
+      path: '/hucang/geology/list', // 点击父项 = 进第一个子项
+      roles: ['admin', 'user', 'viewer'],
+      children: [
+        { key: 'geology-survey', label: '地勘数据库', path: '/hucang/geology/list' },
+        { key: 'geology-terrain', label: '地形数据', path: '/hucang/geology/geography' },
+        { key: 'geology-common', label: '公共数据', path: '/hucang/geology/common' }
+      ]
+    },
+    {
       key: 'avoidzone',
-      icon: 'Warning',
-      label: '避让\n区域',
+      icon: 'AvoidZone',
+      label: '避让区域',
       path: '/hucang/avoidzone',
       roles: ['admin']
     },
     {
-      key: 'rule',
-      icon: 'Memo',
-      label: '制度',
-      path: '/hucang/rule',
-      roles: ['admin']
+      key: 'grid',
+      icon: 'PowerGrid',
+      label: '电网',
+      path: '/hucang/grid/list',
+      roles: ['admin', 'user', 'viewer']
+    },
+    {
+      key: 'equipment',
+      icon: 'Equipment',
+      label: '设备',
+      path: '/hucang/equipment/list', // 点击父项 = 进第一个子项
+      roles: ['admin', 'user', 'viewer'],
+      children: [
+        { key: 'equipment-wind', label: '风机库', path: '/hucang/equipment/list' },
+        { key: 'equipment-pv', label: '光伏库', path: '/hucang/equipment/pv' },
+        { key: 'equipment-inverter', label: '逆变设备', path: '/hucang/equipment/inverter' }
+      ]
+    },
+    {
+      key: 'price',
+      icon: 'Price',
+      label: '造价',
+      path: '/hucang/price/list',
+      roles: ['admin', 'user', 'viewer']
     }
   ],
 
@@ -266,7 +279,7 @@
     {
       key: 'company',
       icon: 'OfficeBuilding',
-      label: '企业\n介绍',
+      label: '企业介绍',
       path: '/guizhi/company',
       roles: ['admin', 'user', 'viewer']
     },
