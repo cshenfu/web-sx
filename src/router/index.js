@@ -356,23 +356,25 @@ const routes = [
       // ─────────────────────────────────────────
       // 1. 气象（新建，先占位）
       // ─────────────────────────────────────────
-      {
-        path: 'weather',
-        redirect: '/hucang/weather/list',
-        children: [
-          {
-            path: 'list',
-            name: 'HucangWeatherList',
-            component: () => import('@/views/hucang/ComingSoon.vue'),
-            meta: {
-              title: '气象数据库',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'weather'
-            }
-          }
-        ]
-      },
+      // router 中 /hucang/weather 这一段
+{
+  path: 'weather',
+  redirect: '/hucang/weather/list',
+  children: [
+    {
+      path: 'list',
+      name: 'HucangWeatherList',
+      // 👇 改为新建的主页面
+      component: () => import('@/views/hucang/commonDataManage/weatherData/index.vue'),
+      meta: {
+        title: '气象数据库',
+        module: 'hucang',
+        sidebar: 'hucang',
+        key: 'weather'
+      }
+    }
+  ]
+},
 
       // ─────────────────────────────────────────
       // 2. 气候

@@ -480,6 +480,249 @@ const templatePath = {
 }
 // pdfview插件配置文件
 const pdfViewConfigurationPath = `https://whln-prod-public.${ossClientInfo.endPointShort}/configuration/viewer.properties`;
+
+
+
+const PACKAGE_TYPE_TT = {
+  'anemometer': 101,
+  'light': 1020000,
+  'weather': 103,
+  'ERA5Download': 1200000,
+  'weatherDownload': 120,
+  'roadPlan': 101,
+  'financeEval': 105,
+   // 新增计经概算验证套餐
+   'costEstimate': 102
+}
+const PACKAGE_TYPE_TT_LISTNAME = {
+  'anemometer': 'AI测风塔分析',
+  'weatherDownload': '气象精灵',
+  'roadPlan': 'AI道路规划'
+}
+const PACKAGE_TYPE_TT_LEFTMENU = {
+  'anemometer': [{
+    path: '/platform/home',
+    meta: {
+      title: '首页',
+      parentActiveKey: 'anemometer',
+      iconActive: 'shouyexuanzhong1',
+      icon: 'shouyeweixuan',
+      leftMenu: true //左侧菜单标识
+    },
+  }, {
+    path: '/anemometer/home',
+    meta: {
+      title: '创建',
+      parentActiveKey: 'anemometer',
+      iconActive: 'fengdian',
+      icon: 'fengdian',
+      leftMenu: true, //左侧菜单标识
+      isNeedCheckValidity: 'anemometer'
+    },
+  }, {
+    path: '/platform/windProject',
+    meta: {
+      title: '项目',
+      parentActiveKey: 'anemometer',
+      iconActive: 'wodexiangmuxuanzhong',
+      icon: 'wodexiangmumoren',
+      leftMenu: true, //左侧菜单标识
+    },
+  }, {
+    path: '/platform/package',
+    meta: {
+      title: '服务',
+      parentActiveKey: 'anemometer',
+      iconActive: 'fuwuxuanzhong1',
+      icon: 'fuwuweixuan',
+      leftMenu: true, //左侧菜单标识
+    },
+  }],
+  'weatherDownload': [{
+    path: '/platform/home',
+    meta: {
+      title: '首页',
+      parentActiveKey: 'weatherDownload',
+      iconActive: 'shouyexuanzhong1',
+      icon: 'shouyeweixuan',
+      leftMenu: true //左侧菜单标识
+    },
+  }, {
+    path: '/weatherAI/home',
+    meta: {
+      title: '查询',
+      parentActiveKey: 'weatherDownload',
+      iconActive: 'fengdian',
+      icon: 'fengdian',
+      leftMenu: true, //左侧菜单标识
+    },
+  }, {
+    path: '/platform/weatherDownload',
+    meta: {
+      title: '下载',
+      parentActiveKey: 'weatherDownload',
+      iconActive: 'xiazaixuanzhong',
+      icon: 'xiazaiweixuan',
+      leftMenu: true, //左侧菜单标识
+    },
+  }, {
+    path: '/platform/package',
+    meta: {
+      title: '服务',
+      parentActiveKey: 'weatherDownload',
+      iconActive: 'fuwuxuanzhong1',
+      icon: 'fuwuweixuan',
+      leftMenu: true, //左侧菜单标识
+    },
+  }],
+  'roadPlan': [{
+    path: '/platform/home',
+    meta: {
+      title: '首页',
+      parentActiveKey: 'roadPlan',
+      iconActive: 'shouyexuanzhong1',
+      icon: 'shouyeweixuan',
+      leftMenu: true //左侧菜单标识
+    },
+  }, {
+    path: '/roadPlan/home',
+    meta: {
+      title: '创建',
+      parentActiveKey: 'roadPlan',
+      iconActive: 'fengdian',
+      icon: 'fengdian',
+      leftMenu: true, //左侧菜单标识
+    },
+  }, {
+    path: '/platform/windProject',
+    meta: {
+      title: '项目',
+      parentActiveKey: 'roadPlan',
+      iconActive: 'wodexiangmuxuanzhong',
+      icon: 'wodexiangmumoren',
+      leftMenu: true, //左侧菜单标识
+    },
+  }, {
+    path: '/platform/package',
+    meta: {
+      title: '服务',
+      parentActiveKey: 'roadPlan',
+      iconActive: 'fuwuxuanzhong1',
+      icon: 'fuwuweixuan',
+      leftMenu: true, //左侧菜单标识
+    },
+  }],
+  // 计经概算
+  // 在 PACKAGE_TYPE_TT_LEFTMENU 对象里追加下面这段
+  'costEstimate': [
+    {
+      path: '/costEstimate/home',
+      meta: {
+        title: '首页',
+        parentActiveKey: 'costEstimate',
+        iconActive: 'shouyexuanzhong1',
+        icon: 'shouyeweixuan',
+        leftMenu: true
+      },
+    },
+    {
+      path: '/costEstimate/estimateList',
+      meta: {
+        title: '创建',
+        parentActiveKey: 'costEstimate',
+        iconActive: 'fengdian',
+        icon: 'fengdian',
+        leftMenu: true,
+        // isNeedCheckValidity: 'costEstimate'
+      },
+    },
+    {
+      path: '/costEstimate/windProject',
+      meta: {
+        title: '项目',
+        parentActiveKey: 'costEstimate',
+        iconActive: 'wodexiangmuxuanzhong',
+        icon: 'wodexiangmumoren',
+        leftMenu: true,
+      },
+    },
+    {
+      path: '/costEstimate/costPrice',
+      meta: {
+        title: '价格',
+        parentActiveKey: 'costEstimate',
+        iconActive: 'xiazaixuanzhong',
+        icon: 'xiazaiweixuan',
+        leftMenu: true,
+      },
+    },
+    {
+      path: '/costEstimate/package',
+      meta: {
+        title: '服务',
+        parentActiveKey: 'costEstimate',
+        iconActive: 'fuwuxuanzhong1',
+        icon: 'fuwuweixuan',
+        leftMenu: true,
+      },
+    }
+  ],
+    // 财务评价分析
+    'financeEval': [
+      {
+        path: '/platform/home',
+        meta: {
+          title: '首页',
+          parentActiveKey: 'financeEval',
+          iconActive: 'shouyexuanzhong1',
+          icon: 'shouyeweixuan',
+          leftMenu: true
+        },
+      },
+      {
+        path: '/financeEval/create',
+        meta: {
+          title: '创建',
+          parentActiveKey: 'financeEval',
+          iconActive: 'fengdian',
+          icon: 'fengdian',
+          leftMenu: true,
+        },
+      },
+      {
+        path: '/financeEval/windProject',
+        meta: {
+          title: '项目',
+          parentActiveKey: 'financeEval',
+          iconActive: 'wodexiangmuxuanzhong',
+          icon: 'wodexiangmumoren',
+          leftMenu: true,
+        },
+      },
+      {
+        path: '/platform/package',
+        meta: {
+          title: '服务',
+          parentActiveKey: 'financeEval',
+          iconActive: 'fuwuxuanzhong1',
+          icon: 'fuwuweixuan',
+          leftMenu: true,
+        },
+      }
+    ],
+}
+
+
+const tdKeyList = ['73d12bf9ba3a754d082c3187012ae118', '145553950507d4901480f35f5ac6a065', '36adcd56a8cb23122ff2520713f0f18e', '5cad10a5ae112431c3d770ee2e13a05a', 'e186208af1ae3acf512d8e879c1b9609', '54bfd8cf9e0266857d0a77795e271d2e', '72f40b2d9e072090fc8e87fb391837de']
+// 校验套餐 1.一键可研 2AI找风资源 3项目建议书
+const PACKAGE_TYPE = {
+  'default': 1,
+  'distributedDefault': 4,
+  'auto': 2,
+  'proposal': 3,
+  'lightDefault': 10,
+}
+
 export {
     fileIconList,
     menumData,
@@ -488,5 +731,10 @@ export {
     ALL_SERVICE_TYPE_OPTIONS,
     pdfViewConfigurationPath,
     ossClientInfo,
-    templatePath
+    templatePath,
+    PACKAGE_TYPE_TT,
+  PACKAGE_TYPE_TT_LEFTMENU,
+  PACKAGE_TYPE_TT_LISTNAME,
+  tdKeyList,
+  PACKAGE_TYPE
 };

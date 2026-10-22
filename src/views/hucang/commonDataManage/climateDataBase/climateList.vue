@@ -1,13 +1,31 @@
 <template>
-    <div class="climate-list-content">
-        <div class="climate-content">
-            <searchBar ref="climateListRef" v-model:modeType="modeType" @getModeType="getModeType" @addEvent="showAddModal"@useFileEvent="showImportFileModal"></searchBar>
-            <climateMap v-if="modeType =='a'"></climateMap>
-            <List  v-if="modeType =='b'"></List>
+    <!-- 外层：带渐变和光晕的容器 -->
+    <div class="climate-page-bg">
+        <!-- 背景光晕层 -->
+        <div class="bg-glow-top-left"></div>
+        <div class="bg-glow-bottom-right"></div>
+        <div class="bg-glow-top-right"></div>
+
+        <!-- 内容层 -->
+        <div class="climate-list-content">
+            <div class="climate-content white-card">
+                <searchBar 
+                    ref="climateListRef" 
+                    v-model:modeType="modeType" 
+                    @getModeType="getModeType" 
+                    @addEvent="showAddModal" 
+                    @useFileEvent="showImportFileModal">
+                </searchBar>
+                
+                <climateMap v-if="modeType == 'a'"></climateMap>
+                <List v-if="modeType == 'b'"></List>
+            </div>
         </div>
     </div>
+
     <!-- 导入数据 -->
     <import-climate-file v-model:importFileFlg="openAddClimateTipsModal"></import-climate-file>
+    
     <!-- 新增 -->
     <tips-modal
         :width="'490px'"
@@ -37,13 +55,6 @@
                         { required: true, ElMessage: '请输入要新增的数据类型', trigger: 'blur' },
                     ]"
                 >
-                    <!-- <a-radio-group v-model:value="openFormData.type" name="radioGroup">
-                        <a-radio :value="1">雷暴</a-radio>
-                        <a-radio value="2">覆冰</a-radio>
-                        <a-radio :value="2">酸雨</a-radio>
-                        <a-radio :value="3">温度</a-radio>
-                        <a-radio :value="4">风压</a-radio>
-                    </a-radio-group> -->
                     <a-radio-group v-model:value="openFormData.type" :options="PLAIN_OPTIONS" name="radioGroup" />
                 </a-form-item>
             </a-form>
@@ -63,6 +74,7 @@
     import {PLAIN_OPTIONS} from './climateDataBase'
     const modeType = ref('');
     const climateListRef = ref(null)
+    
     onMounted(()=> {
         modeType.value = climateListRef.value.searchKey.modeType
     })
@@ -114,17 +126,84 @@
         sessionStorage.removeItem('obsPath')
     })
 </script>
+
 <style scoped lang="scss">
   @import '@/assets/css/fixedGroup.scss';
   @import '@/assets/css/tabs.scss';
+
+    /* 外层全屏容器 */
+    .climate-page-bg {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        /* 基础浅蓝渐变底色 */
+        background: linear-gradient(122.01deg, #E6EEF8 0%, #D2E0F4 100%), #FFFFFF;
+        overflow: hidden;
+    }
+
+    /* ========== 背景光晕层 ========== */
+    .bg-glow-top-left {
+        position: absolute;
+        left: -1.61%;
+        top: -18.52%;
+        width: 350px;
+        height: 350px;
+        background: linear-gradient(135deg, #FFCCD5 0%, #FECFEF 100%);
+        opacity: 0.49;
+        filter: blur(129.5px);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 1;
+    }
+    .bg-glow-bottom-right {
+        position: absolute;
+        right: 4.64%;
+        bottom: -18.13%;
+        width: 450px;
+        height: 450px;
+        background: linear-gradient(120deg, #A1C4FD 0%, #C2E9FB 100%);
+        opacity: 0.7;
+        filter: blur(123px);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 1;
+    }
+    .bg-glow-top-right {
+        position: absolute;
+        right: 19.01%;
+        top: -37.04%;
+        width: 300px;
+        height: 300px;
+        background: linear-gradient(120deg, #A1C4FD 0%, #C2E9FB 100%);
+        opacity: 0.7;
+        filter: blur(123px);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    /* 内容层：去掉了原来的 background 白底，留出 padding */
     .climate-list-content {
+        position: relative;
+        z-index: 2;
         padding: 24px;
-        background: #ffffff;
+        height: 100%;
         max-height: calc(100vh - 100px);
+        box-sizing: border-box;
         overflow: auto;
+        /* 隐藏滚动条让视觉更干净（可选） */
+        &::-webkit-scrollbar {
+            display: none;
+        }
     }
-    .climate-content{
-        // padding: 24px 0;
+
+    /* 内容卡片：把搜索栏、列表包裹在一个白底卡片里 */
+    .white-card {
+        background: #FFFFFF;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 4px 16px rgba(11, 28, 44, 0.04);
+        min-height: 100%; /* 保证内容较少时也能撑开 */
+        box-sizing: border-box;
     }
-    
 </style>

@@ -1,8 +1,12 @@
 <!-- Dashboard-area-editor.vue -->
 <template>
   <main class="dashboard-page">
-    <MapGL ref="mapRef" :style="satelliteStyle" @ready="onMapReady" />
-
+<MapGL
+  ref="mapRef"
+  :style="satelliteStyle"
+  @ready="onMapReady"
+  @city-click="onCityClick"
+/>
     <div class="map-overlay" aria-hidden="true" />
 
     <LayerChipPanel
@@ -468,7 +472,13 @@ function getHoverThemeColor(projectStage) {
   const style = getAreaStyleByStage(projectStage)
   return style.outlineColor || '#22c55e'
 }
-
+// 新增：MapGL 内部 point-in-polygon 命中城市后 emit 过来的回调
+function onCityClick(feature) {
+  console.log('[Dashboard] 收到 city-click:', feature?.properties?.name, 'isAreaView=', isAreaView.value)
+  if (isAreaView.value) return
+  const name = feature?.properties?.name
+  if (name) focusCity(name)
+}
 function formatRegion(row) {
   const names = [row.cityName, row.districtName].filter(Boolean)
   return names.length ? names.join('/') : (row.address || '未知区域')
@@ -862,6 +872,20 @@ function renderSelectedProject(row) {
     enableHover: true,
     ...PROVINCE_MAP_STYLE
   })
+
+  // ★ 重建城市标签（addCentroidLabels 内部幂等，会先清理旧的）
+  mapRef.value.addCentroidLabels({
+    id: 'shaanxi-labels',
+    geojson: shaanxiBoundary,
+    labelField: 'name',
+    subLabelField: 'value',
+    textColor: '#FFFFFF',
+    textSize: 14,
+    subTextSize: 10,
+    textOffset: [0, 0],
+    height: PROVINCE_MAP_STYLE.defaultHeight,
+    followLayer: PROVINCE_EXTRUSION_ID,
+  })
 }
 
 function onProjectStageSelect(row) {
@@ -952,6 +976,8 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
       map.setLayoutProperty(PROVINCE_EXTRUSION_ID, 'visibility', 'visible')
       if (map.getLayer(provinceEventLayerId)) map.setLayoutProperty(provinceEventLayerId, 'visibility', 'visible')
     } else { renderSelectedProject(activeProject.value) }
+    renderSelectedProject(activeProject.value)
+
   },
   onExit: () => {
     syncMaskVisibility(true)
@@ -977,6 +1003,7 @@ const layerPanelZIndex = computed(() => (isAreaView.value ? 26 : 21))
 
 // ==================== 城市点击 ====================
 function focusCity(cityName) {
+  console.log('[Dashboard] focusCity 入参:', cityName)
   if (!cityName || !mapRef.value) return
   const map = mapRef.value.getMap(); if (!map) return
   const feature = shaanxiBoundary.features.find((item) => item.properties?.name === cityName); if (!feature) return
@@ -1000,9 +1027,30 @@ function resolveCityCenter(feature) {
   return n ? [sx / n, sy / n] : null
 }
 
+let cityClickHandler = null
+
 function bindCityClick() {
   if (!mapRef.value) return
-  mapRef.value.onClick(provinceEventLayerId, (feature) => { const cityName = feature.properties?.name; if (cityName) focusCity(cityName) })
+  const map = mapRef.value.getMap?.()
+  if (!map) return
+
+  cityClickHandler = (e) => {
+    // 只在省份视图（非区域视图）响应；区域视图下城市挤出层已被移除
+    if (isAreaView.value) return
+
+    const layers = map.getStyle().layers
+      .filter((l) => l.type === 'fill-extrusion' && l.id.startsWith(PROVINCE_EXTRUSION_ID))
+      .map((l) => l.id)
+    if (!layers.length) return
+
+    const features = map.queryRenderedFeatures(e.point, { layers })
+    const cityFeature = features.find((f) => f.properties?.name)
+    if (cityFeature) {
+      focusCity(cityFeature.properties.name)
+    }
+  }
+
+  map.on('click', cityClickHandler)
 }
 
 // ==================== 其他回调 ====================
@@ -1023,12 +1071,12 @@ function handleWizardSubmit(payload) { wizardVisible.value = false }
 function onMapReady() {
   mapReady.value = true
   renderSelectedProject(activeProject.value) // 初始为 null → 默认态
-  mapRef.value?.addCentroidLabels({ id: 'shaanxi-labels', geojson: shaanxiBoundary, labelField: 'name', subLabelField: 'value', textColor: '#FFFFFF', textSize: 14, subTextSize: 10, textOffset: [0, 0], height: PROVINCE_MAP_STYLE.defaultHeight, followLayer: PROVINCE_EXTRUSION_ID })
+  // mapRef.value?.addCentroidLabels({ id: 'shaanxi-labels', geojson: shaanxiBoundary, labelField: 'name', subLabelField: 'value', textColor: '#FFFFFF', textSize: 14, subTextSize: 10, textOffset: [0, 0], height: PROVINCE_MAP_STYLE.defaultHeight, followLayer: PROVINCE_EXTRUSION_ID })
   const map = mapRef.value.getMap()
   map.on('move', updateDetailCardPosition)
   map.on('zoom', updateDetailCardPosition)
   map.on('click', handleMapBlankClick)
-  bindCityClick()
+  // bindCityClick()
   bindZoomListener()
 
   map.on('zoom', syncMaskVisibility)
@@ -1064,6 +1112,10 @@ onUnmounted(() => {
     map.off('move', updateDetailCardPosition)
     map.off('zoom', updateDetailCardPosition)
     map.off('click', handleMapBlankClick)
+    if (cityClickHandler) {
+      map.off('click', cityClickHandler)
+      cityClickHandler = null
+    }
     map.off('zoom', syncMaskVisibility)
     map.off('move', syncMaskVisibility)
     map.off('style.load', ensureShaanxiMask)

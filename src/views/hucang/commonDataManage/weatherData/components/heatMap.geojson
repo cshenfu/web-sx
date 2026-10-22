@@ -1,0 +1,225 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [116.4074, 39.9042]
+        },
+        "properties": {
+          "city": "北京市",
+          "intensity": 0.9
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [121.4737, 31.2304]
+        },
+        "properties": {
+          "city": "上海市",
+          "intensity": 0.95
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [113.2644, 23.1291]
+        },
+        "properties": {
+          "city": "广州市",
+          "intensity": 0.85
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [114.0579, 22.5431]
+        },
+        "properties": {
+          "city": "深圳市",
+          "intensity": 0.88
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [120.1551, 30.2741]
+        },
+        "properties": {
+          "city": "杭州市",
+          "intensity": 0.8
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [108.9398, 34.3416]
+        },
+        "properties": {
+          "city": "西安市",
+          "intensity": 0.7
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [117.2008, 39.0842]
+        },
+        "properties": {
+          "city": "天津市",
+          "intensity": 0.75
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [106.5516, 29.563]
+        },
+        "properties": {
+          "city": "重庆市",
+          "intensity": 0.78
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [104.0665, 30.5728]
+        },
+        "properties": {
+          "city": "成都市",
+          "intensity": 0.82
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [126.535, 45.8022]
+        },
+        "properties": {
+          "city": "哈尔滨市",
+          "intensity": 0.6
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [125.3235, 43.8171]
+        },
+        "properties": {
+          "city": "长春市",
+          "intensity": 0.65
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [123.4315, 41.8057]
+        },
+        "properties": {
+          "city": "沈阳市",
+          "intensity": 0.68
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [118.7969, 32.0603]
+        },
+        "properties": {
+          "city": "南京市",
+          "intensity": 0.77
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [117.283, 31.8612]
+        },
+        "properties": {
+          "city": "合肥市",
+          "intensity": 0.72
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [112.9388, 28.2282]
+        },
+        "properties": {
+          "city": "长沙市",
+          "intensity": 0.74
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [114.3054, 30.5928]
+        },
+        "properties": {
+          "city": "武汉市",
+          "intensity": 0.79
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [113.6223, 34.7473]
+        },
+        "properties": {
+          "city": "郑州市",
+          "intensity": 0.73
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [118.0894, 36.7347]
+        },
+        "properties": {
+          "city": "济南市",
+          "intensity": 0.71
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [117.1201, 36.6512]
+        },
+        "properties": {
+          "city": "青岛市",
+          "intensity": 0.76
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [119.2965, 26.0745]
+        },
+        "properties": {
+          "city": "福州市",
+          "intensity": 0.69
+        }
+      }
+    ]
+  }

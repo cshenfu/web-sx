@@ -17,7 +17,6 @@ import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { addGradientExtrusion } from '@/utils/gradientExtrusion'
 
-// ★ 背景图（用 import 引入，避免 CSS 里 @/ 别名解析问题）
 import bgImg from '@/assets/img/qinchuan/dashbord/bg.png'
 
 if (typeof maplibregl.setWorkerUrl === 'function') {
@@ -28,12 +27,7 @@ if (typeof window !== 'undefined' && !window.mapboxgl) {
 }
 
 const emit = defineEmits([
-  'ready',
-  'draw-update',
-  'draw-create',
-  'draw-delete',
-  'box-select',
-  'point-drag'
+  'ready', 'draw-update', 'draw-create', 'draw-delete', 'box-select', 'point-drag', 'city-click',
 ])
 
 const props = defineProps({
@@ -54,20 +48,21 @@ const lastHighlightBySource = new Map()
 const clickHandlers = new Map()
 const imageCache = new Map()
 
-// ★ 交互状态
 let draggingFeatureId = null
 let isBoxSelecting = false
 let boxStartPoint = null
 const boxOverlayId = 'box-select-overlay'
 
-// ★ 标签随 3D 顶面抬升
-let labelLiftCfg = null // { layerIds, height, followLayer }
-let labelLiftBound = false
-
-// ★ 用于区分点击和拖拽
 let mousedownPoint = null
 let mousedownFeatureId = null
 
+// point-in-polygon 用
+let cityBoundariesCache = null
+
+// ★ 纯 HTML 城市标签
+let labelsContainer = null
+let cityLabels = []
+let cityLabelMoveHandler = null
 
 const drawStyles = [
   {
@@ -122,16 +117,13 @@ const baseDirectSelectMode = MapboxDraw.modes.direct_select
 
 const vertexOnlyDirectSelectMode = {
   ...baseDirectSelectMode,
-
   onMouseDown(state, event) {
-    // 只把真正命中场区顶点的操作交给 Draw 原生处理
     if (event.featureTarget?.properties?.meta !== 'vertex') return
-
     return baseDirectSelectMode.onMouseDown.call(this, state, event)
   },
 }
+
 onMounted(() => {
-  // 已去掉 projection: 'globe'，省级 3D 地图用墨卡托投影
   map = new maplibregl.Map({
     container: mapContainer.value,
     style: props.style,
@@ -152,45 +144,41 @@ onMounted(() => {
   })
   map.addControl(draw, 'top-left')
 
-  map.on('draw.update', (e) => {
-    handleDrawUpdate(e)
-    emit('draw-update', e.features)
-  })
+  map.on('draw.update', (e) => { handleDrawUpdate(e); emit('draw-update', e.features) })
   map.on('draw.create', (e) => emit('draw-create', e.features))
   map.on('draw.delete', (e) => emit('draw-delete', e.features))
 
   bindPointInteraction()
   bindBoxSelect()
 
+  // 城市点击：point-in-polygon
+  map.on('click', (e) => {
+    if (!cityBoundariesCache) return
+    const feature = findCityAtLngLat(e.lngLat)
+    if (feature) emit('city-click', feature)
+  })
+
   map.on('load', () => {
     map.setProjection({ type: 'globe' })
 
-    // ★ 背景图：把 style 里的 background 层变透明，露出组件背景
     try {
       const styleLayers = map.getStyle()?.layers || []
       styleLayers.forEach((layer) => {
-        if (layer.type === 'background') {
-          map.setPaintProperty(layer.id, 'background-opacity', 0)
-        }
+        if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-opacity', 0)
       })
     } catch (e) { /* 忽略 */ }
 
-    // ★ 背景图：把 globe 的「太空 / 大气 / 雾」也变透明
     try {
       map.setSky({
-        'sky-color': 'rgba(0, 0, 0, 0)',
-        'horizon-color': 'rgba(0, 0, 0, 0)',
-        'fog-color': 'rgba(0, 0, 0, 0)',
-        'sky-horizon-blend': 0.5,
-        'horizon-fog-blend': 0.5,
-        'fog-ground-blend': 0.5,
+        'sky-color': 'rgba(0, 0, 0, 0)', 'horizon-color': 'rgba(0, 0, 0, 0)',
+        'fog-color': 'rgba(0, 0, 0, 0)', 'sky-horizon-blend': 0.5,
+        'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.5,
       })
-    } catch (e) { /* 低版本不支持 setSky 则忽略 */ }
+    } catch (e) { /* 忽略 */ }
 
-    // 柔和的顶光，让挤出体侧面有明暗
     try {
       map.setLight({ anchor: 'viewport', color: '#ffffff', intensity: 0.4, position: [1.15, 200, 45] })
-    } catch (e) { /* 低版本不支持则忽略 */ }
+    } catch (e) { /* 忽略 */ }
 
     flyToShaanxi()
     emit('ready')
@@ -199,8 +187,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   for (const [layerId, handler] of hoverHandlers) {
-    map?.off('mousemove', handler.targetLayer, handler.onMove)
-    map?.off('mouseleave', handler.targetLayer, handler.onLeave)
+    if (handler.onMouseMove) map?.off('mousemove', handler.onMouseMove)
+    if (handler.onMouseLeave && map) map.getCanvas().removeEventListener('mouseleave', handler.onMouseLeave)
     hoverHandlers.delete(layerId)
   }
   for (const [layerId, list] of clickHandlers) {
@@ -209,18 +197,82 @@ onUnmounted(() => {
   clickHandlers.clear()
   imageCache.clear()
 
-  map?.off('move', syncLabelLift)
+  if (labelsContainer) { labelsContainer.remove(); labelsContainer = null }
+  cityLabels = []
+  if (cityLabelMoveHandler && map) {
+    map.off('move', cityLabelMoveHandler)
+    map.off('render', cityLabelMoveHandler)
+    cityLabelMoveHandler = null
+  }
+  cityBoundariesCache = null
+
   map?.off('draw.update', handleDrawUpdate)
   map?.remove()
   map = null
   draw = null
 })
 
-// ======================== 交互相关 ========================
+// ======================== point-in-polygon ========================
+function buildCityBoundaries(geojson) {
+  const cache = new Map()
+  for (const f of geojson.features) {
+    const name = f.properties?.name
+    if (!name || !f.geometry) continue
+    const rings = []
+    let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity
+    const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates]
+      : f.geometry.type === 'MultiPolygon' ? f.geometry.coordinates : []
+    for (const poly of polys) {
+      for (let i = 0; i < poly.length; i++) {
+        const ring = poly[i]
+        rings.push({ coords: ring, isHole: i > 0 })
+        for (const [lng, lat] of ring) {
+          if (lng < minLng) minLng = lng
+          if (lng > maxLng) maxLng = lng
+          if (lat < minLat) minLat = lat
+          if (lat > maxLat) maxLat = lat
+        }
+      }
+    }
+    cache.set(name, { rings, bbox: [minLng, minLat, maxLng, maxLat], feature: f })
+  }
+  return cache
+}
+
+function pointInRing(lng, lat, ring) {
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1]
+    const xj = ring[j][0], yj = ring[j][1]
+    const intersect = ((yi > lat) !== (yj > lat))
+      && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)
+    if (intersect) inside = !inside
+  }
+  return inside
+}
+
+function findCityAtLngLat(lngLat) {
+  if (!cityBoundariesCache) return null
+  const { lng, lat } = lngLat
+  for (const [, data] of cityBoundariesCache) {
+    const [minLng, minLat, maxLng, maxLat] = data.bbox
+    if (lng < minLng || lng > maxLng || lat < minLat || lat > maxLat) continue
+    let hitOuter = false, hitHole = false
+    for (const ring of data.rings) {
+      if (pointInRing(lng, lat, ring.coords)) {
+        if (ring.isHole) hitHole = true
+        else hitOuter = true
+      }
+    }
+    if (hitOuter && !hitHole) return data.feature
+  }
+  return null
+}
+
+// ======================== 交互 ========================
 function bringDrawPointsToTop() {
   if (!map) return
-  const layersToTop = ['gl-draw-point-inactive', 'gl-draw-point-active']
-  layersToTop.forEach(layerId => {
+  ;['gl-draw-point-inactive', 'gl-draw-point-active'].forEach(layerId => {
     if (map.getLayer(layerId)) map.moveLayer(layerId)
   })
 }
@@ -237,8 +289,7 @@ function bindPointInteraction() {
   map.on('mousemove', (e) => {
     if (isBoxSelecting || draggingFeatureId) return
     const features = safeQueryFeatures(e.point)
-    if (features.length) map.getCanvas().style.cursor = 'pointer'
-    else map.getCanvas().style.cursor = ''
+    map.getCanvas().style.cursor = features.length ? 'pointer' : ''
   })
 
   map.on('mousedown', (e) => {
@@ -319,17 +370,16 @@ function stopBoxSelect() {
   if (map && map.getSource(boxOverlayId)) map.getSource(boxOverlayId).setData({ type: 'FeatureCollection', features: [] })
 }
 
-// ======================== 内置方法 ========================
+// ======================== 基础方法 ========================
 function flyToShaanxi() {
   map?.flyTo({ center: [108.9, 35.2], zoom: 6.5, pitch: 50, bearing: 0, duration: 3000, essential: true })
 }
 
 function handleDrawUpdate(event) {}
-
-function loadEditableAreas(featureCollection) { if (draw && featureCollection?.features?.length) draw.add(featureCollection) }
+function loadEditableAreas(fc) { if (draw && fc?.features?.length) draw.add(fc) }
 function clearEditableAreas() { draw?.deleteAll() }
 function getEditableAreas() { return draw?.getAll() || null }
-function cloneGeojson(geojson) { return JSON.parse(JSON.stringify(geojson)) }
+function cloneGeojson(g) { return JSON.parse(JSON.stringify(g)) }
 
 function ensureFeatureIds(geojson) {
   geojson.features.forEach((feature, index) => {
@@ -406,8 +456,7 @@ function bringMaskToTop(id) {
   if (!map || !map.getLayer(id)) return
   const layers = map.getStyle()?.layers || []
   if (!layers.length) return
-  const top = layers[layers.length - 1]
-  if (top.id !== id) map.moveLayer(id)
+  if (layers[layers.length - 1].id !== id) map.moveLayer(id)
 }
 
 function hasMaskLayer(id) { return !!(map && map.getLayer(id)) }
@@ -428,7 +477,7 @@ function addSymbolLayer({ id, geojson, layout = {}, paint = {} }) {
 }
 
 function createColorExpression(opts) {
-  const { heightField, heightMultiplier, defaultHeight, colorField, colorStops, colorMap, defaultColor, highlightColor } = opts
+  const { heightField, heightMultiplier, defaultHeight, colorField, colorStops, colorMap, defaultColor } = opts
   let colorExpression = defaultColor
   if (colorField && Array.isArray(colorStops) && colorStops.length) {
     colorExpression = ['coalesce', ['interpolate', ['linear'], ['get', colorField], ...colorStops.flat()], defaultColor]
@@ -441,30 +490,41 @@ function createColorExpression(opts) {
     colorExpression = ['coalesce', ['get', colorField], defaultColor]
   }
   const heightExpression = heightField ? ['*', ['coalesce', ['get', heightField], 0], heightMultiplier] : defaultHeight
-  return {
-    color: ['case', ['boolean', ['feature-state', 'hover'], false], highlightColor, colorExpression],
-    height: heightExpression,
-  }
+  return { color: colorExpression, height: heightExpression }
 }
-
-// 标签只能贴在地面，按「顶面高度 × 当前俯仰角」实时算出需要抬升的像素
-function syncLabelLift() {
-  if (!map || !labelLiftCfg) return
-  const { layerIds, height, followLayer } = labelLiftCfg
-  const active = height > 0 && (!followLayer || map.getLayer(followLayer))
-  let px = 0
-  if (active) {
-    const mpp = 78271.517 * Math.cos((35.2 * Math.PI) / 180) / Math.pow(2, map.getZoom())
-    px = (height / mpp) * Math.sin((map.getPitch() * Math.PI) / 180)
-  }
-  layerIds.forEach((lid) => { if (map.getLayer(lid)) map.setPaintProperty(lid, 'text-translate', [0, -px]) })
+// 颜色插值工具
+function hexToRgb(hex) {
+  const h = hex.replace('#', '')
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
 }
-
-// 把每个市的边界生成"细条"多边形（宽度单位：米），用 fill-extrusion 立在顶面高度上
+function rgbToHex(r, g, b) {
+  return '#' + [r, g, b].map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('')
+}
+function interpolateColors(colors, t) {
+  if (!colors || !colors.length) return '#000000'
+  if (colors.length === 1) return colors[0]
+  const p = t * (colors.length - 1)
+  const i = Math.floor(p)
+  const f = p - i
+  if (i >= colors.length - 1) return colors[colors.length - 1]
+  const c1 = hexToRgb(colors[i])
+  const c2 = hexToRgb(colors[i + 1])
+  return rgbToHex(c1[0] + (c2[0] - c1[0]) * f, c1[1] + (c2[1] - c1[1]) * f, c1[2] + (c2[2] - c1[2]) * f)
+}
+// 边界细条 GeoJSON
 function buildBorderGeoJSON(geojson, widthM) {
-  const h = widthM / 2 / 111320 // 半宽，单位：纬度(度)
+  const h = widthM / 2 / 111320
   const features = []
+
+  function hashPid(pid) {
+    const s = String(pid)
+    let hh = 0
+    for (let i = 0; i < s.length; i++) hh = (hh * 31 + s.charCodeAt(i)) | 0
+    return Math.abs(hh) % 13
+  }
+
   const pushRing = (ring, pid) => {
+    const elevOffset = hashPid(pid) * 50
     for (let i = 0; i < ring.length - 1; i++) {
       const a = ring[i], b = ring[i + 1]
       const cos = Math.cos(((a[1] + b[1]) / 2) * Math.PI / 180) || 1
@@ -474,7 +534,6 @@ function buildBorderGeoJSON(geojson, widthM) {
       if (!len) continue
       const ux = dx / len, uy = dy / len
       const nx = -uy, ny = ux
-      // 两端各延长半宽，避免拐角处出现缺口
       const sx = ax - ux * h, sy = ay - uy * h
       const ex = bx + ux * h, ey = by + uy * h
       const pts = [
@@ -482,9 +541,14 @@ function buildBorderGeoJSON(geojson, widthM) {
         [ex - nx * h, ey - ny * h], [sx - nx * h, sy - ny * h],
       ].map(([x, y]) => [x / cos, y])
       pts.push(pts[0])
-      features.push({ type: 'Feature', properties: { pid }, geometry: { type: 'Polygon', coordinates: [pts] } })
+      features.push({
+        type: 'Feature',
+        properties: { pid, elevOffset },
+        geometry: { type: 'Polygon', coordinates: [pts] },
+      })
     }
   }
+
   for (const f of geojson.features) {
     const pid = f.id ?? f.properties?.id
     const g = f.geometry
@@ -495,68 +559,134 @@ function buildBorderGeoJSON(geojson, widthM) {
   return { type: 'FeatureCollection', features }
 }
 
+// ============================================================================
+// addExtrusion：五层完全分离，彻底消除 z-fighting
+//   侧面 band：0 ~ topBase-50（19650）
+//   顶面     ：topBase-50 ~ defaultHeight（19650 ~ 20000）
+//   边界     ：defaultHeight+50 ~ defaultHeight+50+borderHeight（20050 ~ 20170+offset）
+//   hover    ：动态改顶面 color，无独立图层
+// ============================================================================
 function addExtrusion(opts) {
   const {
     id, geojson, heightField = null, heightMultiplier = 1, defaultHeight = 180000,
-    colorField = null, colorStops = null, colorMap = null, defaultColor = '#2A9FFF',
-    highlightColor = '#FFD700', opacity = 0.9, enableHover = true, useEventLayer = true,
-    lineColor = 'transparent', hoverLineColor = '#FFFFFF',
-    borderWidth = 1000,    // 边界细条宽度(米)
-    borderHeight = 120,    // 边界细条凸出顶面的高度(米)
-    sideColors = null,     // 侧面渐变色，自下而上；2~4 个关键色即可，内部自动插值
-    sideBands = undefined, // 可选：侧面渐变层数，默认 10
-    topThickness = 300     // 顶面薄片厚度(米)，只有它会变悬停色
+    colorField = null, colorStops = null, colorMap = null, defaultColor = '#8CCBF5',
+    highlightColor = '#EFA83D', opacity = 1, enableHover = true,
+    lineColor = 'transparent',
+    borderWidth = 1000, borderHeight = 120,
+    sideColors = null, sideBands = 10,
+    topThickness = 300,
+    useVerticalGradient = true,   // ★ 新增：默认走单层渐变，彻底无闪
   } = opts
 
   if (!map || !geojson?.features) return
   const mapData = cloneGeojson(geojson)
   ensureFeatureIds(mapData)
 
+  cityBoundariesCache = buildCityBoundaries(mapData)
+
+  const isDynamicHeight = !!heightField
   const expressions = createColorExpression({
     heightField, heightMultiplier, defaultHeight,
-    colorField, colorStops, colorMap, defaultColor, highlightColor,
+    colorField, colorStops, colorMap, defaultColor,
   })
+  const baseColorExpr = JSON.parse(JSON.stringify(expressions.color))
 
-  if (!map.getSource(id)) map.addSource(id, { type: 'geojson', data: mapData })
-  else map.getSource(id).setData(mapData)
-
-  // ---- 侧面渐变：交给独立工具处理 ----
-  // 只在固定高度（无 heightField）时启用，保证侧面等高带总高度 = defaultHeight
-  const useSideColors =
-    Array.isArray(sideColors) && sideColors.length > 0 && !heightField
-
-  const { layerIds: sideLayerIds, topBase } = addGradientExtrusion(map, {
-    id,
-    defaultHeight,
-    topThickness,
-    sideColors: useSideColors ? sideColors : [],
-    bands: sideBands,
-  })
-  sideLayerIds.forEach((l) => addedLayers.add(l))
-
-  // ---- 顶面 ----
-  const topPaint = {
-    'fill-extrusion-color': expressions.color,
-    'fill-extrusion-height': expressions.height,
-    'fill-extrusion-base': topBase,
-    'fill-extrusion-opacity': opacity,
-  }
-  if (!map.getLayer(id)) {
-    map.addLayer({ id, type: 'fill-extrusion', source: id, paint: topPaint })
-    addedLayers.add(id)
+  if (!map.getSource(id)) {
+    map.addSource(id, { type: 'geojson', data: mapData, promoteId: 'id' })
   } else {
-    Object.entries(topPaint).forEach(([k, v]) => map.setPaintProperty(id, k, v))
+    map.getSource(id).setData(mapData)
   }
 
-  // ---- 边界：真 3D 细条，与顶面同高，视角变化不会错位 ----
+  // 清理旧 side 层
+  const oldSideLayers = Array.from(addedLayers).filter(lId => lId.startsWith(`${id}-side-`))
+  oldSideLayers.forEach((lid) => {
+    if (map.getLayer(lid)) map.removeLayer(lid)
+    addedLayers.delete(lid)
+  })
+
+  if (useVerticalGradient) {
+    // ==========================================================================
+    // ★ 方案 B：单层 fill-extrusion + vertical gradient
+    //   - 只有一个 geometry，没有任何共面，拖动绝对不闪
+    //   - 侧面颜色由 MapLibre 按光照自动计算，视觉接近 #0072FF → 白
+    //   - 顶面是该 geometry 的顶面，颜色 = fill-extrusion-color
+    // ==========================================================================
+    const paint = {
+      'fill-extrusion-color': baseColorExpr,
+      'fill-extrusion-height': expressions.height,
+      'fill-extrusion-base': 0,
+      'fill-extrusion-opacity': opacity,
+      'fill-extrusion-vertical-gradient': true,
+    }
+    if (!map.getLayer(id)) {
+      map.addLayer({ id, type: 'fill-extrusion', source: id, paint })
+      addedLayers.add(id)
+    } else {
+      Object.entries(paint).forEach(([k, v]) => map.setPaintProperty(id, k, v))
+    }
+  } else {
+    // ==========================================================================
+    // 方案 A：多 band 渐变（保留精确颜色，可能有轻微 z-fighting）
+    // ==========================================================================
+    const topBase = defaultHeight - topThickness
+    const useSideColors = Array.isArray(sideColors) && sideColors.length > 0 && !heightField
+
+    if (useSideColors) {
+      const bandCount = sideBands || 10
+      const bandHeight = topBase / bandCount
+      for (let i = 0; i < bandCount; i++) {
+        const base = i * bandHeight
+        const height = (i + 1) * bandHeight
+        const t = bandCount === 1 ? 0 : i / (bandCount - 1)
+        const color = interpolateColors(sideColors, t)
+        const lid = `${id}-side-${i}`
+        if (map.getLayer(lid)) map.removeLayer(lid)
+        map.addLayer({
+          id: lid, type: 'fill-extrusion', source: id,
+          paint: {
+            'fill-extrusion-color': color,
+            'fill-extrusion-base': base,
+            'fill-extrusion-height': height,
+            'fill-extrusion-opacity': 1,
+            'fill-extrusion-vertical-gradient': false,
+          },
+        })
+        addedLayers.add(lid)
+      }
+    }
+
+    const topBaseExpr = isDynamicHeight
+      ? ['-', expressions.height, topThickness]
+      : topBase
+    const topPaint = {
+      'fill-extrusion-color': baseColorExpr,
+      'fill-extrusion-height': expressions.height,
+      'fill-extrusion-base': topBaseExpr,
+      'fill-extrusion-opacity': opacity,
+    }
+    if (!map.getLayer(id)) {
+      map.addLayer({ id, type: 'fill-extrusion', source: id, paint: topPaint })
+      addedLayers.add(id)
+    } else {
+      Object.entries(topPaint).forEach(([k, v]) => map.setPaintProperty(id, k, v))
+    }
+  }
+
+  // ---- 边界：抬到顶面之上，无重叠 ----
   const borderId = `${id}-border`
-  const borderTop = defaultHeight
+  const BORDER_LIFT = 50
+  const borderBaseExpr = isDynamicHeight
+    ? ['+', expressions.height, BORDER_LIFT]
+    : defaultHeight + BORDER_LIFT
+  const borderHeightExpr = isDynamicHeight
+    ? ['+', expressions.height, BORDER_LIFT + borderHeight]
+    : defaultHeight + BORDER_LIFT + borderHeight
+  const elevOffsetExpr = ['coalesce', ['get', 'elevOffset'], 0]
+
   const borderPaint = {
-    'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'hover'], false], hoverLineColor, lineColor],
-    'fill-extrusion-base': borderTop,
-    // ★ 去掉 hover 时的 +40 米高度变化：globe zoom 6.5 下 40 米小于深度缓冲精度，
-    //    会与相邻城市边界争夺深度值而闪烁。hover 只改颜色，视觉上足够区分。
-    'fill-extrusion-height': borderTop + borderHeight,
+    'fill-extrusion-color': lineColor,
+    'fill-extrusion-base': ['+', borderBaseExpr, elevOffsetExpr],
+    'fill-extrusion-height': ['+', borderHeightExpr, elevOffsetExpr],
     'fill-extrusion-opacity': 1,
     'fill-extrusion-vertical-gradient': false,
   }
@@ -570,81 +700,40 @@ function addExtrusion(opts) {
     Object.entries(borderPaint).forEach(([k, v]) => map.setPaintProperty(borderId, k, v))
   }
 
-  syncLabelLift() // 省级 3D 图层出现/更新后，同步标签抬升
-
-  // ---- 事件层：改成「顶面 fill-extrusion 薄片」----
-  // 原因：globe + pitch 50° 下，地面 fill 的屏幕位置与 3D 顶面差异很大，
-  // queryRenderedFeatures 会时而命中时而落空，导致 hover 状态抖动 → 视觉闪烁。
-  // 用顶面薄片作为查询面，与视觉面重合，hover 状态稳定。
-  const eventLayerId = `${id}-event`
-  if (useEventLayer) {
-    if (map.getLayer(eventLayerId)) map.removeLayer(eventLayerId)
-    map.addLayer({
-      id: eventLayerId,
-      type: 'fill-extrusion',
-      source: id,
-      paint: {
-        'fill-extrusion-color': '#ffffff',
-        'fill-extrusion-opacity': 0.01, // 不能为 0，否则图层被跳过、无法被 query 命中
-        'fill-extrusion-base': ['-', expressions.height, topThickness],
-        'fill-extrusion-height': expressions.height,
-        'fill-extrusion-vertical-gradient': false,
-      },
-    })
-    addedLayers.add(eventLayerId)
-  }
-
-  // ---- hover ----
+  // ---- hover：直接改顶面颜色 ----
   if (enableHover) {
-    const targetLayer = useEventLayer ? eventLayerId : id
     unbindHover(id)
-
-    let hoveredId = null
-    const borderSrc = `${id}-border`
-    const setHover = (fid, val) => {
-      map.setFeatureState({ source: id, id: fid }, { hover: val })
-      if (map.getSource(borderSrc)) map.setFeatureState({ source: borderSrc, id: fid }, { hover: val })
-    }
-    const onMove = (event) => {
-      const features = map.queryRenderedFeatures(event.point, { layers: [targetLayer] })
-      if (features.length) {
+    let currentHoverName = null
+    const setHoverCity = (name) => {
+      if (name === currentHoverName) return
+      currentHoverName = name
+      if (name) {
+        map.setPaintProperty(id, 'fill-extrusion-color',
+          ['case', ['==', ['get', 'name'], name], highlightColor, baseColorExpr])
         map.getCanvas().style.cursor = 'pointer'
-        const feature = features[0]
-        const featureId = feature.id ?? feature.properties?.id
-
-        if (hoveredId !== featureId) {
-          if (hoveredId !== null) setHover(hoveredId, false)
-          setHover(featureId, true)
-          hoveredId = featureId
-        }
       } else {
+        map.setPaintProperty(id, 'fill-extrusion-color', baseColorExpr)
         map.getCanvas().style.cursor = ''
-        if (hoveredId !== null) {
-          setHover(hoveredId, false)
-          hoveredId = null
-        }
       }
     }
-
-    const onLeave = () => {
-      map.getCanvas().style.cursor = ''
-      if (hoveredId !== null) {
-        setHover(hoveredId, false)
-        hoveredId = null
-      }
+    const onMouseMove = (e) => {
+      const feature = findCityAtLngLat(e.lngLat)
+      setHoverCity(feature?.properties?.name || null)
     }
-
-    map.on('mousemove', targetLayer, onMove)
-    map.on('mouseleave', targetLayer, onLeave)
-    hoverHandlers.set(id, { onMove, onLeave, targetLayer })
+    const onMouseLeave = () => setHoverCity(null)
+    map.on('mousemove', onMouseMove)
+    map.getCanvas().addEventListener('mouseleave', onMouseLeave)
+    hoverHandlers.set(id, { onMouseMove, onMouseLeave, setHoverCity })
   }
 }
 
 function unbindHover(id) {
   if (!hoverHandlers.has(id)) return
   const old = hoverHandlers.get(id)
-  map?.off('mousemove', old.targetLayer, old.onMove)
-  map?.off('mouseleave', old.targetLayer, old.onLeave)
+  if (old.onMouseMove) map?.off('mousemove', old.onMouseMove)
+  if (old.onMouseLeave && map) map.getCanvas().removeEventListener('mouseleave', old.onMouseLeave)
+  if (old.setHoverCity) old.setHoverCity(null)  // 恢复默认色
+  if (map) map.getCanvas().style.cursor = ''
   hoverHandlers.delete(id)
 }
 
@@ -661,7 +750,7 @@ function centroidOfFeature(feature) {
   const rings = []
   if (geom.type === 'Polygon') { if (geom.coordinates?.[0]) rings.push(geom.coordinates[0]) }
   else if (geom.type === 'MultiPolygon') { for (const poly of geom.coordinates || []) { if (poly?.[0]) rings.push(poly[0]) } }
-  else { return null }
+  else return null
   if (!rings.length) return null
   let sx = 0, sy = 0, n = 0
   for (const ring of rings) {
@@ -674,51 +763,98 @@ function centroidOfFeature(feature) {
   return n ? [sx / n, sy / n] : null
 }
 
+// ============================================================================
+// addCentroidLabels：纯 HTML 绝对定位层，不受 pitch 影响
+// ============================================================================
 function addCentroidLabels(opts) {
-  const { id, geojson, labelConfig = null, labelField = 'name', subLabelField = null, textColor = '#FFFFFF', textSize = 14, subTextSize = 10, textOffset = [0, 0], haloColor = '#000000', haloWidth = 1,
-    height = 0, followLayer = null } = opts // height: 需要抬升到的顶面高度(米)；followLayer: 该图层存在时才抬升
-  if (!map || !geojson?.features) return
-  const points = {
-    type: 'FeatureCollection',
-    features: geojson.features.map((f) => {
-      const coordinates = centroidOfFeature(f)
-      return coordinates ? { type: 'Feature', geometry: { type: 'Point', coordinates }, properties: { ...(f.properties || {}) } } : null
-    }).filter(Boolean),
+  const {
+    id, geojson,
+    labelField = 'name', subLabelField = null,
+    textColor = '#FFFFFF', textSize = 14, subTextSize = 10,
+    haloColor = '#000000', haloWidth = 1,
+    height = 0,
+  } = opts
+
+  if (!map || !geojson?.features || !mapContainer.value) return
+
+  // 清理旧
+  if (labelsContainer) {
+    labelsContainer.remove()
+    labelsContainer = null
   }
-  const sourceId = `${id}-points`
-  if (!map.getSource(sourceId)) map.addSource(sourceId, { type: 'geojson', data: points })
-  else map.getSource(sourceId).setData(points)
+  cityLabels = []
+  if (cityLabelMoveHandler && map) {
+    map.off('move', cityLabelMoveHandler)
+    map.off('render', cityLabelMoveHandler)
+    cityLabelMoveHandler = null
+  }
 
-  const oldLayers = Array.from(addedLayers).filter((layerId) => layerId.startsWith(`${id}-`))
-  oldLayers.forEach((layerId) => { if (map.getLayer(layerId)) map.removeLayer(layerId); addedLayers.delete(layerId) })
+  labelsContainer = document.createElement('div')
+  labelsContainer.className = 'city-labels-overlay'
+  labelsContainer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:10;overflow:hidden;'
+  mapContainer.value.appendChild(labelsContainer)
 
-  const configs = labelConfig || [
-    { field: labelField, size: textSize, color: textColor, offset: textOffset, haloColor, haloWidth },
-    ...(subLabelField ? [{ field: subLabelField, size: subTextSize, color: '#A9DFFF', offset: [textOffset[0], textOffset[1] + 1.1], haloColor, haloWidth }] : []),
-  ]
+  for (const f of geojson.features) {
+    const coords = centroidOfFeature(f)
+    if (!coords) continue
+    const name = f.properties?.[labelField]
+    if (!name) continue
+    const sub = subLabelField ? (f.properties?.[subLabelField] ?? '') : ''
 
-  configs.forEach((config, index) => {
-    const layerId = `${id}-line-${index}`
-    map.addLayer({
-      id: layerId, type: 'symbol', source: sourceId,
-      layout: { 'text-field': getTextExpression(config), 'text-size': config.size ?? textSize, 'text-offset': config.offset ?? [0, 0], 'text-allow-overlap': false, 'text-ignore-placement': false, 'text-anchor': 'center' },
-      paint: { 'text-color': config.color ?? textColor, 'text-halo-color': config.haloColor ?? haloColor, 'text-halo-width': config.haloWidth ?? haloWidth, 'text-translate': [0, 0], 'text-translate-anchor': 'viewport' },
-    })
-    addedLayers.add(layerId)
-  })
+    const el = document.createElement('div')
+    el.style.cssText = `
+      position: absolute;
+      left: 0; top: 0;
+      pointer-events: none;
+      text-align: center;
+      line-height: 1.2;
+      white-space: nowrap;
+      will-change: transform;
+    `
 
-  labelLiftCfg = { layerIds: configs.map((_, i) => `${id}-line-${i}`), height, followLayer }
-  if (!labelLiftBound) { map.on('move', syncLabelLift); labelLiftBound = true }
-  syncLabelLift()
-}
+    const nameEl = document.createElement('div')
+    nameEl.textContent = name
+    nameEl.style.cssText = `
+      color: ${textColor};
+      font-size: ${textSize}px;
+      font-weight: 500;
+      text-shadow: 0 0 ${haloWidth}px ${haloColor}, 0 0 ${haloWidth * 2}px ${haloColor};
+    `
+    el.appendChild(nameEl)
 
-function getTextExpression(config) {
-  if (config.text !== undefined && config.text !== null) return config.text
-  if (!config.field) return ''
-  let exp = ['coalesce', ['get', config.field], '']
-  if (config.prefix) exp = ['concat', config.prefix, exp]
-  if (config.suffix) exp = ['concat', exp, config.suffix]
-  return exp
+    if (sub !== '') {
+      const subEl = document.createElement('div')
+      subEl.textContent = sub
+      subEl.style.cssText = `
+        color: #A9DFFF;
+        font-size: ${subTextSize}px;
+        margin-top: 2px;
+        text-shadow: 0 0 ${haloWidth}px ${haloColor}, 0 0 ${haloWidth * 2}px ${haloColor};
+      `
+      el.appendChild(subEl)
+    }
+
+    labelsContainer.appendChild(el)
+    cityLabels.push({ el, lngLat: coords, height })
+  }
+
+  const updatePositions = () => {
+    if (!map || !cityLabels.length) return
+    const pitch = map.getPitch()
+    const zoom = map.getZoom()
+    const mpp = 78271.517 * Math.cos(35.2 * Math.PI / 180) / Math.pow(2, zoom)
+    const sinPitch = Math.sin(pitch * Math.PI / 180)
+    for (const m of cityLabels) {
+      const p = map.project(m.lngLat)
+      const liftPx = m.height > 0 ? (m.height / mpp) * sinPitch : 0
+      m.el.style.transform = `translate(-50%, -50%) translate(${p.x}px, ${p.y - liftPx}px)`
+    }
+  }
+
+  cityLabelMoveHandler = updatePositions
+  map.on('move', updatePositions)
+  map.on('render', updatePositions)
+  updatePositions()
 }
 
 function addLine({ id, geojson, color = '#ffcc00', width = 2, dashArray = null }) {
@@ -790,12 +926,43 @@ async function addImagePoints({ id, geojson, iconId, iconUrl, iconSize = 0.5, ic
   addedLayers.add(id)
 }
 
+// ★ removeLayer：先移除所有 layer，再移除 source；含 labels 清理
 function removeLayer(id) {
   if (!map) return
-  unbindHover(id); clearHighlight(id)
-  const toRemove = Array.from(addedLayers).filter((lId) => lId === id || lId.startsWith(`${id}-`))
-  toRemove.forEach((lId) => { if (map.getLayer(lId)) map.removeLayer(lId); addedLayers.delete(lId) })
-  ;[id, `${id}-points`, `${id}-border`].forEach((sId) => { if (map.getSource(sId)) map.removeSource(sId) })
+  unbindHover(id)
+  clearHighlight(id)
+
+  // 清理 HTML 标签
+  if (labelsContainer) {
+    labelsContainer.remove()
+    labelsContainer = null
+  }
+  cityLabels = []
+  if (cityLabelMoveHandler && map) {
+    map.off('move', cityLabelMoveHandler)
+    map.off('render', cityLabelMoveHandler)
+    cityLabelMoveHandler = null
+  }
+
+  // 收集所有需要移除的 layer（含 hover-layer 这类没有登记在 addedLayers 的）
+  const toRemove = new Set()
+  addedLayers.forEach((lId) => {
+    if (lId === id || lId.startsWith(`${id}-`)) toRemove.add(lId)
+  })
+  // 从 style 里扫描兜底
+  const styleLayers = map.getStyle()?.layers || []
+  styleLayers.forEach((l) => {
+    if (l.id === id || l.id.startsWith(`${id}-`)) toRemove.add(l.id)
+  })
+
+  toRemove.forEach((lId) => {
+    if (map.getLayer(lId)) map.removeLayer(lId)
+    addedLayers.delete(lId)
+  })
+
+  ;[id, `${id}-points`, `${id}-border`, `${id}-hover-source`].forEach((sId) => {
+    if (map.getSource(sId)) map.removeSource(sId)
+  })
 }
 
 function onClick(layerId, callback) {
@@ -819,6 +986,7 @@ function offClick(layerId) {
 
 defineExpose({
   flyToShaanxi, addPolygon, addFillLayer, addSymbolLayer, addExtrusion, addCentroidLabels, addLine, addPoints, addLabels, addImagePoints, ensureImage, removeLayer, onClick, offClick, loadEditableAreas, clearEditableAreas, getEditableAreas, addMaskLayer, setMaskOpacity, bringMaskToTop, hasMaskLayer, removeMaskLayer, getMap: () => map, getDraw: () => draw, startBoxSelect, stopBoxSelect, bringDrawPointsToTop,
+  findCityAtLngLat: (lngLat) => findCityAtLngLat(lngLat),
 })
 </script>
 
@@ -828,7 +996,6 @@ defineExpose({
   inset: 0;
   width: 100%;
   height: 100%;
-  /* ★ 背景图铺满 */
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -836,6 +1003,5 @@ defineExpose({
 }
 :deep(.maplibregl-ctrl-top-right) { display: none; }
 :deep(.maplibregl-ctrl-bottom-right) { display: none; }
-/* canvas 本身保持透明，让容器背景透出 */
 :deep(.maplibregl-canvas) { background: transparent !important; }
 </style>
