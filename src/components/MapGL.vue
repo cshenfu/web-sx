@@ -47,6 +47,7 @@ const addedLayers = new Set()
 const lastHighlightBySource = new Map()
 const clickHandlers = new Map()
 const imageCache = new Map()
+const glowLineGeoJSONCache = new Map()
 
 let draggingFeatureId = null
 let isBoxSelecting = false
@@ -196,6 +197,7 @@ onUnmounted(() => {
   }
   clickHandlers.clear()
   imageCache.clear()
+  glowLineGeoJSONCache.clear()
 
   if (labelsContainer) { labelsContainer.remove(); labelsContainer = null }
   cityLabels = []
@@ -865,6 +867,46 @@ function addLine({ id, geojson, color = '#ffcc00', width = 2, dashArray = null }
   addedLayers.add(id)
 }
 
+function addGlowLine({ id, geojson, color = '#00e6c8', coreColor = '#65f8df', width = 1.5 }) {
+  if (!map) return
+  const existingSource = map.getSource(id)
+  if (!existingSource) map.addSource(id, { type: 'geojson', data: geojson })
+  else if (glowLineGeoJSONCache.get(id) !== geojson) existingSource.setData(geojson)
+  glowLineGeoJSONCache.set(id, geojson)
+
+  // 三层叠加：宽而淡的外晕、较窄的近光晕、半透明的青绿色核心线
+  const layers = [
+    { suffix: 'halo', lineColor: color, lineWidth: width * 7, lineOpacity: 0.08, lineBlur: 6 },
+    { suffix: 'glow', lineColor: color, lineWidth: width * 3.2, lineOpacity: 0.18, lineBlur: 3 },
+    { suffix: 'core', lineColor: coreColor, lineWidth: width, lineOpacity: 0.82, lineBlur: 0 },
+  ]
+
+  for (const layer of layers) {
+    const layerId = `${id}-${layer.suffix}`
+    const paint = {
+      'line-color': layer.lineColor,
+      'line-width': layer.lineWidth,
+      'line-opacity': layer.lineOpacity,
+      'line-blur': layer.lineBlur,
+    }
+
+    if (map.getLayer(layerId)) {
+      for (const [property, value] of Object.entries(paint)) {
+        map.setPaintProperty(layerId, property, value)
+      }
+    } else {
+      map.addLayer({
+        id: layerId,
+        type: 'line',
+        source: id,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint,
+      })
+    }
+    addedLayers.add(layerId)
+  }
+}
+
 function addPoints({ id, geojson, color = '#ff5500', radius = 6 }) {
   if (!map) return
   if (map.getSource(id)) { map.getSource(id).setData(geojson); return }
@@ -963,6 +1005,7 @@ function removeLayer(id) {
   ;[id, `${id}-points`, `${id}-border`, `${id}-hover-source`].forEach((sId) => {
     if (map.getSource(sId)) map.removeSource(sId)
   })
+  glowLineGeoJSONCache.delete(id)
 }
 
 function onClick(layerId, callback) {
@@ -985,7 +1028,7 @@ function offClick(layerId) {
 }
 
 defineExpose({
-  flyToShaanxi, addPolygon, addFillLayer, addSymbolLayer, addExtrusion, addCentroidLabels, addLine, addPoints, addLabels, addImagePoints, ensureImage, removeLayer, onClick, offClick, loadEditableAreas, clearEditableAreas, getEditableAreas, addMaskLayer, setMaskOpacity, bringMaskToTop, hasMaskLayer, removeMaskLayer, getMap: () => map, getDraw: () => draw, startBoxSelect, stopBoxSelect, bringDrawPointsToTop,
+  flyToShaanxi, addPolygon, addFillLayer, addSymbolLayer, addExtrusion, addCentroidLabels, addLine, addPoints, addLabels, addImagePoints, ensureImage, removeLayer, onClick, offClick, loadEditableAreas, clearEditableAreas, getEditableAreas, addMaskLayer, setMaskOpacity, bringMaskToTop, hasMaskLayer, removeMaskLayer, getMap: () => map, getDraw: () => draw, startBoxSelect, stopBoxSelect, bringDrawPointsToTop,addGlowLine,
   findCityAtLngLat: (lngLat) => findCityAtLngLat(lngLat),
 })
 </script>

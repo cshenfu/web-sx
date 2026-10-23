@@ -71,3 +71,11 @@ export async function updateProjectStage(data) {
 export async function updateSXProject(projectId,data) {
     return await publicService4.put(`/ai/api/aiProject/update/${projectId}`,data);
 }
+
+
+
+
+//获取线路
+export async function getRoadData(projectId) {
+    return await publicService4.get(`/ai/api/aiProject/roadLine/${projectId}`);
+}

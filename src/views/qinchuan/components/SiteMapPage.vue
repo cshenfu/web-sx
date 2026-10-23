@@ -262,6 +262,9 @@ const PROJECT_ICON_LAYER_MAP = { 'wind-farm': ['project-wind-all', 'project-wind
 const SELECTED_ICON_LAYER_IDS = ['project-wind-all', 'project-wind-bx-all', 'project-booster-all']
 const DRAWER_WIDTH = 460
 const DRAWER_GAP = 12
+let roadRequestVersion = 0
+const roadDataCache = new Map()
+const roadInFlight = new Map()
 
 // ★ 点击城市跳转的目标缩放阈值（和 useZoomThresholdSwitch 内部阈值保持一致）
 const CITY_CLICK_ZOOM_TARGET = 7
@@ -359,7 +362,7 @@ const editTools = [
   { key: 'booster', label: '编辑升压站', icon: CircleCheck },
   { key: 'unavailable', label: '设置不可用区域', icon: InfoFilled },
 ]
-
+const ROAD_GLOW_ID = 'project-road-glow'
 const expandButtonStyle = computed(() => ({ right: showProjectDrawer.value ? `${DRAWER_WIDTH + DRAWER_GAP}px` : '0px' }))
 
 function setProjectIconVisible(chipId, visible) {
@@ -752,6 +755,7 @@ const windCount = computed(() => selectedProject.value?.windTurbinePoints?.lengt
 const altCount = computed(() => (selectedProject.value?.windTurbinePoints || []).filter((p) => Number(p.isReserve) === 1).length)
 
 async function onProjectClick(projectId) {
+  // 已选中的场区再次点击不重复请求，也不重绘路线
   if (selectedProject.value?.id === projectId) return
   clearSelectionLayers()
   const project = allMapProjects.value.find((p) => p.id === projectId); if (!project) return
@@ -766,10 +770,131 @@ async function onProjectClick(projectId) {
   addProjectArea(project, true)
   await renderSelectedProjectIcons(project)
   updateDetailCardPosition()
+  // ★ 新增：拉取道路数据并渲染
+  fetchAndRenderRoadData(project.id)
 }
+
+function unwrapApiPayload(response) {
+  let value = response
+  // 兼容浏览器原始 res、接口自身的 { code, data }，以及 Axios 的 { data: res }
+  for (let i = 0; i < 4; i += 1) {
+    if (
+      value &&
+      typeof value === 'object' &&
+      value.data != null &&
+      !Object.prototype.hasOwnProperty.call(value, 'roadMap') &&
+      !Object.prototype.hasOwnProperty.call(value, 'line') &&
+      !Object.prototype.hasOwnProperty.call(value, 'CNKJ')
+    ) {
+      value = value.data
+      continue
+    }
+    break
+  }
+  return value
+}
+
+function toMapCoordinate(point) {
+  const lng = Number(Array.isArray(point) ? point[0] : (point?.lon ?? point?.lng ?? point?.longitude))
+  const lat = Number(Array.isArray(point) ? point[1] : (point?.lat ?? point?.latitude))
+  return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null
+}
+
+function appendLineSegments(features, pointRows, sourceType) {
+  if (!Array.isArray(pointRows) || pointRows.length === 0) return
+
+  // roadpoint/cablepoletower 可能是平铺点列，也可能是多段点列
+  const segments = Array.isArray(pointRows[0]) ? pointRows : [pointRows]
+  segments.forEach((segment, segmentIndex) => {
+    if (!Array.isArray(segment)) return
+    const coordinates = segment.map(toMapCoordinate).filter(Boolean)
+    if (coordinates.length < 2) return
+    features.push({
+      type: 'Feature',
+      properties: { sourceType, segmentIndex },
+      geometry: { type: 'LineString', coordinates },
+    })
+  })
+}
+
+async function fetchAndRenderRoadData(projectId) {
+  if (selectedProject.value?.id !== projectId) return
+
+  // 成功加载过的场区直接复用缓存；同一场区请求进行中时不重复请求
+  const cachedLayer = roadDataCache.get(projectId)
+  if (cachedLayer) {
+    mapRef.value?.addGlowLine(cachedLayer)
+    renderedLayerIds.add(ROAD_GLOW_ID)
+    return
+  }
+  if (roadInFlight.has(projectId)) return
+
+  const requestVersion = ++roadRequestVersion
+  roadInFlight.set(projectId, requestVersion)
+  // 先清掉上个场区的路线，避免请求期间显示错误项目的数据
+  mapRef.value?.removeLayer(ROAD_GLOW_ID)
+  renderedLayerIds.delete(ROAD_GLOW_ID)
+
+  try {
+    // 道路与 35kV 线路都来自同一个 getRoadData 响应
+    const res = await api.getRoadData(projectId)
+
+    // 防止快速切换场区时，旧请求覆盖当前场区的路线
+    if (requestVersion !== roadRequestVersion || selectedProject.value?.id !== projectId) return
+
+    const data = unwrapApiPayload(res)
+    const features = []
+
+    // 道路点位：res.data.roadMap.{CNKJ,CNXJ,JZXJ}.roadpoint
+    const roadMap = data?.roadMap ?? data?.data?.roadMap ?? {}
+    for (const type of ['CNKJ', 'CNXJ', 'JZXJ']) {
+      appendLineSegments(features, roadMap?.[type]?.roadpoint, type)
+    }
+
+    // 35kV 线路规划：同一响应中的 line35Kv.line.loops[].cablepoletower
+    const line35Kv = data?.line35Kv ?? data?.data?.line35Kv
+    const loops = line35Kv?.line?.loops ?? data?.line?.loops ?? []
+    if (Array.isArray(loops)) {
+      loops.forEach((loop, loopIndex) => {
+        appendLineSegments(features, loop?.cablepoletower, `35kV-${loopIndex}`)
+      })
+    }
+
+    if (requestVersion !== roadRequestVersion || selectedProject.value?.id !== projectId) return
+
+    if (features.length && mapRef.value) {
+      const layerData = {
+        id: ROAD_GLOW_ID,
+        geojson: { type: 'FeatureCollection', features },
+        color: '#00e6c8',
+        coreColor: '#65f8df',
+        width: 1.5,
+      }
+      roadDataCache.set(projectId, layerData)
+      mapRef.value.addGlowLine(layerData)
+      renderedLayerIds.add(ROAD_GLOW_ID)
+    } else {
+      ElMessage.info('接口未返回可绘制的道路或线路点位')
+    }
+  } catch (err) {
+    console.warn('[road] getRoadData 请求或解析失败:', err)
+    ElMessage.warning(err?.message || '道路或线路数据加载失败，请检查接口返回')
+  } finally {
+    if (roadInFlight.get(projectId) === requestVersion) roadInFlight.delete(projectId)
+  }
+}
+
+function clearRoadLayer() {
+  roadRequestVersion += 1
+  roadInFlight.clear()
+  mapRef.value?.removeLayer(ROAD_GLOW_ID)
+  renderedLayerIds.delete(ROAD_GLOW_ID)
+}
+
 function clearSelectionLayers() {
   if (!selectedProject.value) return
   const pid = selectedProject.value.id
+  clearRoadLayer()
   showVerifyPanel.value = false; showDetailPanel.value = false
   mapRef.value?.clearEditableAreas(); mapRef.value?.stopBoxSelect?.()
   editBuffer.value = null; drawingNewPoint.value = false; isBoxSelecting.value = false; isEditing.value = false; isDirty.value = false; hasSaved.value = false
