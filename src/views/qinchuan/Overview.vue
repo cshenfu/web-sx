@@ -348,6 +348,10 @@ const CITY_OPTIONS = [
 
 const ICON_FENGJI = 'icon-fengji-overview'
 const ICON_SHENGYAZHAN = 'icon-shengyazhan-overview'
+const OVERVIEW_ROAD_LAYER_ID = 'overview-project-road-glow'
+let overviewRoadRequestVersion = 0
+const overviewRoadCache = new Map()
+const overviewRoadInFlight = new Map()
 
 // 3D 地形
 const TERRAIN_SOURCE_ID = 'terrain-dem'
@@ -521,6 +525,13 @@ function getProjectBounds(project) {
 
 // ==================== 核心点击事件 ====================
 function handleProjectSelect(item) {
+  // 当前场区已经选中时，不重复请求，也不重绘路线或场区
+  if (
+    popoverProject.value?.id === item.id ||
+    selectedProject.value?.id === item.id
+  ) return
+
+  clearOverviewRoadLayer()
   hoverProject.value = null
   detailCardPos.visible = false
   clearHideTimer()
@@ -541,6 +552,7 @@ function handleProjectSelect(item) {
 
   addProjectArea(item, true)
   renderSelectedProjectIcons(item)
+  loadOverviewRoadData(item.id)
 }
 
 async function handleOpenDetailPanel(item) {
@@ -703,6 +715,115 @@ async function loadAiProjectDetail(aiProjectId) {
 const mapProjects = ref([])
 const renderedMapLayerIds = new Set()
 
+function unwrapOverviewRoadResponse(response) {
+  let value = response
+  for (let i = 0; i < 4; i += 1) {
+    if (
+      value &&
+      typeof value === 'object' &&
+      value.data != null &&
+      !Object.prototype.hasOwnProperty.call(value, 'roadMap') &&
+      !Object.prototype.hasOwnProperty.call(value, 'line') &&
+      !Object.prototype.hasOwnProperty.call(value, 'CNKJ')
+    ) {
+      value = value.data
+      continue
+    }
+    break
+  }
+  return value
+}
+
+function toOverviewMapCoordinate(point) {
+  const lng = Number(Array.isArray(point) ? point[0] : (point?.lon ?? point?.lng ?? point?.longitude))
+  const lat = Number(Array.isArray(point) ? point[1] : (point?.lat ?? point?.latitude))
+  return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null
+}
+
+function appendOverviewLineSegments(features, pointRows, sourceType) {
+  if (!Array.isArray(pointRows) || pointRows.length === 0) return
+  const segments = Array.isArray(pointRows[0]) ? pointRows : [pointRows]
+
+  segments.forEach((segment, segmentIndex) => {
+    if (!Array.isArray(segment)) return
+    const coordinates = segment.map(toOverviewMapCoordinate).filter(Boolean)
+    if (coordinates.length < 2) return
+    features.push({
+      type: 'Feature',
+      properties: { sourceType, segmentIndex },
+      geometry: { type: 'LineString', coordinates },
+    })
+  })
+}
+
+async function loadOverviewRoadData(projectId) {
+  const isActive = () => (
+    popoverProject.value?.id === projectId ||
+    selectedProject.value?.id === projectId
+  )
+  if (!isActive()) return
+
+  const cachedLayer = overviewRoadCache.get(projectId)
+  if (cachedLayer) {
+    mapRef.value?.addGlowLine(cachedLayer)
+    return
+  }
+  if (overviewRoadInFlight.has(projectId)) return
+
+  const requestVersion = ++overviewRoadRequestVersion
+  overviewRoadInFlight.set(projectId, requestVersion)
+
+  try {
+    const res = await newApi.getRoadData(projectId)
+    if (requestVersion !== overviewRoadRequestVersion || !isActive()) return
+
+    const data = unwrapOverviewRoadResponse(res)
+    const roadMap = data?.roadMap ?? data?.data?.roadMap ?? {}
+    const features = []
+
+    for (const type of ['CNKJ', 'CNXJ', 'JZXJ']) {
+      appendOverviewLineSegments(features, roadMap?.[type]?.roadpoint, type)
+    }
+
+    const line35Kv = data?.line35Kv ?? data?.data?.line35Kv
+    const loops = line35Kv?.line?.loops ?? data?.line?.loops ?? []
+    if (Array.isArray(loops)) {
+      loops.forEach((loop, loopIndex) => {
+        appendOverviewLineSegments(features, loop?.cablepoletower, `35kV-${loopIndex}`)
+      })
+    }
+
+    if (requestVersion !== overviewRoadRequestVersion || !isActive()) return
+    if (!features.length || !mapRef.value) {
+      console.warn('[overview-road] 接口未返回可绘制的道路或线路点位')
+      return
+    }
+
+    const layerData = {
+      id: OVERVIEW_ROAD_LAYER_ID,
+      geojson: { type: 'FeatureCollection', features },
+      color: '#00e6c8',
+      coreColor: '#65f8df',
+      width: 1.5,
+    }
+    overviewRoadCache.set(projectId, layerData)
+    mapRef.value.addGlowLine(layerData)
+  } catch (err) {
+    console.warn('[overview-road] 道路/线路数据加载失败:', err)
+    ElMessage.warning(err?.message || '道路或线路数据加载失败')
+  } finally {
+    if (overviewRoadInFlight.get(projectId) === requestVersion) {
+      overviewRoadInFlight.delete(projectId)
+    }
+  }
+}
+
+function clearOverviewRoadLayer() {
+  overviewRoadRequestVersion += 1
+  overviewRoadInFlight.clear()
+  mapRef.value?.removeLayer(OVERVIEW_ROAD_LAYER_ID)
+}
+
 function buildAreaFeature(project) {
   const coords = getProjectCoords(project)
   if (coords.length < 3) return null
@@ -851,6 +972,7 @@ function clearSelection() {
   // 取任一存在的选中 id（popover 态 或 详情态），用它还原高亮
   const activeId = selectedProject.value?.id ?? popoverProject.value?.id ?? null
 
+  clearOverviewRoadLayer()
   popoverProject.value = null
   selectedProject.value = null
 
@@ -1018,6 +1140,7 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
     renderSelectedProject(activeProject.value)
   },
   onExit: () => {
+    clearOverviewRoadLayer()
     syncMaskVisibility(true)
     activeEditTool.value = ''
     rightPanelMode.value = 'list'

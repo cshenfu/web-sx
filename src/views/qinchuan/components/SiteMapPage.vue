@@ -267,7 +267,7 @@ const roadDataCache = new Map()
 const roadInFlight = new Map()
 
 // ★ 点击城市跳转的目标缩放阈值（和 useZoomThresholdSwitch 内部阈值保持一致）
-const CITY_CLICK_ZOOM_TARGET = 7
+const CITY_CLICK_ZOOM_TARGET = 8.5
 
 // 3D 地形
 const TERRAIN_SOURCE_ID = 'terrain-dem'
