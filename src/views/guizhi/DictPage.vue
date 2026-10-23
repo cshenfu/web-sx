@@ -664,29 +664,126 @@ const handleDelete = (row) => {
 .mr-1 { margin-right: 4px; }
 
 /* 表格区域 */
+
+/* ========== 表格区域：统一角色管理风格 ========== */
 .table-wrapper {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  padding: 0 20px;
+  padding: 0 14px;
   box-sizing: border-box;
   overflow: hidden;
 }
-:deep(.el-table) {
-  --el-table-border-color: #E2E9F0;
-  --el-table-header-bg-color: #F8FAFC;
-  --el-table-row-hover-bg-color: #F4F8FC;
+
+/* 表格整体 */
+.table-wrapper :deep(.el-table) {
+  --el-table-border-color: #e6ebf1;
+  --el-table-header-bg-color: #f5f8fc;
+  --el-table-row-hover-bg-color: #f0f6fc;
+  --el-table-current-row-bg-color: #f0f6fc;
+  --el-table-text-color: #536274;
+  --el-table-header-text-color: #46576a;
+
   width: 100% !important;
-  flex: 1;
+  height: 100%;
+  flex: 1 1 0;
+  min-height: 0;
+  font-size: 10px;
+  background: transparent;
 }
-:deep(.el-table th.el-table__cell) {
-  background-color: #F8FAFC !important;
-  color: #0B1C2C;
+
+/* 表格底部边线 */
+.table-wrapper :deep(.el-table__inner-wrapper::before) {
+  height: 0;
+}
+
+/* 表头：紧凑、浅灰蓝底色 */
+.table-wrapper :deep(.el-table th.el-table__cell) {
+  height: 28px;
+  padding: 0;
+  background: #f5f8fc !important;
+  border-bottom: 1px solid #e2e9f1;
+  color: #46576a;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* 数据行：统一约 40px 高度 */
+.table-wrapper :deep(.el-table td.el-table__cell) {
+  height: 40px;
+  padding: 0;
+  background: #fff;
+  border-bottom: 1px solid #edf1f5;
+  color: #536274;
+  font-size: 10px;
+}
+
+/* 单元格内容 */
+.table-wrapper :deep(.el-table th .cell),
+.table-wrapper :deep(.el-table td .cell) {
+  padding: 0 10px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* 鼠标悬停效果 */
+.table-wrapper :deep(.el-table__body tr) {
+  transition: background-color 0.12s ease;
+}
+
+.table-wrapper :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background-color: #f0f6fc !important;
+}
+
+/* 固定操作列保持一致的背景 */
+.table-wrapper :deep(.el-table__fixed),
+.table-wrapper :deep(.el-table__fixed-right) {
+  height: 100%;
+}
+
+.table-wrapper :deep(.el-table__fixed-right::before) {
+  background-color: transparent;
+}
+
+/* 表格操作按钮 */
+.table-wrapper :deep(.operation-btn-item) {
+  height: 24px;
+  padding: 0;
+  margin-left: 10px;
+  font-size: 10px;
   font-weight: 500;
 }
-:deep(.el-table__inner-wrapper::before) {
-  display: none;
+
+.table-wrapper :deep(.operation-btn-item:first-child) {
+  margin-left: 0;
+}
+
+.table-wrapper :deep(.operation-btn-item.el-button--primary) {
+  color: #087fe5;
+}
+
+.table-wrapper :deep(.operation-btn-item.el-button--primary:hover) {
+  color: #066bc2;
+}
+
+.table-wrapper :deep(.operation-btn-item.is-danger) {
+  color: #d14343 !important;
+}
+
+.table-wrapper :deep(.operation-btn-item.is-danger:hover) {
+  color: #b92f35 !important;
+}
+
+/* 空数据状态 */
+.table-wrapper :deep(.el-table__empty-block) {
+  min-height: 100px;
+}
+
+.table-wrapper :deep(.el-table__empty-text) {
+  font-size: 11px;
+  color: #98a5b5;
 }
 
 /* 分页 */
