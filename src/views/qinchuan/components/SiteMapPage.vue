@@ -224,6 +224,8 @@ import { searchPlaceName } from '../js/useTiandituGeocode'
 import { ICON_SIZE_WIND, ICON_SIZE_BOOSTER } from '@/components/site-map/iconSize.js'
 import * as api from '@/api/modules/project'
 import * as configApi from '@/api/modules/selectConfig'
+import fjIcon from '@/assets/img/mapIcon/fj-icon.png'
+import gfIcon from '@/assets/img/mapIcon/gf-icon.png'
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
 import fengjiBxIcon from '@/assets/img/mapIcon/fengji-bx.png'
 import shengyazhanIcon from '@/assets/img/mapIcon/syz.png'
@@ -231,8 +233,13 @@ import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
 import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPanelConfig'
 import { attachSxLayers } from '@/components/site-map/attachSxLayers'
 import { addGradientExtrusion } from '@/utils/gradientExtrusion'
+import {
+  getIconNaturalWidth,
+  getCoordsBounds,
+  calcIconSizeAtRef,
+  buildIconSizeExpression,
+} from '@/components/site-map/areaCenterIcon'
 
-// ★ 城市边界 / 陕西省轮廓：本地 JSON
 import cityGeoJSONData from '@/assets/js/610000_full.json'
 import shaanxiBoundaryData from '@/assets/js/610000.json'
 
@@ -256,6 +263,10 @@ const emits = defineEmits(['featureVisibleChange'])
 const ICON_FENGJI = 'icon-fengji'
 const ICON_FENGJI_BX = 'icon-fengji-bx'
 const ICON_SHENGYAZHAN = 'icon-shengyazhan'
+const ICON_AREA_FJ = 'icon-area-fj'
+const ICON_AREA_GF = 'icon-area-gf'
+const AREA_CENTER_LAYER_ID = 'project-area-center-icons'
+let areaCenterIconRequestVersion = 0
 const CITY_LAYER_ID = 'site-city-stats'
 const PROVINCE_CODE = '610000'
 const PROJECT_ICON_LAYER_MAP = { 'wind-farm': ['project-wind-all', 'project-wind-bx-all'], booster: ['project-booster-all'] }
@@ -263,13 +274,12 @@ const SELECTED_ICON_LAYER_IDS = ['project-wind-all', 'project-wind-bx-all', 'pro
 const DRAWER_WIDTH = 460
 const DRAWER_GAP = 12
 let roadRequestVersion = 0
+let currentRoadProjectId = null
 const roadDataCache = new Map()
 const roadInFlight = new Map()
 
-// ★ 点击城市跳转的目标缩放阈值（和 useZoomThresholdSwitch 内部阈值保持一致）
-const CITY_CLICK_ZOOM_TARGET = 8.5
+const CITY_CLICK_ZOOM_TARGET = 7
 
-// 3D 地形
 const TERRAIN_SOURCE_ID = 'terrain-dem'
 const HILLSHADE_SOURCE_ID = 'hillshade-dem'
 const HILLSHADE_LAYER_ID = 'terrain-hillshade'
@@ -352,7 +362,6 @@ const customLayerState = reactive({})
 
 const overviewStats = reactive({ totalCapacity: 0, totalCount: 0, windCapacity: 0, windCount: 0, solarCapacity: 0, solarCount: 0 })
 const cityStats = ref([])
-// ★ 本地 JSON 直接作为缓存，不再 fetch
 let cityGeoJSONCache = cityGeoJSONData
 let shaanxiBoundaryCache = shaanxiBoundaryData
 
@@ -391,7 +400,6 @@ function onLayerToggle(item) {
 function onLayerInputChange({ id, value }) { layerInputs[id] = value }
 function toggleCustomLayer(id) {}
 
-// ==================== 3D 地形 ====================
 function toggleTerrain(shouldEnable) {
   const map = mapRef.value?.getMap?.()
   if (!map) return
@@ -404,7 +412,7 @@ function toggleTerrain(shouldEnable) {
 
   try {
     if (!map.getSource(TERRAIN_SOURCE_ID)) {
-      map.addSource(TERRAIN_SOURCE_ID, { type: 'raster-dem', url: TERRAIN_TILEJSON_URL,maxzoom: 14,  })
+      map.addSource(TERRAIN_SOURCE_ID, { type: 'raster-dem', url: TERRAIN_TILEJSON_URL, maxzoom: 14 })
     }
     if (!map.getSource(HILLSHADE_SOURCE_ID)) {
       map.addSource(HILLSHADE_SOURCE_ID, { type: 'raster-dem', url: TERRAIN_TILEJSON_URL })
@@ -675,10 +683,84 @@ function syncMaskVisibility(force = false) {
 
 function getProjectCoords(project) { return (project.coordinate || []).map((c) => [Number(c.longitude), Number(c.latitude)]).filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat)) }
 function getProjectCentroid(project) {
-  const coords = getProjectCoords(project); if (!coords.length) return null
+  let coords = getProjectCoords(project)
+  if (coords.length > 1) {
+    const [firstLng, firstLat] = coords[0]
+    const [lastLng, lastLat] = coords[coords.length - 1]
+    if (firstLng === lastLng && firstLat === lastLat) coords = coords.slice(0, -1)
+  }
+  if (!coords.length) return null
   let sx = 0, sy = 0; for (const [lng, lat] of coords) { sx += lng; sy += lat }
   return [sx / coords.length, sy / coords.length]
 }
+
+function buildAreaCenterFC(projects = allMapProjects.value, naturalWidthMap = {}) {
+  const selectedId = selectedProject.value?.id
+  const features = projects
+    .filter((project) => selectedId == null || String(project.id) !== String(selectedId))
+    .map((project) => {
+      const center = getProjectCentroid(project)
+      if (!center) return null
+      const isGF = project.itemType === 'GF'
+      const bounds = getCoordsBounds(getProjectCoords(project))
+      const naturalWidth = isGF ? naturalWidthMap.gf : naturalWidthMap.fj
+      return {
+        type: 'Feature',
+        properties: {
+          projectId: project.id,
+          iconId: isGF ? ICON_AREA_GF : ICON_AREA_FJ,
+          sizeAtRef: calcIconSizeAtRef(bounds, naturalWidth),
+        },
+        geometry: { type: 'Point', coordinates: center },
+      }
+    })
+    .filter(Boolean)
+  return { type: 'FeatureCollection', features }
+}
+
+async function renderAreaCenterIcons() {
+  const requestVersion = ++areaCenterIconRequestVersion
+  if (!mapReady.value || !mapRef.value) return
+
+  const [fjW, gfW] = await Promise.all([
+    getIconNaturalWidth(fjIcon),
+    getIconNaturalWidth(gfIcon),
+  ])
+  if (requestVersion !== areaCenterIconRequestVersion) return
+
+  const geojson = buildAreaCenterFC(allMapProjects.value, { fj: fjW, gf: gfW })
+  if (!geojson.features.length) {
+    mapRef.value.removeLayer(AREA_CENTER_LAYER_ID)
+    renderedLayerIds.delete(AREA_CENTER_LAYER_ID)
+    return
+  }
+
+  try {
+    await mapRef.value.ensureImage(ICON_AREA_FJ, fjIcon)
+    await mapRef.value.ensureImage(ICON_AREA_GF, gfIcon)
+    if (requestVersion !== areaCenterIconRequestVersion) return
+
+    await mapRef.value.addImagePoints({
+      id: AREA_CENTER_LAYER_ID,
+      geojson,
+      iconId: ICON_AREA_FJ,
+      iconUrl: fjIcon,
+      iconImage: ['get', 'iconId'],
+      iconSize: 0.5,
+      iconAnchor: 'center',
+      allowOverlap: true,
+      iconPitchAlignment: 'map',
+      iconRotationAlignment: 'map',
+      extraLayout: { 'icon-size': buildIconSizeExpression('sizeAtRef') },
+      updateExisting: true,
+    })
+    if (requestVersion !== areaCenterIconRequestVersion) return
+    renderedLayerIds.add(AREA_CENTER_LAYER_ID)
+  } catch (err) {
+    console.warn('[map] 场区中心图标加载失败:', err)
+  }
+}
+
 function flyToProjectBounds(project) {
   const map = mapRef.value?.getMap?.(); if (!map) return
   const coords = getProjectCoords(project); if (!coords.length) return
@@ -704,9 +786,25 @@ function buildWindFC(project) {
   return { normal: { type: 'FeatureCollection', features: normal }, reserve: { type: 'FeatureCollection', features: reserve } }
 }
 function buildBoosterFC(project) {
-  return { type: 'FeatureCollection', features: (project.boosterStationLocations || []).map((p, index) => { const lng = Number(p.lng), lat = Number(p.lat); return Number.isFinite(lng) && Number.isFinite(lat) ? { type: 'Feature', properties: { projectId: project.id, index, isBest: p.isBest }, geometry: { type: 'Point', coordinates: [lng, lat] } } : null }).filter(Boolean) }
+  return {
+    type: 'FeatureCollection',
+    features: (project.boosterStationLocations || [])
+      .map((p, index) => {
+        if (!(p.isBest === true || Number(p.isBest) === 1)) return null
+        const lng = Number(p.lng), lat = Number(p.lat)
+        return Number.isFinite(lng) && Number.isFinite(lat)
+          ? { type: 'Feature', properties: { projectId: project.id, index, isBest: true }, geometry: { type: 'Point', coordinates: [lng, lat] } }
+          : null
+      })
+      .filter(Boolean),
+  }
 }
-function clearProjectLayers() { if (!mapRef.value) return; for (const id of renderedLayerIds) mapRef.value.removeLayer(id); renderedLayerIds.clear() }
+function clearProjectLayers() {
+  if (!mapRef.value) return
+  areaCenterIconRequestVersion += 1
+  for (const id of renderedLayerIds) mapRef.value.removeLayer(id)
+  renderedLayerIds.clear()
+}
 
 async function safeAddIcon({ layerId, featureCollection, iconId, iconUrl, iconSize, iconAnchor = 'center', fallbackColor = '#3b82f6', fallbackRadius = 8 }) {
   try { await mapRef.value.ensureImage(iconId, iconUrl); await mapRef.value.addImagePoints({ id: layerId, geojson: featureCollection, iconId, iconUrl, iconSize, iconAnchor }) }
@@ -739,6 +837,7 @@ async function renderProjectsByStage(stage) {
   clearProjectLayers()
   if (!allMapProjects.value.length || stage === 'overview') return
   for (const p of allMapProjects.value) addProjectArea(p, p.id === selectedProject.value?.id)
+  await renderAreaCenterIcons()
   if (selectedProject.value) await renderSelectedProjectIcons(selectedProject.value)
   syncAllProjectIcons(); syncMaskVisibility()
 }
@@ -755,28 +854,26 @@ const windCount = computed(() => selectedProject.value?.windTurbinePoints?.lengt
 const altCount = computed(() => (selectedProject.value?.windTurbinePoints || []).filter((p) => Number(p.isReserve) === 1).length)
 
 async function onProjectClick(projectId) {
-  // 已选中的场区再次点击不重复请求，也不重绘路线
-  if (selectedProject.value?.id === projectId) return
-  clearSelectionLayers()
-  const project = allMapProjects.value.find((p) => p.id === projectId); if (!project) return
+  if (String(selectedProject.value?.id ?? '') === String(projectId)) return
+  clearSelectionLayers({ restoreAreaCenter: false })
+  const project = allMapProjects.value.find((p) => String(p.id) === String(projectId)); if (!project) return
   flyToProjectBounds(project)
   selectedProject.value = project
   cardClosed.value = false
   hasSaved.value = false
   isEditing.value = true
   isDirty.value = false
-  editMode.value = null          // ★ 不预选任何编辑工具
+  editMode.value = null
   initEditBuffer(project)
   addProjectArea(project, true)
+  await renderAreaCenterIcons()
   await renderSelectedProjectIcons(project)
   updateDetailCardPosition()
-  // ★ 新增：拉取道路数据并渲染
   fetchAndRenderRoadData(project.id)
 }
 
 function unwrapApiPayload(response) {
   let value = response
-  // 兼容浏览器原始 res、接口自身的 { code, data }，以及 Axios 的 { data: res }
   for (let i = 0; i < 4; i += 1) {
     if (
       value &&
@@ -802,8 +899,6 @@ function toMapCoordinate(point) {
 
 function appendLineSegments(features, pointRows, sourceType) {
   if (!Array.isArray(pointRows) || pointRows.length === 0) return
-
-  // roadpoint/cablepoletower 可能是平铺点列，也可能是多段点列
   const segments = Array.isArray(pointRows[0]) ? pointRows : [pointRows]
   segments.forEach((segment, segmentIndex) => {
     if (!Array.isArray(segment)) return
@@ -818,40 +913,41 @@ function appendLineSegments(features, pointRows, sourceType) {
 }
 
 async function fetchAndRenderRoadData(projectId) {
-  if (selectedProject.value?.id !== projectId) return
+  if (String(selectedProject.value?.id ?? '') !== String(projectId)) return
 
-  // 成功加载过的场区直接复用缓存；同一场区请求进行中时不重复请求
+  // ★ 幂等：当前 layer 显示的就是这个项目，直接 return
+  if (
+    currentRoadProjectId === String(projectId) &&
+    mapRef.value?.getMap?.()?.getSource(ROAD_GLOW_ID)
+  ) return
+
   const cachedLayer = roadDataCache.get(projectId)
   if (cachedLayer) {
     mapRef.value?.addGlowLine(cachedLayer)
     renderedLayerIds.add(ROAD_GLOW_ID)
+    currentRoadProjectId = String(projectId)
     return
   }
   if (roadInFlight.has(projectId)) return
 
   const requestVersion = ++roadRequestVersion
   roadInFlight.set(projectId, requestVersion)
-  // 先清掉上个场区的路线，避免请求期间显示错误项目的数据
   mapRef.value?.removeLayer(ROAD_GLOW_ID)
   renderedLayerIds.delete(ROAD_GLOW_ID)
 
   try {
-    // 道路与 35kV 线路都来自同一个 getRoadData 响应
     const res = await api.getRoadData(projectId)
 
-    // 防止快速切换场区时，旧请求覆盖当前场区的路线
-    if (requestVersion !== roadRequestVersion || selectedProject.value?.id !== projectId) return
+    if (requestVersion !== roadRequestVersion || String(selectedProject.value?.id ?? '') !== String(projectId)) return
 
     const data = unwrapApiPayload(res)
     const features = []
 
-    // 道路点位：res.data.roadMap.{CNKJ,CNXJ,JZXJ}.roadpoint
     const roadMap = data?.roadMap ?? data?.data?.roadMap ?? {}
     for (const type of ['CNKJ', 'CNXJ', 'JZXJ']) {
       appendLineSegments(features, roadMap?.[type]?.roadpoint, type)
     }
 
-    // 35kV 线路规划：同一响应中的 line35Kv.line.loops[].cablepoletower
     const line35Kv = data?.line35Kv ?? data?.data?.line35Kv
     const loops = line35Kv?.line?.loops ?? data?.line?.loops ?? []
     if (Array.isArray(loops)) {
@@ -860,7 +956,7 @@ async function fetchAndRenderRoadData(projectId) {
       })
     }
 
-    if (requestVersion !== roadRequestVersion || selectedProject.value?.id !== projectId) return
+    if (requestVersion !== roadRequestVersion || String(selectedProject.value?.id ?? '') !== String(projectId)) return
 
     if (features.length && mapRef.value) {
       const layerData = {
@@ -873,6 +969,7 @@ async function fetchAndRenderRoadData(projectId) {
       roadDataCache.set(projectId, layerData)
       mapRef.value.addGlowLine(layerData)
       renderedLayerIds.add(ROAD_GLOW_ID)
+      currentRoadProjectId = String(projectId)
     } else {
       ElMessage.info('接口未返回可绘制的道路或线路点位')
     }
@@ -889,20 +986,23 @@ function clearRoadLayer() {
   roadInFlight.clear()
   mapRef.value?.removeLayer(ROAD_GLOW_ID)
   renderedLayerIds.delete(ROAD_GLOW_ID)
+  currentRoadProjectId = null
 }
 
-function clearSelectionLayers() {
+function clearSelectionLayers({ restoreAreaCenter = true } = {}) {
   if (!selectedProject.value) return
+  if (!restoreAreaCenter) areaCenterIconRequestVersion += 1
   const pid = selectedProject.value.id
   clearRoadLayer()
   showVerifyPanel.value = false; showDetailPanel.value = false
   mapRef.value?.clearEditableAreas(); mapRef.value?.stopBoxSelect?.()
   editBuffer.value = null; drawingNewPoint.value = false; isBoxSelecting.value = false; isEditing.value = false; isDirty.value = false; hasSaved.value = false
-  editMode.value = null          // ★ 清空编辑工具
+  editMode.value = null
   const project = allMapProjects.value.find((p) => p.id === pid)
   if (project && isAreaView.value) addProjectArea(project, false)
   clearSelectedProjectIcons()
   selectedProject.value = null
+  if (restoreAreaCenter) renderAreaCenterIcons()
   detailCardPos.visible = false
   cardClosed.value = false
 }
@@ -916,22 +1016,23 @@ function closeDetailCard() { cardClosed.value = true }
 
 function handleMapBlankClick(e) {
   if (!isAreaView.value || !selectedProject.value || showEditProject.value) return
-  const map = mapRef.value?.getMap?.(); if (!map) return
-  const areaIds = []
-  for (const id of renderedLayerIds) { if (id.startsWith('project-area-')) areaIds.push(`${id}-fill`) }
-  if (!areaIds.length) return
-  if (map.queryRenderedFeatures(e.point, { layers: areaIds }).length) return
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
 
-  // 已激活具体编辑工具 → 不取消选中，仅退出画点/框选
-  if (editMode.value !== null) {
-    if (drawingNewPoint.value) { mapRef.value?.getDraw?.()?.changeMode('simple_select'); drawingNewPoint.value = false }
-    if (isBoxSelecting.value) { mapRef.value?.stopBoxSelect?.(); isBoxSelecting.value = false }
-    return
+  try {
+    const hits = map.queryRenderedFeatures(e.point)
+    if (hits.some((f) => f.properties?.projectId != null)) return
+    if (editMode.value !== null) {
+      if (drawingNewPoint.value) { mapRef.value?.getDraw?.()?.changeMode('simple_select'); drawingNewPoint.value = false }
+      if (isBoxSelecting.value) { mapRef.value?.stopBoxSelect?.(); isBoxSelecting.value = false }
+      return
+    }
+    clearSelectionLayers()
+  } catch (err) {
+    console.warn('[site-map] handleMapBlankClick 查询失败:', err)
   }
-  clearSelectionLayers()
 }
 
-// ==================== 城市点击跳转 ====================
 function getCityCenterFromFeature(feature) {
   const p = feature?.properties || {}
   const code = String(p.regionCode || p.adcode || '')
@@ -1000,7 +1101,7 @@ function exitEditMode() {
   if (!isEditing.value) return
   mapRef.value?.clearEditableAreas(); mapRef.value?.stopBoxSelect?.()
   editBuffer.value = null; drawingNewPoint.value = false; isBoxSelecting.value = false; isEditing.value = false; isDirty.value = false
-  editMode.value = null          // ★ 清空编辑工具
+  editMode.value = null
   if (selectedProject.value) renderSelectedProjectIcons(selectedProject.value)
 }
 function enterEditMode(mode) {
@@ -1114,7 +1215,7 @@ async function onMapReady() {
   const map = mapRef.value.getMap()
   map.on('move', updateDetailCardPosition); map.on('zoom', updateDetailCardPosition)
   map.on('click', handleMapBlankClick)
-  map.on('click', handleCityFillClick)   // ★ 城市点击跳转
+  map.on('click', handleCityFillClick)
   bindZoomListener(); syncByZoom()
   if (isAreaView.value) { hideCityStats(); renderProjectsByStage('area') } else await renderCityStats()
   map.on('zoom', syncMaskVisibility); map.on('move', syncMaskVisibility); map.on('style.load', ensureShaanxiMask)

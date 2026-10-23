@@ -17,7 +17,6 @@
       @toggle="onLayerToggle"
     />
 
-    <!-- ===================== 缩小时：head + 左右 dashboard ===================== -->
     <template v-if="!isAreaView">
       <DashboardHead class="head-layer" />
 
@@ -41,7 +40,6 @@
       <RightDashboard class="right-layer" />
     </template>
 
-    <!-- ===================== 放大时：无 head ===================== -->
     <template v-else>
       <div class="area-top-toolbar">
         <div class="view-tabs">
@@ -64,7 +62,6 @@
         </div>
       </div>
 
-      <!-- ──────── 地图模式 ──────── -->
       <template v-if="viewMode === 'map'">
         <aside v-if="!wizardVisible" class="area-summary">
           <ProjectOverview
@@ -116,7 +113,6 @@
           </template>
         </div>
 
-        <!-- 悬浮深色气泡窗 -->
         <div
           v-if="hoverProject && detailCardPos.visible && !isDetailFullscreen && !popoverProject && !selectedProject"
           class="hover-tooltip"
@@ -152,7 +148,6 @@
           </div>
         </div>
 
-        <!-- 右上角白色卡片 -->
         <div
           v-if="popoverProject && !isDetailFullscreen && !selectedProject"
           class="right-top-card"
@@ -207,7 +202,6 @@
         </div>
       </template>
 
-      <!-- ──────── 项目列表模式 ──────── -->
       <section v-else class="area-list-view">
         <div class="list-heading">
           <div class="list-title">
@@ -333,9 +327,17 @@ import {
 import { cloneValue } from './js/geoUtils'
 import { useZoomThresholdSwitch } from './js/useZoomThresholdSwitch'
 
+import fjIcon from '@/assets/img/mapIcon/fj-icon.png'
+import gfIcon from '@/assets/img/mapIcon/gf-icon.png'
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
 import shengyazhanIcon from '@/assets/img/mapIcon/syz.png'
 import shaanxiOutline610000 from '/public/geojson/610000.json'
+import {
+  getIconNaturalWidth,
+  getCoordsBounds,
+  calcIconSizeAtRef,
+  buildIconSizeExpression,
+} from '@/components/site-map/areaCenterIcon'
 
 // ==================== 常量 ====================
 const CITY_OPTIONS = [
@@ -348,8 +350,13 @@ const CITY_OPTIONS = [
 
 const ICON_FENGJI = 'icon-fengji-overview'
 const ICON_SHENGYAZHAN = 'icon-shengyazhan-overview'
+const ICON_AREA_FJ = 'icon-area-fj-overview'
+const ICON_AREA_GF = 'icon-area-gf-overview'
+const AREA_CENTER_LAYER_ID = 'overview-project-area-center-icons'
+let areaCenterIconRequestVersion = 0
 const OVERVIEW_ROAD_LAYER_ID = 'overview-project-road-glow'
 let overviewRoadRequestVersion = 0
+let currentOverviewRoadProjectId = null
 const overviewRoadCache = new Map()
 const overviewRoadInFlight = new Map()
 
@@ -455,11 +462,11 @@ const stageMap = computed(() => Object.fromEntries(stageOptions.value.map((item)
 
 const popoverWindCount = computed(() => {
   const pts = popoverProject.value?.windTurbinePoints || []
-  return pts.filter((p) => !p.isAlternative).length
+  return pts.filter((p) => Number(p.isReserve) !== 1).length
 })
 const popoverAltCount = computed(() => {
   const pts = popoverProject.value?.windTurbinePoints || []
-  return pts.filter((p) => p.isAlternative).length
+  return pts.filter((p) => Number(p.isReserve) === 1).length
 })
 
 // ==================== 悬浮交互逻辑 ====================
@@ -525,10 +532,11 @@ function getProjectBounds(project) {
 
 // ==================== 核心点击事件 ====================
 function handleProjectSelect(item) {
-  // 当前场区已经选中时，不重复请求，也不重绘路线或场区
+  const popoverId = popoverProject.value?.id
+  const selectedId = selectedProject.value?.id
   if (
-    popoverProject.value?.id === item.id ||
-    selectedProject.value?.id === item.id
+    (popoverId != null && String(popoverId) === String(item.id)) ||
+    (selectedId != null && String(selectedId) === String(item.id))
   ) return
 
   clearOverviewRoadLayer()
@@ -537,6 +545,7 @@ function handleProjectSelect(item) {
   clearHideTimer()
 
   popoverProject.value = item
+  void renderAreaCenterIcons()
 
   const map = mapRef.value?.getMap()
   const bounds = getProjectBounds(item)
@@ -639,7 +648,7 @@ function toggleTerrain(shouldEnable) {
 
   try {
     if (!map.getSource(TERRAIN_SOURCE_ID)) {
-      map.addSource(TERRAIN_SOURCE_ID, { type: 'raster-dem', url: TERRAIN_TILEJSON_URL,maxzoom: 14, })
+      map.addSource(TERRAIN_SOURCE_ID, { type: 'raster-dem', url: TERRAIN_TILEJSON_URL, maxzoom: 14 })
     }
     if (!map.getSource(HILLSHADE_SOURCE_ID)) {
       map.addSource(HILLSHADE_SOURCE_ID, { type: 'raster-dem', url: TERRAIN_TILEJSON_URL })
@@ -757,15 +766,23 @@ function appendOverviewLineSegments(features, pointRows, sourceType) {
 }
 
 async function loadOverviewRoadData(projectId) {
-  const isActive = () => (
-    popoverProject.value?.id === projectId ||
-    selectedProject.value?.id === projectId
-  )
+  const isActive = () => {
+    const pid = String(projectId)
+    return String(popoverProject.value?.id ?? '') === pid
+        || String(selectedProject.value?.id ?? '') === pid
+  }
   if (!isActive()) return
+
+  // ★ 幂等：当前 layer 显示的就是这个项目，直接 return，不重绘
+  if (
+    currentOverviewRoadProjectId === String(projectId) &&
+    mapRef.value?.getMap?.()?.getSource(OVERVIEW_ROAD_LAYER_ID)
+  ) return
 
   const cachedLayer = overviewRoadCache.get(projectId)
   if (cachedLayer) {
     mapRef.value?.addGlowLine(cachedLayer)
+    currentOverviewRoadProjectId = String(projectId)
     return
   }
   if (overviewRoadInFlight.has(projectId)) return
@@ -808,6 +825,7 @@ async function loadOverviewRoadData(projectId) {
     }
     overviewRoadCache.set(projectId, layerData)
     mapRef.value.addGlowLine(layerData)
+    currentOverviewRoadProjectId = String(projectId)
   } catch (err) {
     console.warn('[overview-road] 道路/线路数据加载失败:', err)
     ElMessage.warning(err?.message || '道路或线路数据加载失败')
@@ -822,6 +840,7 @@ function clearOverviewRoadLayer() {
   overviewRoadRequestVersion += 1
   overviewRoadInFlight.clear()
   mapRef.value?.removeLayer(OVERVIEW_ROAD_LAYER_ID)
+  currentOverviewRoadProjectId = null
 }
 
 function buildAreaFeature(project) {
@@ -841,7 +860,7 @@ function buildWindFC(project) {
     features: (project.windTurbinePoints || []).map((p, index) => {
       const lng = Number(p.longitude); const lat = Number(p.latitude)
       if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
-      return { type: 'Feature', properties: { projectId: project.id, index, isAlternative: p.isAlternative }, geometry: { type: 'Point', coordinates: [lng, lat] } }
+      return { type: 'Feature', properties: { projectId: project.id, index, isReserve: Number(p.isReserve) === 1 ? 1 : 0 }, geometry: { type: 'Point', coordinates: [lng, lat] } }
     }).filter(Boolean)
   }
 }
@@ -850,9 +869,10 @@ function buildBoosterFC(project) {
   return {
     type: 'FeatureCollection',
     features: (project.boosterStationLocations || []).map((p, index) => {
+      if (!(p.isBest === true || Number(p.isBest) === 1)) return null
       const lng = Number(p.lng); const lat = Number(p.lat)
       if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
-      return { type: 'Feature', properties: { projectId: project.id, index, isBest: p.isBest }, geometry: { type: 'Point', coordinates: [lng, lat] } }
+      return { type: 'Feature', properties: { projectId: project.id, index, isBest: true }, geometry: { type: 'Point', coordinates: [lng, lat] } }
     }).filter(Boolean)
   }
 }
@@ -906,8 +926,81 @@ async function safeAddIcon({ layerId, featureCollection, iconId, iconUrl, iconSi
   renderedMapLayerIds.add(layerId)
 }
 
+function buildAreaCenterFC(projects = mapProjects.value, naturalWidthMap = {}) {
+  const hiddenIds = new Set(
+    [popoverProject.value?.id, selectedProject.value?.id]
+      .filter((id) => id != null)
+      .map(String)
+  )
+  const features = projects
+    .filter((project) => !hiddenIds.has(String(project.id)))
+    .map((project) => {
+      const center = getProjectCentroid(project)
+      if (!center) return null
+      const isGF = project.itemType === 'GF'
+      const bounds = getCoordsBounds(getProjectCoords(project))
+      const naturalWidth = isGF ? naturalWidthMap.gf : naturalWidthMap.fj
+      return {
+        type: 'Feature',
+        properties: {
+          projectId: project.id,
+          iconId: isGF ? ICON_AREA_GF : ICON_AREA_FJ,
+          sizeAtRef: calcIconSizeAtRef(bounds, naturalWidth),
+        },
+        geometry: { type: 'Point', coordinates: center },
+      }
+    })
+    .filter(Boolean)
+  return { type: 'FeatureCollection', features }
+}
+
+async function renderAreaCenterIcons() {
+  const requestVersion = ++areaCenterIconRequestVersion
+  if (!mapReady.value || !mapRef.value || !isAreaView.value) return
+
+  const [fjW, gfW] = await Promise.all([
+    getIconNaturalWidth(fjIcon),
+    getIconNaturalWidth(gfIcon),
+  ])
+  if (requestVersion !== areaCenterIconRequestVersion) return
+
+  const featureCollection = buildAreaCenterFC(mapProjects.value, { fj: fjW, gf: gfW })
+  if (!featureCollection.features.length) {
+    mapRef.value.removeLayer(AREA_CENTER_LAYER_ID)
+    renderedMapLayerIds.delete(AREA_CENTER_LAYER_ID)
+    return
+  }
+
+  try {
+    await mapRef.value.ensureImage(ICON_AREA_FJ, fjIcon)
+    await mapRef.value.ensureImage(ICON_AREA_GF, gfIcon)
+    if (requestVersion !== areaCenterIconRequestVersion) return
+
+    await mapRef.value.addImagePoints({
+      id: AREA_CENTER_LAYER_ID,
+      geojson: featureCollection,
+      iconId: ICON_AREA_FJ,
+      iconUrl: fjIcon,
+      iconImage: ['get', 'iconId'],
+      iconSize: 0.5,
+      iconAnchor: 'center',
+      allowOverlap: true,
+      iconPitchAlignment: 'map',
+      iconRotationAlignment: 'map',
+      extraLayout: { 'icon-size': buildIconSizeExpression('sizeAtRef') },
+      updateExisting: true,
+    })
+  } catch (err) {
+    if (requestVersion !== areaCenterIconRequestVersion) return
+    mapRef.value.addPoints({ id: AREA_CENTER_LAYER_ID, geojson: featureCollection, color: '#00e6c8', radius: 6 })
+    console.warn('[overview-map] 场区中心图标加载失败:', err)
+  }
+  if (requestVersion === areaCenterIconRequestVersion) renderedMapLayerIds.add(AREA_CENTER_LAYER_ID)
+}
+
 function clearMapIconLayers() {
   if (!mapRef.value) return
+  areaCenterIconRequestVersion += 1
   const map = mapRef.value.getMap?.()
   for (const id of renderedMapLayerIds) {
     mapRef.value.removeLayer(id)
@@ -956,6 +1049,7 @@ async function renderProjectsByStage(stage) {
   for (const p of mapProjects.value) {
     addProjectArea(p, p.id === popoverProject.value?.id || p.id === selectedProject.value?.id)
   }
+  await renderAreaCenterIcons()
   if (popoverProject.value) await renderSelectedProjectIcons(popoverProject.value)
   else if (selectedProject.value) await renderSelectedProjectIcons(selectedProject.value)
 }
@@ -969,15 +1063,15 @@ async function fetchMapProjects() {
 }
 
 function clearSelection() {
-  // 取任一存在的选中 id（popover 态 或 详情态），用它还原高亮
   const activeId = selectedProject.value?.id ?? popoverProject.value?.id ?? null
 
   clearOverviewRoadLayer()
   popoverProject.value = null
   selectedProject.value = null
+  void renderAreaCenterIcons()
 
   if (activeId) {
-    const project = mapProjects.value.find((p) => p.id === activeId)
+    const project = mapProjects.value.find((p) => String(p.id) === String(activeId))
     if (project && isAreaView.value) addProjectArea(project, false)
   }
 
@@ -1008,14 +1102,16 @@ function updateDetailCardPosition() {
 
 function handleMapBlankClick(e) {
   if (!isAreaView.value) return
-  const map = mapRef.value?.getMap()
+  const map = mapRef.value?.getMap?.()
   if (!map) return
-  const areaLayerIds = []
-  for (const id of renderedMapLayerIds) {
-    if (id.startsWith('overview-project-area-')) areaLayerIds.push(`${id}-fill`)
+
+  try {
+    const hits = map.queryRenderedFeatures(e.point)
+    if (hits.some((f) => f.properties?.projectId != null)) return
+    clearSelection()
+  } catch (err) {
+    console.warn('[overview] handleMapBlankClick 查询失败:', err)
   }
-  if (!areaLayerIds.length) return
-  if (!map.queryRenderedFeatures(e.point, { layers: areaLayerIds }).length) clearSelection()
 }
 
 // ==================== 阶段选择 ====================
@@ -1187,31 +1283,6 @@ function resolveCityCenter(feature) {
   return n ? [sx / n, sy / n] : null
 }
 
-let cityClickHandler = null
-
-function bindCityClick() {
-  if (!mapRef.value) return
-  const map = mapRef.value.getMap?.()
-  if (!map) return
-
-  cityClickHandler = (e) => {
-    if (isAreaView.value) return
-
-    const layers = map.getStyle().layers
-      .filter((l) => l.type === 'fill-extrusion' && l.id.startsWith(PROVINCE_EXTRUSION_ID))
-      .map((l) => l.id)
-    if (!layers.length) return
-
-    const features = map.queryRenderedFeatures(e.point, { layers })
-    const cityFeature = features.find((f) => f.properties?.name)
-    if (cityFeature) {
-      focusCity(cityFeature.properties.name)
-    }
-  }
-
-  map.on('click', cityClickHandler)
-}
-
 // ==================== 其他回调 ====================
 function handleReportConfirm(payload) {
   const option = payload?.option || payload
@@ -1269,10 +1340,6 @@ onUnmounted(() => {
     map.off('move', updateDetailCardPosition)
     map.off('zoom', updateDetailCardPosition)
     map.off('click', handleMapBlankClick)
-    if (cityClickHandler) {
-      map.off('click', cityClickHandler)
-      cityClickHandler = null
-    }
     map.off('zoom', syncMaskVisibility)
     map.off('move', syncMaskVisibility)
     map.off('style.load', ensureShaanxiMask)
@@ -1322,7 +1389,6 @@ onUnmounted(() => {
 .view-tab:hover { color: #1677ff; }
 .view-tab.active { color: #1677ff; background: #e6f2ff; }
 
-/* 放大态项目概况：宽高对齐缩小时 LeftDashboard 的第一个面板 */
 .area-summary {
   position: absolute;
   z-index: 20;

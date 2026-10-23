@@ -944,7 +944,17 @@ async function ensureImage(iconId, iconUrl, timeout = 8000) {
   return promise
 }
 
-async function addImagePoints({ id, geojson, iconId, iconUrl, iconSize = 0.5, iconAnchor = 'center', allowOverlap = true, textField = null, textSize = 11, textColor = '#ffffff', textHaloColor = '#000000', textHaloWidth = 1, textOffset = [0, 1.4] }) {
+async function addImagePoints({
+  id, geojson, iconId, iconUrl,
+  iconSize = 0.5, iconAnchor = 'center', allowOverlap = true,
+  textField = null, textSize = 11, textColor = '#ffffff',
+  textHaloColor = '#000000', textHaloWidth = 1, textOffset = [0, 1.4],
+  // ★ 新增
+  iconImage = null,             // 传表达式如 ['get','iconId'] 时走数据驱动
+  iconPitchAlignment = null,    // 'map' | 'viewport' | 'auto'
+  iconRotationAlignment = null, // 'map' | 'viewport' | 'auto'
+  extraLayout = null,           // 最后合并，可覆盖默认 layout
+}) {
   if (!map || !geojson?.features) return
   if (iconUrl) await ensureImage(iconId, iconUrl)
 
@@ -952,7 +962,16 @@ async function addImagePoints({ id, geojson, iconId, iconUrl, iconSize = 0.5, ic
   else map.getSource(id).setData(geojson)
   if (map.getLayer(id)) return
 
-  const layout = { 'icon-image': iconId, 'icon-size': iconSize, 'icon-anchor': iconAnchor, 'icon-allow-overlap': allowOverlap, 'icon-ignore-placement': allowOverlap }
+  const layout = {
+    'icon-image': iconImage || iconId,
+    'icon-size': iconSize,
+    'icon-anchor': iconAnchor,
+    'icon-allow-overlap': allowOverlap,
+    'icon-ignore-placement': allowOverlap,
+  }
+  if (iconPitchAlignment) layout['icon-pitch-alignment'] = iconPitchAlignment
+  if (iconRotationAlignment) layout['icon-rotation-alignment'] = iconRotationAlignment
+
   const paint = {}
   if (textField) {
     layout['text-field'] = ['coalesce', ['get', textField], '']
@@ -964,6 +983,8 @@ async function addImagePoints({ id, geojson, iconId, iconUrl, iconSize = 0.5, ic
     paint['text-halo-color'] = textHaloColor
     paint['text-halo-width'] = textHaloWidth
   }
+  if (extraLayout) Object.assign(layout, extraLayout)
+
   map.addLayer({ id, type: 'symbol', source: id, layout, paint })
   addedLayers.add(id)
 }
