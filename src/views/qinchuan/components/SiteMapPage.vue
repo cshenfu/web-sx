@@ -66,17 +66,9 @@
           </el-input>
         </div>
 
-        <!-- 顶部编辑工具栏（保持原样，没有储备按钮） -->
         <div v-if="selectedProject && !showVerifyPanel && !showDetailPanel" class="edit-toolbar">
-          <template v-if="!isEditing">
-            <!-- <button class="edit-tool-button" @click="startEdit"><el-icon><Edit /></el-icon>编辑</button> -->
-          </template>
+          <template v-if="!isEditing"></template>
           <template v-else>
-            <!-- <button class="edit-tool-button" @click="openEditProjectForm">
-              <el-icon><Edit /></el-icon>编辑
-            </button> -->
-            <!-- <span class="edit-divider" /> -->
-
             <button v-for="item in editTools" :key="item.key" class="edit-tool-button" :class="{ active: editMode === item.key }" @click="enterEditMode(item.key)">
               <el-icon><component :is="item.icon" /></el-icon>{{ item.label }}
             </button>
@@ -109,7 +101,6 @@
           </template>
         </div>
 
-        <!-- 气泡窗：带关闭叉号，且操作列渲染 cardActions -->
         <div v-if="selectedProject && detailCardPos.visible && !cardClosed" class="detail-card" :style="{ left: detailCardPos.x + 'px', top: detailCardPos.y + 'px' }">
           <button class="detail-close" title="关闭" @click.stop="closeDetailCard">
             <el-icon><Close /></el-icon>
@@ -120,8 +111,7 @@
           <div class="detail-row"><span class="detail-label">推荐机型</span><span class="detail-value">{{ selectedProject.recommendedModel || '-' }}</span></div>
           <div class="detail-row"><span class="detail-label">资本金 IRR</span><span class="detail-value">{{ selectedProject.capitalFinancialRate != null ? selectedProject.capitalFinancialRate + '%' : '-' }}</span></div>
           <slot name="detail-card-extra" :project="selectedProject" />
-          
-          <!-- 气泡窗操作按钮 -->
+
           <div class="detail-actions">
             <button v-for="action in cardActions" :key="action" class="detail-action" :class="{ danger: action === 'delete' }" @click="executeAction(action, selectedProject)">
               {{ ACTION_LABELS[action] || action }}
@@ -130,7 +120,7 @@
         </div>
 
         <slot name="map-overlay" :projects="projectList" :selected="selectedProject" />
-        
+
         <button v-if="!showVerifyPanel && !showDetailPanel" class="expand-button" :style="expandButtonStyle" :title="showProjectDrawer ? '收起项目列表' : '打开项目列表'" @click="showProjectDrawer = !showProjectDrawer">
           <el-icon><ArrowLeft v-if="showProjectDrawer" /><ArrowRight v-else /></el-icon>
         </button>
@@ -194,18 +184,18 @@
       <CreateProjectForm ref="editProjectFormRef" :map-ref="mapRef" :panel-width="550" mode="edit" :project="editProjectTarget" @cancel="onEditProjectCancel" @saved="onProjectUpdated" />
     </section>
 
-<VerifyPanel
-  v-if="showVerifyPanelFlag"
-  :visible="showVerifyPanel"
-  :project="selectedProject"
-  @close="showVerifyPanel = false"
-  @saved="onVerifySaved"
-/>    <ProjectDrawer :visible="showProjectDrawer" :list="projectList" :total="pagination.total" :page="pagination.page" :page-size="pagination.pageSize" :selected-id="selectedProject?.id ?? null" :loading="listLoading" :row-actions="rowActions" @close="showProjectDrawer = false" @select="focusProject" @action="handleDrawerAction" @page-change="handlePageChange" @size-change="handleSizeChange" @sort-change="handleDrawerSortChange" />
+    <VerifyPanel
+      v-if="showVerifyPanelFlag"
+      :visible="showVerifyPanel"
+      :project="selectedProject"
+      @close="showVerifyPanel = false"
+      @saved="onVerifySaved"
+    />
+    <ProjectDrawer :visible="showProjectDrawer" :list="projectList" :total="pagination.total" :page="pagination.page" :page-size="pagination.pageSize" :selected-id="selectedProject?.id ?? null" :loading="listLoading" :row-actions="rowActions" @close="showProjectDrawer = false" @select="focusProject" @action="handleDrawerAction" @page-change="handlePageChange" @size-change="handleSizeChange" @sort-change="handleDrawerSortChange" />
     <ProjectDetailPanel :visible="showDetailPanel" :project="selectedProject" :stage="stage" :initial-tab="detailPanelTab" @close="showDetailPanel = false" @action="onDetailPanelAction" />
     <GenerateReportPanel :visible="showGeneratePanel" :project="generatePanelProject" :action-key="generatePanelActionKey" :sub-code="generatePanelSubCode" @close="showGeneratePanel = false" @generated="onReportGenerated" />
     <AssignDialog v-model="showAssignDialog" :project="assignTargetProject" @success="onAssignSuccess" />
 
-    <!-- 储备项目审批弹窗 -->
     <ReserveApprovalDialog v-model="showReserveDialog" :project="selectedProject" @saved="onReserveSaved" />
 
     <slot name="page-extra" />
@@ -231,6 +221,7 @@ import ReserveApprovalDialog from './ReserveApprovalDialog.vue'
 import { satelliteStyle } from '../js/mapConfig'
 import { useZoomThresholdSwitch } from '../js/useZoomThresholdSwitch'
 import { searchPlaceName } from '../js/useTiandituGeocode'
+import { ICON_SIZE_WIND, ICON_SIZE_BOOSTER } from '@/components/site-map/iconSize.js'
 import * as api from '@/api/modules/project'
 import * as configApi from '@/api/modules/selectConfig'
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
@@ -240,9 +231,11 @@ import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
 import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPanelConfig'
 import { attachSxLayers } from '@/components/site-map/attachSxLayers'
 import { addGradientExtrusion } from '@/utils/gradientExtrusion'
+
+// ★ 城市边界 / 陕西省轮廓：本地 JSON
 import cityGeoJSONData from '@/assets/js/610000_full.json'
 import shaanxiBoundaryData from '@/assets/js/610000.json'
-// 或相对路径 './gradientExtrusion'
+
 const props = defineProps({
   stage: { type: String, default: '' },
   summaryTitle: { type: String, default: '项目通道概况' },
@@ -263,8 +256,6 @@ const emits = defineEmits(['featureVisibleChange'])
 const ICON_FENGJI = 'icon-fengji'
 const ICON_FENGJI_BX = 'icon-fengji-bx'
 const ICON_SHENGYAZHAN = 'icon-shengyazhan'
-const ICON_SIZE_WIND = 0.25
-const ICON_SIZE_BOOSTER = 1
 const CITY_LAYER_ID = 'site-city-stats'
 const PROVINCE_CODE = '610000'
 const PROJECT_ICON_LAYER_MAP = { 'wind-farm': ['project-wind-all', 'project-wind-bx-all'], booster: ['project-booster-all'] }
@@ -272,7 +263,16 @@ const SELECTED_ICON_LAYER_IDS = ['project-wind-all', 'project-wind-bx-all', 'pro
 const DRAWER_WIDTH = 460
 const DRAWER_GAP = 12
 
-// ★ 核心配置：在智能选址（PRELIMINARY_SELECTION）加上 reserve
+// ★ 点击城市跳转的目标缩放阈值（和 useZoomThresholdSwitch 内部阈值保持一致）
+const CITY_CLICK_ZOOM_TARGET = 7
+
+// 3D 地形
+const TERRAIN_SOURCE_ID = 'terrain-dem'
+const HILLSHADE_SOURCE_ID = 'hillshade-dem'
+const HILLSHADE_LAYER_ID = 'terrain-hillshade'
+const TERRAIN_TILEJSON_URL = 'https://gis-rustfs.wh-ge.com/terrain/china-dem/tilejson.json'
+const TERRAIN_EXAGGERATION = 1.5
+
 const STAGE_ACTIONS = {
   PRELIMINARY_SELECTION: ['assign', 'verify', 'reserve', 'edit', 'delete'],
   PROJECT_RESERVE:       ['material', 'edit', 'assign', 'delete'],
@@ -280,7 +280,6 @@ const STAGE_ACTIONS = {
   FEASIBILITY_REVIEW:    ['researchReview', 'investMaterial', 'edit', 'assign', 'delete'],
   INVESTMENT_DECISION:   ['investMeeting', 'edit', 'assign', 'delete'],
 }
-// ★ 加入储备标签
 const ACTION_LABELS = { material: '立项材料', researchMaterial: '可研材料', investMaterial: '投决材料', establishMeeting: '立项上会', researchReview: '可研审查', investMeeting: '投决上会', assign: '分配', verify: '核查', reserve: '储备', edit: '编辑', delete: '删除' }
 const CITY_OPTIONS = [
   { label: '西安市', value: '610100' }, { label: '铜川市', value: '610200' }, { label: '宝鸡市', value: '610300' },
@@ -328,7 +327,7 @@ const selectedProject = ref(null)
 const detailCardPos = reactive({ x: 0, y: 0, visible: false })
 
 const cardClosed = ref(false)
-const editMode = ref('area')
+const editMode = ref(null)
 const drawingNewPoint = ref(false)
 const saving = ref(false)
 const isBoxSelecting = ref(false)
@@ -350,8 +349,9 @@ const customLayerState = reactive({})
 
 const overviewStats = reactive({ totalCapacity: 0, totalCount: 0, windCapacity: 0, windCount: 0, solarCapacity: 0, solarCount: 0 })
 const cityStats = ref([])
-// 原来是 let cityGeoJSONCache = null
+// ★ 本地 JSON 直接作为缓存，不再 fetch
 let cityGeoJSONCache = cityGeoJSONData
+let shaanxiBoundaryCache = shaanxiBoundaryData
 
 const editTools = [
   { key: 'area', label: '编辑场区', icon: Location },
@@ -380,14 +380,47 @@ function onLayerToggle(item) {
     return
   }
   if (item.type === 'project') setProjectIconVisible(item.id, !isOn)
-  else if (item.type === 'terrain') toggleTerrain(item.id)
+  else if (item.type === 'terrain') toggleTerrain(!isOn)
   else if (item.type === 'custom') toggleCustomLayer(item.id)
   customLayerState[item.id] = !isOn
   layerVisibleIds.value = isOn ? layerVisibleIds.value.filter((id) => id !== item.id) : [...layerVisibleIds.value, item.id]
 }
 function onLayerInputChange({ id, value }) { layerInputs[id] = value }
-function toggleTerrain(id) {}
 function toggleCustomLayer(id) {}
+
+// ==================== 3D 地形 ====================
+function toggleTerrain(shouldEnable) {
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+
+  if (!shouldEnable) {
+    try { map.setTerrain(null) } catch (err) { console.warn('[terrain] 关闭地形失败:', err) }
+    if (map.getLayer(HILLSHADE_LAYER_ID)) map.removeLayer(HILLSHADE_LAYER_ID)
+    return
+  }
+
+  try {
+    if (!map.getSource(TERRAIN_SOURCE_ID)) {
+      map.addSource(TERRAIN_SOURCE_ID, { type: 'raster-dem', url: TERRAIN_TILEJSON_URL,maxzoom: 14,  })
+    }
+    if (!map.getSource(HILLSHADE_SOURCE_ID)) {
+      map.addSource(HILLSHADE_SOURCE_ID, { type: 'raster-dem', url: TERRAIN_TILEJSON_URL })
+    }
+    map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration: TERRAIN_EXAGGERATION })
+    if (!map.getLayer(HILLSHADE_LAYER_ID)) {
+      map.addLayer({
+        id: HILLSHADE_LAYER_ID,
+        type: 'hillshade',
+        source: HILLSHADE_SOURCE_ID,
+        layout: { visibility: 'visible' },
+        paint: { 'hillshade-shadow-color': '#473B24' },
+      })
+    }
+  } catch (err) {
+    console.error('[terrain] 开启地形失败:', err)
+    ElMessage.error('3D 地形开启失败，请检查网络或 DEM 服务')
+  }
+}
 
 const showCreateProject = ref(false)
 const createProjectFormRef = ref(null)
@@ -487,14 +520,13 @@ function executeAction(action, project) {
   if (['material', 'researchMaterial', 'investMaterial'].includes(action)) { openDetailPanel(mapProject, 'material'); return }
   if (['establishMeeting', 'researchReview', 'investMeeting'].includes(action)) { openDetailPanel(mapProject, 'meeting'); return }
   if (action === 'assign') { assignTargetProject.value = mapProject; showAssignDialog.value = true; return }
-  
+
   if (action === 'verify') {
     showProjectDrawer.value = false; showDetailPanel.value = false; viewMode.value = 'map'
     setTimeout(() => { onProjectClick(mapProject.id); showVerifyPanel.value = true }, 100)
     return
   }
-  
-  // ★ 处理气泡窗点击「储备」
+
   if (action === 'reserve') {
     showProjectDrawer.value = false; showDetailPanel.value = false; viewMode.value = 'map'
     setTimeout(async () => {
@@ -563,9 +595,10 @@ async function fetchCityStats() {
     if (mapReady.value && !isAreaView.value) await renderCityStats()
   } catch (err) { console.error('[stats] provinceViewData 失败:', err) }
 }
-async function loadCityGeoJSON() {
-  return cityGeoJSONCache
-}
+
+function loadCityGeoJSON() { return Promise.resolve(cityGeoJSONCache) }
+function loadShaanxiBoundary() { return Promise.resolve(shaanxiBoundaryCache) }
+
 async function renderCityStats() {
   if (!mapReady.value || !mapRef.value) return
   const geoJSON = await loadCityGeoJSON(); if (!geoJSON) return
@@ -585,12 +618,7 @@ function hideCityStats() { mapRef.value?.removeLayer(CITY_LAYER_ID); mapRef.valu
 const MASK_LAYER_ID = 'shaanxi-mask'
 const MASK_SOURCE_ID = 'shaanxi-mask-src'
 const SHAANXI_BOUNDS = [[105.4, 31.7], [111.2, 39.6]]
-// 原来是 let shaanxiBoundaryCache = null
-let shaanxiBoundaryCache = shaanxiBoundaryData
 let lastMaskOpacity = -1
-async function loadShaanxiBoundary() {
-  return shaanxiBoundaryCache
-}
 function ensureClosed(ring) { if (!ring || ring.length < 3) return ring; const f = ring[0], l = ring[ring.length - 1]; return (f[0] === l[0] && f[1] === l[1]) ? ring : [...ring, [f[0], f[1]]] }
 function ringSignedArea(ring) { if (!ring || ring.length < 3) return 0; let a = 0; for (let i = 0; i < ring.length - 1; i++) { a += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1] } return a / 2 }
 function ensureOuterCCW(ring) { const r = ensureClosed(ring); return ringSignedArea(r) >= 0 ? r : r.slice().reverse() }
@@ -733,7 +761,7 @@ async function onProjectClick(projectId) {
   hasSaved.value = false
   isEditing.value = true
   isDirty.value = false
-  editMode.value = 'area'
+  editMode.value = null          // ★ 不预选任何编辑工具
   initEditBuffer(project)
   addProjectArea(project, true)
   await renderSelectedProjectIcons(project)
@@ -745,6 +773,7 @@ function clearSelectionLayers() {
   showVerifyPanel.value = false; showDetailPanel.value = false
   mapRef.value?.clearEditableAreas(); mapRef.value?.stopBoxSelect?.()
   editBuffer.value = null; drawingNewPoint.value = false; isBoxSelecting.value = false; isEditing.value = false; isDirty.value = false; hasSaved.value = false
+  editMode.value = null          // ★ 清空编辑工具
   const project = allMapProjects.value.find((p) => p.id === pid)
   if (project && isAreaView.value) addProjectArea(project, false)
   clearSelectedProjectIcons()
@@ -759,25 +788,52 @@ function updateDetailCardPosition() {
   const pt = map.project(centroid); detailCardPos.x = pt.x; detailCardPos.y = pt.y; detailCardPos.visible = true
 }
 function closeDetailCard() { cardClosed.value = true }
+
 function handleMapBlankClick(e) {
   if (!isAreaView.value || !selectedProject.value || showEditProject.value) return
   const map = mapRef.value?.getMap?.(); if (!map) return
-  const areaIds = []; for (const id of renderedLayerIds) { if (id.startsWith('project-area-')) areaIds.push(`${id}-fill`) }
+  const areaIds = []
+  for (const id of renderedLayerIds) { if (id.startsWith('project-area-')) areaIds.push(`${id}-fill`) }
   if (!areaIds.length) return
-  if (!map.queryRenderedFeatures(e.point, { layers: areaIds }).length) {
+  if (map.queryRenderedFeatures(e.point, { layers: areaIds }).length) return
+
+  // 已激活具体编辑工具 → 不取消选中，仅退出画点/框选
+  if (editMode.value !== null) {
     if (drawingNewPoint.value) { mapRef.value?.getDraw?.()?.changeMode('simple_select'); drawingNewPoint.value = false }
     if (isBoxSelecting.value) { mapRef.value?.stopBoxSelect?.(); isBoxSelecting.value = false }
+    return
   }
+  clearSelectionLayers()
 }
+
+// ==================== 城市点击跳转 ====================
+function getCityCenterFromFeature(feature) {
+  const p = feature?.properties || {}
+  const code = String(p.regionCode || p.adcode || '')
+  const fromProps = Array.isArray(p.center) ? p.center : null
+  const center = fromProps || CITY_LABEL_CENTER[code] || null
+  if (!center) return null
+  const lng = Number(center[0]); const lat = Number(center[1])
+  return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null
+}
+function handleCityFillClick(e) {
+  if (isAreaView.value) return
+  if (showCreateProject.value || showEditProject.value) return
+  const map = mapRef.value?.getMap?.(); if (!map) return
+  const fillLayerId = `${CITY_LAYER_ID}-fill`
+  if (!map.getLayer(fillLayerId)) return
+  const features = map.queryRenderedFeatures(e.point, { layers: [fillLayerId] })
+  if (!features.length) return
+  const center = getCityCenterFromFeature(features[0])
+  if (!center) return
+  map.flyTo({ center, zoom: CITY_CLICK_ZOOM_TARGET, pitch: 45, duration: 1500 })
+}
+
 async function onVerifySaved() {
   showVerifyPanel.value = false
   await fetchMapProjects()
   const fresh = allMapProjects.value.find(p => p.id === selectedProject.value?.id)
-  if (fresh) {
-    selectedProject.value = fresh
-    initEditBuffer(fresh)
-    updateDetailCardPosition()
-  }
+  if (fresh) { selectedProject.value = fresh; initEditBuffer(fresh); updateDetailCardPosition() }
   fetchProjectList()
   fetchOverviewStats()
   fetchCityStats()
@@ -814,11 +870,12 @@ function syncDrawToBuffer() {
   refreshAllPointsLayers()
 }
 function onDrawChange() { if (suppressDrawSync) return; syncDrawToBuffer(); if (isEditing.value) isDirty.value = true }
-function startEdit() { if (!selectedProject.value) return; isEditing.value = true; isDirty.value = false; editMode.value = 'area'; initEditBuffer(selectedProject.value); enterEditMode('area') }
+function startEdit() { if (!selectedProject.value) return; isEditing.value = true; isDirty.value = false; editMode.value = null; initEditBuffer(selectedProject.value); enterEditMode('area') }
 function exitEditMode() {
   if (!isEditing.value) return
   mapRef.value?.clearEditableAreas(); mapRef.value?.stopBoxSelect?.()
   editBuffer.value = null; drawingNewPoint.value = false; isBoxSelecting.value = false; isEditing.value = false; isDirty.value = false
+  editMode.value = null          // ★ 清空编辑工具
   if (selectedProject.value) renderSelectedProjectIcons(selectedProject.value)
 }
 function enterEditMode(mode) {
@@ -902,7 +959,7 @@ async function saveEdit() {
       const target = allMapProjects.value.find(p => p.id === pid)
       if (target) { target.coordinate = coordinate; target.windTurbinePoints = windTurbinePoints; target.boosterStationLocations = boosterStationLocations }
       await renderProjectsByStage('area'); updateDetailCardPosition()
-      if (target) { initEditBuffer(target); enterEditMode('area') }
+      if (target) { initEditBuffer(target); editMode.value = null }
       fetchOverviewStats(); fetchCityStats()
     } else ElMessage.error(res?.msg || '保存失败')
   } catch (err) { ElMessage.error(err?.message || '保存失败') }
@@ -930,7 +987,9 @@ async function onMapReady() {
   mapReady.value = true
   if (showCreateProject.value) nextTick(() => startCreateDrawing())
   const map = mapRef.value.getMap()
-  map.on('move', updateDetailCardPosition); map.on('zoom', updateDetailCardPosition); map.on('click', handleMapBlankClick)
+  map.on('move', updateDetailCardPosition); map.on('zoom', updateDetailCardPosition)
+  map.on('click', handleMapBlankClick)
+  map.on('click', handleCityFillClick)   // ★ 城市点击跳转
   bindZoomListener(); syncByZoom()
   if (isAreaView.value) { hideCityStats(); renderProjectsByStage('area') } else await renderCityStats()
   map.on('zoom', syncMaskVisibility); map.on('move', syncMaskVisibility); map.on('style.load', ensureShaanxiMask)
@@ -946,7 +1005,15 @@ onUnmounted(() => {
   whlnPlugin?.destroy?.(); whlnPlugin = null
   unbindZoomListener()
   const map = mapRef.value?.getMap?.()
-  if (map) { map.off('move', updateDetailCardPosition); map.off('zoom', updateDetailCardPosition); map.off('click', handleMapBlankClick); map.off('zoom', syncMaskVisibility); map.off('move', syncMaskVisibility); map.off('style.load', ensureShaanxiMask) }
+  if (map) {
+    map.off('move', updateDetailCardPosition)
+    map.off('zoom', updateDetailCardPosition)
+    map.off('click', handleMapBlankClick)
+    map.off('click', handleCityFillClick)
+    map.off('zoom', syncMaskVisibility)
+    map.off('move', syncMaskVisibility)
+    map.off('style.load', ensureShaanxiMask)
+  }
 })
 </script>
 
@@ -1032,7 +1099,6 @@ onUnmounted(() => {
 .edit-tool-button:disabled { opacity: 0.6; cursor: not-allowed; }
 .edit-divider { width: 1px; height: 18px; margin: 0 4px; background: #e5e7eb; }
 
-/* 气泡窗 */
 .detail-card {
   position: absolute; z-index: 5; width: 320px; padding: 16px;
   color: #303133; background: rgba(255,255,255,0.98); border-radius: 8px;

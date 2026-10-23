@@ -1,12 +1,12 @@
 <!-- Dashboard-area-editor.vue -->
 <template>
   <main class="dashboard-page">
-<MapGL
-  ref="mapRef"
-  :style="satelliteStyle"
-  @ready="onMapReady"
-  @city-click="onCityClick"
-/>
+    <MapGL
+      ref="mapRef"
+      :style="satelliteStyle"
+      @ready="onMapReady"
+      @city-click="onCityClick"
+    />
     <div class="map-overlay" aria-hidden="true" />
 
     <LayerChipPanel
@@ -43,7 +43,6 @@
 
     <!-- ===================== 放大时：无 head ===================== -->
     <template v-else>
-      <!-- 顶部：地图模式 / 项目列表 -->
       <div class="area-top-toolbar">
         <div class="view-tabs">
           <button
@@ -117,7 +116,7 @@
           </template>
         </div>
 
-        <!-- 🌟 1. 悬浮深色气泡窗 -->
+        <!-- 悬浮深色气泡窗 -->
         <div
           v-if="hoverProject && detailCardPos.visible && !isDetailFullscreen && !popoverProject && !selectedProject"
           class="hover-tooltip"
@@ -153,7 +152,7 @@
           </div>
         </div>
 
-        <!-- 🌟 2. 点击后右上角白色卡片 -->
+        <!-- 右上角白色卡片 -->
         <div
           v-if="popoverProject && !isDetailFullscreen && !selectedProject"
           class="right-top-card"
@@ -302,13 +301,14 @@
 import {
   ref, computed, reactive, watch, onMounted, onUnmounted, nextTick
 } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { List, MapLocation, Plus, Search, Edit, ArrowRight } from '@element-plus/icons-vue'
 
 import MapGL from '@/components/MapGL.vue'
 import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
 import { WHLN_LAYER_IDS } from '@/components/site-map/layerPanelConfig'
 import { attachSxLayers } from '@/components/site-map/attachSxLayers'
+import { ICON_SIZE_WIND, ICON_SIZE_BOOSTER } from '@/components/site-map/iconSize.js'
 import DashboardHead from './components/DashboardHead.vue'
 import LeftDashboard from './components/LeftDashboard.vue'
 import RightDashboard from './components/RightDashboard.vue'
@@ -348,10 +348,14 @@ const CITY_OPTIONS = [
 
 const ICON_FENGJI = 'icon-fengji-overview'
 const ICON_SHENGYAZHAN = 'icon-shengyazhan-overview'
-const ICON_SIZE_WIND = 0.16
-const ICON_SIZE_BOOSTER = 0.5
 
-// 省级 3D 地图样式（取自 Figma：冰蓝顶面 + #0072FF→白 渐变侧面）
+// 3D 地形
+const TERRAIN_SOURCE_ID = 'terrain-dem'
+const HILLSHADE_SOURCE_ID = 'hillshade-dem'
+const HILLSHADE_LAYER_ID = 'terrain-hillshade'
+const TERRAIN_TILEJSON_URL = 'https://gis-rustfs.wh-ge.com/terrain/china-dem/tilejson.json'
+const TERRAIN_EXAGGERATION = 1.5
+
 const PROVINCE_MAP_STYLE = {
   defaultHeight: 20000,
   defaultColor: '#8CCBF5',
@@ -359,10 +363,10 @@ const PROVINCE_MAP_STYLE = {
   opacity: 1,
   lineColor: '#E6F9FF',
   hoverLineColor: '#FFFFFF',
-  borderWidth: 1000,   // 边界宽度(米)，想更粗/更细改这里
-  borderHeight: 120,   // 边界凸出顶面的高度(米)
+  borderWidth: 1000,
+  borderHeight: 120,
   sideColors: ['#0072FF', '#2F8CFF', '#62A8FF', '#9AC7FF', '#D0E5FF', '#FFFFFF'],
-  sideBands: 10,       // 侧面渐变层数，globe 下 10 层足够平滑、深度冲突更少
+  sideBands: 10,
 }
 
 const STAGE_GROUP = {
@@ -400,14 +404,14 @@ function getAreaStyleByStage(projectStage) {
 
 // ==================== 基础状态 ====================
 const mapRef = ref(null)
-const selectedStage = ref(null)          // 初始无选中
-const activeProject = ref(null)          // 初始无选中 → 地图为默认态
+const selectedStage = ref(null)
+const activeProject = ref(null)
 const mapReady = ref(false)
 
 const viewMode = ref('map')
 const showLayerPanel = ref(false)
 let whlnPlugin = null
-const layerVisibleIds = ref(['hd-imagery'])
+const layerVisibleIds = ref(['tdt-imagery'])
 const isDetailFullscreen = ref(false)
 
 const activeEditTool = ref('')
@@ -418,10 +422,9 @@ const activeProjectDetail = ref(projectDetailMockData)
 const reportModalVisible = ref(false)
 const detailLoading = ref(false)
 
-// 🌟 三个关键状态
-const hoverProject = ref(null)     // 悬浮深色气泡
-const popoverProject = ref(null)   // 点击后的右上角白卡
-const selectedProject = ref(null)  // 点击查看详情后的完整面板
+const hoverProject = ref(null)
+const popoverProject = ref(null)
+const selectedProject = ref(null)
 
 const detailCardPos = reactive({ x: 0, y: 0, visible: false })
 
@@ -472,9 +475,7 @@ function getHoverThemeColor(projectStage) {
   const style = getAreaStyleByStage(projectStage)
   return style.outlineColor || '#22c55e'
 }
-// 新增：MapGL 内部 point-in-polygon 命中城市后 emit 过来的回调
 function onCityClick(feature) {
-  console.log('[Dashboard] 收到 city-click:', feature?.properties?.name, 'isAreaView=', isAreaView.value)
   if (isAreaView.value) return
   const name = feature?.properties?.name
   if (name) focusCity(name)
@@ -612,6 +613,40 @@ function applyLayerVisibility() {
 }
 
 function handleAddProject() { ElMessage.info('添加项目功能已停用') }
+
+// ==================== 3D 地形 ====================
+function toggleTerrain(shouldEnable) {
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+
+  if (!shouldEnable) {
+    try { map.setTerrain(null) } catch (err) { console.warn('[terrain] 关闭地形失败:', err) }
+    if (map.getLayer(HILLSHADE_LAYER_ID)) map.removeLayer(HILLSHADE_LAYER_ID)
+    return
+  }
+
+  try {
+    if (!map.getSource(TERRAIN_SOURCE_ID)) {
+      map.addSource(TERRAIN_SOURCE_ID, { type: 'raster-dem', url: TERRAIN_TILEJSON_URL,maxzoom: 14, })
+    }
+    if (!map.getSource(HILLSHADE_SOURCE_ID)) {
+      map.addSource(HILLSHADE_SOURCE_ID, { type: 'raster-dem', url: TERRAIN_TILEJSON_URL })
+    }
+    map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration: TERRAIN_EXAGGERATION })
+    if (!map.getLayer(HILLSHADE_LAYER_ID)) {
+      map.addLayer({
+        id: HILLSHADE_LAYER_ID,
+        type: 'hillshade',
+        source: HILLSHADE_SOURCE_ID,
+        layout: { visibility: 'visible' },
+        paint: { 'hillshade-shadow-color': '#473B24' },
+      })
+    }
+  } catch (err) {
+    console.error('[terrain] 开启地形失败:', err)
+    ElMessage.error('3D 地形开启失败，请检查网络或 DEM 服务')
+  }
+}
 
 // ==================== 详情数据映射 ====================
 function buildDetailFromListItem(item) {
@@ -813,13 +848,17 @@ async function fetchMapProjects() {
 }
 
 function clearSelection() {
+  // 取任一存在的选中 id（popover 态 或 详情态），用它还原高亮
+  const activeId = selectedProject.value?.id ?? popoverProject.value?.id ?? null
+
   popoverProject.value = null
-  if (selectedProject.value) {
-    const pid = selectedProject.value.id
-    const project = mapProjects.value.find((p) => p.id === pid)
+  selectedProject.value = null
+
+  if (activeId) {
+    const project = mapProjects.value.find((p) => p.id === activeId)
     if (project && isAreaView.value) addProjectArea(project, false)
-    selectedProject.value = null
   }
+
   detailCardPos.visible = false
   rightPanelMode.value = 'list'
   isDetailFullscreen.value = false
@@ -858,7 +897,6 @@ function handleMapBlankClick(e) {
 }
 
 // ==================== 阶段选择 ====================
-// row 为 null 时：渲染默认态（所有城市统一底色，无阶段着色）
 function renderSelectedProject(row) {
   if (!mapRef.value) return
   const colorMap = row
@@ -873,7 +911,6 @@ function renderSelectedProject(row) {
     ...PROVINCE_MAP_STYLE
   })
 
-  // ★ 重建城市标签（addCentroidLabels 内部幂等，会先清理旧的）
   mapRef.value.addCentroidLabels({
     id: 'shaanxi-labels',
     geojson: shaanxiBoundary,
@@ -956,6 +993,8 @@ function onLayerToggle(item) {
   layerVisibleIds.value = next
   if (item.type === 'whln') {
     whlnPlugin?.setVisibleIds?.(next.filter((id) => WHLN_LAYER_IDS.includes(id)))
+  } else if (item.type === 'terrain') {
+    toggleTerrain(!isOn)
   }
 }
 
@@ -977,7 +1016,6 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
       if (map.getLayer(provinceEventLayerId)) map.setLayoutProperty(provinceEventLayerId, 'visibility', 'visible')
     } else { renderSelectedProject(activeProject.value) }
     renderSelectedProject(activeProject.value)
-
   },
   onExit: () => {
     syncMaskVisibility(true)
@@ -1003,7 +1041,6 @@ const layerPanelZIndex = computed(() => (isAreaView.value ? 26 : 21))
 
 // ==================== 城市点击 ====================
 function focusCity(cityName) {
-  console.log('[Dashboard] focusCity 入参:', cityName)
   if (!cityName || !mapRef.value) return
   const map = mapRef.value.getMap(); if (!map) return
   const feature = shaanxiBoundary.features.find((item) => item.properties?.name === cityName); if (!feature) return
@@ -1035,7 +1072,6 @@ function bindCityClick() {
   if (!map) return
 
   cityClickHandler = (e) => {
-    // 只在省份视图（非区域视图）响应；区域视图下城市挤出层已被移除
     if (isAreaView.value) return
 
     const layers = map.getStyle().layers
@@ -1070,13 +1106,11 @@ function handleWizardSubmit(payload) { wizardVisible.value = false }
 // ==================== 生命周期 ====================
 function onMapReady() {
   mapReady.value = true
-  renderSelectedProject(activeProject.value) // 初始为 null → 默认态
-  // mapRef.value?.addCentroidLabels({ id: 'shaanxi-labels', geojson: shaanxiBoundary, labelField: 'name', subLabelField: 'value', textColor: '#FFFFFF', textSize: 14, subTextSize: 10, textOffset: [0, 0], height: PROVINCE_MAP_STYLE.defaultHeight, followLayer: PROVINCE_EXTRUSION_ID })
+  renderSelectedProject(activeProject.value)
   const map = mapRef.value.getMap()
   map.on('move', updateDetailCardPosition)
   map.on('zoom', updateDetailCardPosition)
   map.on('click', handleMapBlankClick)
-  // bindCityClick()
   bindZoomListener()
 
   map.on('zoom', syncMaskVisibility)
@@ -1138,13 +1172,12 @@ onUnmounted(() => {
   background: #03162e;
 }
 
-/* 地图边缘内发光（已去掉径向压暗，避免地图发灰） */
 .dashboard-page::after {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 3; /* 在地图上面，UI 下面 */
+  z-index: 3;
   box-shadow: inset 0 0 60px rgba(47, 218, 255, 0.12);
   background: none;
 }
@@ -1166,8 +1199,30 @@ onUnmounted(() => {
 .view-tab:hover { color: #1677ff; }
 .view-tab.active { color: #1677ff; background: #e6f2ff; }
 
-.area-summary { position: absolute; z-index: 20; top: 60px; left: 12px; width: 240px; }
-.area-summary.wizard-layer { width: auto; }
+/* 放大态项目概况：宽高对齐缩小时 LeftDashboard 的第一个面板 */
+.area-summary {
+  position: absolute;
+  z-index: 20;
+  top: 60px;
+  left: 12px;
+  width: clamp(240px, 23vw, 320px);
+  height: calc((85vh - 70px) * 0.3685 + 20px);
+  padding-top: 20px;
+  box-sizing: border-box;
+}
+.area-summary :deep(.dashboard-panel) {
+  display: flex;
+  flex-direction: column;
+  margin-top: 0;
+  height: 100%;
+  min-height: 0;
+}
+.area-summary.wizard-layer {
+  width: auto;
+  height: auto;
+  padding-top: 0;
+}
+
 .area-view-layer { position: absolute; z-index: 20; top: 60px; right: 12px; bottom: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; overflow: visible; }
 .panel-below { flex: 1; min-height: 0; }
 
@@ -1182,7 +1237,6 @@ onUnmounted(() => {
 .project-table :deep(.el-table__body tr:hover > td) { background: #f5f8ff; }
 .pagination-row { display: flex; justify-content: flex-end; padding-top: 12px; }
 
-/* ================= 🌟 1. 深色悬浮气泡窗 ================= */
 .hover-tooltip {
   position: absolute;
   z-index: 30;
@@ -1215,7 +1269,6 @@ onUnmounted(() => {
 .tooltip-label { color: #A0AEC0; flex-shrink: 0; width: 70px; }
 .tooltip-value { color: #FFFFFF; flex: 1; word-break: break-all; }
 
-/* ================= 🌟 2. 右上角白色卡片 ================= */
 .right-top-card {
   position: absolute;
   z-index: 25;

@@ -188,7 +188,7 @@
   const mapRef = ref(null)
   const viewMode = ref('map')
   let whlnPlugin = null
-  const layerVisibleIds = ref(['hd-imagery'])
+  const layerVisibleIds = ref(['tdt-imagery'])
   const currentPage = ref(1)
   const selectedAreaInfo = ref(null)
   
