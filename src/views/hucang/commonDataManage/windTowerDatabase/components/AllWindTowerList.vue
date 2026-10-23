@@ -1,6 +1,6 @@
 <template>
     <div class="wind-tower-list">
-        <table-list class="user-table" :loading="loading" :tableData="dataList" :tableColumn="clomun"
+        <table-list class="user-table" fit :loading="loading" :tableData="dataList" :tableColumn="clomun"
             :page="page" @getRowData="getRowData" @changePage="changePage">
             <template #areaData="{record}">
                 <span>{{ record.provinceName }}/{{ record.cityName}}/{{record.districtName  }}</span>
@@ -75,14 +75,14 @@
                             <span class="operation-btn-item" @click.stop="getCommon(record)">转换公共</span>
                         </div>
                         <div class="cloumn-btn">
-                            <span class="operation-btn-item" @click.stop="deleteFile(record)">删除</span>
+                            <span class="operation-btn-item is-danger" @click.stop="deleteFile(record)">删除</span>
                             <span class="operation-btn-item" @click.stop="recalculate(record, 'user')">重新计算</span>
                         </div>
                     </template>
                     <template v-if="searchKey.source == 1">
                         <div class="cloumn-btn">
                             <span class="operation-btn-item" @click.stop="editFile(record)">编辑</span>
-                            <span class="operation-btn-item" @click.stop="deleteFile(record)">删除</span>
+                            <span class="operation-btn-item is-danger" @click.stop="deleteFile(record)">删除</span>
                             <!-- <span class="operation-btn-item" @click.stop="recalculate(record, 'public')">重新计算</span> -->
                         </div>
                         <div class="cloumn-btn">
@@ -97,7 +97,7 @@
         </table-list>
         <!-- 删除 -->
         <tips-modal :width="'490px'" title="删除提示" :tipType="'danger'" class="tip-content-modal" :okText="'确定删除'"
-            :openTipsModal.sync="openTipsPowerModal" @handleChangeFileModal="handleChangeClose">
+            v-model:openTipsModal="openTipsPowerModal" @handleChangeFileModal="handleChangeClose">
             <template #contentBody>
                 <span class="modalTip">确定删除该数据么？</span>
             </template>
@@ -105,7 +105,7 @@
         <!-- 禁用、开放、转换公共 -->
         <tips-modal :width="'490px'" :tipType="tipModalType == 'common' ? 'success' : 'danger'" class="tip-content-modal"
             :okText="tipModalType == 'open' ? '确定开放' : tipModalType == 'common' ? '确定' : '确定禁用'"
-            :openTipsModal.sync="openTipsOpenModal" @handleChangeFileModal="handleChangeOpenModal">
+            v-model:openTipsModal="openTipsOpenModal" @handleChangeFileModal="handleChangeOpenModal">
             <template #customTitle>{{ tipTitle }}</template>
             <template #contentBody>
                 <div class="tuning-tip">
@@ -115,13 +115,13 @@
                 <a-form :colon="false" class="sort-form" ref="openFormRef" :model="openFormData" :labelCol="labelCol"
                     labelAlign="left">
                     <a-form-item v-if="tipModalType !== 'common'" label="原因" name="reason"
-                        :rules="[{ required: true, ElMessage: '请输入原因' }]">
+                        :rules="[{ required: true, message: '请输入原因' }]">
                         <a-textarea style="width: 362px" :auto-size="{ minRows: 2, maxRows: 5 }"
                             v-model:value="openFormData.reason" placeholder="请输入原因" />
                     </a-form-item>
                     <template v-if="tipModalType == 'common'">
                         <div class="current-tower-no">当前塔号: <span>{{ openFormData.currentTowerNo }}</span></div>
-                        <a-form-item label="塔号" name="windTowerSeq" :rules="[{ required: true, ElMessage: '请输入更高为公共的测风塔号' }]">
+                        <a-form-item label="塔号" name="windTowerSeq" :rules="[{ required: true, message: '请输入更高为公共的测风塔号' }]">
                             <a-input style="width: 386px" v-model:value="openFormData.windTowerSeq"
                                 placeholder="请输入更高为公共的测风塔号" />
                         </a-form-item>
@@ -132,7 +132,7 @@
         </tips-modal>
         <!-- 核对数据 -->
         <tips-modal :width="'490px'" :tipType="'success'" class="tip-content-modal" :okText="'确定'"
-            :openTipsModal.sync="checkTipsOpenModal" @handleChangeFileModal="handleChangeCheckModal">
+            v-model:openTipsModal="checkTipsOpenModal" @handleChangeFileModal="handleChangeCheckModal">
             <template #customTitle>{{ tipTitle }}</template>
             <template #contentBody>
                 <a-form :colon="false" class="sort-form" ref="checkFormRef" :rules="rules" :model="checkFormData"
@@ -186,7 +186,7 @@
         </tips-modal>
         <!-- 重新计算 -->
         <tips-modal :width="'490px'" :tipType="'success'" class="tip-content-modal" :okText="'确定'"
-            :openTipsModal.sync="recalculateTipsOpenModal" @handleChangeFileModal="handleChangeRecalculateModal">
+            v-model:openTipsModal="recalculateTipsOpenModal" @handleChangeFileModal="handleChangeRecalculateModal">
             <template #customTitle>{{ tipTitle }}</template>
             <template #contentBody>
                 <a-form :colon="false" class="sort-form" ref="recalculateFormRef" :rules="rules"
@@ -259,7 +259,7 @@ onActivated(()=> {
 })
 onBeforeUnmount(() => {
     deletMitt()
-}),
+})
 onDeactivated(()=> {
     deletMitt()
 })
@@ -294,7 +294,7 @@ const checkFormData = ref({
     lat: '',
     lng: '',
     elevation: '',
-    rawFile	: [],
+    rawFile: [],
     repairFile: []
 });
 const checkLabelCol = {
@@ -358,7 +358,7 @@ const getTableData = async (val) => {
 // 表格
 const getRowData = (row) => {
     router.push({
-        path: '/windTower/detail',
+        path: '/hucang/windTower/detail', // 已改为新路由前缀
         query: {
             id: row.windTowerId,
         },
@@ -407,20 +407,20 @@ const checkAltitude = (rule, value, callback) => {
     }
 }
 const rules = {
-    windTowerCode: [{ required: true, ElMessage: '请输入测风塔编号', trigger: 'blur' }],
-    windTowerSeq: [{ required: true, ElMessage: '请输入测风塔号', trigger: 'blur' }],
-    lat: [{ required: true, ElMessage: '请输入经度', trigger: 'blur' }],
-    lng: [{ required: true, ElMessage: '请输入纬度', trigger: 'blur' }],
+    windTowerCode: [{ required: true, message: '请输入测风塔编号', trigger: 'blur' }],
+    windTowerSeq: [{ required: true, message: '请输入测风塔号', trigger: 'blur' }],
+    lat: [{ required: true, message: '请输入经度', trigger: 'blur' }],
+    lng: [{ required: true, message: '请输入纬度', trigger: 'blur' }],
     elevation: [{ required: true, trigger: 'blur',validator: checkAltitude }],
-    rawFile	: [{ required: true, ElMessage: '请上传原始文件', trigger: 'blur' }],
-    repairFile: [{ required: false, ElMessage: '请上传插补后文件', trigger: 'blur' }],
-    project: [{ required: true, ElMessage: '请选择关联项目', trigger: 'blur' }],
-    windTowerData: [{ required: true, ElMessage: '请输入关联测风塔数据', trigger: 'blur' }],
-    mesoscaleData: [{ required: true, ElMessage: '请输入关联中尺度数据', trigger: 'blur' }],
+    rawFile: [{ required: true, message: '请上传原始文件', trigger: 'blur' }],
+    repairFile: [{ required: false, message: '请上传插补后文件', trigger: 'blur' }],
+    project: [{ required: true, message: '请选择关联项目', trigger: 'blur' }],
+    windTowerData: [{ required: true, message: '请输入关联测风塔数据', trigger: 'blur' }],
+    mesoscaleData: [{ required: true, message: '请输入关联中尺度数据', trigger: 'blur' }],
 };
 // 获取原始文件
 const getUploadFile = (val, type) => {
-    type === 'rawFile' ? checkFormData.value.rawFile	 =[val]
+    type === 'rawFile' ? checkFormData.value.rawFile =[val]
         : checkFormData.value.repairFile = [val];
     checkFormRef.value.validateFields([type])
 }
@@ -628,6 +628,71 @@ defineExpose({
 <style scoped lang="scss">
 @import '@/assets/css/tabs.scss';
 
+/* ========== 新版样式 ========== */
+.wind-tower-list {
+    height: 100%;
+    min-height: 0;
+}
+
+/* 状态标签：胶囊样式 */
+.wind-tower-list .status-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 24px;
+    width: auto;
+}
+.wind-tower-list .status-tag.pending-icon {
+    color: #00A63E;
+    background: #E8F7EE;
+    box-shadow: inset 0 0 0 1px #B7E4C7;
+}
+.wind-tower-list .status-tag.finish-icon {
+    color: #D9363E;
+    background: #FEECEC;
+    box-shadow: inset 0 0 0 1px #FFC9C9;
+}
+.wind-tower-list .status-tag.bind-icon {
+    color: #0050B5;
+    background: #DDF0FF;
+    box-shadow: inset 0 0 0 1px #ABD1FF;
+}
+
+/* 操作列：多个按钮按一行排列，放不下自动换行 */
+.wind-tower-list .operation-btn-column {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px 12px;
+}
+.wind-tower-list .cloumn-btn {
+    display: contents;
+}
+.wind-tower-list .operation-btn-item {
+    font-size: 13px;
+    color: #667383;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover {
+        color: #0278E7;
+    }
+    &.is-danger {
+        color: #F2555A;
+
+        &:hover {
+            color: #D9363E;
+        }
+    }
+}
+
+/* ========== 以下为原有样式（未改动） ========== */
 .tip {
     font-size: 12px;
     font-family: PingFangSC, PingFang SC;

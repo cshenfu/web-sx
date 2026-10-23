@@ -4,6 +4,8 @@ import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { fileURLToPath, URL } from 'node:url'
+// 👇 1. 引入 polyfill 插件
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 // ✅ cross-env 注入的 Node 环境变量
 const env = process.env.NODE_ENV || 'development'
@@ -23,6 +25,16 @@ export default defineConfig(({ mode }) => {
       }),
       Components({
         resolvers: [ElementPlusResolver()],
+      }),
+      // 👇 2. 注入 Node.js Polyfill
+      nodePolyfills({
+        // 针对 @aws-sdk 需要的模块进行 polyfill
+        include: ['util', 'stream', 'crypto', 'buffer', 'process'],
+        globals: {
+          Buffer: true, // 修复部分 aws-sdk 需要的 Buffer
+          global: true,
+          process: true,
+        },
       }),
     ],
 
@@ -44,7 +56,6 @@ export default defineConfig(({ mode }) => {
       },
     },
 
-    // ⚠️⚠️⚠️ 老方式能生效的关键，必须有 ⚠️⚠️⚠️
     define: {
       'process.env.NODE_ENV': JSON.stringify(env),
       'process.env.VITE_APP_ENV': JSON.stringify(env),

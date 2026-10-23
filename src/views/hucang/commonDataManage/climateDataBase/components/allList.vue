@@ -3,6 +3,7 @@
         <table-list
             v-if="clomun.length > 0"
             class="user-table"
+            fit
             :loading="loading"
             :tableData="tableData"
             :tableColumn="clomun"
@@ -42,7 +43,7 @@
 
 <script setup>
     import { ref, reactive, onBeforeMount, onMounted, watch, onUnmounted, onActivated,onDeactivated } from 'vue';
-    import TableList from '@/components/tableList/TableList.vue';
+    import TableList from '@/components/tableList/TableList2.vue';
     import TipsModal from '@/components/tipsDialog/TipsModal.vue';
     import { 
         THUNDER_TABLE_LIST_CLOUMN, 
@@ -142,7 +143,7 @@
     // 表格
     const getRowData = (row) => {
         router.push({
-            path: '/climate/detail',
+            path: '/hucang/climate/detail', // 已改为新路由前缀
             query: { 
                 id: row.id,
                 type: searchKey.value.activeKey,
@@ -210,7 +211,7 @@
     // 编辑文件
     const editFile = (file) => {
         router.push({
-            path: '/climate/edit',
+            path: '/hucang/climate/edit', // 已改为新路由前缀
             query: {
                 type: searchKey.value.activeKey,
                 id: file.id,
@@ -317,9 +318,40 @@
         deletMitt()
     });
 </script>
+
 <style scoped lang="scss">
   @import '@/assets/css/fixedGroup.scss';
 
+    /* 表格、分页的新版样式在 TableList.vue 的 fit 模式里（Element Plus） */
+    .user-list {
+        height: 100%;
+        min-height: 0;
+    }
+
+    /* 操作列：编辑为灰色，删除为红色 */
+    .user-list .operation-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .user-list .operation-btn-item {
+        font-size: 13px;
+        color: #667383;
+        cursor: pointer;
+
+        &:hover {
+            color: #0278E7;
+        }
+        &:last-child {
+            color: #F2555A;
+
+            &:hover {
+                color: #D9363E;
+            }
+        }
+    }
+
+    /* ========== 以下为原有样式（未改动） ========== */
     .user-list {
         .status-tag {
             width: 52px;
@@ -366,8 +398,6 @@
         .tuning-tip {
             display: flex;
             align-items: flex-start;
-            // width: 442px;
-            // height: 42px;
             padding: 8px 0 5px 0;
             background: #fef1df;
             border-radius: 4px;

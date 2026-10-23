@@ -1,6 +1,6 @@
 <template>
     <div class="water-conservation-list">
-        <table-list id="waterConservationTable" class="user-table" :loading="loading" :tableData="dataList"
+        <table-list id="waterConservationTable" class="user-table" fit :loading="loading" :tableData="dataList"
             :tableColumn="clomun" :page="page" @getRowData="getRowData" @changePage="changePage">
             <template #areaData="{ record }">
                 <span>{{ record.provinceName }}{{ record.cityName?`/${record.cityName}`:'' }}{{ record.districtName?`/${record.districtName}`:'' }}</span>
@@ -56,11 +56,11 @@
                         <span class="operation-btn-item" @click.stop="editFile(record)">{{
             record.status != 2? '核对' : '编辑'
         }}</span>
-                        <span class="operation-btn-item" @click.stop="deleteFile(record)">删除</span>
+                        <span class="operation-btn-item is-danger" @click.stop="deleteFile(record)">删除</span>
                     </template>
                     <template v-if="searchKey.source == 1">
                         <span class="operation-btn-item" @click.stop="editFile(record)">编辑</span>
-                        <span class="operation-btn-item" @click.stop="deleteFile(record)">删除</span>
+                        <span class="operation-btn-item is-danger" @click.stop="deleteFile(record)">删除</span>
                         <span class="operation-btn-item" v-if="record.isDisable == 0" @click.stop="disableFile(record)">禁用</span>
                         <span class="operation-btn-item" v-if="record.isDisable == 1" @click.stop="openFile(record)">置为开放</span>
                     </template>
@@ -69,14 +69,14 @@
         </table-list>
         <!-- 删除 -->
         <tips-modal :width="'490px'" title="删除提示" :tipType="'danger'" class="tip-content-modal" :okText="'确定删除'"
-            :openTipsModal.sync="openTipsPowerModal" @handleChangeFileModal="handleChangeClose">
+            v-model:openTipsModal="openTipsPowerModal" @handleChangeFileModal="handleChangeClose">
             <template #contentBody>
                 <span class="modalTip">确定删除该数据么？</span>
             </template>
         </tips-modal>
         <!-- 开放、禁用 -->
         <tips-modal :width="'490px'" :tipType="'danger'" class="tip-content-modal"
-            :okText="tipModalType == 'open' ? '确定开放' : '确定禁用'" :openTipsModal.sync="openTipsOpenModal"
+            :okText="tipModalType == 'open' ? '确定开放' : '确定禁用'" v-model:openTipsModal="openTipsOpenModal"
             @handleChangeFileModal="handleChangeOpenModal">
             <template #customTitle>{{ tipTitle }}</template>
             <template #contentBody>
@@ -86,7 +86,7 @@
                 </div>
                 <a-form :colon="false" class="sort-form" ref="openFormRef" :model="openFormData" :labelCol="labelCol"
                     labelAlign="left">
-                    <a-form-item label="原因" name="reason" :rules="[{ required: true, ElMessage: '请输入原因' }]">
+                    <a-form-item label="原因" name="reason" :rules="[{ required: true, message: '请输入原因' }]">
                         <a-textarea style="width: 358px" :auto-size="{ minRows: 2, maxRows: 5 }"
                             v-model:value="openFormData.reason" placeholder="请输入原因" />
                     </a-form-item>
@@ -202,7 +202,7 @@ const getTableData = async (val) => {
 // 表格
 const getRowData = (row) => {
     router.push({
-        path: '/environment/detail',
+        path: '/hucang/environment/detail', // 已改为新路由前缀
         query: {
             id: row.id,
         },
@@ -220,7 +220,7 @@ const tipTitle = ref('');
 // 核对、编辑
 const editFile = (val) => {
     router.push({
-        path: '/environment/add',
+        path: '/hucang/environment/add', // 已改为新路由前缀
         query: {
             id: val.id,
         },
@@ -344,10 +344,78 @@ onBeforeUnmount(() => {
 <style scoped lang="scss">
 @import '@/assets/css/tabs.scss';
 
+/* ========== 新版样式 ========== */
 .water-conservation-list {
-    padding: 0 0px 52px 0;
+    height: 100%;
+    min-height: 0;
 }
 
+/* 状态标签：胶囊样式 */
+.water-conservation-list .status-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 24px;
+}
+.water-conservation-list .status-tag.pending-icon {
+    color: #00A63E;
+    background: #E8F7EE;
+    box-shadow: inset 0 0 0 1px #B7E4C7;
+}
+.water-conservation-list .status-tag.finish-icon {
+    color: #D9363E;
+    background: #FEECEC;
+    box-shadow: inset 0 0 0 1px #FFC9C9;
+}
+.water-conservation-list .status-tag.bind-icon {
+    color: #D97706;
+    background: #FFF3E0;
+    box-shadow: inset 0 0 0 1px #FFD8A8;
+}
+.water-conservation-list .status-tag.has-bind-icon {
+    color: #0050B5;
+    background: #DDF0FF;
+    box-shadow: inset 0 0 0 1px #ABD1FF;
+}
+.water-conservation-list .status-tag.stop-icon {
+    color: #667383;
+    background: #EEF1F5;
+    box-shadow: inset 0 0 0 1px #DFE5EC;
+}
+
+/* 操作列：按钮排成一行，放不下自动换行 */
+.water-conservation-list .operation-btn {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px 12px;
+}
+.water-conservation-list .operation-btn-item {
+    font-size: 13px;
+    color: #667383;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover {
+        color: #0278E7;
+    }
+    &.is-danger {
+        color: #F2555A;
+
+        &:hover {
+            color: #D9363E;
+        }
+    }
+}
+
+/* ========== 以下为原有样式（未改动） ========== */
 .tuning-tip {
     display: flex;
     padding: 8px 0 5px 0;

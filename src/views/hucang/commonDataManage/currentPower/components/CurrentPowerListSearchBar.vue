@@ -1,222 +1,312 @@
 <template>
+    <div class="current-power-search-bar">
+        <!-- 头部：Tab + 新增数据按钮（完美解决和表格同行的问题） -->
+        <div class="search-bar-header">
+            <div class="climate-tabs">
+                <ul class="climate-tabs-list">
+                    <li class="climate-tab" @click="chooseTabs(2)" :class="{ active: searchKey.source == 2 }">用户数据</li>
+                    <li class="climate-tab" @click="chooseTabs(1)" :class="{ active: searchKey.source == 1 }">公共数据</li>
+                </ul>
+            </div>
+            <div class="filter-actions">
+                <a-button type="primary" class="btn-add" @click="goPath">
+                    <iconpark-icon name="xinzeng" size="12"></iconpark-icon>
+                    新增数据
+                </a-button>
+            </div>
+        </div>
 
-     <div class="user-tabs">
-        <ul class="user-tabs-ul">
-            <li class="user-tabs-li" @click="chooseTabs(2)" :class="searchKey.source==2?'active':''">用户数据</li>
-            <li class="user-tabs-li" @click="chooseTabs(1)" :class="searchKey.source==1?'active':''">公共数据</li>
-        </ul>
-        <div class="add-btn" @click="goPath"><iconpark-icon name="xinzeng" size="12" class="add-icon"></iconpark-icon> 新增数据</div>
+        <!-- 筛选行：筛选项 + 重置/搜索 -->
+        <div class="filter-row">
+            <div class="filter-inputs">
+                <select-search
+                    :allowClear="false"
+                    placeholder="省市区"
+                    v-model:selectValue="searchKey.rangeType"
+                    :options="rangeTypeOptions"
+                    @changeAreaData="changeAreaData"
+                ></select-search>
+                <a-cascader
+                    @dropdownVisibleChange="(e) => openDropDown(e, 'first')"
+                    v-model:value="searchKey.areaCode"
+                    style="width: 160px"
+                    placeholder="所属区域"
+                    change-on-select
+                    allowClear
+                    :fieldNames="{
+                        label: 'regionName',
+                        value: 'regionCode',
+                        children: 'subList',
+                    }"
+                    :options="areaCodeOptions"
+                    @change="handleSearch"
+                >
+                    <template #suffixIcon>
+                        <iconpark-icon name="xiala" v-if="!isSelectOpen.first"></iconpark-icon>
+                        <iconpark-icon name="shouqi" v-if="isSelectOpen.first"
+                            :class="isSelectOpen.first ? 'green' : ''"></iconpark-icon>
+                    </template>
+                </a-cascader>
+                <select-search
+                    placeholder="数据状态"
+                    v-model:selectValue="searchKey.status"
+                    :options="statusData"
+                    @updateSearch="handleSearch"
+                ></select-search>
+                <a-input
+                    v-model:value="searchKey.gridCode"
+                    placeholder="数据编号"
+                    class="filter-input"
+                    allowClear
+                    @pressEnter="handleSearch"
+                >
+                    <template #suffix>
+                        <iconpark-icon name="sousuo" size="12"></iconpark-icon>
+                    </template>
+                </a-input>
+                <a-input
+                    v-model:value="searchKey.projectCode"
+                    placeholder="关联项目编号"
+                    class="filter-input"
+                    allowClear
+                    @pressEnter="handleSearch"
+                >
+                    <template #suffix>
+                        <iconpark-icon name="sousuo" size="12"></iconpark-icon>
+                    </template>
+                </a-input>
+            </div>
+
+            <div class="filter-buttons">
+                <a-button class="btn-reset" @click="resetSearch">重置</a-button>
+                <a-button type="primary" class="btn-search" @click="handleSearch">搜索</a-button>
+            </div>
+        </div>
     </div>
-    <SearchBar :searchKey="searchKey" @handleSearch="handleSearch" @resetSearch="resetSearch">
-        <a-flex :vertical="false" wrap="wrap" class="my-project-list-search">
-            <!-- <a-radio-group
-                v-model:value="searchKey.modeType"
-                button-style="solid"
-                @change="changeMode"
-                class="type-active search-item-box"
-            >
-                <a-radio-button value="a">
-                    <div class="mode-list">
-                        <iconpark-icon
-                            :name="searchKey.modeType == 'a' ? 'dituxuanzhong' : 'ditumoren'"
-                            size="13"
-                            class="mode-icon"
-                        ></iconpark-icon
-                        ><span>地图模式</span>
-                    </div>
-                </a-radio-button>
-                <a-radio-button value="b">
-                    <div class="mode-list">
-                        <iconpark-icon
-                            :name="searchKey.modeType == 'b' ? 'liebiaoxuanzhong' : 'liebiaomoren'"
-                            size="13"
-                            class="mode-icon"
-                        ></iconpark-icon
-                        ><span>列表模式</span>
-                    </div>
-                </a-radio-button>
-            </a-radio-group> -->
-            <select-search
-                :allowClear="false"
-                class="search-item-box"
-                placeholder="省市区"
-                v-model:selectValue="searchKey.rangeType"
-                :options="rangeTypeOptions"
-                @changeAreaData="changeAreaData"
-            ></select-search>
-            <a-cascader
-                @dropdownVisibleChange="(e) => openDropDown(e, 'first')"
-                v-model:value="searchKey.areaCode"
-                style="width: 140px; margin-right: 10px; margin-bottom: 12px"
-                placeholder="所属区域"
-                change-on-select
-                allowClear
-                :fieldNames="{
-                    label: 'regionName',
-                    value: 'regionCode',
-                    children: 'subList',
-                }"
-                :options="areaCodeOptions"
-                @change="handleSearch"
-            >
-                <template #suffixIcon>
-                    <iconpark-icon name="xiala" v-if="!isSelectOpen.first"></iconpark-icon>
-                    <iconpark-icon
-                        name="shouqi"
-                        v-if="isSelectOpen.first"
-                        :class="isSelectOpen.first ? 'green' : ''"
-                    ></iconpark-icon>
-                </template>
-            </a-cascader>
-            <select-search
-                class="search-item-box"
-                placeholder="数据状态"
-                v-model:selectValue="searchKey.status"
-                :options="statusData"
-                @updateSearch="handleSearch"
-            ></select-search>
-            <a-input
-                v-model:value="searchKey.gridCode"
-                placeholder="数据编号"
-                class="site-input-right search-item-box"
-                style="width: 240px; text-align: center"
-                allowClear
-            >
-                <template #suffix>
-                    <iconpark-icon name="sousuo" size="12"></iconpark-icon>
-                </template>
-            </a-input>
-            <a-input
-                v-model:value="searchKey.projectCode"
-                placeholder="关联项目编号"
-                class="site-input-right search-item-box"
-                style="width: 240px; text-align: center"
-                allowClear
-            >
-                <template #suffix>
-                    <iconpark-icon name="sousuo" size="12"></iconpark-icon>
-                </template>
-            </a-input>
-        </a-flex>
-    </SearchBar>
 </template>
+
 <script setup>
-    import SearchBar from '@/components/searchBar/SearchBar.vue';
-    import SelectSearch from '@/components/selectSearch/SelectSearch.vue';
-    import { computed, reactive, ref,onMounted,watch} from 'vue';
-    import mitt from '@/utils/eventBus';
-    import {useRouter} from 'vue-router';
-    import { USER_COMMON_DATA_STATUS,PUBLIC_COMMON_STATUS,filterAreaInfo,RANGE_TYPE_PROVINCE} from '../../commonData'
-    import { getProvince } from '@/api/modules/public';
-    const emit = defineEmits(['getModeType']);
-    const router = useRouter()
-    const rangeTypeOptions = RANGE_TYPE_PROVINCE;
-    const areaCodeData = ref([]);
-    const areaCodeOptions = ref([]);
-    const searchKey = reactive({
-        source:1,
-        modeType: 'b',
-        rangeType: 0,
-        areaCode: [],
-        status: null,
-        projectCode: '',
-        gridCode:''
-    });
-    const goPath = () => {
-        router.push({
-            path: '/currentPower/add',
-        })
-    }
-    const statusData = computed(() => {
-        searchKey.status = null;
-        return searchKey.source == 2 ? USER_COMMON_DATA_STATUS:PUBLIC_COMMON_STATUS;
-    });
-    const chooseTabs = (index) => {
-        searchKey.source = index
-        resetSearch()
-    }
-    const defaultModeType = ref('b');
-    // 搜索
-    const handleSearch = () => {
-        // if(searchKey.source === 1) {
-        //     searchKey.isDisable = searchKey.status
-        //     delete searchKey.status
-        // }
-        mitt.emit('handleSearch', searchKey)
-    };
-    // 重置
-    const resetSearch = async() => {
-        let source = searchKey.source
-        for (const key in searchKey) {
-            if (Object.hasOwnProperty.call(searchKey, key)) {
-                searchKey[key] = null;
-            }
+import SelectSearch from '@/components/selectSearch/SelectSearch.vue';
+import { computed, reactive, ref, onMounted } from 'vue';
+import mitt from '@/utils/eventBus';
+import { useRouter } from 'vue-router';
+import { USER_COMMON_DATA_STATUS, PUBLIC_COMMON_STATUS, filterAreaInfo, RANGE_TYPE_PROVINCE } from '../../commonData';
+import { getProvince } from '@/api/modules/public';
+
+const emit = defineEmits(['getModeType']);
+const router = useRouter();
+const rangeTypeOptions = RANGE_TYPE_PROVINCE;
+const areaCodeData = ref([]);
+const areaCodeOptions = ref([]);
+
+const searchKey = reactive({
+    source: 1,
+    modeType: 'b',
+    rangeType: 0,
+    areaCode: [],
+    status: null,
+    projectCode: '',
+    gridCode: '',
+});
+
+const goPath = () => {
+    router.push({ path: '/currentPower/add' });
+};
+
+const statusData = computed(() => {
+    searchKey.status = null;
+    return searchKey.source == 2 ? USER_COMMON_DATA_STATUS : PUBLIC_COMMON_STATUS;
+});
+
+const chooseTabs = (index) => {
+    searchKey.source = index;
+    resetSearch();
+};
+
+const defaultModeType = ref('b');
+
+const handleSearch = () => {
+    mitt.emit('handleSearch', searchKey);
+};
+
+const resetSearch = async () => {
+    const source = searchKey.source;
+    for (const key in searchKey) {
+        if (Object.hasOwnProperty.call(searchKey, key)) {
+            searchKey[key] = null;
         }
-        searchKey.modeType = defaultModeType.value;
-        searchKey.rangeType = 0;
-        searchKey.source = source;
-        searchKey.status = null
-        mitt.emit('resetSearch', searchKey);
-    };
-    const isSelectOpen = ref({
-        first: false,
-    });
-    const openDropDown = (open, type) => {
-        isSelectOpen.value[type] = open;
-    };
-    const changeMode = async(e) => {
-        defaultModeType.value = e.target.value;
-        emit('getModeType', e.target.value);
-        await mitt.all.clear()
-        mitt.emit('handleSearch', searchKey)
-    };
-    const changeAreaData = (val) => {
-        areaCodeOptions.value = filterAreaInfo(val, areaCodeData.value);
-        // mitt.emit('getAreaInfo', val);
-        searchKey.areaCode =[]
-        mitt.emit('handleSearch', searchKey)
-    };
-    onMounted(async() => {
-        try {
-            const res = await getProvince();
-            if(res.code === 200){
-                areaCodeData.value = res.data?.subList;
-                areaCodeOptions.value = filterAreaInfo(0, areaCodeData.value);
-            }
-        }catch (e) {
-            console.log(e);
+    }
+    searchKey.modeType = defaultModeType.value;
+    searchKey.rangeType = 0;
+    searchKey.source = source;
+    searchKey.status = null;
+    searchKey.areaCode = [];
+    areaCodeOptions.value = filterAreaInfo(0, areaCodeData.value);
+    mitt.emit('resetSearch', searchKey);
+};
+
+const isSelectOpen = ref({ first: false });
+const openDropDown = (open, type) => {
+    isSelectOpen.value[type] = open;
+};
+
+const changeMode = async (e) => {
+    defaultModeType.value = e.target.value;
+    emit('getModeType', e.target.value);
+    await mitt.all.clear();
+    mitt.emit('handleSearch', searchKey);
+};
+
+const changeAreaData = (val) => {
+    areaCodeOptions.value = filterAreaInfo(val, areaCodeData.value);
+    searchKey.areaCode = [];
+    mitt.emit('handleSearch', searchKey);
+};
+
+onMounted(async () => {
+    try {
+        const res = await getProvince();
+        if (res.code === 200) {
+            areaCodeData.value = res.data?.subList;
+            areaCodeOptions.value = filterAreaInfo(0, areaCodeData.value);
         }
-        handleSearch()
-    });
-    defineExpose({
-        searchKey,
-    });
+    } catch (e) {
+        console.log(e);
+    }
+    handleSearch();
+});
+
+defineExpose({ searchKey });
 </script>
+
 <style lang="scss" scoped>
+@import '@/assets/css/fixedGroup.scss';
 @import '@/assets/css/tabs.scss';
-.user-tabs {
-    margin-bottom: 12px
+
+.current-power-search-bar {
+    background: #FFFFFF;
 }
-    .search-item-box {
-        margin-right: 12px;
-        margin-bottom: 16px;
-    }
 
-    .search-item {
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
-        margin-right: 12px;
+/* ========== 头部 Tab 与 按钮 ========== */
+.search-bar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    border-bottom: 1px solid #E2E9F0;
+}
+.climate-tabs-list {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow-x: auto;
+    &::-webkit-scrollbar { display: none; }
+}
+.climate-tab {
+    position: relative;
+    flex-shrink: 0;
+    height: 48px;
+    line-height: 48px;
+    font-size: 14px;
+    color: #667383;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.15s ease;
 
-        &:last-child {
-            margin-right: 0;
+    &:hover { color: #0B1C2C; }
+    &.active {
+        color: #0278E7;
+        font-weight: 500;
+        &::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: -1px;
+            height: 2px;
+            border-radius: 2px;
+            background: #0278E7;
         }
-
-        .search-label-self {
-            flex: 0 0 auto;
-            margin-right: 12px;
-            font-size: 12px;
-            color: #363b4d;
-        }
     }
+}
+
+/* ========== 筛选行 ========== */
+.filter-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px 20px;
+}
+.filter-inputs {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.filter-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 下拉框 */
+.filter-inputs :deep(.ant-select-selector) {
+    height: 36px !important;
+    border: 1px solid #E2E9F0 !important;
+    border-radius: 10px !important;
+    background: #FFFFFF !important;
+    box-shadow: none !important;
+    font-size: 13px;
+}
+.filter-inputs :deep(.ant-select-selection-item),
+.filter-inputs :deep(.ant-select-selection-placeholder) {
+    line-height: 34px !important;
+    color: #667383;
+}
+
+/* 输入框 */
+.filter-row .filter-input {
+    width: 200px;
+    height: 36px;
+    border: 1px solid #E2E9F0;
+    border-radius: 10px;
+    background: #FFFFFF;
+    box-shadow: none;
+    font-size: 13px;
+}
+.filter-row .filter-input :deep(input) { font-size: 13px; }
+
+/* 按钮 */
+.filter-row .btn-reset,
+.filter-row .btn-search,
+.filter-actions .btn-add {
+    height: 36px;
+    padding: 0 16px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+.filter-row .btn-reset {
+    color: #667383;
+    background: #FFFFFF;
+    border: 1px solid #E2E9F0;
+}
+.filter-row .btn-search,
+.filter-actions .btn-add {
+    background: #0278E7 !important;
+    border-color: #0278E7 !important;
+    color: #FFFFFF !important;
+    &:hover {
+        background: #0267C7 !important;
+        border-color: #0267C7 !important;
+    }
+}
+.filter-actions .btn-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
 </style>

@@ -2,6 +2,7 @@
     <div class="geology-list">
         <table-list
             class="geology-table"
+            fit
             :loading="loading"
             :tableData="dataSource"
             :tableColumn="thArr"
@@ -133,7 +134,7 @@
                         >发送计算</span
                     >
                     <span v-if="props.activeKey == 1" class="operation-btn-item" @click.stop="copy(record)">复制</span>
-                    <span class="operation-btn-item" @click.stop="updateStatus(record, true)"
+                    <span class="operation-btn-item is-danger" @click.stop="updateStatus(record, true)"
                         >删除</span
                     >
                     <span class="operation-btn-item" @click.stop="goGeography(record)"
@@ -357,7 +358,7 @@
     // 表格
     const getRowData = (row) => {
         router.push({
-            path: '/geology/detail',
+            path: '/hucang/geology/detail', // 已改为新路由前缀
             query: {
                 id: row.id,
             },
@@ -423,7 +424,7 @@
                 });
             } else {
                 router.push({
-                    path: '/geology/geography',
+                    path: '/hucang/geology/geography', // 已改为新路由前缀
                     query: {
                         sourceType: props.activeKey,
                         id: row.id,
@@ -468,7 +469,8 @@
                         }
                     })
                     .catch((err) => {
-                        ElMessage.error(res.msg);
+                        // 原来这里引用了未定义的 res，会再抛一次错误，改为使用 err
+                        ElMessage.error(err?.msg || err?.message || '删除失败');
                         openTipsUpdateStatus.value = false;
                     });
             } else {
@@ -548,7 +550,7 @@
     const correlationProgress = (row) => {
         sessionStorage.setItem('linkProgressInfo', JSON.stringify(row));
         router.push({
-            path: '/geology/linkage',
+            path: '/hucang/geology/linkage', // 已改为新路由前缀
         });
     };
     // 发送计算  
@@ -565,7 +567,7 @@
     // 跳转地形管理链接
     const goGeography = (row) => {
         router.push({
-            path: '/geology/geography',
+            path: '/hucang/geology/geography', // 已改为新路由前缀
             query: {
                 id: row.id,
                 sourceType: props.activeKey,
@@ -593,6 +595,50 @@
 </script>
 <style scoped lang="scss">
   @import './css/tableList.scss';
+
+    /* ========== 新版样式 ========== */
+    .geology-list {
+        height: 100%;
+        min-height: 0;
+    }
+
+    /* 状态标签：胶囊样式 */
+    .geology-list :deep(.el-tag) {
+        height: 24px;
+        padding: 0 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    /* 操作列：按钮按一行排列，放不下自动换行 */
+    .geology-list .operation-btn {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 4px 12px;
+    }
+    .geology-list .operation-btn-item {
+        font-size: 13px;
+        color: #667383;
+        cursor: pointer;
+        white-space: nowrap;
+
+        &:hover {
+            color: #0278E7;
+        }
+        &.is-danger,
+        &.operation-btn-item-error {
+            color: #F2555A;
+
+            &:hover {
+                color: #D9363E;
+            }
+        }
+    }
+
+    /* ========== 以下为原有样式（未改动） ========== */
     .openTitle {
         display: flex;
         align-items: center;

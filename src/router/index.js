@@ -3,15 +3,11 @@ import MainLayout from '@/layout/MainLayout.vue'
 
 // 路由表
 const routes = [
-  // 登录页：不经过 MainLayout
   {
     path: '/login',
     name: 'Login',
     component: () => import('@/views/login/Login.vue'),
-    meta: {
-      title: '登录',
-      public: true
-    }
+    meta: { title: '登录', public: true }
   },
 
   // ─────────────────────────────────────────────
@@ -22,83 +18,13 @@ const routes = [
     component: MainLayout,
     redirect: '/overview',
     children: [
-      {
-        path: 'overview',
-        name: 'Overview',
-        component: () => import('@/views/qinchuan/Overview.vue'),
-        meta: {
-          title: '项目总览',
-          module: 'qinchuan',
-          sidebar: 'qinchuan',
-          key: 'overview'
-        }
-      },
-      {
-        path: 'site',
-        name: 'SiteSelect',
-        component: () => import('@/views/qinchuan/SiteSelect.vue'),
-        meta: {
-          title: '智能选址',
-          module: 'qinchuan',
-          sidebar: 'qinchuan',
-          key: 'site'
-        }
-      },
-      {
-        path: 'reserve',
-        name: 'Reserve',
-        component: () => import('@/views/qinchuan/Reserve.vue'),
-        meta: {
-          title: '项目储备',
-          module: 'qinchuan',
-          sidebar: 'qinchuan',
-          key: 'reserve'
-        }
-      },
-      {
-        path: 'approval',
-        name: 'Approval',
-        component: () => import('@/views/qinchuan/Approval.vue'),
-        meta: {
-          title: '立项阶段',
-          module: 'qinchuan',
-          sidebar: 'qinchuan',
-          key: 'approval'
-        }
-      },
-      {
-        path: 'research',
-        name: 'Research',
-        component: () => import('@/views/qinchuan/Research.vue'),
-        meta: {
-          title: '可研阶段',
-          module: 'qinchuan',
-          sidebar: 'qinchuan',
-          key: 'research'
-        }
-      },
-      {
-        path: 'decision',
-        name: 'Decision',
-        component: () => import('@/views/qinchuan/Decision.vue'),
-        meta: {
-          title: '投资决策',
-          module: 'qinchuan',
-          sidebar: 'qinchuan',
-          key: 'decision'
-        }
-      },
-      {
-        path: 'compute',
-        name: 'Compute',
-        component: () => import('@/views/qinchuan/Compute.vue'),
-        meta: {
-          title: '计算队列',
-          module: 'qinchuan',
-          sidebar: 'qinchuan',
-          key: 'compute'
-        }
-      }
+      { path: 'overview', name: 'Overview', component: () => import('@/views/qinchuan/Overview.vue'), meta: { title: '项目总览', module: 'qinchuan', sidebar: 'qinchuan', key: 'overview' } },
+      { path: 'site', name: 'SiteSelect', component: () => import('@/views/qinchuan/SiteSelect.vue'), meta: { title: '智能选址', module: 'qinchuan', sidebar: 'qinchuan', key: 'site' } },
+      { path: 'reserve', name: 'Reserve', component: () => import('@/views/qinchuan/Reserve.vue'), meta: { title: '项目储备', module: 'qinchuan', sidebar: 'qinchuan', key: 'reserve' } },
+      { path: 'approval', name: 'Approval', component: () => import('@/views/qinchuan/Approval.vue'), meta: { title: '立项阶段', module: 'qinchuan', sidebar: 'qinchuan', key: 'approval' } },
+      { path: 'research', name: 'Research', component: () => import('@/views/qinchuan/Research.vue'), meta: { title: '可研阶段', module: 'qinchuan', sidebar: 'qinchuan', key: 'research' } },
+      { path: 'decision', name: 'Decision', component: () => import('@/views/qinchuan/Decision.vue'), meta: { title: '投资决策', module: 'qinchuan', sidebar: 'qinchuan', key: 'decision' } },
+      { path: 'compute', name: 'Compute', component: () => import('@/views/qinchuan/Compute.vue'), meta: { title: '计算队列', module: 'qinchuan', sidebar: 'qinchuan', key: 'compute' } }
     ]
   },
 
@@ -109,601 +35,182 @@ const routes = [
     path: '/yanping',
     component: MainLayout,
     children: [
-      // 研评智坊首页
-      {
-        path: '',
-        name: 'YanpingIndex',
-        component: () => import('@/views/yanping/Index.vue'),
-        meta: {
-          title: '研评智坊',
-          module: 'yanping'
-        }
-      },
-
-      // ─────────────────────────────────────────
-      // 智能评审
-      // ─────────────────────────────────────────
+      { path: '', name: 'YanpingIndex', component: () => import('@/views/yanping/Index.vue'), meta: { title: '研评智坊', module: 'yanping' } },
       {
         path: 'review',
         redirect: '/yanping/review/project',
         children: [
-          {
-            path: 'create',
-            name: 'ReviewCreate',
-            component: () => import('@/views/yanping/review/Create.vue'),
-            meta: {
-              title: '智能评审-创建',
-              module: 'yanping',
-              sidebar: 'yanping-review',
-              key: 'create'
-            }
-          },
-          {
-            path: 'project',
-            name: 'ReviewProject',
-            component: () => import('@/views/yanping/review/Project.vue'),
-            meta: {
-              title: '智能评审-项目',
-              module: 'yanping',
-              sidebar: 'yanping-review',
-              key: 'project'
-            }
-          },
-          {
-            path: 'draft',
-            name: 'ReviewDraft',
-            component: () => import('@/views/yanping/review/DefaultProject.vue'),
-            meta: {
-              title: '智能评审-草稿',
-              module: 'yanping',
-              sidebar: 'yanping-review',
-              key: 'draft'
-            }
-          },
-          {
-            path: 'default-project',
-            name: 'ReviewDefaultProject',
-            component: () => import('@/views/yanping/review/DefaultProject.vue'),
-            meta: {
-              title: '智能评审-项目',
-              module: 'yanping',
-              sidebar: 'yanping-review',
-              key: 'default-project'
-            }
-          }
+          { path: 'create', name: 'ReviewCreate', component: () => import('@/views/yanping/review/Create.vue'), meta: { title: '智能评审-创建', module: 'yanping', sidebar: 'yanping-review', key: 'create' } },
+          { path: 'project', name: 'ReviewProject', component: () => import('@/views/yanping/review/Project.vue'), meta: { title: '智能评审-项目', module: 'yanping', sidebar: 'yanping-review', key: 'project' } },
+          { path: 'draft', name: 'ReviewDraft', component: () => import('@/views/yanping/review/DefaultProject.vue'), meta: { title: '智能评审-草稿', module: 'yanping', sidebar: 'yanping-review', key: 'draft' } },
+          { path: 'default-project', name: 'ReviewDefaultProject', component: () => import('@/views/yanping/review/DefaultProject.vue'), meta: { title: '智能评审-项目', module: 'yanping', sidebar: 'yanping-review', key: 'default-project' } }
         ]
       },
-
-      // ─────────────────────────────────────────
-      // 技经概算
-      // ─────────────────────────────────────────
       {
         path: 'budget',
-        redirect: '/yanping/budget/project', // 默认进项目页
+        redirect: '/yanping/budget/project',
         children: [
-          // 侧边栏“首页”如果指向这里，直接重定向回整个大首页
-          {
-            path: 'home',
-            redirect: '/yanping' 
-          },
-          // 1. 创建
-          {
-            path: 'create',
-            name: 'BudgetCreate',
-            // 替换为你复制过来的真实组件路径
-            component: () => import('@/views/yanping/budget/estimateProject/estimateList/estimateTemplateList.vue'),
-            meta: {
-              title: '技经概算-创建',
-              module: 'yanping',
-              sidebar: 'yanping-budget',
-              key: 'create'
-            }
-          },
-          // 2. 项目
-          {
-            path: 'project',
-            name: 'BudgetProject',
-            // 替换为你复制过来的真实组件路径
-            component: () => import('@/views/yanping/budget/estimateProject/estimateList/estimateList.vue'),
-            meta: {
-              title: '技经概算-项目',
-              module: 'yanping',
-              sidebar: 'yanping-budget',
-              key: 'project'
-            }
-          },
-          // 3. 草稿（保持原样）
-          {
-            path: 'draft',
-            name: 'BudgetDraft',
-            component: () => import('@/views/yanping/budget/DefaultProject.vue'),
-            meta: {
-              title: '技经概算-草稿',
-              module: 'yanping',
-              sidebar: 'yanping-budget',
-              key: 'draft'
-            }
-          },
-          {
-            path: 'default-project',
-            name: 'BudgetDefaultProject',
-            component: () => import('@/views/yanping/budget/DefaultProject.vue'),
-            meta: {
-              title: '技经概算-项目',
-              module: 'yanping',
-              sidebar: 'yanping-budget',
-              key: 'default-project'
-            }
-          },
-          // ========== 下面是子页面（不在左侧菜单显示，但需保留防止 404） ==========
-          // 预览页（如果在“项目”里点击进入预览）
-          {
-            path: 'newTemplatePreview',
-            name: 'BudgetNewTemplatePreview',
-            component: () => import('@/views/yanping/budget/estimateProject/templatePreview/NewTemplatePreview.vue'),
-            meta: {
-              title: '新项目预览',
-              module: 'yanping',
-              sidebar: 'yanping-budget',
-              key: 'project' // 保持在左侧菜单高亮“项目”
-            }
-          },
-          // 模版设置（如果在“项目”里点击进入设置）
-          {
-            path: 'set',
-            name: 'BudgetSet',
-            component: () => import('@/views/yanping/budget/estimateProject/estimateList/index2.vue'),
-            meta: {
-              title: '模版设置',
-              module: 'yanping',
-              sidebar: 'yanping-budget',
-              key: 'project' // 保持在左侧菜单高亮“项目”
-            }
-          }
+          { path: 'home', redirect: '/yanping' },
+          { path: 'create', name: 'BudgetCreate', component: () => import('@/views/yanping/budget/estimateProject/estimateList/estimateTemplateList.vue'), meta: { title: '技经概算-创建', module: 'yanping', sidebar: 'yanping-budget', key: 'create' } },
+          { path: 'project', name: 'BudgetProject', component: () => import('@/views/yanping/budget/estimateProject/estimateList/estimateList.vue'), meta: { title: '技经概算-项目', module: 'yanping', sidebar: 'yanping-budget', key: 'project' } },
+          { path: 'draft', name: 'BudgetDraft', component: () => import('@/views/yanping/budget/DefaultProject.vue'), meta: { title: '技经概算-草稿', module: 'yanping', sidebar: 'yanping-budget', key: 'draft' } },
+          { path: 'default-project', name: 'BudgetDefaultProject', component: () => import('@/views/yanping/budget/DefaultProject.vue'), meta: { title: '技经概算-项目', module: 'yanping', sidebar: 'yanping-budget', key: 'default-project' } },
+          { path: 'newTemplatePreview', name: 'BudgetNewTemplatePreview', component: () => import('@/views/yanping/budget/estimateProject/templatePreview/NewTemplatePreview.vue'), meta: { title: '新项目预览', module: 'yanping', sidebar: 'yanping-budget', key: 'project' } },
+          { path: 'set', name: 'BudgetSet', component: () => import('@/views/yanping/budget/estimateProject/estimateList/index2.vue'), meta: { title: '模版设置', module: 'yanping', sidebar: 'yanping-budget', key: 'project' } }
         ]
       },
-
-            // ─────────────────────────────────────────
-      // 财务评价
-      // ─────────────────────────────────────────
       {
         path: 'finance',
-        redirect: '/yanping/finance/project', // 默认进项目页
+        redirect: '/yanping/finance/project',
         children: [
-          // 侧边栏“首页”统一重定向回研评智坊总首页
-          {
-            path: 'home',
-            redirect: '/yanping'
-          },
-          // 1. 创建
-          {
-            path: 'create',
-            name: 'FinanceCreate',
-            // 替换为你复制过来的真实组件路径
-            component: () => import('@/views/yanping/finance/financeEval/create/Create.vue'),
-            meta: {
-              title: '财务评价-创建',
-              module: 'yanping',
-              sidebar: 'yanping-finance',
-              key: 'create'
-            }
-          },
-          // 2. 项目
-          {
-            path: 'project',
-            name: 'FinanceProject',
-            // 替换为你复制过来的真实组件路径
-            component: () => import('@/views/yanping/finance/financeEval/project/Project.vue'),
-            meta: {
-              title: '财务评价-项目',
-              module: 'yanping',
-              sidebar: 'yanping-finance',
-              key: 'project'
-            }
-          },
-          // 3. 草稿（保持原样占位）
-          {
-            path: 'draft',
-            name: 'FinanceDraft',
-            component: () => import('@/views/yanping/finance/DefaultProject.vue'),
-            meta: {
-              title: '财务评价-草稿',
-              module: 'yanping',
-              sidebar: 'yanping-finance',
-              key: 'draft'
-            }
-          },
-          {
-            path: 'default-project',
-            name: 'FinanceDefaultProject',
-            component: () => import('@/views/yanping/finance/DefaultProject.vue'),
-            meta: {
-              title: '财务评价-项目',
-              module: 'yanping',
-              sidebar: 'yanping-finance',
-              key: 'default-project'
-            }
-          },
-          // ========== 下面是子页面（不在左侧菜单显示，但需保留防止 404） ==========
-          // 项目预览
-          {
-            path: 'preview',
-            name: 'FinancePreview',
-            component: () => import('@/views/yanping/finance/financeEval/preview/FinancePreview.vue'),
-            meta: {
-              title: '财务评价-项目预览',
-              module: 'yanping',
-              sidebar: 'yanping-finance',
-              key: 'project' // 强制左侧菜单高亮“项目”
-            }
-          }
+          { path: 'home', redirect: '/yanping' },
+          { path: 'create', name: 'FinanceCreate', component: () => import('@/views/yanping/finance/financeEval/create/Create.vue'), meta: { title: '财务评价-创建', module: 'yanping', sidebar: 'yanping-finance', key: 'create' } },
+          { path: 'project', name: 'FinanceProject', component: () => import('@/views/yanping/finance/financeEval/project/Project.vue'), meta: { title: '财务评价-项目', module: 'yanping', sidebar: 'yanping-finance', key: 'project' } },
+          { path: 'draft', name: 'FinanceDraft', component: () => import('@/views/yanping/finance/DefaultProject.vue'), meta: { title: '财务评价-草稿', module: 'yanping', sidebar: 'yanping-finance', key: 'draft' } },
+          { path: 'default-project', name: 'FinanceDefaultProject', component: () => import('@/views/yanping/finance/DefaultProject.vue'), meta: { title: '财务评价-项目', module: 'yanping', sidebar: 'yanping-finance', key: 'default-project' } },
+          { path: 'preview', name: 'FinancePreview', component: () => import('@/views/yanping/finance/financeEval/preview/FinancePreview.vue'), meta: { title: '财务评价-项目预览', module: 'yanping', sidebar: 'yanping-finance', key: 'project' } }
         ]
       }
     ]
   },
 
   // ─────────────────────────────────────────────
-  // 湖仓汇源
-  // ─────────────────────────────────────────────
-    // ─────────────────────────────────────────────
-  // 湖仓汇源
+  // 湖仓汇源 (地址采用 hucang，文件全部对应 commonDataManage)
   // ─────────────────────────────────────────────
   {
     path: '/hucang',
     component: MainLayout,
-    redirect: '/hucang/weather/list', // 默认进第一个菜单「气象」
+    redirect: '/hucang/weather/list',
     children: [
-      // ─────────────────────────────────────────
-      // 1. 气象（新建，先占位）
-      // ─────────────────────────────────────────
-      // router 中 /hucang/weather 这一段
-{
-  path: 'weather',
-  redirect: '/hucang/weather/list',
-  children: [
-    {
-      path: 'list',
-      name: 'HucangWeatherList',
-      // 👇 改为新建的主页面
-      component: () => import('@/views/hucang/commonDataManage/weatherData/index.vue'),
-      meta: {
-        title: '气象数据库',
-        module: 'hucang',
-        sidebar: 'hucang',
-        key: 'weather'
-      }
-    }
-  ]
-},
+      // 1. 气象
+      {
+        path: 'weather',
+        redirect: '/hucang/weather/list',
+        children: [
+          { path: 'list', name: 'HucangWeatherList', component: () => import('@/views/hucang/commonDataManage/weatherData/index.vue'), meta: { title: '气象数据库', module: 'hucang', sidebar: 'hucang', key: 'weather' } }
+        ]
+      },
 
-      // ─────────────────────────────────────────
-      // 2. 气候
-      // ─────────────────────────────────────────
+      // 2. 气候 (对应旧项目 /climate/list)
       {
         path: 'climate',
         redirect: '/hucang/climate/list',
         children: [
-          {
-            path: 'list',
-            name: 'HucangClimateList',
-            component: () => import('@/views/hucang/commonDataManage/climateDataBase/climateList.vue'),
-            meta: {
-              title: '气候数据库',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'climate'
-            }
-          },
-          {
-            path: 'edit',
-            name: 'HucangClimateEdit',
-            component: () => import('@/views/hucang/commonDataManage/climateDataBase/addClimate.vue'),
-            meta: {
-              title: '新增数据',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'climate'
-            }
-          },
-          {
-            path: 'detail',
-            name: 'HucangClimateDetail',
-            component: () => import('@/views/hucang/commonDataManage/climateDataBase/climateDetail.vue'),
-            meta: {
-              title: '数据详情',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'climate'
-            }
-          }
+          { path: 'list', name: 'HucangClimateList', component: () => import('@/views/hucang/commonDataManage/climateDataBase/climateList.vue'), meta: { title: '气候数据库', module: 'hucang', sidebar: 'hucang', key: 'climate' } },
+          { path: 'edit', name: 'HucangClimateEdit', component: () => import('@/views/hucang/commonDataManage/climateDataBase/addClimate.vue'), meta: { title: '新增数据', module: 'hucang', sidebar: 'hucang', key: 'climate' } },
+          { path: 'detail', name: 'HucangClimateDetail', component: () => import('@/views/hucang/commonDataManage/climateDataBase/climateDetail.vue'), meta: { title: '数据详情', module: 'hucang', sidebar: 'hucang', key: 'climate' } }
         ]
       },
 
-      // ─────────────────────────────────────────
-      // 3. 测风塔
-      // ─────────────────────────────────────────
+      // 3. 测风塔 (对应旧项目 /windTower/list)
       {
-        path: 'windtower',
-        redirect: '/hucang/windtower/list',
+        path: 'windTower',
+        redirect: '/hucang/windTower/list',
         children: [
-          {
-            path: 'list',
-            name: 'HucangWindTowerList',
-            component: () => import('@/views/hucang/commonDataManage/windTowerDatabase/windTowerList.vue'),
-            meta: {
-              title: '测风塔数据库列表',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'windtower'
-            }
-          },
-          {
-            path: 'detail',
-            name: 'HucangWindTowerDetail',
-            component: () => import('@/views/hucang/commonDataManage/windTowerDatabase/windTowerDetail.vue'),
-            meta: {
-              title: '测风塔数据库详情',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'windtower'
-            }
-          }
+          { path: 'list', name: 'HucangWindTowerList', component: () => import('@/views/hucang/commonDataManage/windTowerDatabase/windTowerList.vue'), meta: { title: '测风塔数据库列表', module: 'hucang', sidebar: 'hucang', key: 'windTower' } },
+          { path: 'detail', name: 'HucangWindTowerDetail', component: () => import('@/views/hucang/commonDataManage/windTowerDatabase/windTowerDetail.vue'), meta: { title: '测风塔数据库详情', module: 'hucang', sidebar: 'hucang', key: 'windTower' } }
         ]
       },
 
-      // ─────────────────────────────────────────
-      // 4. 地质（带子菜单：地勘数据库 / 地形数据 / 公共数据）
-      // ─────────────────────────────────────────
+      // 4. 地质 (对应旧项目 /geology/...)
       {
         path: 'geology',
-        redirect: '/hucang/geology/list', // 默认进「地勘数据库」
+        redirect: '/hucang/geology/list',
         children: [
-          // 子菜单 1：地勘数据库
-          {
-            path: 'list',
-            name: 'HucangGeologyList',
-            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyHome.vue'),
-            meta: {
-              title: '地勘数据库',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'geology-survey'
-            }
-          },
-          // 子菜单 2：地形数据
-          {
-            path: 'geography',
-            name: 'HucangGeographyManage',
-            component: () => import('@/views/hucang/commonDataManage/geologyData/geographyManage.vue'),
-            meta: {
-              title: '地形数据',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'geology-terrain'
-            }
-          },
-          // 子菜单 3：公共数据（新建，先占位）
-          {
-            path: 'common',
-            name: 'HucangGeologyCommon',
-            component: () => import('@/views/hucang/ComingSoon.vue'),
-            meta: {
-              title: '公共数据',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'geology-common'
-            }
-          },
-          // ===== 以下为地勘数据库的子页面（不在菜单显示，高亮归到地勘数据库）=====
-          {
-            path: 'import',
-            name: 'GeologyDataImport',
-            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyImport.vue'),
-            meta: {
-              title: '地质数据导入',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'geology-survey'
-            }
-          },
-          {
-            path: 'detail',
-            name: 'HucangGeologyDetail',
-            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyDetail.vue'),
-            meta: {
-              title: '地质数据库数据详情',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'geology-survey'
-            }
-          },
-          {
-            path: 'edit',
-            name: 'HucangGeologyEdit',
-            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyEdit.vue'),
-            meta: {
-              title: '地质数据库数据管理',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'geology-survey'
-            }
-          },
-          {
-            path: 'linkage',
-            name: 'HucangGeologyLinkage',
-            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyLinkage.vue'),
-            meta: {
-              title: '项目关联信息',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'geology-survey'
-            }
-          },
-          {
-            path: 'map',
-            name: 'HucangGeologyMap',
-            component: () => import('@/views/hucang/commonDataManage/geologyData/geologyMap.vue'),
-            meta: {
-              title: '地质数据管理',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'geology-survey'
-            }
-          }
+          { path: 'list', name: 'HucangGeologyList', component: () => import('@/views/hucang/commonDataManage/geologyData/geologyHome.vue'), meta: { title: '地质数据库', module: 'hucang', sidebar: 'hucang', key: 'geology-list' } },
+          { path: 'geography', name: 'HucangGeographyManage', component: () => import('@/views/hucang/commonDataManage/geologyData/geographyManage.vue'), meta: { title: '地形数据', module: 'hucang', sidebar: 'hucang', key: 'geology-list' } },
+          { path: 'import', name: 'GeologyDataImport', component: () => import('@/views/hucang/commonDataManage/geologyData/geologyImport.vue'), meta: { title: '地质数据导入', module: 'hucang', sidebar: 'hucang', key: 'geology-list' } },
+          { path: 'detail', name: 'HucangGeologyDetail', component: () => import('@/views/hucang/commonDataManage/geologyData/geologyDetail.vue'), meta: { title: '地质数据库数据详情', module: 'hucang', sidebar: 'hucang', key: 'geology-list' } },
+          { path: 'edit', name: 'HucangGeologyEdit', component: () => import('@/views/hucang/commonDataManage/geologyData/geologyEdit.vue'), meta: { title: '地质数据库数据管理', module: 'hucang', sidebar: 'hucang', key: 'geology-list' } },
+          { path: 'linkage', name: 'HucangGeologyLinkage', component: () => import('@/views/hucang/commonDataManage/geologyData/geologyLinkage.vue'), meta: { title: '项目关联信息', module: 'hucang', sidebar: 'hucang', key: 'geology-list' } },
+          { path: 'map', name: 'HucangGeologyMap', component: () => import('@/views/hucang/commonDataManage/geologyData/geologyMap.vue'), meta: { title: '地质数据管理', module: 'hucang', sidebar: 'hucang', key: 'geology-list' } }
         ]
       },
 
-      // ─────────────────────────────────────────
-      // 5. 避让区域（占位页）
-      // ─────────────────────────────────────────
+      // 5. 环评 (对应旧项目 /environment/...)
+      {
+        path: 'environment',
+        redirect: '/hucang/environment/list',
+        children: [
+          { path: 'list', name: 'HucangEnvironmentList', component: () => import('@/views/hucang/commonDataManage/environmentalDatabase/EnvironmentDatabase.vue'), meta: { title: '环评数据库管理', module: 'hucang', sidebar: 'hucang', key: 'environment-list' } },
+          { path: 'add', name: 'HucangEnvironmentAdd', component: () => import('@/views/hucang/commonDataManage/environmentalDatabase/AddEnvironment.vue'), meta: { title: '新增环评数据', module: 'hucang', sidebar: 'hucang', key: 'environment-list' } },
+          { path: 'detail', name: 'HucangEnvironmentDetail', component: () => import('@/views/hucang/commonDataManage/environmentalDatabase/EnvironmentDetail.vue'), meta: { title: '环评数据详情', module: 'hucang', sidebar: 'hucang', key: 'environment-list' } }
+        ]
+      },
+
+      // 6. 水保 (对应旧项目 /waterConservayion/...)
+      {
+        path: 'waterConservayion',
+        redirect: '/hucang/waterConservayion/list',
+        children: [
+          { path: 'list', name: 'HucangWaterList', component: () => import('@/views/hucang/commonDataManage/waterConservationDatabase/WaterConservation.vue'), meta: { title: '水保数据库列表', module: 'hucang', sidebar: 'hucang', key: 'water-list' } },
+          { path: 'add', name: 'HucangWaterAdd', component: () => import('@/views/hucang/commonDataManage/waterConservationDatabase/AddWaterConservation.vue'), meta: { title: '水保数据库新增', module: 'hucang', sidebar: 'hucang', key: 'water-list' } },
+          { path: 'detail', name: 'HucangWaterDetail', component: () => import('@/views/hucang/commonDataManage/waterConservationDatabase/WaterConservationDetail.vue'), meta: { title: '水保数据库详情', module: 'hucang', sidebar: 'hucang', key: 'water-list' } }
+        ]
+      },
+
+      // 7. 避让区域
       {
         path: 'avoidzone',
         name: 'HucangAvoidZone',
         component: () => import('@/views/hucang/ComingSoon.vue'),
-        meta: {
-          title: '避让区域',
-          module: 'hucang',
-          sidebar: 'hucang',
-          key: 'avoidzone'
-        }
+        meta: { title: '避让区域', module: 'hucang', sidebar: 'hucang', key: 'avoidzone' }
       },
 
-      // ─────────────────────────────────────────
-      // 6. 电网
-      // ─────────────────────────────────────────
+      // 8. 电网 (对应旧项目 /currentPower/...)
       {
-        path: 'grid',
-        redirect: '/hucang/grid/list',
+        path: 'currentPower',
+        redirect: '/hucang/currentPower/list',
         children: [
-          {
-            path: 'list',
-            name: 'HucangGridList',
-            component: () => import('@/views/hucang/commonDataManage/currentPower/CurrentPower.vue'),
-            meta: {
-              title: '电网现状数据库',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'grid'
-            }
-          },
-          {
-            path: 'add',
-            name: 'HucangGridAdd',
-            component: () => import('@/views/hucang/commonDataManage/currentPower/AddCurrentPower.vue'),
-            meta: {
-              title: '电网现状数据管理',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'grid'
-            }
-          },
-          {
-            path: 'detail',
-            name: 'HucangGridDetail',
-            component: () => import('@/views/hucang/commonDataManage/currentPower/CurrentPowerDetail.vue'),
-            meta: {
-              title: '电网数据详情',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'grid'
-            }
-          }
+          { path: 'list', name: 'HucangGridList', component: () => import('@/views/hucang/commonDataManage/currentPower/CurrentPower.vue'), meta: { title: '电网现状数据库', module: 'hucang', sidebar: 'hucang', key: 'currentPower' } },
+          { path: 'add', name: 'HucangGridAdd', component: () => import('@/views/hucang/commonDataManage/currentPower/AddCurrentPower.vue'), meta: { title: '电网现状数据管理', module: 'hucang', sidebar: 'hucang', key: 'currentPower' } },
+          { path: 'detail', name: 'HucangGridDetail', component: () => import('@/views/hucang/commonDataManage/currentPower/CurrentPowerDetail.vue'), meta: { title: '电网数据详情', module: 'hucang', sidebar: 'hucang', key: 'currentPower' } }
         ]
       },
 
-      // ─────────────────────────────────────────
-      // 7. 设备（带子菜单：风机库 / 光伏库 / 逆变设备）
-      // ─────────────────────────────────────────
+      // 9. 风电设备 (对应旧项目 /windEquipment/...)
       {
-        path: 'equipment',
-        redirect: '/hucang/equipment/list', // 默认进「风机库」
+        path: 'windEquipment',
+        redirect: '/hucang/windEquipment/list',
         children: [
-          // 子菜单 1：风机库
-          {
-            path: 'list',
-            name: 'HucangEquipmentList',
-            component: () => import('@/views/hucang/commonDataManage/windPowerEquipment/WindPowerEquipmentList.vue'),
-            meta: {
-              title: '风机库',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'equipment-wind'
-            }
-          },
-          // 子菜单 2：光伏库（新建，先占位）
-          {
-            path: 'pv',
-            name: 'HucangEquipmentPv',
-            component: () => import('@/views/hucang/ComingSoon.vue'),
-            meta: {
-              title: '光伏库',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'equipment-pv'
-            }
-          },
-          // 子菜单 3：逆变设备（新建，先占位）
-          {
-            path: 'inverter',
-            name: 'HucangEquipmentInverter',
-            component: () => import('@/views/hucang/ComingSoon.vue'),
-            meta: {
-              title: '逆变设备',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'equipment-inverter'
-            }
-          },
-          // ===== 以下为风机库的子页面（不在菜单显示，高亮归到风机库）=====
-          {
-            path: 'detail',
-            name: 'HucangEquipmentDetail',
-            component: () => import('@/views/hucang/commonDataManage/windPowerEquipment/detail/Detail.vue'),
-            meta: {
-              title: '设备详情',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'equipment-wind'
-            }
-          },
-          {
-            path: 'add',
-            name: 'HucangEquipmentAdd',
-            component: () => import('@/views/hucang/commonDataManage/windPowerEquipment/addWindDevice.vue'),
-            meta: {
-              title: '新增设备',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'equipment-wind'
-            }
-          }
+          { path: 'list', name: 'HucangEquipmentList', component: () => import('@/views/hucang/commonDataManage/windPowerEquipment/WindPowerEquipmentList.vue'), meta: { title: '风电设备库', module: 'hucang', sidebar: 'hucang', key: 'equipment-wind' } },
+          { path: 'detail', name: 'HucangEquipmentDetail', component: () => import('@/views/hucang/commonDataManage/windPowerEquipment/detail/Detail.vue'), meta: { title: '设备详情', module: 'hucang', sidebar: 'hucang', key: 'equipment-wind' } },
+          { path: 'add', name: 'HucangEquipmentAdd', component: () => import('@/views/hucang/commonDataManage/windPowerEquipment/addWindDevice.vue'), meta: { title: '新增设备', module: 'hucang', sidebar: 'hucang', key: 'equipment-wind' } }
         ]
       },
 
-      // ─────────────────────────────────────────
-      // 8. 造价（原「价格」改名，path/key 保持不动）
-      // ─────────────────────────────────────────
+      // 10. 光伏组件 (对应旧项目 /photovoltaic/...)
       {
-        path: 'price',
-        redirect: '/hucang/price/list',
+        path: 'photovoltaic',
+        redirect: '/hucang/photovoltaic/list',
         children: [
-          {
-            path: 'list',
-            name: 'HucangPriceList',
-            component: () => import('@/views/hucang/commonDataManage/costLibrary/components/costLibraryList.vue'),
-            meta: {
-              title: '造价数据',
-              module: 'hucang',
-              sidebar: 'hucang',
-              key: 'price'
-            }
-          }
+          { path: 'list', name: 'HucangPhotovoltaicList', component: () => import('@/views/hucang/commonDataManage/photovoltaicEquipmentManage/photovoltaicEquipmentList.vue'), meta: { title: '光伏组件设备库', module: 'hucang', sidebar: 'hucang', key: 'equipment-pv' } },
+          { path: 'detail', name: 'HucangPhotovoltaicDetail', component: () => import('@/views/hucang/commonDataManage/photovoltaicEquipmentManage/photovoltaicDetail.vue'), meta: { title: '光伏组件设备库详情', module: 'hucang', sidebar: 'hucang', key: 'equipment-pv' } }
+        ]
+      },
+
+      // 11. 逆变器 (对应旧项目 /inverter/...)
+      {
+        path: 'inverter',
+        redirect: '/hucang/inverter/list',
+        children: [
+          { path: 'list', name: 'HucangInverterList', component: () => import('@/views/hucang/commonDataManage/inverterManage/inverterList.vue'), meta: { title: '逆变器设备库', module: 'hucang', sidebar: 'hucang', key: 'equipment-inverter' } },
+          { path: 'detail', name: 'HucangInverterDetail', component: () => import('@/views/hucang/commonDataManage/inverterManage/inverterDetail.vue'), meta: { title: '逆变器设备详情', module: 'hucang', sidebar: 'hucang', key: 'equipment-inverter' } }
+        ]
+      },
+
+      // 12. 造价 (对应旧项目 /costLibrary/...)
+      {
+        path: 'costLibrary',
+        redirect: '/hucang/costLibrary/list',
+        children: [
+          { path: 'list', name: 'HucangCostList', component: () => import('@/views/hucang/commonDataManage/costLibrary/components/costLibraryList.vue'), meta: { title: '造价数据', module: 'hucang', sidebar: 'hucang', key: 'costLibrary' } }
         ]
       }
     ]
   },
 
-   // ─────────────────────────────────────────────
+  // ─────────────────────────────────────────────
   // 规制中枢
   // ─────────────────────────────────────────────
   {
@@ -711,65 +218,19 @@ const routes = [
     component: MainLayout,
     redirect: '/guizhi/role',
     children: [
-      {
-        path: 'role',
-        name: 'RoleManage',
-        component: () => import('@/views/guizhi/RolePage.vue'),
-        meta: {
-          title: '角色管理',
-          module: 'guizhi',
-          sidebar: 'guizhi', // 👈 必须有这个，侧边栏才会显示
-          key: 'role'         // 👈 必须有这个，侧边栏对应的菜单才会高亮
-        }
-      },
-      // 如果你后续加了字典、企业介绍、日志，也要加上上面这两个 meta 字段
-      {
-        path: 'dict',
-        name: 'DictManage',
-        component: () => import('@/views/guizhi/DictPage.vue'),
-        meta: {
-          title: '字典管理',
-          module: 'guizhi',
-          sidebar: 'guizhi',
-          key: 'dict'
-        }
-      },
-      {
-        path: 'company',
-        name: 'CompanyIntro',
-        component: () => import('@/views/guizhi/CompanyIntro.vue'),
-        meta: {
-          title: '企业介绍',
-          module: 'guizhi',
-          sidebar: 'guizhi',
-          key: 'company'
-        }
-      },
-      {
-        path: 'log',
-        name: 'LogManage',
-        component: () => import('@/views/guizhi/LogPage.vue'),
-        meta: {
-          title: '日志管理',
-          module: 'guizhi',
-          sidebar: 'guizhi',
-          key: 'log'
-        }
-      }
+      { path: 'role', name: 'RoleManage', component: () => import('@/views/guizhi/RolePage.vue'), meta: { title: '角色管理', module: 'guizhi', sidebar: 'guizhi', key: 'role' } },
+      { path: 'dict', name: 'DictManage', component: () => import('@/views/guizhi/DictPage.vue'), meta: { title: '字典管理', module: 'guizhi', sidebar: 'guizhi', key: 'dict' } },
+      { path: 'company', name: 'CompanyIntro', component: () => import('@/views/guizhi/CompanyIntro.vue'), meta: { title: '企业介绍', module: 'guizhi', sidebar: 'guizhi', key: 'company' } },
+      { path: 'log', name: 'LogManage', component: () => import('@/views/guizhi/LogPage.vue'), meta: { title: '日志管理', module: 'guizhi', sidebar: 'guizhi', key: 'log' } }
     ]
   },
 
-  // ─────────────────────────────────────────────
   // 404
-  // ─────────────────────────────────────────────
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/views/NotFound.vue'),
-    meta: {
-      title: '页面不存在',
-      public: true
-    }
+    meta: { title: '页面不存在', public: true }
   }
 ]
 
@@ -777,47 +238,22 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior: () => ({
-    top: 0
-  })
+  scrollBehavior: () => ({ top: 0 })
 })
 
 // 全局路由守卫
 router.beforeEach((to) => {
-  // 设置页面标题
-  document.title = to.meta.title
-    ? `${to.meta.title} - 新能源项目前期工作AI平台`
-    : '新能源项目前期工作AI平台'
-
+  document.title = to.meta.title ? `${to.meta.title} - 新能源项目前期工作AI平台` : '新能源项目前期工作AI平台'
   const token = sessionStorage.getItem('accessToken')
-
-  // 已登录用户再次访问登录页时，直接回到目标页面或默认首页。
   if (to.name === 'Login' && token) {
     const redirect = to.query.redirect
-    const safeRedirect =
-      typeof redirect === 'string' &&
-      redirect.startsWith('/') &&
-      !redirect.startsWith('//')
-        ? redirect
-        : '/overview'
-
+    const safeRedirect = typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/overview'
     return safeRedirect
   }
-
-  // 公开页面直接放行
-  if (to.meta.public) {
-    return true
-  }
-
+  if (to.meta.public) return true
   if (!token) {
-    return {
-      path: '/login',
-      query: {
-        redirect: to.fullPath
-      }
-    }
+    return { path: '/login', query: { redirect: to.fullPath } }
   }
-
   return true
 })
 

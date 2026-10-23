@@ -9,9 +9,9 @@
 
       <div class="page-content" :class="{ 'no-sidebar': !hasSidebar || isFullScreen }">
         <RouterView v-slot="{ Component, route }">
-          <Transition name="fade" mode="out-in">
+          <!-- <Transition name="fade" mode="out-in"> -->
             <component :is="Component" :key="route.fullPath" />
-          </Transition>
+          <!-- </Transition> -->
         </RouterView>
       </div>
     </div>

@@ -1,44 +1,63 @@
 <template>
-    <div class="geology-database-component">
-        <div class="fixed-group">
-            <el-button type="primary" @click="addGeology">
-                <iconpark-icon name="xinzeng"></iconpark-icon>
-                新增地质数据
-            </el-button>
-        </div>
-        <div class="user-tabs">
-            <ul class="user-tabs-ul">
-                <li
-                    class="user-tabs-li"
-                    @click="chooseTabs(2)"
-                    :class="activeKey == 2 ? 'active' : ''"
-                    >用户数据</li
-                >
-                <li
-                    class="user-tabs-li"
-                    @click="chooseTabs(1)"
-                    :class="activeKey == 1 ? 'active' : ''"
-                    >公共数据</li
-                >
-            </ul>
-        </div>
-        <searchCommon
-            ref="searchCommonRef"
-            @viewType="getViewType"
-            @handleSearchCommon="handleSearchEvent"
-            @resetSearchCommon="resetSearchEvent"
-            :activeKey="activeKey"
-        ></searchCommon>
-        <geologyMap :dataSource="dataForMap" v-if="viewTypes == 1"></geologyMap>
+    <!-- 唯一根节点 -->
+    <div class="geology-home-root">
+        <div class="geology-page-bg">
+            <!-- 背景光晕层 -->
+            <div class="bg-glow-top-left"></div>
+            <div class="bg-glow-bottom-right"></div>
+            <div class="bg-glow-top-right"></div>
 
-        <geologyList
-            ref="geologyListRef"
-            :dataSource="dataForList"
-            :activeKey="activeKey"
-            :totalNum="totalNum"
-            @reGetListData="onInitAreaListData()"
-            v-if="viewTypes == 2"
-        ></geologyList>
+            <!-- 顶部 Header：左标题，右新增按钮 -->
+            <div class="page-header">
+                <span class="page-title">地质数据库</span>
+                <el-button type="primary" class="add-btn" @click="addGeology">
+                    <iconpark-icon name="xinzeng"></iconpark-icon>
+                    新增地质数据
+                </el-button>
+            </div>
+
+            <!-- 主卡片：Tab + 搜索 + 列表 / 地图，整体白底 -->
+            <div class="main-card">
+                <!-- 数据来源 Tab -->
+                <div class="geo-tabs">
+                    <ul class="geo-tabs-list">
+                        <li
+                            class="geo-tab"
+                            :class="{ active: activeKey == 2 }"
+                            @click="chooseTabs(2)"
+                        >用户数据</li>
+                        <li
+                            class="geo-tab"
+                            :class="{ active: activeKey == 1 }"
+                            @click="chooseTabs(1)"
+                        >公共数据</li>
+                    </ul>
+                </div>
+
+                <div class="filter-bar">
+                    <searchCommon
+                        ref="searchCommonRef"
+                        @viewType="getViewType"
+                        @handleSearchCommon="handleSearchEvent"
+                        @resetSearchCommon="resetSearchEvent"
+                        :activeKey="activeKey"
+                    ></searchCommon>
+                </div>
+
+                <div class="table-wrapper" :class="{ 'is-map': viewTypes == 1 }">
+                    <geologyMap :dataSource="dataForMap" v-if="viewTypes == 1"></geologyMap>
+
+                    <geologyList
+                        ref="geologyListRef"
+                        :dataSource="dataForList"
+                        :activeKey="activeKey"
+                        :totalNum="totalNum"
+                        @reGetListData="onInitAreaListData()"
+                        v-if="viewTypes == 2"
+                    ></geologyList>
+                </div>
+            </div>
+        </div>
 
         <el-dialog
             v-model="dataTypeDialogVisible"
@@ -66,11 +85,7 @@
         </el-dialog>
     </div>
 </template>
-<style scoped lang="scss">
-  @use './css/index.scss';
-    @use '@/assets/css/tabs.scss';
-    @use '@/assets/css/fixedGroup.scss';
-</style>
+
 <script>
 export default {name: "geologyList"}
 </script>
@@ -159,7 +174,7 @@ export default {name: "geologyList"}
     })
     onBeforeUnmount(() => {
         deletMitt()
-    }),
+    });
     onDeactivated(()=> {
         deletMitt()
     })
@@ -220,10 +235,193 @@ export default {name: "geologyList"}
         nextTick(() => onInitAreaListData());
     };
     // 重置搜索
-    const resetSearchEvent = () => {};
+    const resetSearchEvent = () => {
+        searchCont.value = undefined;
+        if (geologyListRef.value?.page) {
+            geologyListRef.value.page.current = 1;
+        }
+        nextTick(() => onInitAreaListData());
+    };
 </script>
 
 <style scoped lang="scss">
+    @use './css/index.scss';
+
+    .geology-home-root {
+        width: 100%;
+        height: 100%;
+    }
+
+    /* 外层容器：纵向 flex，撑满父级 */
+    .geology-page-bg {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(122.01deg, #E6EEF8 0%, #D2E0F4 100%), #FFFFFF;
+        overflow: hidden;
+    }
+
+    /* ========== 背景光晕层 ========== */
+    .bg-glow-top-left {
+        position: absolute;
+        left: -1.61%;
+        top: -18.52%;
+        width: 350px;
+        height: 350px;
+        background: linear-gradient(135deg, #FFCCD5 0%, #FECFEF 100%);
+        opacity: 0.49;
+        filter: blur(129.5px);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 1;
+    }
+    .bg-glow-bottom-right {
+        position: absolute;
+        right: 4.64%;
+        bottom: -18.13%;
+        width: 450px;
+        height: 450px;
+        background: linear-gradient(120deg, #A1C4FD 0%, #C2E9FB 100%);
+        opacity: 0.7;
+        filter: blur(123px);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 1;
+    }
+    .bg-glow-top-right {
+        position: absolute;
+        right: 19.01%;
+        top: -37.04%;
+        width: 300px;
+        height: 300px;
+        background: linear-gradient(120deg, #A1C4FD 0%, #C2E9FB 100%);
+        opacity: 0.7;
+        filter: blur(123px);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    /* ========== 顶部 Header ========== */
+    .page-header {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 67px;
+        padding: 15px 20px;
+        box-sizing: border-box;
+        flex-shrink: 0;
+        border-bottom: 1px solid #E2E9F0;
+    }
+    .page-title {
+        font-family: 'PingFang SC';
+        font-weight: 500;
+        font-size: 16px;
+        color: #0B1C2C;
+    }
+    .add-btn {
+        --el-button-bg-color: #0278E7;
+        --el-button-border-color: #0278E7;
+        --el-button-hover-bg-color: #0267C7;
+        --el-button-hover-border-color: #0267C7;
+        --el-button-active-bg-color: #0267C7;
+        --el-button-active-border-color: #0267C7;
+        height: 36px;
+        padding: 0 16px;
+        border-radius: 8px;
+        font-size: 13px;
+    }
+
+    /* ========== 主卡片 ========== */
+    .main-card {
+        position: relative;
+        z-index: 2;
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        margin: 0 12px 30px;        /* 底部 30px 留白 */
+        background: #FFFFFF;
+        border: 1px solid #DFE5EC;
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(11, 28, 44, 0.04);
+        overflow: hidden;
+    }
+
+    /* 数据来源 Tab */
+    .geo-tabs {
+        flex-shrink: 0;
+        padding: 0 20px;
+        border-bottom: 1px solid #E2E9F0;
+    }
+    .geo-tabs-list {
+        display: flex;
+        align-items: center;
+        gap: 32px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+    .geo-tab {
+        position: relative;
+        height: 48px;
+        line-height: 48px;
+        font-size: 14px;
+        color: #667383;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: color 0.15s ease;
+
+        &:hover {
+            color: #0B1C2C;
+        }
+        &.active {
+            color: #0278E7;
+            font-weight: 500;
+
+            &::after {
+                content: '';
+                position: absolute;
+                left: 0;
+                right: 0;
+                bottom: -1px;
+                height: 2px;
+                border-radius: 2px;
+                background: #0278E7;
+            }
+        }
+    }
+
+    .filter-bar {
+        flex-shrink: 0;
+        background: #FFFFFF;
+    }
+
+    .table-wrapper {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 0 20px;
+        box-sizing: border-box;
+        overflow: hidden;
+
+        > * {
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* 地图模式：铺满卡片，不留内边距 */
+        &.is-map {
+            padding: 0;
+        }
+    }
+
+    /* 选择数据类型弹窗 */
     .data-type-options {
         display: flex;
         flex-direction: column;

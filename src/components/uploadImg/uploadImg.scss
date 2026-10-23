@@ -1,0 +1,80 @@
+:deep(.ant-upload-wrapper.ant-upload-picture-card-wrapper .ant-upload.ant-upload-select) {
+    width: 52px;
+    height: 52px;
+    margin: 0;
+    border-radius: 4px;
+    background-color: #f5f6f9;
+}
+:deep(.ant-upload-wrapper.ant-upload-picture-card-wrapper){
+    width: auto;
+    margin-right: 12px;
+}
+.flex-horizontal{
+    position: relative;
+    .file-components{
+        display: flex;
+        flex: 1;
+        .file-item{
+            flex: none;
+            width: 52px;
+            height: 52px;
+            border-radius: 4px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-right: 12px;
+            background-color: rgb(74, 74, 74);
+            img{
+                max-width: 100%;
+                max-height: 100%;
+            }
+            .close-file-item{
+                width: 14px;
+                height: 14px;
+                position: absolute;
+                top: -7px;
+                right: -7px;
+                background: #fff;
+                border-radius: 100%;
+                display: none;
+                cursor: pointer;
+            }
+            &:hover{
+                .close-file-item{
+                    display: block;
+                }
+            }
+        }
+    }
+}
+.filePDF{
+    position: absolute;
+    bottom: 0px;
+    width: 170px;
+    display: flex;
+    align-items: center;
+    .close-file-item{
+        width: 14px;
+        height: 14px;
+        position: absolute;
+        top: -7px;
+        right: -7px;
+        background: #fff;
+        border-radius: 100%;
+        display: none;
+        cursor: pointer;
+    }
+    span{
+        display: inline-block;
+        width: 150px;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+    &:hover{
+        .close-file-item{
+            display: block;
+        }
+    }
+}

@@ -1,4 +1,8 @@
-const THUNDER_TABLE_LIST_CLOUMN = [
+// 统一居中：给每一列补上 align: 'center'。
+// 某一列需要其他对齐时，在该列里单独写 align: 'left' 即可覆盖。
+const centerAll = (columns) => columns.map((col) => ({ align: 'center', ...col }));
+
+const THUNDER_TABLE_LIST_CLOUMN = centerAll([
     {
         title: '所属区域',
         width: 150,
@@ -25,8 +29,8 @@ const THUNDER_TABLE_LIST_CLOUMN = [
         width: 136,
         fixed: 'right',
     },
-];
-const CING_TABLE_LIST_CLOUMN = [
+]);
+const CING_TABLE_LIST_CLOUMN = centerAll([
     {
         title: '所属区域',
         width: 150,
@@ -68,8 +72,8 @@ const CING_TABLE_LIST_CLOUMN = [
         width: 136,
         fixed: 'right',
     },
-];
-const ACID_RAIN_TABLE_LIST_CLOUMN = [
+]);
+const ACID_RAIN_TABLE_LIST_CLOUMN = centerAll([
     {
         title: '所属区域',
         width: 150,
@@ -101,8 +105,8 @@ const ACID_RAIN_TABLE_LIST_CLOUMN = [
         width: 136,
         fixed: 'right',
     },
-];
-const TEMPERATURE_RAIN_TABLE_LIST_CLOUMN = [
+]);
+const TEMPERATURE_RAIN_TABLE_LIST_CLOUMN = centerAll([
     {
         title: '所属区域',
         width: 120,
@@ -159,8 +163,8 @@ const TEMPERATURE_RAIN_TABLE_LIST_CLOUMN = [
         width: 136,
         fixed: 'right',
     },
-];
-const WIND_PRESSURE_TABLE_LIST_CLOUMN = [
+]);
+const WIND_PRESSURE_TABLE_LIST_CLOUMN = centerAll([
     {
         title: '所属区域',
         width: 120,
@@ -197,9 +201,9 @@ const WIND_PRESSURE_TABLE_LIST_CLOUMN = [
         width: 136,
         fixed: 'right',
     }
-]
+]);
 // 雪压
-const SNOW_PRESSURE_TABLE_LIST_CLOUMN =[
+const SNOW_PRESSURE_TABLE_LIST_CLOUMN = centerAll([
     {
         title: '所属区域',
         width: 120,
@@ -236,9 +240,9 @@ const SNOW_PRESSURE_TABLE_LIST_CLOUMN =[
         width: 136,
         fixed: 'right',
     }
-]
+]);
 // 降水
-const RAIN_FALL_TABLE_LIST_CLOUMN =[
+const RAIN_FALL_TABLE_LIST_CLOUMN = centerAll([
     {
         title: '所属区域',
         width: 120,
@@ -265,9 +269,9 @@ const RAIN_FALL_TABLE_LIST_CLOUMN =[
         scopedSlots: 'operation',
         width: 136,
     }
-]
+]);
 // 沙尘暴
-const DUST_STORM_TABLE_LIST_CLOUMN =[
+const DUST_STORM_TABLE_LIST_CLOUMN = centerAll([
     {
         title: '所属区域',
         width: 120,
@@ -294,9 +298,9 @@ const DUST_STORM_TABLE_LIST_CLOUMN =[
         scopedSlots: 'operation',
         width: 136,
     }
-]
+]);
 // 风速
-const WIND_SPEED_TABLE_LIST_CLOUMN = [
+const WIND_SPEED_TABLE_LIST_CLOUMN = centerAll([
     {
         title: '所属区域',
         width: 120,
@@ -327,9 +331,9 @@ const WIND_SPEED_TABLE_LIST_CLOUMN = [
         scopedSlots: 'operation',
         width: 136,
     }
-]
+]);
 // 冰雹
-const HAIL_TABLE_LIST_CLOUMN =[
+const HAIL_TABLE_LIST_CLOUMN = centerAll([
     {
         title: '所属区域',
         width: 120,
@@ -356,7 +360,7 @@ const HAIL_TABLE_LIST_CLOUMN =[
         scopedSlots: 'operation',
         width: 136,
     }
-]
+]);
 export {
     THUNDER_TABLE_LIST_CLOUMN,
     CING_TABLE_LIST_CLOUMN,

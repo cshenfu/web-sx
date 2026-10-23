@@ -1,142 +1,153 @@
 <template>
-    <!-- 外层：带渐变和光晕的容器 -->
-    <div class="climate-page-bg">
-        <!-- 背景光晕层 -->
-        <div class="bg-glow-top-left"></div>
-        <div class="bg-glow-bottom-right"></div>
-        <div class="bg-glow-top-right"></div>
+    <!-- 唯一根节点 -->
+    <div class="climate-list-root">
+        <div class="climate-page-bg">
+            <!-- 背景光晕层 -->
+            <div class="bg-glow-top-left"></div>
+            <div class="bg-glow-bottom-right"></div>
+            <div class="bg-glow-top-right"></div>
 
-        <!-- 内容层 -->
-        <div class="climate-list-content">
-            <div class="climate-content white-card">
-                <searchBar 
-                    ref="climateListRef" 
-                    v-model:modeType="modeType" 
-                    @getModeType="getModeType" 
-                    @addEvent="showAddModal" 
-                    @useFileEvent="showImportFileModal">
-                </searchBar>
-                
-                <climateMap v-if="modeType == 'a'"></climateMap>
-                <List v-if="modeType == 'b'"></List>
+            <!-- 顶部 Header -->
+            <div class="page-header">
+                <span class="page-title">气候数据库</span>
+            </div>
+
+            <!-- 主卡片：从分类 Tab 到表格、分页，整体白底 -->
+            <div class="main-card">
+                <div class="filter-bar">
+                    <searchBar
+                        ref="climateListRef"
+                        v-model:modeType="modeType"
+                        @getModeType="getModeType"
+                        @addEvent="showAddModal"
+                        @useFileEvent="showImportFileModal">
+                    </searchBar>
+                </div>
+
+                <div class="table-wrapper">
+                    <climateMap v-if="modeType == 'a'"></climateMap>
+                    <List v-if="modeType == 'b'"></List>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- 导入数据 -->
-    <import-climate-file v-model:importFileFlg="openAddClimateTipsModal"></import-climate-file>
-    
-    <!-- 新增 -->
-    <tips-modal
-        :width="'490px'"
-        :tipType="'success'"
-        class="tip-content-modal"
-        okText="确定"
-        :openTipsModal.sync="openTipsOpenModal"
-        @handleChangeFileModal="handleChangeOpenModal"
-    >
-        <template #customTitle>{{ tipTitle }}</template>
-        <template #contentBody>
-            <div class="tuning-tip">
-                <!-- <iconpark-icon name="jinggao" size="18" class="success"></iconpark-icon>
-                <span class="tuning-tip-title">{{ contentTip }}</span> -->
-            </div>
-            <a-form
-                :colon="false"
-                class="sort-form"
-                ref="openFormRef"
-                :model="openFormData"
-                labelAlign="left"
-            >
-                <a-form-item
-                    label="数据类型"
-                    name="type"
-                    :rules="[
-                        { required: true, ElMessage: '请输入要新增的数据类型', trigger: 'blur' },
-                    ]"
+        <!-- 导入数据 -->
+        <import-climate-file v-model:importFileFlg="openAddClimateTipsModal"></import-climate-file>
+
+        <!-- 新增 -->
+        <tips-modal
+            :width="'490px'"
+            :tipType="'success'"
+            class="tip-content-modal"
+            okText="确定"
+            v-model:openTipsModal="openTipsOpenModal"
+            @handleChangeFileModal="handleChangeOpenModal"
+        >
+            <template #customTitle>{{ tipTitle }}</template>
+            <template #contentBody>
+                <div class="tuning-tip"></div>
+                <a-form
+                    :colon="false"
+                    class="sort-form"
+                    ref="openFormRef"
+                    :model="openFormData"
+                    labelAlign="left"
                 >
-                    <a-radio-group v-model:value="openFormData.type" :options="PLAIN_OPTIONS" name="radioGroup" />
-                </a-form-item>
-            </a-form>
-        </template>
-    </tips-modal>
+                    <a-form-item
+                        label="数据类型"
+                        name="type"
+                        :rules="[
+                            { required: true, message: '请输入要新增的数据类型', trigger: 'blur' },
+                        ]"
+                    >
+                        <a-radio-group v-model:value="openFormData.type" :options="PLAIN_OPTIONS" name="radioGroup" />
+                    </a-form-item>
+                </a-form>
+            </template>
+        </tips-modal>
+    </div>
 </template>
 
 <script setup>
     import List from './components/allList.vue';
     import searchBar from './components/searchBar.vue';
     import climateMap from './climateMap.vue';
-    import { ref, reactive,onBeforeMount, onMounted,onUnmounted, computed, watch, nextTick } from 'vue';
+    import { ref, reactive, onBeforeMount, onMounted, onUnmounted } from 'vue';
     import { useRouter } from 'vue-router';
     import TipsModal from '@/components/tipsDialog/TipsModal.vue';
-    import { trigger } from '@vue/reactivity';
     import ImportClimateFile from './components/ImportClimateFile.vue';
-    import {PLAIN_OPTIONS} from './climateDataBase'
-    const modeType = ref('');
-    const climateListRef = ref(null)
-    
-    onMounted(()=> {
-        modeType.value = climateListRef.value.searchKey.modeType
-    })
-    // 获取模式
-    const getModeType=(val)=> {
-        // modeType.value = val;
-    }
+    import { PLAIN_OPTIONS } from './climateDataBase';
+
     const router = useRouter();
-    // 新增导入
-    const openAddClimateTipsModal = ref(false);
-    // 关闭导入数据
-    const handleChangeAddClimateModal = (val) => {
-        console.log('关闭新增', val);
+    const modeType = ref('');
+    const climateListRef = ref(null);
+
+    onMounted(() => {
+        modeType.value = climateListRef.value?.searchKey?.modeType;
+    });
+
+    // 获取模式
+    const getModeType = (val) => {
+        // modeType.value = val;
     };
-    // 显示导入弹窗
+
+    // 导入数据
+    const openAddClimateTipsModal = ref(false);
     const showImportFileModal = () => {
         openAddClimateTipsModal.value = true;
-    }
+    };
 
     // 新增操作
     const openFormRef = ref(null);
-    let tipTitle = ref('');
-    let openTipsOpenModal = ref(false);
-    let openFormData = reactive({
+    const tipTitle = ref('');
+    const openTipsOpenModal = ref(false);
+    const openFormData = reactive({
         type: '1',
     });
+
     // 显示新增弹窗
     const showAddModal = (title) => {
         tipTitle.value = title;
         openTipsOpenModal.value = true;
-    }
+    };
+
     const handleChangeOpenModal = (value) => {
         if (value) {
             router.push({
-                path: '/climate/edit',
+                path: '/hucang/climate/edit',
                 query: {
                     type: openFormData.type,
                 },
             });
-        } 
-        openFormRef.value.resetFields();
+        }
+        openFormRef.value?.resetFields();
         openTipsOpenModal.value = false;
     };
 
     onBeforeMount(() => {
-        sessionStorage.setItem('obsPath','climate/')
+        sessionStorage.setItem('obsPath', 'climate/');
     });
     onUnmounted(() => {
-        sessionStorage.removeItem('obsPath')
-    })
+        sessionStorage.removeItem('obsPath');
+    });
 </script>
 
 <style scoped lang="scss">
   @import '@/assets/css/fixedGroup.scss';
   @import '@/assets/css/tabs.scss';
 
-    /* 外层全屏容器 */
+    .climate-list-root {
+        width: 100%;
+        height: 100%;
+    }
+
+    /* 外层容器：纵向 flex，撑满父级 */
     .climate-page-bg {
         position: relative;
         width: 100%;
         height: 100%;
-        /* 基础浅蓝渐变底色 */
+        display: flex;
+        flex-direction: column;
         background: linear-gradient(122.01deg, #E6EEF8 0%, #D2E0F4 100%), #FFFFFF;
         overflow: hidden;
     }
@@ -182,28 +193,60 @@
         z-index: 1;
     }
 
-    /* 内容层：去掉了原来的 background 白底，留出 padding */
-    .climate-list-content {
+    /* ========== 顶部 Header ========== */
+    .page-header {
         position: relative;
         z-index: 2;
-        padding: 24px;
-        height: 100%;
-        max-height: calc(100vh - 100px);
+        display: flex;
+        align-items: center;
+        height: 67px;
+        padding: 15px 20px;
         box-sizing: border-box;
-        overflow: auto;
-        /* 隐藏滚动条让视觉更干净（可选） */
-        &::-webkit-scrollbar {
-            display: none;
-        }
+        flex-shrink: 0;
+        border-bottom: 1px solid #E2E9F0;
+    }
+    .page-title {
+        font-family: 'PingFang SC';
+        font-weight: 500;
+        font-size: 16px;
+        color: #0B1C2C;
     }
 
-    /* 内容卡片：把搜索栏、列表包裹在一个白底卡片里 */
-    .white-card {
+    /* ========== 主卡片：Tab + 筛选 + 表格 + 分页 同在一张白卡里 ========== */
+    .main-card {
+        position: relative;
+        z-index: 2;
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        margin: 0 12px 30px;          /* 底部 30px 留白 */
         background: #FFFFFF;
-        border-radius: 16px;
-        padding: 24px;
+        border: 1px solid #DFE5EC;
+        border-radius: 12px;
         box-shadow: 0 4px 16px rgba(11, 28, 44, 0.04);
-        min-height: 100%; /* 保证内容较少时也能撑开 */
+        overflow: hidden;
+    }
+
+    /* 搜索栏（含分类 Tab、筛选项、按钮）：白底，内边距由 searchBar 自己控制 */
+    .filter-bar {
+        flex-shrink: 0;
+        background: #FFFFFF;
+    }
+
+    /* 列表 / 地图区域：占满剩余高度，滚动交给 allList 内部，分页固定在底部 */
+    .table-wrapper {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 0 20px;              /* 与 Tab、筛选行左右对齐 */
         box-sizing: border-box;
+        overflow: hidden;
+
+        > * {
+            flex: 1;
+            min-height: 0;
+        }
     }
 </style>

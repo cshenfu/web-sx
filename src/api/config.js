@@ -28,9 +28,10 @@ const requestConfig = {
 };
 
 export function getEnvUrl() {
-    const env = process.env.NODE_ENV;
-
+    // 1. 读取环境，如果拿不到就默认 'development'
+    const env = process.env.NODE_ENV || 'development';
     console.log('config.ts:28 ==> env-->', env);
 
-    return requestConfig[env];
+    // 2. 如果匹配不到，强制返回 development 的配置，防止报错白屏
+    return requestConfig[env] || requestConfig['development'];
 }
