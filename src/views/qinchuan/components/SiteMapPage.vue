@@ -278,7 +278,7 @@ let currentRoadProjectId = null
 const roadDataCache = new Map()
 const roadInFlight = new Map()
 
-const CITY_CLICK_ZOOM_TARGET = 7
+const CITY_CLICK_ZOOM_TARGET = 8.5
 
 const TERRAIN_SOURCE_ID = 'terrain-dem'
 const HILLSHADE_SOURCE_ID = 'hillshade-dem'
