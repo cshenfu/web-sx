@@ -1,0 +1,67 @@
+.global-delete-confirm-box {
+  box-sizing: border-box;
+  width: 470px !important;
+  max-width: calc(100vw - 32px);
+  padding: 0 !important;
+  border: 1px solid #e8e8e8 !important;
+  border-radius: 9px !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12) !important;
+}
+
+.global-delete-confirm-box .el-message-box__header {
+  padding: 24px 28px 0;
+}
+
+.global-delete-confirm-box .el-message-box__title {
+  color: #438fbe;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.global-delete-confirm-box .el-message-box__content {
+  padding: 28px 28px 0;
+}
+
+.global-delete-confirm-question {
+  color: #303133;
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.global-delete-confirm-note {
+  margin-top: 12px;
+  color: #999;
+  font-size: 14px;
+}
+
+.global-delete-confirm-box .el-message-box__btns {
+  justify-content: center;
+  gap: 42px;
+  padding: 28px 28px 22px;
+}
+
+.global-delete-confirm-box .el-message-box__btns .el-button {
+  box-sizing: border-box;
+  width: 122px;
+  height: 42px;
+  margin-left: 0;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+.global-delete-confirm-box .global-delete-confirm-cancel {
+  color: #fff;
+  background: #bdbdbd;
+  border-color: #bdbdbd;
+}
+
+.global-delete-confirm-box .global-delete-confirm-submit {
+  color: #fff;
+  background: #e60012;
+  border-color: #e60012;
+}
+
+.global-delete-confirm-box .global-delete-confirm-submit:hover {
+  background: #c90010;
+  border-color: #c90010;
+}
