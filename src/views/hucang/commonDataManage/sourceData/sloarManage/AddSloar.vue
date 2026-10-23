@@ -76,7 +76,7 @@
     import { useRoute, useRouter } from 'vue-router';
     import linkage from '@/components/linkage/linkage.vue';
     import CommonAddDataHeader from '@/components/linkage/CommonAddDataHeader.vue';
-    import Upload from '@/components/upload/Upload';
+    import Upload from '@/components/upload/Upload.vue';
     import Ckeditor from '@/components/editor/Editor.vue';
     import { addSolarEnergy,getSolarEnergyDetail,updateSolarEnergy } from '@/api/modules/sourceData/sloarManage';
     import { ElMessage } from 'element-plus'
