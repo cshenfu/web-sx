@@ -240,6 +240,8 @@ import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
 import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPanelConfig'
 import { attachSxLayers } from '@/components/site-map/attachSxLayers'
 import { addGradientExtrusion } from '@/utils/gradientExtrusion'
+import cityGeoJSONData from '@/assets/js/610000_full.json'
+import shaanxiBoundaryData from '@/assets/js/610000.json'
 // 或相对路径 './gradientExtrusion'
 const props = defineProps({
   stage: { type: String, default: '' },
@@ -265,7 +267,6 @@ const ICON_SIZE_WIND = 0.25
 const ICON_SIZE_BOOSTER = 1
 const CITY_LAYER_ID = 'site-city-stats'
 const PROVINCE_CODE = '610000'
-const CITY_GEOJSON_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/610000_full.json'
 const PROJECT_ICON_LAYER_MAP = { 'wind-farm': ['project-wind-all', 'project-wind-bx-all'], booster: ['project-booster-all'] }
 const SELECTED_ICON_LAYER_IDS = ['project-wind-all', 'project-wind-bx-all', 'project-booster-all']
 const DRAWER_WIDTH = 460
@@ -349,7 +350,8 @@ const customLayerState = reactive({})
 
 const overviewStats = reactive({ totalCapacity: 0, totalCount: 0, windCapacity: 0, windCount: 0, solarCapacity: 0, solarCount: 0 })
 const cityStats = ref([])
-let cityGeoJSONCache = null
+// 原来是 let cityGeoJSONCache = null
+let cityGeoJSONCache = cityGeoJSONData
 
 const editTools = [
   { key: 'area', label: '编辑场区', icon: Location },
@@ -562,9 +564,7 @@ async function fetchCityStats() {
   } catch (err) { console.error('[stats] provinceViewData 失败:', err) }
 }
 async function loadCityGeoJSON() {
-  if (cityGeoJSONCache) return cityGeoJSONCache
-  try { cityGeoJSONCache = await (await fetch(CITY_GEOJSON_URL)).json(); return cityGeoJSONCache }
-  catch (err) { console.error('[city] GeoJSON 加载失败:', err); return null }
+  return cityGeoJSONCache
 }
 async function renderCityStats() {
   if (!mapReady.value || !mapRef.value) return
@@ -584,11 +584,13 @@ function hideCityStats() { mapRef.value?.removeLayer(CITY_LAYER_ID); mapRef.valu
 
 const MASK_LAYER_ID = 'shaanxi-mask'
 const MASK_SOURCE_ID = 'shaanxi-mask-src'
-const SHAANXI_BOUNDARY_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/610000.json'
 const SHAANXI_BOUNDS = [[105.4, 31.7], [111.2, 39.6]]
-let shaanxiBoundaryCache = null
+// 原来是 let shaanxiBoundaryCache = null
+let shaanxiBoundaryCache = shaanxiBoundaryData
 let lastMaskOpacity = -1
-async function loadShaanxiBoundary() { if (shaanxiBoundaryCache) return shaanxiBoundaryCache; shaanxiBoundaryCache = await (await fetch(SHAANXI_BOUNDARY_URL)).json(); return shaanxiBoundaryCache }
+async function loadShaanxiBoundary() {
+  return shaanxiBoundaryCache
+}
 function ensureClosed(ring) { if (!ring || ring.length < 3) return ring; const f = ring[0], l = ring[ring.length - 1]; return (f[0] === l[0] && f[1] === l[1]) ? ring : [...ring, [f[0], f[1]]] }
 function ringSignedArea(ring) { if (!ring || ring.length < 3) return 0; let a = 0; for (let i = 0; i < ring.length - 1; i++) { a += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1] } return a / 2 }
 function ensureOuterCCW(ring) { const r = ensureClosed(ring); return ringSignedArea(r) >= 0 ? r : r.slice().reverse() }
