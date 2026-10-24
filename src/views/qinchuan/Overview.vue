@@ -805,20 +805,28 @@ function toOverviewMapCoordinate(point) {
   return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null
 }
 
-function appendOverviewLineSegments(features, pointRows, sourceType) {
-  if (!Array.isArray(pointRows) || pointRows.length === 0) return
-  const segments = Array.isArray(pointRows[0]) ? pointRows : [pointRows]
-
-  segments.forEach((segment, segmentIndex) => {
-    if (!Array.isArray(segment)) return
-    const coordinates = segment.map(toOverviewMapCoordinate).filter(Boolean)
-    if (coordinates.length < 2) return
-    features.push({
+/**
+ * 把一组点（或点数组的数组）压成 LineString Feature。
+ * - 一维数组：[{lon,lat}, ...] → 一条 LineString
+ * - 二维数组：[[{lon,lat}, ...], ...] → 每条子数组一条 LineString
+ * - 点数 < 2 / 无有效坐标 → 跳过（不加载）
+ */
+function pushOverviewLineFeatures(target, rows, baseProps) {
+  if (!Array.isArray(rows) || rows.length === 0) return 0
+  const groups = Array.isArray(rows[0]) ? rows : [rows]
+  let count = 0
+  groups.forEach((group) => {
+    if (!Array.isArray(group)) return
+    const coords = group.map(toOverviewMapCoordinate).filter(Boolean)
+    if (coords.length < 2) return
+    target.push({
       type: 'Feature',
-      properties: { sourceType, segmentIndex },
-      geometry: { type: 'LineString', coordinates },
+      properties: { ...baseProps },
+      geometry: { type: 'LineString', coordinates: coords },
     })
+    count += 1
   })
+  return count
 }
 
 /** 把接口数据拆成「道路」和「线路」两个 Feature 数组 */
@@ -826,34 +834,34 @@ function buildRoadLineFeatures(data) {
   const roadFeatures = []
   const lineFeatures = []
 
-  // 三种道路来源合并，统一显示为「道路」
+  // 道路：CNKJ / CNXJ / JZXJ 各自数组 → 各自一条线
   const roadMap = data?.roadMap ?? data?.data?.roadMap ?? {}
   for (const type of ['CNKJ', 'CNXJ', 'JZXJ']) {
-    const before = roadFeatures.length
-    appendOverviewLineSegments(roadFeatures, roadMap?.[type]?.roadpoint, type)
-    for (let i = before; i < roadFeatures.length; i += 1) {
-      roadFeatures[i].properties = {
-        ...roadFeatures[i].properties,
-        category: 'road',
-        label: '道路',
-      }
-    }
+    pushOverviewLineFeatures(
+      roadFeatures,
+      roadMap?.[type]?.roadpoint,
+      { category: 'road', sourceType: type, label: '道路' }
+    )
   }
 
-  // 35kV 线路
+  // 线路：每个 loop 的 cablepoletower 数组 → 一条线；无坐标跳过
   const line35Kv = data?.line35Kv ?? data?.data?.line35Kv
   const loops = line35Kv?.line?.loops ?? data?.line?.loops ?? []
   if (Array.isArray(loops)) {
     loops.forEach((loop, loopIndex) => {
-      const before = lineFeatures.length
-      appendOverviewLineSegments(lineFeatures, loop?.cablepoletower, `35kV-${loopIndex}`)
-      for (let i = before; i < lineFeatures.length; i += 1) {
-        lineFeatures[i].properties = {
-          ...lineFeatures[i].properties,
+      const loopName = loop?.loopname || String(loopIndex + 1)
+      pushOverviewLineFeatures(
+        lineFeatures,
+        loop?.cablepoletower,
+        {
           category: 'line',
-          label: loops.length > 1 ? `35kV 线路（${loopIndex + 1}）` : '35kV 线路',
+          loopIndex,
+          loopName,
+          loopLength: loop?.looplength || '',
+          fanCount: Number(loop?.fan) || (loop?.fanidarr?.length ?? 0),
+          label: `35kV 线路 ${loopName}`,
         }
-      }
+      )
     })
   }
 
@@ -884,7 +892,7 @@ function upsertLineLayer(layerId, geojson, paint) {
   map.on('mouseleave', layerId, onLineHoverLeave)
 
   // 保持遮罩在最顶层
-  if (map.getLayer(MASK_LAYER_ID)) map.moveLayer(MASK_LAYER_ID)
+  if (mapRef.value?.hasMaskLayer?.(MASK_LAYER_ID)) mapRef.value.bringMaskToTop(MASK_LAYER_ID)
 }
 
 /** 根据当前可见状态 + 缓存数据，同步道路/线路图层显隐 */
@@ -939,7 +947,17 @@ function onLineHoverMove(e) {
   const feature = e.features?.[0]
   if (!feature) return
   const props = feature.properties || {}
-  lineTip.text = props.label || (props.category === 'line' ? '35kV 线路' : '道路')
+
+  if (props.category === 'line') {
+    const parts = ['35kV 线路']
+    if (props.loopName) parts.push(`回路 ${props.loopName}`)
+    if (props.loopLength && props.loopLength !== '0') parts.push(`${props.loopLength} km`)
+    if (props.fanCount) parts.push(`${props.fanCount} 台风机`)
+    lineTip.text = parts.join(' · ')
+  } else {
+    lineTip.text = props.label || '道路'
+  }
+
   lineTip.x = e.point.x
   lineTip.y = e.point.y
   lineTip.visible = true

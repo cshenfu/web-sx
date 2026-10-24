@@ -292,7 +292,8 @@ const AREA_CENTER_LAYER_ID = 'project-area-center-icons'
 let areaCenterIconRequestVersion = 0
 const CITY_LAYER_ID = 'site-city-stats'
 const PROVINCE_CODE = '610000'
-// ★ 修正：风机 chip id 与 layerPanelConfig 保持一致
+
+// ★ 风机 chip id 与 layerPanelConfig 保持一致
 const PROJECT_ICON_LAYER_MAP = { 'wind-gh': ['project-wind-all', 'project-wind-bx-all'], booster: ['project-booster-all'] }
 const SELECTED_ICON_LAYER_IDS = ['project-wind-all', 'project-wind-bx-all', 'project-booster-all']
 const DRAWER_WIDTH = 460
@@ -401,7 +402,7 @@ const expandButtonStyle = computed(() => ({ right: showProjectDrawer.value ? `${
 const ROAD_LAYER_ID = 'project-road-layer'
 const LINE_LAYER_ID = 'project-35kv-line-layer'
 
-// 道路：蓝色系；线路：黄色系（图例与此同色）
+// 道路：蓝色系；线路：黄色系
 const ROAD_LINE_COLORS = {
   road: '#2563eb',
   line: '#eab308',
@@ -957,19 +958,44 @@ function toMapCoordinate(point) {
   return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null
 }
 
-function appendLineSegments(features, pointRows, sourceType) {
-  if (!Array.isArray(pointRows) || pointRows.length === 0) return
-  const segments = Array.isArray(pointRows[0]) ? pointRows : [pointRows]
-  segments.forEach((segment, segmentIndex) => {
-    if (!Array.isArray(segment)) return
-    const coordinates = segment.map(toMapCoordinate).filter(Boolean)
-    if (coordinates.length < 2) return
-    features.push({
+/**
+ * 把一组点（或点数组的数组）压成 LineString Feature。
+ * - 一维数组：[{lon,lat}, ...] → 一条 LineString
+ * - 二维数组：[[{lon,lat}, ...], ...] → 每条子数组一条 LineString
+ * - 点数 < 2 / 无有效坐标 → 跳过（不加载）
+ *
+ * @param {Array} target   输出 Feature 数组（原地 push）
+ * @param {Array} rows     点位数组
+ * @param {object} baseProps 写入每个 Feature 的属性
+ * @returns {number}       实际生成的 LineString 数量
+ */
+function pushLineFeatures(target, rows, baseProps) {
+  if (!Array.isArray(rows) || rows.length === 0) return 0
+  const groups = Array.isArray(rows[0]) ? rows : [rows]
+  let count = 0
+  groups.forEach((group, groupIdx) => {
+    if (!Array.isArray(group)) return
+    const coords = group.map(toMapCoordinate).filter(Boolean)
+
+    // ===== diag：每条线路的经纬度数组 =====
+    console.groupCollapsed(
+      `[diag-line] ${baseProps.category === 'line' ? '线路' : '道路'} ${baseProps.loopName || baseProps.sourceType || ''} 组#${groupIdx} → ${coords.length} 点`
+    )
+    console.log('原始点数:', group.length, '有效点数:', coords.length)
+    console.log('坐标数组 [lng, lat]:', coords)
+    console.table(coords.map((c, i) => ({ '#': i, lng: c[0], lat: c[1] })))
+    console.groupEnd()
+    // ===== diag =====
+
+    if (coords.length < 2) return
+    target.push({
       type: 'Feature',
-      properties: { sourceType, segmentIndex },
-      geometry: { type: 'LineString', coordinates },
+      properties: { ...baseProps },
+      geometry: { type: 'LineString', coordinates: coords },
     })
+    count += 1
   })
+  return count
 }
 
 /** 把接口数据拆成「道路」和「线路」两个 Feature 数组 */
@@ -977,34 +1003,40 @@ function buildRoadLineFeatures(data) {
   const roadFeatures = []
   const lineFeatures = []
 
-  // 三种道路来源合并，统一显示为「道路」（不再按类型分色）
+  // 道路：CNKJ / CNXJ / JZXJ 各自数组 → 各自一条线
   const roadMap = data?.roadMap ?? data?.data?.roadMap ?? {}
   for (const type of ['CNKJ', 'CNXJ', 'JZXJ']) {
-    const before = roadFeatures.length
-    appendLineSegments(roadFeatures, roadMap?.[type]?.roadpoint, type)
-    for (let i = before; i < roadFeatures.length; i += 1) {
-      roadFeatures[i].properties = {
-        ...roadFeatures[i].properties,
-        category: 'road',
-        label: '道路',
-      }
-    }
+    pushLineFeatures(
+      roadFeatures,
+      roadMap?.[type]?.roadpoint,
+      { category: 'road', sourceType: type, label: '道路' }
+    )
   }
 
-  // 35kV 线路
+  // 线路：每个 loop 的 cablepoletower → 一条线；空数组跳过
   const line35Kv = data?.line35Kv ?? data?.data?.line35Kv
-  const loops = line35Kv?.line?.loops ?? data?.line?.loops ?? []
+  const loops =
+    line35Kv?.loops ??
+    line35Kv?.line?.loops ??
+    data?.loops ??
+    data?.line?.loops ??
+    []
+
   if (Array.isArray(loops)) {
     loops.forEach((loop, loopIndex) => {
-      const before = lineFeatures.length
-      appendLineSegments(lineFeatures, loop?.cablepoletower, `35kV-${loopIndex}`)
-      for (let i = before; i < lineFeatures.length; i += 1) {
-        lineFeatures[i].properties = {
-          ...lineFeatures[i].properties,
+      const loopName = loop?.loopname || String(loopIndex + 1)
+      pushLineFeatures(
+        lineFeatures,
+        loop?.cablepoletower,
+        {
           category: 'line',
-          label: loops.length > 1 ? `35kV 线路（${loopIndex + 1}）` : '35kV 线路',
+          loopIndex,
+          loopName,
+          loopLength: loop?.looplength || '',
+          fanCount: Number(loop?.fan) || (loop?.fanidarr?.length ?? 0),
+          label: `35kV 线路 ${loopName}`,
         }
-      }
+      )
     })
   }
 
@@ -1090,7 +1122,17 @@ function onLineHoverMove(e) {
   const feature = e.features?.[0]
   if (!feature) return
   const props = feature.properties || {}
-  lineTip.text = props.label || (props.category === 'line' ? '35kV 线路' : '道路')
+
+  if (props.category === 'line') {
+    const parts = ['35kV 线路']
+    if (props.loopName) parts.push(`回路 ${props.loopName}`)
+    if (props.loopLength && props.loopLength !== '0') parts.push(`${props.loopLength} km`)
+    if (props.fanCount) parts.push(`${props.fanCount} 台风机`)
+    lineTip.text = parts.join(' · ')
+  } else {
+    lineTip.text = props.label || '道路'
+  }
+
   lineTip.x = e.point.x
   lineTip.y = e.point.y
   lineTip.visible = true
@@ -1130,6 +1172,21 @@ async function fetchAndRenderRoadData(projectId) {
     if (requestVersion !== roadRequestVersion || String(selectedProject.value?.id ?? '') !== String(projectId)) return
 
     const data = unwrapApiPayload(res)
+    // ===== diag =====
+console.log('[diag-line] ① raw response:', res)
+console.log('[diag-line] ① unwrapped data:', data)
+console.log('[diag-line] ① data keys:', data && typeof data === 'object' ? Object.keys(data) : typeof data)
+// 不同可能的路径逐个探测
+console.log('[diag-line] ① line35Kv 探测:', {
+  'data.line35Kv': !!data?.line35Kv,
+  'data.data.line35Kv': !!data?.data?.line35Kv,
+  'data.line': !!data?.line,
+  'data.loops.length': Array.isArray(data?.loops) ? data.loops.length : 'n/a',
+  'data.line35Kv.loops.length': Array.isArray(data?.line35Kv?.loops) ? data.line35Kv.loops.length : 'n/a',
+  'data.line35Kv.line.loops.length': Array.isArray(data?.line35Kv?.line?.loops) ? data.line35Kv.line.loops.length : 'n/a',
+  'data.line.loops.length': Array.isArray(data?.line?.loops) ? data.line.loops.length : 'n/a',
+})
+// ===== diag =====
     const { roadFeatures, lineFeatures } = buildRoadLineFeatures(data)
     roadDataCache.set(projectId, { roadFeatures, lineFeatures })
     currentRoadProjectId = String(projectId)
@@ -1554,7 +1611,6 @@ onUnmounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   transform: translate(12px, 12px);
 }
-/* 提高特异性，覆盖 .map-view > * 的 pointer-events: auto */
 .map-view > .map-line-tip { pointer-events: none; }
 
 /* ---------- 图层图例（传入 LayerChipPanel 的 #legend） ---------- */

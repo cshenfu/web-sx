@@ -65,7 +65,6 @@ export const WHLN_LAYER_IDS = PANEL_GROUPS.flatMap(g => g.items)
 
 export const DEFAULT_VISIBLE = [
   'tdt-imagery',
-  'wind-farm',   // 已建风场（whln，保留原默认）
   'wind-gh',     // 场区风机
   'booster',     // 升压塔
   'road',        // 道路
