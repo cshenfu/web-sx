@@ -43,7 +43,6 @@ onUnmounted(() => {
   document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
 })
 </script>
-
 <style scoped>
 .main-layout {
   display: flex;
@@ -63,29 +62,30 @@ onUnmounted(() => {
   overflow: hidden;
   margin-top: 65px; 
   transition: margin-top 0.3s ease;
-  background-color: #fff; /* 【新增】保证下层是白色，圆角透出的底色就是白的 */
+  background-color: #fff; /* 保证下层是白色，圆角透出的底色就是白的 */
 }
 
 .page-content {
   flex: 1;
   overflow: hidden;
   position: relative;
-  /* 【修改】左上角 16px 圆角 */
+  /* 左上角 16px 圆角 */
   border-radius: 16px 0 0 0; 
   background-color: transparent; 
 }
 
-/* 如果你不想在全屏时左上角还有圆角，可以保留全屏时的覆盖设置 */
+/* 全屏时去掉左上角圆角 */
 .is-fullscreen .page-content {
   border-radius: 0;
 }
 
 .page-content.no-sidebar {
   width: 100%;
-  border-radius:0;
+  border-radius: 0;
+  /* ★ 核心修改：去掉了 height: 100vh，交给 flex: 1 自动撑满 */
 }
 
-.no-sidebar .dashboard-page{
+.no-sidebar .dashboard-page {
   height: 100%;
 }
 

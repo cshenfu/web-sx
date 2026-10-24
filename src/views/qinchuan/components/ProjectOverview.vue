@@ -14,51 +14,69 @@
     </div>
 
     <div class="project-table">
+      <!-- 表头：4列 -->
       <div class="project-header">
         <span>项目阶段</span>
-        <span class="project-type"><img :src="windIcon" alt="" />风电项目</span>
-        <span class="project-type"><img :src="solarIcon" alt="" />光伏项目</span>
+        <span>风电/MW</span>
+        <span>光伏/MW</span>
+        <span>总容量/MW</span>
       </div>
 
+      <!-- 数据行 -->
       <button
-        v-for="row in rows"
+        v-for="(row, index) in displayRows"
         :key="row.key || row.stage"
         class="project-row"
         :class="{ 'is-selected': selectedKey === (row.key || row.stage) }"
         type="button"
         @click="selectRow(row)"
       >
+        <!-- 左右装饰线 (选中时出现) -->
         <div class="decor-line left" v-if="selectedKey === (row.key || row.stage)">
           <span class="dot"></span><span class="line"></span><span class="dot"></span>
         </div>
-
-        <span class="stage-cell">
-          <i class="stage-dot" :style="{ backgroundColor: row.color, color: row.color }" />
-          <span class="stage-name">{{ row.stage }}</span>
-        </span>
-
-        <template v-if="selectedKey === (row.key || row.stage)">
-          <div class="capacity-merged">
-            <span class="total-label">项目总容量：</span>
-            <strong class="total-value">{{ (Number(row.wind?.value) || 0) + (Number(row.solar?.value) || 0) }}</strong>
-            <small class="total-unit">MW</small>
-          </div>
-        </template>
-        <template v-else>
-          <div class="capacity-box">
-            <img :src="windIcon" alt="" />
-            <strong class="val-wind">{{ row.wind?.value ?? '-' }}</strong>
-            <small>{{ row.wind?.unit || 'MW' }}</small>
-          </div>
-          <div class="capacity-box">
-            <img :src="solarIcon" alt="" />
-            <strong class="val-solar">{{ row.solar?.value ?? '-' }}</strong>
-            <small>{{ row.solar?.unit || 'MW' }}</small>
-          </div>
-        </template>
-
         <div class="decor-line right" v-if="selectedKey === (row.key || row.stage)">
           <span class="dot"></span><span class="line"></span><span class="dot"></span>
+        </div>
+
+        <!-- 1. 项目阶段列 -->
+        <span class="stage-cell">
+          <i class="stage-dot" :style="{ backgroundColor: row.color, color: row.color }" />
+          
+          <div v-if="row.isDropdown" class="dropdown-trigger" ref="dropdownRef" @click.stop="toggleDropdown(index)">
+            <span class="stage-name">{{ row.stage }}</span>
+            <i class="arrow-icon" :class="{ 'is-open': activeDropdownIndex === index }"></i>
+            
+            <!-- 毛玻璃下拉菜单 -->
+            <transition name="fade">
+              <div v-if="activeDropdownIndex === index" class="glass-dropdown">
+                <div 
+                  v-for="opt in dropdownOptions" 
+                  :key="opt.label"
+                  class="dropdown-item"
+                  :class="{ active: row.stage === opt.label }"
+                  @click.stop="selectOption(index, opt)"
+                >
+                  {{ opt.label }}
+                </div>
+              </div>
+            </transition>
+          </div>
+          
+          <span v-else class="stage-name">{{ row.stage }}</span>
+        </span>
+
+        <!-- 2. 右侧三列容量（带括号包裹） -->
+        <div class="capacity-group">
+          <span class="bracket bracket-left"></span>
+          
+          <div class="capacity-values">
+            <span class="val-wind">{{ formatNumber(row.wind?.value) }}</span>
+            <span class="val-solar">{{ formatNumber(row.solar?.value) }}</span>
+            <span class="val-total">{{ formatNumber((Number(row.wind?.value) || 0) + (Number(row.solar?.value) || 0)) }}</span>
+          </div>
+          
+          <span class="bracket bracket-right"></span>
         </div>
       </button>
     </div>
@@ -66,11 +84,9 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import titleBg from '@/assets/img/qinchuan/dashbord/title-bg.png'
 import xmgkIcon from '@/assets/img/qinchuan/dashbord/xmgk.png'
-import windIcon from '@/assets/img/qinchuan/dashbord/fj.png'
-import solarIcon from '@/assets/img/qinchuan/dashbord/tynb.png'
 import { projectOverviewRows } from '../js/dashboardMcokData'
 
 const props = defineProps({
@@ -79,13 +95,12 @@ const props = defineProps({
 })
 const emit = defineEmits(['select', 'update:modelValue'])
 
-// 初始无选中；外部置为 null 时也能同步清空
+// ========== 选中态逻辑（恢复原有） ==========
 const selectedKey = ref(props.modelValue ?? null)
 watch(() => props.modelValue, (val) => { selectedKey.value = val ?? null })
 
 function selectRow(row) {
   const key = row.key || row.stage
-  // 再点一次已选中的行 → 取消选中
   if (selectedKey.value === key) {
     selectedKey.value = null
     emit('update:modelValue', null)
@@ -95,6 +110,65 @@ function selectRow(row) {
   selectedKey.value = key
   emit('update:modelValue', key)
   emit('select', row)
+}
+
+// ========== 下拉框逻辑 ==========
+const activeDropdownIndex = ref(null)
+const dropdownRef = ref(null)
+
+// 下拉选择对应的数据
+const dropdownOptions = [
+  { label: '推进中', wind: 200.00, solar: 100.32 },
+  { label: '立项中', wind: 150.50, solar: 80.20 },
+  { label: '可研中', wind: 120.00, solar: 60.10 },
+  { label: '投决中', wind: 80.00, solar: 40.00 },
+]
+
+const selectedOptionIndex = ref(0)
+
+function toggleDropdown(index) {
+  if (activeDropdownIndex.value === index) {
+    activeDropdownIndex.value = null
+  } else {
+    activeDropdownIndex.value = index
+  }
+}
+
+function selectOption(rowIndex, opt) {
+  selectedOptionIndex.value = dropdownOptions.findIndex(o => o.label === opt.label)
+  activeDropdownIndex.value = null
+}
+
+// 点击外部关闭下拉
+function handleClickOutside(e) {
+  if (activeDropdownIndex.value !== null && !e.target.closest('.dropdown-trigger')) {
+    activeDropdownIndex.value = null
+  }
+}
+
+onMounted(() => document.addEventListener('click', handleClickOutside))
+onUnmounted(() => document.removeEventListener('click', handleClickOutside))
+
+// ========== 数据渲染逻辑 ==========
+const displayRows = computed(() => {
+  return props.rows.map((row) => {
+    if (row.stage === '规划中' || row.stage === '推进中') {
+      const currentOpt = dropdownOptions[selectedOptionIndex.value]
+      return {
+        ...row,
+        stage: currentOpt.label,
+        isDropdown: true,
+        wind: { value: currentOpt.wind },
+        solar: { value: currentOpt.solar },
+      }
+    }
+    return row
+  })
+})
+
+function formatNumber(val) {
+  if (val === undefined || val === null || isNaN(val)) return '0.00'
+  return Number(val).toFixed(2)
 }
 </script>
 
@@ -112,6 +186,10 @@ function selectRow(row) {
   backdrop-filter: blur(14px);
   box-shadow: inset 0 0 24px rgba(20, 136, 237, 0.1), 0 0 16px rgba(0, 116, 224, 0.13);
   margin-top: 14px;
+  container-type: size;
+  /* 确保面板不被内容撑破 */
+  display: flex;
+  flex-direction: column;
 }
 
 .panel-heading {
@@ -142,69 +220,175 @@ function selectRow(row) {
 .panel-location { display: flex; align-items: center; gap: 4px; font-family: 'PingFang SC', sans-serif; font-size: 13px; font-weight: 500; color: #fff; opacity: 0.9; transform: translateY(-4px); }
 .location-icon { color: #00d2ff; flex-shrink: 0; }
 
-.project-table { padding: 28px 8px 6px; }
-.project-header, .project-row { display: grid; grid-template-columns: 1.1fr 1fr 1fr; align-items: center; column-gap: 2px; }
-.project-header { height: 26px; padding: 0 6px; color: #FFFFFF; opacity: 0.64; font-family: 'PingFang SC', sans-serif; font-size: 12px; }
-.project-header > span:first-child { padding-left: 8px; }
-.project-type { display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
-.project-type img { width: 14px; height: 14px; }
-
-.project-row {
-  position: relative; width: 100%; min-height: 32px; margin-top: 2px; padding: 2px 6px;
-  border: 1px solid transparent; border-radius: 2px; background: transparent; cursor: pointer; transition: all 0.2s; box-sizing: border-box;
-}
-.project-row.is-selected { background: rgba(91, 137, 254, 0.2); border-radius: 7.45px; }
-
-.stage-cell { display: flex; align-items: center; gap: 6px; font-family: 'PingFang SC', sans-serif; font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; }
-.stage-dot { display: inline-block; width: 5px; height: 5px; flex-shrink: 0; border-radius: 50%; box-shadow: 0 0 8px 1px currentColor; }
-.stage-name { background: linear-gradient(180deg, #FFFFFF 0%, rgba(255, 255, 255, 0.5) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-
-.capacity-box { display: flex; align-items: center; justify-content: center; gap: 2px; min-width: 0; }
-.capacity-box img { width: 16px; height: 16px; flex-shrink: 0; }
-.val-wind { color: #20DAED; font-family: 'PingFang SC', sans-serif; font-size: 13px; font-weight: 500; }
-.val-solar { color: #42A3FC; font-family: 'PingFang SC', sans-serif; font-size: 13px; font-weight: 500; }
-.capacity-box small { color: rgba(255, 255, 255, 0.6); font-size: 10px; }
-
-.capacity-merged { grid-column: span 2; display: flex; align-items: center; justify-content: center; height: 24px; white-space: nowrap; }
-.total-label { color: rgba(255, 255, 255, 0.6); font-family: 'PingFang SC', sans-serif; font-size: 11px; margin-right: 4px; }
-.total-value { color: #E8059B; font-family: 'PingFang SC', sans-serif; font-size: 13px; font-weight: 500; margin-right: 2px; }
-.total-unit { color: rgba(255, 255, 255, 0.6); font-size: 10px; }
-
-.decor-line { position: absolute; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; height: 100%; padding: 4px 0; box-sizing: border-box; pointer-events: none; }
-.decor-line.left { left: 0px; } .decor-line.right { right: 0px; }
-.decor-line .dot { width: 4px; height: 4px; border: 1px solid #FFFFFF; }
-.decor-line .line { width: 0; flex: 1; border-left: 1px solid rgba(255, 255, 255, 0.2); }
-.dashboard-panel { container-type: size; }
+/* ================= 表格布局 ================= */
 .project-table {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
   min-height: 0;
-  padding:
-    clamp(18px, min(10.69cqw, 14.25cqh), 43.82px)
-    clamp(8px, min(3.64cqw, 4.85cqh), 14.91px)
-    4px;
-  overflow-y: auto;
+  padding: 28px 12px 12px;
+  box-sizing: border-box;
+  /* 移除 overflow-y: auto 解决滚动条问题 */
+  overflow: visible; 
 }
+
+.project-header, .project-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr 1fr;
+  align-items: center;
+  column-gap: 4px;
+}
+
 .project-header {
   flex: 0 0 auto;
-  height: clamp(20px, min(6.59cqw, 8.78cqh), 27px);
-  font-size: clamp(10px, min(3.18cqw, 4.25cqh), 13.05px);
+  height: 24px;
+  padding: 0 6px;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: 'PingFang SC', sans-serif;
+  font-size: 12px;
 }
+.project-header > span:first-child { padding-left: 8px; }
+.project-header > span:not(:first-child) { text-align: center; }
+
 .project-row {
-  flex: 0 1 36.34px;
-  min-height: clamp(24px, min(8.86cqw, 11.82cqh), 36.34px);
-  margin-top: 0;
+  position: relative;
+  width: 100%;
+  min-height: 32px;
+  /* 减小行距，确保5行放得下 */
+  margin-top: 6px; 
+  padding: 4px 6px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
 }
-.project-row + .project-row {
-  margin-top: clamp(4px, min(2.27cqw, 3.03cqh), 9.32px);
+.project-row:hover { background: rgba(255, 255, 255, 0.03); }
+.project-row.is-selected { 
+  background: rgba(91, 137, 254, 0.2); 
+  border-radius: 7.45px; 
 }
-.capacity-box img {
-  width: clamp(20px, min(8.18cqw, 10.91cqh), 33.55px);
-  height: clamp(20px, min(8.18cqw, 10.91cqh), 33.55px);
+
+/* --- 阶段列 --- */
+.stage-cell { 
+  display: flex; align-items: center; gap: 6px; 
+  font-family: 'PingFang SC', sans-serif; font-size: 13px; font-weight: 500; 
+  white-space: nowrap;
 }
-.stage-cell { font-size: clamp(10px, min(3.18cqw, 4.25cqh), 13.05px); }
-.val-wind, .val-solar {
-  font-size: clamp(11px, min(3.64cqw, 4.85cqh), 14.91px);
+.stage-dot { 
+  display: inline-block; width: 6px; height: 6px; flex-shrink: 0; 
+  border-radius: 50%; box-shadow: 0 0 8px 1px currentColor; 
+}
+.stage-name { 
+  background: linear-gradient(180deg, #FFFFFF 0%, rgba(255, 255, 255, 0.7) 100%); 
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+}
+
+/* --- 下拉框触发器 --- */
+.dropdown-trigger {
+  position: relative;
+  display: flex; align-items: center; gap: 4px;
+  cursor: pointer;
+  padding: 2px 4px; border-radius: 4px;
+}
+.arrow-icon {
+  display: inline-block;
+  width: 0; height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid rgba(255, 255, 255, 0.6);
+  transition: transform 0.3s;
+}
+.arrow-icon.is-open { transform: rotate(180deg); }
+
+/* --- 毛玻璃下拉菜单 --- */
+/* --- 毛玻璃下拉菜单 (使用原面板背景色) --- */
+.glass-dropdown {
+  position: absolute;
+  top: 100%; left: 0;
+  margin-top: 4px;
+  min-width: 85px;
+  padding: 4px;
+  /* 将原本的深色背景替换为你提供的渐变背景 */
+  background: linear-gradient(180deg, rgba(16, 98, 222, 0.4) 0%, rgba(57, 126, 233, 0.35) 54.88%, rgba(19, 98, 215, 0.2) 75.82%, rgba(0, 95, 223, 0.15) 100%),
+              linear-gradient(180deg, rgba(0, 40, 96, 0.2) 0%, rgba(0, 42, 95, 0.3) 23.24%, rgba(0, 42, 97, 0.4) 44.61%, rgba(0, 40, 96, 0.5) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 119, 255, 0.4);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+.dropdown-item {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  border-radius: 3px;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.dropdown-item:hover { background: rgba(27, 126, 242, 0.3); color: #fff; }
+.dropdown-item.active { color: #00CEEA; font-weight: bold; }
+
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s, transform 0.2s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-4px); }
+
+/* --- 容量数据组 (带括号) --- */
+.capacity-group {
+  grid-column: span 3;
+  display: flex;
+  align-items: stretch; /* 确保括号高度与数字齐平 */
+  justify-content: space-between;
+  padding: 2px 0;
+  height: 22px; /* 固定高度防止因字体变化撑开 */
+}
+
+.bracket {
+  width: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.bracket-left { border-right: none; }
+.bracket-right { border-left: none; }
+
+.capacity-values {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: center;
+}
+.capacity-values > span {
+  text-align: center;
+  font-family: 'PingFang SC', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.val-wind { color: #20DAED; }
+.val-solar { color: #42A3FC; }
+.val-total { color: #42A3FC; }
+
+/* --- 装饰线 (选中的左右括号) --- */
+.decor-line { position: absolute; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; height: 100%; padding: 4px 0; box-sizing: border-box; pointer-events: none; }
+.decor-line.left { left: 0px; } .decor-line.right { right: 0px; }
+.decor-line .dot { width: 4px; height: 4px; border: 1px solid #FFFFFF; }
+.decor-line .line { width: 0; flex: 1; border-left: 1px solid rgba(255, 255, 255, 0.2); }
+
+/* ================= 容器自适应 ================= */
+@container (min-height: 200px) {
+  .project-table {
+    padding: clamp(20px, 10cqh, 28px) clamp(8px, 3cqw, 12px) 8px;
+  }
+  .project-header {
+    font-size: clamp(11px, 3cqw, 12px);
+  }
+  .stage-cell, .capacity-values > span {
+    font-size: clamp(12px, 3.2cqw, 13px);
+  }
+  .project-row {
+    min-height: clamp(28px, 8cqh, 32px);
+    margin-top: clamp(4px, 2cqh, 6px);
+  }
 }
 </style>

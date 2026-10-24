@@ -1,11 +1,17 @@
 <template>
-  <div class="layer-panel" :class="{ expanded: !collapsed }" :style="panelStyle">
-    <!-- ★ 小按钮：始终显示，点击切换展开/收起 -->
+  <div
+    ref="panelRef"
+    class="layer-panel"
+    :class="{ expanded: !collapsed }"
+    :style="panelStyle"
+    @mouseleave="onPanelLeave"
+  >
+    <!-- ★ 小按钮：点击只展开；收起由鼠标离开整块区域触发 -->
     <button
       class="layer-toggle"
       type="button"
-      :title="collapsed ? '展开图层' : '收起图层'"
-      @click="collapsed = !collapsed"
+      title="展开图层"
+      @click="expandPanel"
     >
       <el-icon><Files /></el-icon>
       <span v-if="activeCount" class="layer-toggle-badge">{{ activeCount }}</span>
@@ -68,7 +74,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import {
   Bell,
   Camera,
@@ -103,6 +109,9 @@ const emit = defineEmits(['toggle', 'input-change'])
 
 const groups = PANEL_GROUPS
 const collapsed = ref(true)
+const panelRef = ref(null)
+
+let collapseTimer = null
 
 const panelStyle = computed(() => buildPanelStyle(props.offset, props.zIndex))
 
@@ -129,6 +138,35 @@ function buildPanelStyle(offset, zIndex) {
   return style
 }
 
+/** 清除待执行的收起定时器 */
+function clearCollapseTimer() {
+  if (collapseTimer) {
+    clearTimeout(collapseTimer)
+    collapseTimer = null
+  }
+}
+
+/** 仅由按钮点击触发展开；鼠标悬停不会展开 */
+function expandPanel() {
+  clearCollapseTimer()
+  collapsed.value = false
+}
+
+/** 鼠标离开按钮+面板整体区域后自动收起 */
+function onPanelLeave() {
+  clearCollapseTimer()
+  // 稍作延迟，避免鼠标恰好划过边界时闪烁
+  collapseTimer = setTimeout(() => {
+    collapseTimer = null
+    const active = document.activeElement
+    // 只在"正在编辑面板内的 input"时豁免收起；按钮/其它元素获得焦点不豁免
+    if (active && active.tagName === 'INPUT' && panelRef.value?.contains(active)) {
+      return
+    }
+    collapsed.value = true
+  }, 120)
+}
+
 function isActive(id) {
   return props.visibleIds.includes(id)
 }
@@ -143,6 +181,8 @@ function onInputChange(item, e) {
   const num = raw === '' ? '' : Number(raw)
   emit('input-change', { id: item.id, value: num, item })
 }
+
+onBeforeUnmount(clearCollapseTimer)
 </script>
 
 <style scoped>

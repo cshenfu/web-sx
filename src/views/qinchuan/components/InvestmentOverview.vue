@@ -17,7 +17,7 @@
     <div class="investment-body">
       <!-- 顶部：年计划口径 + 大数字 -->
       <!-- 注意：增加了 no-padding 类，用于贴边 -->
-      <div class="summary-header-block no-padding">
+      <div class="summary-header-block">
         <!-- 左侧：年计划口径 + 图片背景 -->
         <div class="summary-left">
           <div class="title-text">年计划口径</div>

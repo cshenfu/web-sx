@@ -37,6 +37,8 @@ const props = defineProps({
   },
   center: { type: Array, default: () => [0, 20] },
   zoom: { type: Number, default: 1.5 },
+  // ★ 新增：初始化 load 完成后是否自动 flyToShaanxi
+  flyToOnLoad: { type: Boolean, default: true },
 })
 
 const mapContainer = ref(null)
@@ -114,6 +116,16 @@ const drawStyles = [
     paint: { 'circle-radius': 9, 'circle-color': '#FFD700', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 },
   },
 ]
+
+// ★ 城市标签可见状态（跨容器重建保持）
+let labelsVisible = true
+
+function setCentroidLabelsVisible(visible) {
+  labelsVisible = !!visible
+  if (labelsContainer) {
+    labelsContainer.style.display = labelsVisible ? '' : 'none'
+  }
+}
 const baseDirectSelectMode = MapboxDraw.modes.direct_select
 
 const vertexOnlyDirectSelectMode = {
@@ -133,7 +145,7 @@ onMounted(() => {
   })
 
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
-
+  map.on('dragstart', () => stopAutoRotate())
   draw = new MapboxDraw({
     displayControlsDefault: false,
     userProperties: true,
@@ -160,33 +172,34 @@ onMounted(() => {
   })
 
   map.on('load', () => {
-    map.setProjection({ type: 'globe' })
+  map.setProjection({ type: 'globe' })
 
-    try {
-      const styleLayers = map.getStyle()?.layers || []
-      styleLayers.forEach((layer) => {
-        if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-opacity', 0)
-      })
-    } catch (e) { /* 忽略 */ }
+  try {
+    const styleLayers = map.getStyle()?.layers || []
+    styleLayers.forEach((layer) => {
+      if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-opacity', 0)
+    })
+  } catch (e) { /* 忽略 */ }
 
-    try {
-      map.setSky({
-        'sky-color': 'rgba(0, 0, 0, 0)', 'horizon-color': 'rgba(0, 0, 0, 0)',
-        'fog-color': 'rgba(0, 0, 0, 0)', 'sky-horizon-blend': 0.5,
-        'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.5,
-      })
-    } catch (e) { /* 忽略 */ }
+  try {
+    map.setSky({
+      'sky-color': 'rgba(0, 0, 0, 0)', 'horizon-color': 'rgba(0, 0, 0, 0)',
+      'fog-color': 'rgba(0, 0, 0, 0)', 'sky-horizon-blend': 0.5,
+      'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.5,
+    })
+  } catch (e) { /* 忽略 */ }
 
-    try {
-      map.setLight({ anchor: 'viewport', color: '#ffffff', intensity: 0.4, position: [1.15, 200, 45] })
-    } catch (e) { /* 忽略 */ }
+  try {
+    map.setLight({ anchor: 'viewport', color: '#ffffff', intensity: 0.4, position: [1.15, 200, 45] })
+  } catch (e) { /* 忽略 */ }
 
-    flyToShaanxi()
-    emit('ready')
-  })
+  if (props.flyToOnLoad) flyToShaanxi()   // ★ 条件执行
+  emit('ready')
+})
 })
 
 onUnmounted(() => {
+  stopAutoRotate()
   for (const [layerId, handler] of hoverHandlers) {
     if (handler.onMouseMove) map?.off('mousemove', handler.onMouseMove)
     if (handler.onMouseLeave && map) map.getCanvas().removeEventListener('mouseleave', handler.onMouseLeave)
@@ -376,7 +389,33 @@ function stopBoxSelect() {
 function flyToShaanxi() {
   map?.flyTo({ center: [108.9, 35.2], zoom: 6.5, pitch: 50, bearing: 0, duration: 3000, essential: true })
 }
+// ---------- 地球自转 ----------
+let spinTimer = null
+let spinSpeedDegPerSec = 3
 
+function startAutoRotate(degPerSec = 3) {
+  if (!map) return
+  stopAutoRotate()
+  spinSpeedDegPerSec = degPerSec
+  // 每 50ms 推进一次经度，避免每帧 jumpTo 触发过多 render
+  spinTimer = setInterval(() => {
+    if (!map) return
+    try {
+      const c = map.getCenter()
+      let lng = c.lng + spinSpeedDegPerSec * 0.05
+      while (lng > 180) lng -= 360
+      while (lng < -180) lng += 360
+      map.jumpTo({ center: [lng, c.lat] })
+    } catch (e) { /* 忽略 */ }
+  }, 50)
+}
+
+function stopAutoRotate() {
+  if (spinTimer != null) {
+    clearInterval(spinTimer)
+    spinTimer = null
+  }
+}
 function handleDrawUpdate(event) {}
 function loadEditableAreas(fc) { if (draw && fc?.features?.length) draw.add(fc) }
 function clearEditableAreas() { draw?.deleteAll() }
@@ -794,6 +833,7 @@ function addCentroidLabels(opts) {
   labelsContainer = document.createElement('div')
   labelsContainer.className = 'city-labels-overlay'
   labelsContainer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:10;overflow:hidden;'
+  if (!labelsVisible) labelsContainer.style.display = 'none'
   mapContainer.value.appendChild(labelsContainer)
 
   for (const f of geojson.features) {
@@ -841,7 +881,7 @@ function addCentroidLabels(opts) {
   }
 
   const updatePositions = () => {
-    if (!map || !cityLabels.length) return
+    if (!map || !cityLabels.length || !labelsVisible) return
     const pitch = map.getPitch()
     const zoom = map.getZoom()
     const mpp = 78271.517 * Math.cos(35.2 * Math.PI / 180) / Math.pow(2, zoom)
@@ -1049,7 +1089,7 @@ function offClick(layerId) {
 }
 
 defineExpose({
-  flyToShaanxi, addPolygon, addFillLayer, addSymbolLayer, addExtrusion, addCentroidLabels, addLine, addPoints, addLabels, addImagePoints, ensureImage, removeLayer, onClick, offClick, loadEditableAreas, clearEditableAreas, getEditableAreas, addMaskLayer, setMaskOpacity, bringMaskToTop, hasMaskLayer, removeMaskLayer, getMap: () => map, getDraw: () => draw, startBoxSelect, stopBoxSelect, bringDrawPointsToTop,addGlowLine,
+  flyToShaanxi, addPolygon, addFillLayer, addSymbolLayer, addExtrusion, addCentroidLabels, addLine, addPoints, addLabels, addImagePoints, ensureImage, removeLayer, onClick, offClick, loadEditableAreas, clearEditableAreas, getEditableAreas, addMaskLayer, setMaskOpacity, bringMaskToTop, hasMaskLayer, removeMaskLayer, getMap: () => map, getDraw: () => draw, startBoxSelect, stopBoxSelect, bringDrawPointsToTop,addGlowLine, startAutoRotate, stopAutoRotate,setCentroidLabelsVisible,
   findCityAtLngLat: (lngLat) => findCityAtLngLat(lngLat),
 })
 </script>

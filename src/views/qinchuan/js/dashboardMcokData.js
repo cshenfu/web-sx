@@ -57,35 +57,27 @@ export const annualTargetData = {
 
 export const progressWarningData = [
   {
-    key: 'reserve',
-    label: '储备',
+    key: 'construction-scale',
+    label: '建设规模',
     target: 300,
     actual: 260,
-    unit: '万',
+    unit: 'MW',
   },
   {
-    key: 'project-initiation',
-    label: '立项',
+    key: 'project-approval',
+    label: '核准备案',
     target: 233,
     actual: 213,
-    unit: '项',
-  },
-  {
-    key: 'research-review',
-    label: '科研审查',
-    target: 233,
-    actual: 233,
-    unit: '项',
+    unit: 'MW',
   },
   {
     key: 'investment-decision',
     label: '投资决策',
     target: 233,
     actual: 233,
-    unit: '项',
+    unit: 'MW',
   },
 ]
-
 // 点击项目阶段后，父组件可以用这份假数据调用 MapGL.addExtrusion。
 // cityValues 的 key 要和 GeoJSON properties.name 保持一致。
 export const stageCityData = {

@@ -6,40 +6,62 @@
         <span class="panel-title">年度目标</span>
       </div>
       <div class="panel-location">
-        <span>{{ data.year || '2026年' }}</span>
+        <!-- 年份选择器 -->
+        <div class="year-selector">
+          <span class="year-text">{{ data.year || '2026年' }}</span>
+          <div class="arrows">
+            <i class="arrow-up"></i>
+            <i class="arrow-down"></i>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="target-list">
       <div v-for="item in targetItems" :key="item.key" class="target-item">
         
-        <!-- ⭐️ 直接使用图片，去掉圆环 -->
-        <div class="target-icon-wrap">
-          <img :src="item.icon" class="target-icon-bg" alt="" />
-          <div class="ring-inner">
-            <strong>{{ percentage(item) }}%</strong>
-            <span>{{ item.label }}</span>
+        <!-- 左侧：环形图与标题 -->
+        <div class="target-left">
+          <div class="target-label-top">{{ item.label }}</div>
+          <div class="target-icon-wrap">
+            <img :src="item.icon" class="target-icon-bg" alt="" />
+            <div class="ring-inner">
+              <strong>{{ item.ringValue }}</strong><span>%</span>
+            </div>
           </div>
         </div>
 
-        <div class="target-content">
-          <div class="target-caption">
-            <span class="caption-label">{{ item.label }}已完成</span>
-            <strong class="caption-value" :style="{ color: item.key === 'development' ? '#1B7EF2' : '#29F1FA' }">
-              {{ formatValue(item.completed) }} <small>{{ item.unit }}</small>
-            </strong>
-          </div>
-          <div class="progress-track">
-            <div class="progress-fill" :style="fillStyle(item)" />
-            <div class="progress-thumb" :style="{ left: `${percentage(item)}%`, borderColor: item.key === 'development' ? '#1B7EF2' : '#28D2DD' }">
-              <span class="dot-inner" />
+        <!-- 右侧：双进度条数据 -->
+        <div class="target-right">
+          <!-- 1. 确保目标 / 登高目标 (顶部文字) -->
+          <div class="target-row">
+            <div class="group-left">
+              <span class="label">确保目标</span>
+              <span class="value cyan">{{ item.ensureTarget }}%</span>
+            </div>
+            <div class="group-right">
+              <span class="label">登高目标</span>
+              <span class="value blue">{{ item.climbTarget }}%</span>
             </div>
           </div>
-          <div class="target-meta">
-            <span class="meta-item"><i class="meta-dot" :style="{ backgroundColor: item.key === 'development' ? '#1B7EF2' : '#29F1FA' }"></i>年度目标 {{ formatValue(item.target) }} {{ item.unit }}</span>
-            <span class="meta-item"><i class="meta-dot" :style="{ backgroundColor: item.key === 'development' ? '#1B7EF2' : '#29F1FA' }"></i>完成 {{ formatValue(item.completed) }} {{ item.unit }}</span>
+
+          <!-- 2. 双进度条 (倾斜且无圆角) -->
+          <div class="progress-row">
+            <div class="progress-track track-cyan">
+              <div class="progress-fill fill-cyan" :style="{ width: `${item.ensureTarget}%` }"></div>
+            </div>
+            <div class="progress-track track-blue">
+              <div class="progress-fill fill-blue" :style="{ width: `${item.climbTarget}%` }"></div>
+            </div>
+          </div>
+
+          <!-- 3. 底部数值 -->
+          <div class="target-row">
+            <div class="group-left val-cyan">{{ item.ensureValue }}</div>
+            <div class="group-right val-blue">{{ item.climbValue }}</div>
           </div>
         </div>
+
       </div>
     </div>
   </section>
@@ -51,21 +73,32 @@ import titleBg from '@/assets/img/qinchuan/dashbord/title-bg.png'
 import ndmbIcon from '@/assets/img/qinchuan/dashbord/ndmb.png'
 import developmentIcon from '@/assets/img/qinchuan/dashbord/kf.png'
 import commissioningIcon from '@/assets/img/qinchuan/dashbord/tc.png'
-import { annualTargetData } from '../js/dashboardMcokData'
 
-const props = defineProps({ data: { type: Object, default: () => annualTargetData } })
-const targetItems = computed(() => [
-  { ...props.data.development, key: 'development', icon: developmentIcon },
-  { ...props.data.commissioning, key: 'commissioning', icon: commissioningIcon },
-])
-function percentage(item) { return !item.target ? 0 : Math.min(100, Math.max(0, Math.round((item.completed / item.target) * 100))) }
-function formatValue(value) { return Number(value || 0).toLocaleString('zh-CN') }
-function fillStyle(item) {
-  return {
-    width: `${percentage(item)}%`,
-    background: item.key === 'development' ? 'linear-gradient(269.98deg, #1B7EF2 0.96%, rgba(27, 126, 242, 0) 99.99%)' : 'linear-gradient(269.98deg, #29F1FA 0.96%, rgba(41, 241, 250, 0) 99.99%)'
+const props = defineProps({ 
+  data: { 
+    type: Object, 
+    default: () => ({
+      year: '2026年',
+      list: [
+        { key: '1', label: '建设规模', icon: developmentIcon, ringValue: 50, ensureTarget: 65, climbTarget: 45, ensureValue: '26,450kW', climbValue: '36,400kW' },
+        { key: '2', label: '核准备案', icon: commissioningIcon, ringValue: 50, ensureTarget: 20, climbTarget: 45, ensureValue: '26,450kW', climbValue: '36,400kW' },
+        { key: '3', label: '投资决策', icon: developmentIcon, ringValue: 100, ensureTarget: 100, climbTarget: 89, ensureValue: '26,450kW', climbValue: '36,400kW' }
+      ]
+    }) 
+  } 
+})
+
+const targetItems = computed(() => {
+  if (props.data.list && props.data.list.length) {
+    return props.data.list
   }
-}
+  // 兼容旧数据格式的降级处理
+  return [
+    { key: 'construction', label: '建设规模', icon: developmentIcon, ringValue: 50, ensureTarget: 65, climbTarget: 45, ensureValue: '26,450kW', climbValue: '36,400kW' },
+    { key: 'approval', label: '核准备案', icon: commissioningIcon, ringValue: 50, ensureTarget: 20, climbTarget: 45, ensureValue: '26,450kW', climbValue: '36,400kW' },
+    { key: 'investment', label: '投资决策', icon: developmentIcon, ringValue: 100, ensureTarget: 100, climbTarget: 89, ensureValue: '26,450kW', climbValue: '36,400kW' }
+  ]
+})
 </script>
 
 <style scoped>
@@ -77,7 +110,10 @@ function fillStyle(item) {
   background: linear-gradient(180deg, rgba(16, 98, 222, 0.12) 0%, rgba(57, 126, 233, 0.11) 54.88%, rgba(19, 98, 215, 0.05) 75.82%, rgba(0, 95, 223, 0.03) 100%), linear-gradient(180deg, rgba(0, 40, 96, 0) 0%, rgba(0, 42, 95, 0.09) 23.24%, rgba(0, 42, 97, 0.23) 44.61%, rgba(0, 40, 96, 0.27) 100%);
   backdrop-filter: blur(14px); box-shadow: inset 0 0 24px rgba(20, 136, 237, 0.1), 0 0 16px rgba(0, 116, 224, 0.13);
   margin-top: 14px; 
+  container-type: size;
 }
+
+/* 顶部标题栏 */
 .panel-heading {
   position: absolute; top: -14px; left: 0; width: 100%; height: 42px; 
   display: flex; align-items: center; justify-content: space-between; padding: 0 12px;
@@ -91,61 +127,120 @@ function fillStyle(item) {
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   transform: matrix(1, 0, -0.16, 0.99, 0, 0);
 }
-.panel-location { font-family: 'PingFang SC', sans-serif; font-size: 13px; font-weight: 500; color: #fff; opacity: 0.9; transform: translateY(-4px); }
 
-/* ⭐️ 稍微加大列表内边距 */
-.target-list { padding: 28px 14px 12px; }
-.target-item { display: flex; align-items: center; gap: 12px; }
-.target-item + .target-item { margin-top: 14px; }
+/* 年份选择器 */
+.panel-location { transform: translateY(-4px); }
+.year-selector { display: flex; align-items: center; gap: 4px; }
+.year-text {
+  font-family: 'YouSheBiaoTiHei', sans-serif; font-size: 14px;
+  background: linear-gradient(180deg, #FFFFFF 24.68%, #CAE2FF 69.7%, #8FACD7 86.96%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  transform: matrix(1, 0, -0.16, 0.99, 0, 0);
+}
+.arrows { display: flex; flex-direction: column; gap: 2px; }
+.arrow-up, .arrow-down {
+  width: 0; height: 0;
+  border-left: 4px solid transparent; border-right: 4px solid transparent;
+}
+.arrow-up { border-bottom: 5px solid #8FACD7; }
+.arrow-down { border-top: 5px solid #8FACD7; }
 
-/* ⭐️ 直接包图片和文字 */
-.target-icon-wrap { position: relative; width: 52px; height: 52px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-.target-icon-bg { width: 100%; height: 100%; object-fit: contain; }
-
-.ring-inner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -40%); display: flex; flex-direction: column; align-items: center; z-index: 1; }
-.ring-inner strong { color: #effaff; font-family: 'PingFang SC', sans-serif; font-size: 15px; line-height: 15px; font-weight: 700; }
-.ring-inner span { color: rgba(255, 255, 255, 0.7); font-size: 10px; margin-top: 1px; }
-
-.target-content { min-width: 0; flex: 1; }
-.target-caption, .target-meta { display: flex; align-items: center; justify-content: space-between; }
-.target-caption { margin-bottom: 6px; }
-.caption-label { font-family: 'PingFang SC', sans-serif; font-size: 13px; background: linear-gradient(180deg, #FFFFFF 0%, rgba(255, 255, 255, 0.5) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.caption-value { font-family: 'PingFang SC', sans-serif; font-size: 15px; font-weight: 700; }
-.caption-value small { color: rgba(255, 255, 255, 0.6); font-size: 11px; margin-left: 2px; }
-
-.progress-track { position: relative; height: 5px; margin: 4px 6px 6px 0; border-radius: 999px; background: rgba(112, 112, 112, 0.23); }
-.progress-fill { height: 100%; border-radius: inherit; }
-.progress-thumb { position: absolute; top: 50%; width: 16px; height: 16px; transform: translate(-50%, -50%); background: #161616; border: 0.77px solid; border-radius: 50%; box-shadow: 0 0 4px 2px rgba(27, 126, 242, 0.65); display: flex; align-items: center; justify-content: center; }
-.dot-inner { width: 5px; height: 5px; background: #FFF; border-radius: 50%; box-shadow: 0 0 3px 1px rgba(255, 255, 255, 0.44); }
-.target-meta { color: rgba(255, 255, 255, 0.6); font-size: 11px; }
-.meta-item { display: flex; align-items: center; gap: 4px; }
-.meta-dot { width: 4px; height: 4px; border-radius: 50%; }
-.dashboard-panel { container-type: size; }
+/* ================= 列表内容区 ================= */
 .target-list {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
-  box-sizing: border-box;
-  padding:
-    clamp(20px, min(10cqw, 17.32cqh), 41px)
-    clamp(8px, min(3.64cqw, 6.3cqh), 14.91px)
-    clamp(6px, min(3.18cqw, 5.5cqh), 13.04px);
+  display: flex; flex-direction: column; justify-content: space-between;
+  width: 100%; height: 100%; box-sizing: border-box;
+  padding: 32px 18px 16px;
+  gap: 12px;
 }
+
 .target-item {
-  flex: 1 1 91.32px;
-  min-height: 0;
-  gap: clamp(10px, min(9.26cqw, 16.04cqh), 37.97px);
+  display: flex; align-items: center; gap: 12px;
+  flex: 1;
 }
-.target-item + .target-item { margin-top: 0; }
+
+/* --- 左侧环形图区 (复用原图片) --- */
+.target-left {
+  display: flex; flex-direction: column; align-items: center;
+  width: 100px; flex-shrink: 0;
+}
+.target-label-top {
+  font-family: 'PingFang SC', sans-serif; font-size: 12px; font-weight: 500;
+  background: linear-gradient(180deg, #FFFFFF 0%, rgba(255, 255, 255, 0.5) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: 2px;
+}
 .target-icon-wrap {
-  flex: 0 0 clamp(64px, min(29.82cqw, 51.66cqh), 122.27px);
-  width: clamp(64px, min(29.82cqw, 51.66cqh), 122.27px);
-  height: min(100%, clamp(56px, 38.59cqh, 91.32px));
+  position: relative; width: 52px; height: 52px; 
+  display: flex; align-items: center; justify-content: center;
 }
 .target-icon-bg {
-  width: clamp(48px, min(20.73cqw, 35.91cqh), 85px);
-  height: clamp(48px, min(20.73cqw, 35.91cqh), 85px);
+  width: 100%; height: 100%; object-fit: contain;
+}
+.ring-inner { 
+  position: absolute; top: 50%; left: 50%; 
+  transform: translate(-50%, -40%); /* 略微向上偏移以居中于图形 */
+  display: flex; align-items: baseline; z-index: 1;
+}
+.ring-inner strong { color: #00CEEA; font-size: 18px; font-weight: 600; line-height: 1; text-shadow: 0 0 4px rgba(0, 206, 234, 0.3); }
+.ring-inner span { color: #00CEEA; font-size: 11px; font-weight: 400; margin-left: 1px; }
+
+/* --- 右侧双进度条区 --- */
+.target-right {
+  flex: 1; display: flex; flex-direction: column; justify-content: space-between; 
+  min-width: 0; padding: 2px 0; gap: 6px;
 }
 
+.target-row {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.group-left, .group-right {
+  display: flex; align-items: center; gap: 8px;
+}
+
+.label { font-size: 12px; color: rgba(255, 255, 255, 0.8); white-space: nowrap; }
+.value { font-size: 12px; font-weight: 600; }
+.value.cyan { color: #00CEEA; }
+.value.blue { color: #1B7EF2; }
+
+/* 进度条容器 */
+.progress-row {
+  display: flex; justify-content: space-between; align-items: center;
+  height: 6px; margin: 2px 0;
+}
+.progress-track {
+  height: 100%; 
+  transform: skewX(-30deg); /* 倾斜度 */
+  position: relative; 
+  overflow: hidden; /* 保证填充不超出轨道边界 */
+}
+/* 左右轨道宽度占比，形成倾斜的中间切口 */
+.track-cyan {
+  width: 72%; 
+  background: rgba(0, 206, 234, 0.35);
+}
+.track-blue {
+  width: 24%; 
+  background: rgba(27, 126, 242, 0.35);
+}
+
+.progress-fill {
+  height: 100%; 
+  /* 进度条本身无圆角 */
+}
+.fill-cyan { background: #00CEEA; }
+.fill-blue { background: #1B7EF2; }
+
+/* 底部数值 */
+.group-left.val-cyan { color: #1F99B4; font-size: 12px; font-weight: 600; }
+.group-right.val-blue { color: #155FBC; font-size: 12px; font-weight: 600; }
+
+/* ================= 容器自适应 (cqw / cqh) ================= */
+@container (min-height: 200px) {
+  .target-list {
+    padding: clamp(24px, 10cqh, 40px) clamp(12px, 3cqw, 20px) clamp(12px, 5cqh, 20px);
+  }
+  .target-left { width: clamp(80px, 20cqw, 110px); }
+  .target-icon-wrap { width: clamp(48px, 12cqw, 64px); height: clamp(48px, 12cqw, 64px); }
+  .ring-inner strong { font-size: clamp(16px, 4cqw, 20px); }
+}
 </style>

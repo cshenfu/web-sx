@@ -15,16 +15,23 @@
       <template v-else>
         <div class="panel-header">
           <span class="panel-title">{{ project?.projectName || '-' }}</span>
-          <el-button
-            v-if="advanceConfig"
-            size="small"
-            type="primary"
-            :disabled="!necessaryFilesDone"
-            :loading="advancing"
-            @click="handleHeaderAction"
-          >
-            {{ advanceConfig.label }}
-          </el-button>
+          
+          <div class="header-actions">
+            <el-button
+              v-if="advanceConfig"
+              size="small"
+              type="primary"
+              :disabled="!necessaryFilesDone"
+              :loading="advancing"
+              @click="handleHeaderAction"
+            >
+              {{ advanceConfig.label }}
+            </el-button>
+            <!-- ★ 新增：关闭按钮 -->
+            <button class="close-btn" title="关闭" @click="handleClose">
+              <el-icon><Close /></el-icon>
+            </button>
+          </div>
         </div>
 
         <div class="panel-tabs">
@@ -96,6 +103,9 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
+// ★ 新增引入 Close 图标
+import { Close } from '@element-plus/icons-vue'
+
 import DetailMainTab from './DetailMainTab.vue'
 import DetailMaterialTab from './DetailMaterialTab.vue'
 import DetailMeetingTab from './DetailMeetingTab.vue'
@@ -108,11 +118,16 @@ import * as fileApi from '@/api/modules/projectFile'
 const props = defineProps({
   visible: { type: Boolean, default: false },
   project: { type: Object, default: null },
-  stage: { type: String, default: '' }, // ⚠️ 注意检查这里传的是不是 FEASIBILITY_REVIEW
+  stage: { type: String, default: '' },
   initialTab: { type: String, default: 'main' },
 })
 
 const emit = defineEmits(['close', 'action'])
+
+// ★ 新增：触发关闭事件
+function handleClose() {
+  emit('close')
+}
 
 const router = useRouter()
 
@@ -155,7 +170,6 @@ const MEETING_UPLOAD_ACTIONS = new Set([
 const STAGE_ADVANCE = {
   PROJECT_RESERVE:    { label: '开始立项', next: 'PROJECT_INITIATION',  fileCode: 'PROJECT_INITIATION_MATERIALS' },
   PROJECT_INITIATION: { label: '开始审查', next: 'FEASIBILITY_REVIEW',  fileCode: 'PROJECT_INITIATION_MATERIALS' },
-  // 🌟 新增这一行：科研阶段 -> 投决阶段
   FEASIBILITY_REVIEW: { label: '开始投决', next: 'INVESTMENT_DECISION', fileCode: 'PROJECT_FEASIBILITY_MATERIALS' },
 }
 const advanceConfig = computed(() => STAGE_ADVANCE[props.stage] || null)
@@ -193,13 +207,11 @@ async function loadNecessaryFiles() {
   try {
     const res = await fileApi.getFileListByProjectid({
       aiProjectId: props.project.id,
-      // 🌟 动态读取当前阶段配置的 fileCode
       firstBusinessTitle: advanceConfig.value.fileCode || 'PROJECT_INITIATION_MATERIALS',
     })
     const list = (res?.data || []).map(normalizeRecord)
     const required = list.filter(isRequired)
 
-    // 必须有必填文件，并且每一个必填文件都有至少一个 URL，才能点亮按钮
     necessaryFilesDone.value =
       required.length > 0 && required.every(f => f.fileUrlList.length > 0)
   } catch (err) {
@@ -229,7 +241,6 @@ async function handleHeaderAction() {
     ElMessage.success(`${label}成功`)
     emit('action', { type: 'stage-changed', project: props.project, newStage: next })
 
-    // ★ 跳转到下一阶段的列表模式
     const targetName = STAGE_ROUTE_NAME[next]
     if (targetName) {
       router.push({ name: targetName, query: { view: 'list' } })
@@ -361,10 +372,9 @@ function handleUpload(item) {
 function handleUploadSaved() {
   showUploadDialog.value = false
   materialTabRef.value?.loadFiles()
-  loadNecessaryFiles()          // ★ 同步刷新 header 按钮可用态
+  loadNecessaryFiles()
 }
 
-// ★ 材料删除后刷新 header 按钮可用态
 function handleFileDeleted() {
   loadNecessaryFiles()
 }
@@ -412,7 +422,6 @@ function handleMeetingUploadSaved() {
   loadNecessaryFiles()
 }
 
-// ★ 会议文件删除后刷新（上会材料一般不影响 header 按钮，但保持一致刷新）
 function handleMeetingFileDeleted() {
   loadNecessaryFiles()
 }
@@ -424,7 +433,6 @@ function handleMeetingFileDeleted() {
   top: 65px;
   height:calc(100vh - 65px);
   right: 0;
-  /* bottom: 0; */
   width: 520px;
   z-index: 200;
   display: flex;
@@ -441,6 +449,35 @@ function handleMeetingFileDeleted() {
   padding: 16px 20px 12px;
   border-bottom: 1px solid #ebeef5;
 }
+
+/* ★ 新增：右侧操作区 */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* ★ 新增：关闭按钮样式 */
+.close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: #909399;
+  font-size: 18px;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.close-btn:hover {
+  color: #303133;
+  background: #f0f2f5;
+}
+
 .panel-title {
   flex: 1;
   overflow: hidden;

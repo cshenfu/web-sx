@@ -65,3 +65,21 @@
   background: #c90010;
   border-color: #c90010;
 }
+
+
+
+/* 全屏时，隐藏原来的顶部导航 */
+body.is-fullscreen-active .app-header {
+  display: none !important;
+}
+
+/* 全屏时，强制内容区高度填满屏幕，且去掉原本为了避开 Header 而设置的 padding/margin */
+body.is-fullscreen-active .page-content {
+  height: 100vh !important;
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+  overflow-y: auto; 
+}
+
+/* 如果左侧还有侧边栏，也需要全屏时隐藏，可以一并加上 */
+/* body.is-fullscreen-active .app-sidebar { display: none !important; } */

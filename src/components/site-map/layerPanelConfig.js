@@ -15,7 +15,7 @@ export const PANEL_GROUPS = [
       { id: 'hd-imagery',     name: '高清影像',   icon: 'Camera',      type: 'whln' },
       { id: 'wind-resource',  name: '风资源图谱', icon: 'WindPower',   type: 'whln' },
       { id: 'solar-resource', name: '光资源图谱', icon: 'Sunny',       type: 'whln' },
-      { id: 'road-network',   name: '路网',       icon: 'Guide',       type: 'whln' },
+      
       { id: 'terrain-3d',     name: '3D地形',     icon: 'Grid',        type: 'terrain' },
     ],
   },
@@ -36,7 +36,7 @@ export const PANEL_GROUPS = [
     label: '地物元素',
     items: [
       // ============ 原有 ============
-      { id: 'building',        name: '建筑物体',  color: '#1e40af', type: 'whln' },
+      { id: 'buildings-2025',        name: '建筑物体',  color: '#1e40af', type: 'whln' },
       { id: 'forest',          name: '林地',      color: '#4ade80', type: 'whln' },
       { id: 'farmland',        name: '耕地',      color: '#14b8a6', type: 'whln' },
       { id: 'water',           name: '水域',      color: '#3b82f6', type: 'whln' },
@@ -45,7 +45,7 @@ export const PANEL_GROUPS = [
       { id: 'mining',          name: '矿区',      color: '#eab308', type: 'whln' },
       { id: 'cemetery',        name: '坟地',      color: '#FF00FF', type: 'whln' },
       { id: 'scenic',          name: '景区',      color: '#14B8A6', type: 'whln' },
-
+      { id: 'road-network',   name: '路网',       color: '#06B6D4',       type: 'whln' },
       // ============ 新增：对齐 whln layer.js ============
       { id: 'grassland',       name: '草原',      color: '#8FB34A', type: 'whln' },
       { id: 'railway',         name: '铁路',      color: '#F97316', type: 'whln' },

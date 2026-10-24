@@ -159,7 +159,7 @@ function navigate(item) {
 
 <style scoped>
 .sidebar {
-  width: 97px;
+  width: 85px;
   height: 100%;
   flex-shrink: 0;
   display: flex;

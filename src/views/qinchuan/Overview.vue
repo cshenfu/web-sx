@@ -2,11 +2,16 @@
 <template>
   <main class="dashboard-page">
     <MapGL
-      ref="mapRef"
-      :style="satelliteStyle"
-      @ready="onMapReady"
-      @city-click="onCityClick"
-    />
+  ref="mapRef"
+  :style="satelliteStyle"
+  :fly-to-on-load="false"     
+  @ready="onMapReady"
+  @city-click="onCityClick"
+  @draw-update="onDrawChange"
+  @draw-create="onDrawChange"
+  @draw-delete="onDrawChange"
+  @box-select="handleBoxSelect"
+/>
     <div class="map-overlay" aria-hidden="true" />
 
     <LayerChipPanel
@@ -100,7 +105,7 @@
           @submit="handleWizardSubmit"
         />
 
-        <div class="area-view-layer" v-show="!popoverProject">
+        <div class="area-view-layer" v-show="!popoverProject && !isEditing">
           <template v-if="!selectedProject">
             <ProjectListPanel
               class="panel-below"
@@ -132,52 +137,19 @@
         </div>
 
         <div
-          v-if="hoverProject && detailCardPos.visible && !isDetailFullscreen && !popoverProject && !selectedProject"
-          class="hover-tooltip"
-          :style="{ left: detailCardPos.x + 'px', top: detailCardPos.y + 'px' }"
-          @mouseenter="clearHideTimer"
-          @mouseleave="startHideTimer"
-        >
-          <span class="corner top-left" :style="{ borderColor: getHoverThemeColor(hoverProject.projectStage) }"></span>
-          <span class="corner bottom-left" :style="{ borderColor: getHoverThemeColor(hoverProject.projectStage) }"></span>
-
-          <div class="tooltip-title" :style="{ color: getHoverThemeColor(hoverProject.projectStage) }">
-            {{ hoverProject.projectName }}
-          </div>
-          <div class="tooltip-row">
-            <span class="tooltip-label">项目状态：</span>
-            <span class="tooltip-value" :style="{ color: getHoverThemeColor(hoverProject.projectStage) }">
-              {{ stageMap[hoverProject.projectStage] || '已投产' }}
-            </span>
-          </div>
-          <div class="tooltip-row">
-            <span class="tooltip-label">收益率：</span>
-            <span class="tooltip-value">
-              {{ hoverProject.capitalFinancialRate != null ? hoverProject.capitalFinancialRate + '%' : '-' }}
-            </span>
-          </div>
-          <div class="tooltip-row">
-            <span class="tooltip-label">所属单位：</span>
-            <span class="tooltip-value">{{ hoverProject.managerCompany || '-' }}</span>
-          </div>
-          <div class="tooltip-row">
-            <span class="tooltip-label">项目地址：</span>
-            <span class="tooltip-value">{{ formatRegion(hoverProject) }}</span>
-          </div>
-        </div>
-
-        <div
-          v-if="popoverProject && !isDetailFullscreen && !selectedProject"
+          v-if="popoverProject && !isDetailFullscreen && !selectedProject && !isEditing && !isActionPanelOpen"
           class="right-top-card"
         >
           <div class="tooltip-header">
+            <button class="tooltip-title title-link" type="button" @click.stop="handleOpenDetailPanel(popoverProject)">
+              {{ popoverProject.projectName || '-' }}
+            </button>
             <div class="tooltip-status">
               <span class="status-dot" :style="{ background: getHoverThemeColor(popoverProject.projectStage) }"></span>
               <span class="status-text" :style="{ color: getHoverThemeColor(popoverProject.projectStage) }">
-                {{ popoverProject.itemType === 'GF' ? '光伏项目' : '风电项目' }}·在研
+                {{ stageMap[popoverProject.projectStage] || '项目' }}
               </span>
             </div>
-            <div class="tooltip-title">{{ popoverProject.projectName }}</div>
           </div>
 
           <div class="tooltip-grid">
@@ -197,8 +169,7 @@
             <div class="grid-item border-right">
               <div class="grid-label">推荐机型</div>
               <div class="grid-value">
-                <span class="bold">{{ popoverProject.recommendedModel?.split(' ')[0] || 'MySE' }}</span>
-                <span class="sub-text">{{ popoverProject.recommendedModel?.split(' ')[1] || '5.0-200' }}</span>
+                <span class="bold">{{ popoverProject.recommendedModel || 'MySE5.0-200' }}</span>
               </div>
             </div>
             <div class="grid-item">
@@ -209,14 +180,76 @@
             </div>
           </div>
 
-          <div class="tooltip-footer" @click.stop="handleOpenDetailPanel(popoverProject)">
-            <div class="footer-left">
-              <el-icon><Edit /></el-icon> 推荐机型
-            </div>
-            <div class="footer-right">
-              查看详情 <el-icon><ArrowRight /></el-icon>
+          <div class="tooltip-footer" @click.stop>
+            <button
+              v-for="action in visiblePopoverActions"
+              :key="action"
+              type="button"
+              class="footer-action"
+              :class="{ danger: action === 'delete' }"
+              @click.stop="executeProjectAction(action, popoverProject)"
+            >
+              {{ ACTION_LABELS[action] || action }}
+            </button>
+            <div v-if="overflowPopoverActions.length" class="action-menu-wrap">
+              <button
+                type="button"
+                class="action-menu-button"
+                aria-label="更多操作"
+                title="更多操作"
+                @click.stop="actionMenuOpen = !actionMenuOpen"
+              >
+                <el-icon><MoreFilled /></el-icon>
+              </button>
+              <div v-if="actionMenuOpen" class="action-menu">
+                <button
+                  v-for="action in overflowPopoverActions"
+                  :key="action"
+                  type="button"
+                  :class="{ danger: action === 'delete' }"
+                  @click.stop="executeProjectAction(action, popoverProject)"
+                >
+                  {{ ACTION_LABELS[action] || action }}
+                </button>
+              </div>
             </div>
           </div>
+        </div>
+
+        <div
+          v-if="isAreaView && (isEditing || (popoverProject && !isDetailFullscreen && !selectedProject && !isActionPanelOpen))"
+          class="geometry-edit-toolbar"
+        >
+          <button
+            v-for="item in editTools"
+            :key="item.key"
+            type="button"
+            class="edit-tool-button"
+            :class="{ active: editMode === item.key }"
+            @click="isEditing ? enterEditMode(item.key) : startGeometryEdit(popoverProject, item.key)"
+          >
+            <el-icon><component :is="item.icon" /></el-icon>{{ item.label }}
+          </button>
+          <template v-if="editMode === 'wind' || editMode === 'booster'">
+            <span class="edit-divider" />
+            <template v-if="editMode === 'wind'">
+              <button class="edit-tool-button" :class="{ active: drawingNewPoint }" @click="startAddWindPoint">添加风机</button>
+              <button class="edit-tool-button" :class="{ active: isBoxSelecting }" @click="startBoxSelection">框选</button>
+              <button class="edit-tool-button danger" @click="deleteSelectedPoints">删除选中</button>
+              <button class="edit-tool-button" @click="markReserve(true)">标记备选</button>
+              <button class="edit-tool-button" @click="markReserve(false)">取消备选</button>
+            </template>
+            <template v-else>
+              <button class="edit-tool-button" :class="{ active: drawingNewPoint }" @click="toggleAddPoint">{{ drawingNewPoint ? '退出新增' : '新增点' }}</button>
+              <button class="edit-tool-button" :class="{ active: isBoxSelecting }" @click="startBoxSelection">框选</button>
+              <button class="edit-tool-button danger" @click="deleteSelectedPoints">删除选中</button>
+            </template>
+          </template>
+          <span class="edit-divider" />
+          <button v-if="isDirty" class="edit-tool-button save" :disabled="saving" @click="saveEdit">{{ saving ? '保存中…' : '保存' }}</button>
+          <button v-if="isDirty" class="edit-tool-button" :disabled="saving" @click="cancelEdit">取消修改</button>
+          <button v-if="hasSaved && !isDirty" class="edit-tool-button recalculate" :disabled="recalculating" @click="handleRecalculate">{{ recalculating ? '计算中…' : '重新计算' }}</button>
+          <button v-if="!isDirty" class="edit-tool-button" :disabled="saving" @click="exitEditMode">完成编辑</button>
         </div>
       </template>
 
@@ -306,6 +339,43 @@
       @confirm="handleReportConfirm"
       @add-report="reportModalVisible = false"
     />
+
+    <section v-if="showEditProject" class="create-project-fullpage">
+      <CreateProjectForm
+        ref="editProjectFormRef"
+        :map-ref="mapRef"
+        :panel-width="550"
+        mode="edit"
+        :project="editProjectTarget"
+        @cancel="onEditProjectCancel"
+        @saved="onProjectUpdated"
+      />
+    </section>
+
+    <VerifyPanel
+      :visible="showVerifyPanel"
+      :project="actionProject"
+      @close="showVerifyPanel = false"
+      @saved="onVerifySaved"
+    />
+    <SiteMapProjectDetailPanel
+      :visible="showSiteMapDetailPanel"
+      :project="actionProject"
+      :stage="actionProject?.projectStage || ''"
+      :initial-tab="detailPanelTab"
+      @close="showSiteMapDetailPanel = false"
+      @action="onSiteMapDetailAction"
+    />
+    <SiteMapGenerateReportPanel
+      :visible="showGeneratePanel"
+      :project="generatePanelProject"
+      :action-key="generatePanelActionKey"
+      :sub-code="generatePanelSubCode"
+      @close="showGeneratePanel = false"
+      @generated="onReportGenerated"
+    />
+    <AssignDialog v-model="showAssignDialog" :project="actionProject" @success="onAssignSuccess" />
+    <ReserveApprovalDialog v-model="showReserveDialog" :project="actionProject" @saved="onReserveSaved" />
   </main>
 </template>
 
@@ -313,8 +383,8 @@
 import {
   ref, computed, reactive, watch, onMounted, onUnmounted, nextTick
 } from 'vue'
-import { ElMessage } from 'element-plus'
-import { List, MapLocation, Plus, Search, Edit, ArrowRight } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { List, MapLocation, Plus, Search, MoreFilled, Location, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 
 import MapGL from '@/components/MapGL.vue'
 import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
@@ -328,6 +398,12 @@ import ProjectOverview from './components/ProjectOverview.vue'
 import ProjectListPanel from './components/area-panel/ProjectListPanel.vue'
 import ProjectDetailPanel from './components/area-panel/ProjectDetailPanel.vue'
 import ReportGenerateModal from './components/area-panel/ReportGenerateModal.vue'
+import CreateProjectForm from './components/Createprojectform.vue'
+import VerifyPanel from './components/VerifyPanel.vue'
+import SiteMapProjectDetailPanel from './components/ProjectDetailPanel.vue'
+import SiteMapGenerateReportPanel from './components/GenerateReportPanel.vue'
+import AssignDialog from './components/AssignDialog.vue'
+import ReserveApprovalDialog from './components/ReserveApprovalDialog.vue'
 import ReportWizard from './components/report-wizard/ReportWizard.vue'
 import { PACKAGE_TYPE } from './js/Reportwizardmockdata'
 import { projectOverviewRows, stageCityData } from './js/dashboardMcokData'
@@ -335,6 +411,7 @@ import { buildStageColorMap } from './js/mapStageColor'
 import { projectDetailMockData } from './js/areaPanelMockData'
 import { buildMainInfoFromAi } from './js/aiProjectAdapter'
 import * as newApi from '@/api/modules/project'
+import * as configApi from '@/api/modules/selectConfig'
 
 import {
   satelliteStyle,
@@ -348,6 +425,7 @@ import { useZoomThresholdSwitch } from './js/useZoomThresholdSwitch'
 import fjIcon from '@/assets/img/mapIcon/fj-icon.png'
 import gfIcon from '@/assets/img/mapIcon/gf-icon.png'
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
+import fengjiBxIcon from '@/assets/img/mapIcon/fengji-bx.png'
 import shengyazhanIcon from '@/assets/img/mapIcon/syz.png'
 import shaanxiOutline610000 from '/public/geojson/610000.json'
 import {
@@ -367,6 +445,7 @@ const CITY_OPTIONS = [
 ]
 
 const ICON_FENGJI = 'icon-fengji-overview'
+const ICON_FENGJI_BX = 'icon-fengji-bx-overview'
 const ICON_SHENGYAZHAN = 'icon-shengyazhan-overview'
 const ICON_AREA_FJ = 'icon-area-fj-overview'
 const ICON_AREA_GF = 'icon-area-gf-overview'
@@ -400,7 +479,7 @@ const lineTip = reactive({ visible: false, x: 0, y: 0, text: '' })
 
 // chip → 图层映射
 const PROJECT_ICON_LAYER_MAP = {
-  'wind-gh': ['overview-project-wind-all'],
+  'wind-gh': ['overview-project-wind-all', 'overview-project-wind-bx-all'],
   booster: ['overview-project-booster-all'],
 }
 
@@ -457,12 +536,33 @@ function getAreaStyleByStage(projectStage) {
   return GROUP_AREA_STYLE[group || 'unknown']
 }
 
+const STAGE_ACTIONS = {
+  PRELIMINARY_SELECTION: ['assign', 'verify', 'reserve', 'edit', 'delete'],
+  PROJECT_RESERVE: ['material', 'edit', 'assign', 'delete'],
+  PROJECT_INITIATION: ['establishMeeting', 'researchMaterial', 'edit', 'assign', 'delete'],
+  FEASIBILITY_REVIEW: ['researchReview', 'investMaterial', 'edit', 'assign', 'delete'],
+  INVESTMENT_DECISION: ['investMeeting', 'edit', 'assign', 'delete'],
+}
+const ACTION_LABELS = {
+  material: '立项材料',
+  researchMaterial: '可研材料',
+  investMaterial: '投决材料',
+  establishMeeting: '立项上会',
+  researchReview: '可研审查',
+  investMeeting: '投决上会',
+  assign: '分配',
+  verify: '核查',
+  reserve: '储备',
+  edit: '编辑',
+  delete: '删除',
+}
+
 // ==================== 基础状态 ====================
 const mapRef = ref(null)
 const selectedStage = ref(null)
 const activeProject = ref(null)
 const mapReady = ref(false)
-
+let hasEntered = false   // ★ 是否已经点击进入陕西
 const viewMode = ref('map')
 const showLayerPanel = ref(false)
 let whlnPlugin = null
@@ -477,16 +577,98 @@ const activeProjectDetail = ref(projectDetailMockData)
 const reportModalVisible = ref(false)
 const detailLoading = ref(false)
 
-const hoverProject = ref(null)
 const popoverProject = ref(null)
 const selectedProject = ref(null)
 
-const detailCardPos = reactive({ x: 0, y: 0, visible: false })
+const popoverActions = computed(() => {
+  const actions = STAGE_ACTIONS[popoverProject.value?.projectStage] || STAGE_ACTIONS.PRELIMINARY_SELECTION
+  // 1. 规定除了删除以外其他按钮的显示顺序（把 delete 从里面去掉）
+  const displayOrder = ['edit', 'reserve', 'verify', 'assign']
+  
+  // 2. 找出不在 displayOrder 里的其他操作（比如 material, establishMeeting 等），排除 delete
+  const otherActions = actions.filter((action) => !displayOrder.includes(action) && action !== 'delete')
+  
+  // 3. 合并起来，最后强制把 delete 塞到数组的最末尾
+  const result = [
+    ...displayOrder.filter((action) => actions.includes(action)),
+    ...otherActions,
+  ]
+  if (actions.includes('delete')) {
+    result.push('delete')
+  }
+  return result
+})
 
-const hoverHandlers = new Map()
-let hideTimer = null
+const visiblePopoverActions = computed(() => {
+  const all = popoverActions.value
+  if (all.length <= 5) return all
+  
+  // 4. 如果按钮总数超过 5 个，确保「删除」一定在主面板显示，且永远排在最后一个
+  const withoutDelete = all.filter(a => a !== 'delete')
+  const hasDelete = all.includes('delete')
+  
+  // 取前 4 个常规操作 + 删除
+  return hasDelete ? [...withoutDelete.slice(0, 4), 'delete'] : withoutDelete.slice(0, 5)
+})
 
+const overflowPopoverActions = computed(() => {
+  const all = popoverActions.value
+  if (all.length <= 5) return []
+  
+  // 5. 多余的按钮进入「更多」下拉菜单（此时删除已经在主面板，所以这里去掉它）
+  const withoutDelete = all.filter(a => a !== 'delete')
+  const hasDelete = all.includes('delete')
+  
+  return hasDelete ? withoutDelete.slice(4) : withoutDelete.slice(5)
+})
+const actionMenuOpen = ref(false)
+const actionProject = ref(null)
+const showVerifyPanel = ref(false)
+const showSiteMapDetailPanel = ref(false)
+const showGeneratePanel = ref(false)
+const generatePanelProject = ref(null)
+const generatePanelActionKey = ref('')
+const generatePanelSubCode = ref('')
+const detailPanelTab = ref('main')
+const showAssignDialog = ref(false)
+const showReserveDialog = ref(false)
+const showEditProject = ref(false)
+const editProjectTarget = ref(null)
+const editProjectFormRef = ref(null)
+const refreshingActionProject = ref(false)
+const deleteConfirmOpen = ref(false)
 const wizardVisible = ref(false)
+const isActionPanelOpen = computed(() => (
+  showEditProject.value ||
+  showVerifyPanel.value ||
+  showSiteMapDetailPanel.value ||
+  showGeneratePanel.value ||
+  showAssignDialog.value ||
+  showReserveDialog.value ||
+  reportModalVisible.value ||
+  refreshingActionProject.value ||
+  deleteConfirmOpen.value ||
+  wizardVisible.value
+))
+
+const geometryProject = ref(null)
+const editBuffer = ref(null)
+const isEditing = ref(false)
+const editMode = ref(null)
+const drawingNewPoint = ref(false)
+const isBoxSelecting = ref(false)
+const saving = ref(false)
+const isDirty = ref(false)
+const hasSaved = ref(false)
+const recalculating = ref(false)
+let suppressDrawSync = false
+const editTools = [
+  { key: 'area', label: '编辑场区', icon: Location },
+  { key: 'wind', label: '编辑风机', icon: MapLocation },
+  { key: 'booster', label: '编辑升压站', icon: CircleCheck },
+  { key: 'unavailable', label: '设置不可用区域', icon: CircleClose },
+]
+
 const wizardMode = ref(PACKAGE_TYPE.default)
 const reportKeyToWizardMode = {
   'feasibility-centralized': PACKAGE_TYPE.default,
@@ -513,25 +695,13 @@ const popoverAltCount = computed(() => {
   return pts.filter((p) => Number(p.isReserve) === 1).length
 })
 
-// ==================== 悬浮交互逻辑 ====================
-function clearHideTimer() {
-  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
-}
-
-function startHideTimer() {
-  clearHideTimer()
-  hideTimer = setTimeout(() => {
-    hoverProject.value = null
-    detailCardPos.visible = false
-  }, 200)
-}
-
 function getHoverThemeColor(projectStage) {
   const style = getAreaStyleByStage(projectStage)
   return style.outlineColor || '#22c55e'
 }
 function onCityClick(feature) {
   if (isAreaView.value) return
+  if (!hasEntered) return          // ★ 未进入前不处理
   const name = feature?.properties?.name
   if (name) focusCity(name)
 }
@@ -584,11 +754,8 @@ function handleProjectSelect(item) {
   ) return
 
   clearOverviewRoadLayer()
-  hoverProject.value = null
-  detailCardPos.visible = false
-  clearHideTimer()
-
   popoverProject.value = item
+  actionMenuOpen.value = false
   void renderAreaCenterIcons()
 
   const map = mapRef.value?.getMap()
@@ -610,6 +777,7 @@ function handleProjectSelect(item) {
 
 async function handleOpenDetailPanel(item) {
   popoverProject.value = null
+  actionMenuOpen.value = false
   selectedProject.value = item
 
   activeAreaId.value = item.id
@@ -618,6 +786,553 @@ async function handleOpenDetailPanel(item) {
   rightPanelMode.value = 'detail'
   isDetailFullscreen.value = true
   await loadAiProjectDetail(item.id)
+}
+
+function resolveMapProject(project) {
+  return mapProjects.value.find((item) => String(item.id) === String(project?.id)) || project
+}
+
+function openSiteMapDetailPanel(project, tab = 'main') {
+  actionProject.value = resolveMapProject(project)
+  detailPanelTab.value = tab
+  actionMenuOpen.value = false
+  showSiteMapDetailPanel.value = true
+}
+
+function executeProjectAction(action, project) {
+  if (!project) return
+  const item = resolveMapProject(project)
+  actionProject.value = item
+  actionMenuOpen.value = false
+
+  if (['material', 'researchMaterial', 'investMaterial'].includes(action)) {
+    openSiteMapDetailPanel(item, 'material')
+    return
+  }
+  if (['establishMeeting', 'researchReview', 'investMeeting'].includes(action)) {
+    openSiteMapDetailPanel(item, 'meeting')
+    return
+  }
+  if (action === 'assign') {
+    showAssignDialog.value = true
+    return
+  }
+  if (action === 'verify') {
+    showVerifyPanel.value = true
+    return
+  }
+  if (action === 'reserve') {
+    showReserveDialog.value = true
+    return
+  }
+  if (action === 'edit') {
+    openEditProjectForm(item)
+    return
+  }
+  if (action === 'delete') {
+    void handleDeleteProject(item)
+    return
+  }
+  ElMessage.info(`点击了「${ACTION_LABELS[action] || action}」：${item.projectName || ''}`)
+}
+
+function openEditProjectForm(project) {
+  if (isDirty.value) {
+    ElMessage.warning('请先保存或取消地图上的修改')
+    return
+  }
+  actionProject.value = resolveMapProject(project)
+  editProjectTarget.value = actionProject.value
+  actionMenuOpen.value = false
+  clearSelectedProjectIcons()
+  showEditProject.value = true
+}
+
+async function onProjectUpdated() {
+  showEditProject.value = false
+  editProjectTarget.value = null
+  await refreshActionProjectData()
+}
+
+function onEditProjectCancel() {
+  showEditProject.value = false
+  editProjectTarget.value = null
+  if (actionProject.value) void renderSelectedProjectIcons(actionProject.value)
+}
+
+async function handleDeleteProject(project) {
+  if (!project) return
+  deleteConfirmOpen.value = true
+  try {
+    await ElMessageBox.confirm(
+      `确认删除项目「${project.projectName || ''}」吗？删除后不可恢复。`,
+      '提示',
+      { type: 'warning' },
+    )
+  } catch {
+    deleteConfirmOpen.value = false
+    return
+  }
+
+  try {
+    const response = await newApi.deletProject(project.id)
+    if (response?.code !== 200) {
+      ElMessage.error(response?.msg || '删除失败')
+      return
+    }
+    ElMessage.success('删除成功')
+    if (String(popoverProject.value?.id) === String(project.id)) popoverProject.value = null
+    if (String(actionProject.value?.id) === String(project.id)) actionProject.value = null
+    await Promise.all([fetchMapProjects(), fetchProjectList()])
+  } catch (error) {
+    ElMessage.error(error?.message || '删除失败')
+  } finally {
+    deleteConfirmOpen.value = false
+  }
+}
+
+async function onVerifySaved() {
+  showVerifyPanel.value = false
+  await refreshActionProjectData()
+}
+
+async function onAssignSuccess() {
+  await refreshActionProjectData()
+}
+
+async function onReserveSaved() {
+  await refreshActionProjectData()
+}
+
+async function refreshActionProjectData() {
+  const projectId = actionProject.value?.id
+  refreshingActionProject.value = true
+  try {
+    await Promise.all([fetchMapProjects(), fetchProjectList()])
+    if (projectId == null) return
+    const fresh = mapProjects.value.find((item) => String(item.id) === String(projectId))
+    if (!fresh) return
+    actionProject.value = fresh
+    if (popoverProject.value && String(popoverProject.value.id) === String(projectId)) {
+      popoverProject.value = fresh
+    }
+    if (mapReady.value && isAreaView.value) await renderProjectsByStage('area')
+  } finally {
+    refreshingActionProject.value = false
+  }
+}
+
+async function onSiteMapDetailAction(payload) {
+  if (payload?.type === 'stage-changed') {
+    showSiteMapDetailPanel.value = false
+    await refreshActionProjectData()
+    return
+  }
+  if (payload?.type === 'generate-report') {
+    generatePanelProject.value = payload.project || actionProject.value
+    generatePanelActionKey.value = payload.actionKey || ''
+    generatePanelSubCode.value = payload.subCode || ''
+    showGeneratePanel.value = true
+  }
+}
+
+function onReportGenerated() {
+  showGeneratePanel.value = false
+  ElMessage.success('报告生成完成')
+}
+
+// ==================== 地图场区/点位编辑 ====================
+function startGeometryEdit(project, mode = 'area') {
+  const item = resolveMapProject(project)
+  if (!item) return
+  if (isDirty.value) {
+    ElMessage.warning('当前地图修改尚未保存，请先保存或取消')
+    return
+  }
+
+  geometryProject.value = item
+  actionProject.value = item
+  popoverProject.value = null
+  selectedProject.value = null
+  actionMenuOpen.value = false
+  rightPanelMode.value = 'list'
+  isDetailFullscreen.value = false
+  clearOverviewRoadLayer()
+
+  isEditing.value = true
+  isDirty.value = false
+  hasSaved.value = false
+  initEditBuffer(item)
+  enterEditMode(mode)
+}
+
+function initEditBuffer(project) {
+  const area = getProjectCoords(project)
+  const wind = (project.windTurbinePoints || [])
+    .map((point) => {
+      const lng = Number(point.longitude)
+      const lat = Number(point.latitude)
+      return Number.isFinite(lng) && Number.isFinite(lat)
+        ? { lng, lat, isReserve: Number(point.isReserve) === 1 ? 1 : 0 }
+        : null
+    })
+    .filter(Boolean)
+  const booster = (project.boosterStationLocations || [])
+    .map((point) => {
+      const lng = Number(point.lng)
+      const lat = Number(point.lat)
+      return Number.isFinite(lng) && Number.isFinite(lat)
+        ? { lng, lat, isBest: point.isBest === true || Number(point.isBest) === 1 ? 1 : 0 }
+        : null
+    })
+    .filter(Boolean)
+  editBuffer.value = { area, wind, booster, unavailable: [] }
+}
+
+function closeRing(coords) {
+  if (!coords || coords.length < 3) return coords
+  const first = coords[0]
+  const last = coords[coords.length - 1]
+  return first[0] === last[0] && first[1] === last[1]
+    ? coords
+    : [...coords, [first[0], first[1]]]
+}
+
+function syncDrawToBuffer() {
+  if (!editBuffer.value) return
+  const draw = mapRef.value?.getDraw?.()
+  const all = draw?.getAll?.() || { type: 'FeatureCollection', features: [] }
+  if (editMode.value === 'area') {
+    const areaFeature = all.features.find((feature) => feature.properties?.kind === 'area')
+    editBuffer.value.area = areaFeature
+      ? areaFeature.geometry.coordinates[0].map(([lng, lat]) => [lng, lat])
+      : []
+  } else if (editMode.value === 'wind') {
+    editBuffer.value.wind = all.features
+      .filter((feature) => feature.properties?.kind === 'wind')
+      .map((feature) => ({
+        lng: feature.geometry.coordinates[0],
+        lat: feature.geometry.coordinates[1],
+        isReserve: Number(feature.properties?.isReserve) === 1 ? 1 : 0,
+      }))
+  } else if (editMode.value === 'booster') {
+    editBuffer.value.booster = all.features
+      .filter((feature) => feature.properties?.kind === 'booster')
+      .map((feature) => ({
+        lng: feature.geometry.coordinates[0],
+        lat: feature.geometry.coordinates[1],
+        isBest: Number(feature.properties?.isBest) === 1 ? 1 : 0,
+      }))
+  } else if (editMode.value === 'unavailable') {
+    editBuffer.value.unavailable = all.features.filter((feature) => feature.properties?.kind === 'unavailable')
+  }
+  refreshAllPointsLayers()
+}
+
+function onDrawChange(event) {
+  if (suppressDrawSync || !isEditing.value) return
+  const draw = mapRef.value?.getDraw?.()
+  if (event?.features?.length && draw && ['wind', 'booster', 'unavailable'].includes(editMode.value)) {
+    const kind = editMode.value
+    event.features.forEach((feature) => {
+      if (!feature?.id || feature.geometry?.type !== (kind === 'unavailable' ? 'Polygon' : 'Point')) return
+      if (feature.properties?.kind) return
+      draw.setFeatureProperty(feature.id, 'kind', kind)
+      if (kind === 'wind') draw.setFeatureProperty(feature.id, 'isReserve', 0)
+      if (kind === 'booster') draw.setFeatureProperty(feature.id, 'isBest', 0)
+    })
+  }
+  syncDrawToBuffer()
+  isDirty.value = true
+}
+
+function enterEditMode(mode) {
+  if (!geometryProject.value || !editBuffer.value) return
+  const draw = mapRef.value?.getDraw?.()
+  if (!draw) return
+
+  const currentFeatures = draw.getAll?.().features || []
+  if (!suppressDrawSync && currentFeatures.length) syncDrawToBuffer()
+  refreshAllPointsLayers()
+  suppressDrawSync = true
+  editMode.value = mode
+  drawingNewPoint.value = false
+  isBoxSelecting.value = false
+  mapRef.value?.stopBoxSelect?.()
+  mapRef.value?.clearEditableAreas?.()
+
+  const features = []
+  const buffer = editBuffer.value
+  if (mode === 'area' && buffer.area?.length >= 3) {
+    features.push({
+      type: 'Feature',
+      id: 'edit-area',
+      properties: { kind: 'area' },
+      geometry: { type: 'Polygon', coordinates: [closeRing(buffer.area)] },
+    })
+  } else if (mode === 'wind') {
+    buffer.wind.forEach((point, index) => {
+      features.push({
+        type: 'Feature',
+        id: `edit-wind-${index}`,
+        properties: { kind: 'wind', index, isReserve: point.isReserve },
+        geometry: { type: 'Point', coordinates: [point.lng, point.lat] },
+      })
+    })
+  } else if (mode === 'booster') {
+    buffer.booster.forEach((point, index) => {
+      features.push({
+        type: 'Feature',
+        id: `edit-booster-${index}`,
+        properties: { kind: 'booster', index, isBest: point.isBest },
+        geometry: { type: 'Point', coordinates: [point.lng, point.lat] },
+      })
+    })
+  } else if (mode === 'unavailable') {
+    buffer.unavailable.forEach((feature) => features.push(feature))
+  }
+
+  try {
+    if (features.length) draw.add({ type: 'FeatureCollection', features })
+    if (mode === 'area') {
+      const areaFeature = features.find((feature) => feature.properties.kind === 'area')
+      if (areaFeature) draw.changeMode('vertex_only_direct_select', { featureId: areaFeature.id })
+      else draw.changeMode('simple_select')
+    } else if (mode === 'unavailable') {
+      draw.changeMode('draw_polygon')
+    } else {
+      draw.changeMode('simple_select')
+    }
+  } finally {
+    nextTick(() => {
+      mapRef.value?.bringDrawPointsToTop?.()
+      suppressDrawSync = false
+    })
+  }
+}
+
+function startAddWindPoint() {
+  const draw = mapRef.value?.getDraw?.()
+  if (!draw) return
+  draw.changeMode('draw_point')
+  drawingNewPoint.value = true
+  ElMessage.info('点击地图添加风机')
+}
+
+function toggleAddPoint() {
+  const draw = mapRef.value?.getDraw?.()
+  if (!draw) return
+  if (drawingNewPoint.value) {
+    draw.changeMode('simple_select')
+    drawingNewPoint.value = false
+  } else {
+    draw.changeMode('draw_point')
+    drawingNewPoint.value = true
+    ElMessage.info('点击地图添加升压站')
+  }
+}
+
+function startBoxSelection() {
+  if (!['wind', 'booster'].includes(editMode.value)) {
+    ElMessage.warning('仅支持在编辑风机/升压站时框选')
+    return
+  }
+  isBoxSelecting.value = true
+  mapRef.value?.startBoxSelect?.()
+  ElMessage.info('请在地图上拖拽进行框选')
+}
+
+function handleBoxSelect(featureIds) {
+  if (!featureIds?.length) return
+  const draw = mapRef.value?.getDraw?.()
+  if (draw) {
+    draw.changeMode('simple_select', { featureIds })
+    isBoxSelecting.value = false
+  }
+}
+
+function markReserve(isReserve) {
+  const draw = mapRef.value?.getDraw?.()
+  if (!draw) return
+  const ids = draw.getSelectedIds?.() || []
+  if (!ids.length) {
+    ElMessage.warning('请先选中风机点位')
+    return
+  }
+  let count = 0
+  ids.forEach((id) => {
+    const feature = draw.get(id)
+    if (feature?.properties?.kind !== 'wind') return
+    draw.setFeatureProperty(id, 'isReserve', isReserve ? 1 : 0)
+    count += 1
+  })
+  if (!count) return
+  syncDrawToBuffer()
+  enterEditMode('wind')
+  isDirty.value = true
+  ElMessage.success(`已${isReserve ? '标记' : '取消'}备选 ${count} 个风机`)
+}
+
+function deleteSelectedPoints() {
+  const draw = mapRef.value?.getDraw?.()
+  if (!draw) return
+  const ids = draw.getSelectedIds?.() || []
+  if (!ids.length) {
+    ElMessage.warning('请先选中要删除的点')
+    return
+  }
+  draw.delete(ids)
+  syncDrawToBuffer()
+  enterEditMode(editMode.value)
+  isDirty.value = true
+  ElMessage.success(`已删除 ${ids.length} 个点`)
+}
+
+function refreshAllPointsLayers() {
+  const map = mapRef.value?.getMap?.()
+  if (!map || !editBuffer.value || !geometryProject.value) return
+  const windNormalFeatures = []
+  const windReserveFeatures = []
+  editBuffer.value.wind.forEach((point, index) => {
+    const feature = {
+      type: 'Feature',
+      properties: { projectId: geometryProject.value.id, index, isReserve: point.isReserve },
+      geometry: { type: 'Point', coordinates: [point.lng, point.lat] },
+    }
+    ;(Number(point.isReserve) === 1 ? windReserveFeatures : windNormalFeatures).push(feature)
+  })
+  const boosterFeatures = editBuffer.value.booster.map((point, index) => ({
+    type: 'Feature',
+    properties: { projectId: geometryProject.value.id, index, isBest: Number(point.isBest) === 1 },
+    geometry: { type: 'Point', coordinates: [point.lng, point.lat] },
+  }))
+  map.getSource('overview-project-wind-all')?.setData({ type: 'FeatureCollection', features: windNormalFeatures })
+  map.getSource('overview-project-wind-bx-all')?.setData({ type: 'FeatureCollection', features: windReserveFeatures })
+  map.getSource('overview-project-booster-all')?.setData({ type: 'FeatureCollection', features: boosterFeatures })
+}
+
+async function saveEdit() {
+  if (!editBuffer.value || !geometryProject.value || saving.value) return
+  syncDrawToBuffer()
+  const project = geometryProject.value
+  const projectId = project.id
+  if (editBuffer.value.area.length < 3) {
+    ElMessage.warning('场区至少需要 3 个有效坐标点')
+    return
+  }
+
+  const fallbackRegionCode = project.coordinate?.[0]?.regionCode ?? null
+  const coordinate = editBuffer.value.area.map(([lng, lat]) => ({
+    regionCode: fallbackRegionCode,
+    longitude: String(lng),
+    latitude: String(lat),
+  }))
+  const windTurbinePoints = editBuffer.value.wind.map((point) => ({
+    longitude: point.lng,
+    latitude: point.lat,
+    isReserve: point.isReserve,
+  }))
+  const boosterStationLocations = editBuffer.value.booster.map((point) => ({
+    lng: point.lng,
+    lat: point.lat,
+    isBest: point.isBest,
+  }))
+  const payload = {
+    coordinate,
+    windTurbinePoints,
+    boosterStationLocations,
+    accessSubstationName: project.accessSubstationName ?? null,
+    accessSubstationPoints: project.accessSubstationPoints ?? null,
+    address: project.address ?? null,
+    capitalFinancialRate: project.capitalFinancialRate ?? null,
+    city: project.city ?? null,
+    currentProjectCapacity: project.currentProjectCapacity ?? null,
+    district: project.district ?? null,
+    fileCollection: project.fileCollection ?? [],
+    itemType: project.itemType ?? null,
+    notes: project.notes ?? null,
+    projectCode: project.projectCode ?? null,
+    projectName: project.projectName ?? null,
+    projectStage: project.projectStage ?? null,
+    province: project.province ?? null,
+    sendOutType: project.sendOutType ?? null,
+  }
+
+  try {
+    saving.value = true
+    const response = await configApi.upDataLayer(projectId, payload)
+    if (response?.code !== 200) {
+      ElMessage.error(response?.msg || '保存失败')
+      return
+    }
+
+    Object.assign(project, { coordinate, windTurbinePoints, boosterStationLocations })
+    const target = mapProjects.value.find((item) => String(item.id) === String(projectId))
+    if (target) Object.assign(target, { coordinate, windTurbinePoints, boosterStationLocations })
+    geometryProject.value = target || project
+    actionProject.value = geometryProject.value
+    await renderProjectsByStage('area')
+    initEditBuffer(geometryProject.value)
+    editMode.value = null
+    isDirty.value = false
+    hasSaved.value = true
+    ElMessage.success('保存成功')
+    await fetchProjectList()
+  } catch (error) {
+    ElMessage.error(error?.message || '保存失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function handleRecalculate() {
+  if (!geometryProject.value || !hasSaved.value || recalculating.value) return
+  try {
+    recalculating.value = true
+    const response = await configApi.updateCalculateStatus(geometryProject.value.id, { isReturnProject: 1 })
+    if (response?.code === 200) {
+      ElMessage.success('重新计算发起成功')
+      hasSaved.value = false
+      await Promise.all([fetchMapProjects(), fetchProjectList()])
+    } else {
+      ElMessage.error(response?.msg || '重新计算失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '重新计算请求异常')
+  } finally {
+    recalculating.value = false
+  }
+}
+
+function exitEditMode() {
+  if (!isEditing.value) return
+  const project = geometryProject.value
+  suppressDrawSync = true
+  mapRef.value?.clearEditableAreas?.()
+  mapRef.value?.stopBoxSelect?.()
+  nextTick(() => { suppressDrawSync = false })
+  editBuffer.value = null
+  geometryProject.value = null
+  drawingNewPoint.value = false
+  isBoxSelecting.value = false
+  isEditing.value = false
+  isDirty.value = false
+  editMode.value = null
+  if (project && isAreaView.value) {
+    popoverProject.value = resolveMapProject(project)
+    void renderProjectsByStage('area')
+    loadOverviewRoadData(project.id)
+  }
+}
+
+function cancelEdit() {
+  if (isDirty.value) {
+    ElMessageBox.confirm('放弃当前未保存的地图修改吗？', '确认取消', { type: 'warning' })
+      .then(() => exitEditMode())
+      .catch(() => {})
+    return
+  }
+  exitEditMode()
 }
 
 // ==================== 数据请求 ====================
@@ -1031,13 +1746,23 @@ function buildAreaFeature(project) {
 }
 
 function buildWindFC(project) {
+  const normal = []
+  const reserve = []
+  for (const [index, point] of (project.windTurbinePoints || []).entries()) {
+    const lng = Number(point.longitude)
+    const lat = Number(point.latitude)
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue
+    const isReserve = Number(point.isReserve) === 1
+    const feature = {
+      type: 'Feature',
+      properties: { projectId: project.id, index, isReserve: isReserve ? 1 : 0 },
+      geometry: { type: 'Point', coordinates: [lng, lat] },
+    }
+    ;(isReserve ? reserve : normal).push(feature)
+  }
   return {
-    type: 'FeatureCollection',
-    features: (project.windTurbinePoints || []).map((p, index) => {
-      const lng = Number(p.longitude); const lat = Number(p.latitude)
-      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
-      return { type: 'Feature', properties: { projectId: project.id, index, isReserve: Number(p.isReserve) === 1 ? 1 : 0 }, geometry: { type: 'Point', coordinates: [lng, lat] } }
-    }).filter(Boolean)
+    normal: { type: 'FeatureCollection', features: normal },
+    reserve: { type: 'FeatureCollection', features: reserve },
   }
 }
 
@@ -1064,34 +1789,9 @@ function addProjectArea(project, highlighted = false) {
   const fillLayerId = `${layerId}-fill`
 
   mapRef.value.offClick(fillLayerId)
-  mapRef.value.onClick(fillLayerId, () => handleProjectSelect(project))
-
-  const map = mapRef.value.getMap?.()
-  if (map) {
-    if (hoverHandlers.has(fillLayerId)) {
-      const old = hoverHandlers.get(fillLayerId)
-      map.off('mouseenter', fillLayerId, old.onEnter)
-      map.off('mouseleave', fillLayerId, old.onLeave)
-    }
-
-    const onEnter = () => {
-      clearHideTimer()
-      if (hoverProject.value?.id !== project.id) {
-        hoverProject.value = project
-        updateDetailCardPosition()
-      }
-      map.getCanvas().style.cursor = 'pointer'
-    }
-
-    const onLeave = () => {
-      map.getCanvas().style.cursor = ''
-      startHideTimer()
-    }
-
-    map.on('mouseenter', fillLayerId, onEnter)
-    map.on('mouseleave', fillLayerId, onLeave)
-    hoverHandlers.set(fillLayerId, { onEnter, onLeave })
-  }
+  mapRef.value.onClick(fillLayerId, () => {
+    if (!isEditing.value && !isActionPanelOpen.value) handleProjectSelect(project)
+  })
 }
 
 async function safeAddIcon({ layerId, featureCollection, iconId, iconUrl, iconSize, iconAnchor = 'center', fallbackColor = '#3b82f6', fallbackRadius = 8 }) {
@@ -1104,7 +1804,7 @@ async function safeAddIcon({ layerId, featureCollection, iconId, iconUrl, iconSi
 
 function buildAreaCenterFC(projects = mapProjects.value, naturalWidthMap = {}) {
   const hiddenIds = new Set(
-    [popoverProject.value?.id, selectedProject.value?.id]
+    [popoverProject.value?.id, selectedProject.value?.id, geometryProject.value?.id]
       .filter((id) => id != null)
       .map(String)
   )
@@ -1177,18 +1877,8 @@ async function renderAreaCenterIcons() {
 function clearMapIconLayers() {
   if (!mapRef.value) return
   areaCenterIconRequestVersion += 1
-  const map = mapRef.value.getMap?.()
   for (const id of renderedMapLayerIds) {
     mapRef.value.removeLayer(id)
-    if (map) {
-      const fillLayerId = `${id}-fill`
-      if (hoverHandlers.has(fillLayerId)) {
-        const old = hoverHandlers.get(fillLayerId)
-        map.off('mouseenter', fillLayerId, old.onEnter)
-        map.off('mouseleave', fillLayerId, old.onLeave)
-        hoverHandlers.delete(fillLayerId)
-      }
-    }
   }
   renderedMapLayerIds.clear()
 }
@@ -1198,19 +1888,49 @@ async function renderSelectedProjectIcons(project) {
   clearSelectedProjectIcons()
   const wf = buildWindFC(project)
   const bf = buildBoosterFC(project)
-  if (wf.features.length) {
-    await safeAddIcon({ layerId: 'overview-project-wind-all', featureCollection: wf, iconId: ICON_FENGJI, iconUrl: fengjiIcon, iconSize: ICON_SIZE_WIND, iconAnchor: 'bottom' })
-  }
-  if (bf.features.length) {
-    await safeAddIcon({ layerId: 'overview-project-booster-all', featureCollection: bf, iconId: ICON_SHENGYAZHAN, iconUrl: shengyazhanIcon, iconSize: ICON_SIZE_BOOSTER, iconAnchor: 'bottom' })
-  }
+  // 保留空图层：编辑时点位的 isReserve / isBest 状态改变后，
+  // refreshAllPointsLayers 可以直接更新对应 source，不必重建图层。
+  await safeAddIcon({
+    layerId: 'overview-project-wind-all',
+    featureCollection: wf.normal,
+    iconId: ICON_FENGJI,
+    iconUrl: fengjiIcon,
+    iconSize: ICON_SIZE_WIND,
+    iconAnchor: 'bottom',
+    fallbackColor: '#22c55e',
+    fallbackRadius: 3,
+  })
+  await safeAddIcon({
+    layerId: 'overview-project-wind-bx-all',
+    featureCollection: wf.reserve,
+    iconId: ICON_FENGJI_BX,
+    iconUrl: fengjiBxIcon,
+    iconSize: ICON_SIZE_WIND,
+    iconAnchor: 'bottom',
+    fallbackColor: '#f59e0b',
+    fallbackRadius: 3,
+  })
+  await safeAddIcon({
+    layerId: 'overview-project-booster-all',
+    featureCollection: bf,
+    iconId: ICON_SHENGYAZHAN,
+    iconUrl: shengyazhanIcon,
+    iconSize: ICON_SIZE_BOOSTER,
+    iconAnchor: 'bottom',
+    fallbackColor: '#ef4444',
+    fallbackRadius: 3,
+  })
   syncAllProjectIcons()
 }
 
 function clearSelectedProjectIcons() {
   if (!mapRef.value) return
   const map = mapRef.value.getMap?.()
-  const layers = ['overview-project-wind-all', 'overview-project-booster-all']
+  const layers = [
+    'overview-project-wind-all',
+    'overview-project-wind-bx-all',
+    'overview-project-booster-all',
+  ]
   layers.forEach(id => {
     if (map?.getLayer(id)) mapRef.value.removeLayer(id)
     renderedMapLayerIds.delete(id)
@@ -1223,11 +1943,12 @@ async function renderProjectsByStage(stage) {
   if (stage === 'overview') return
 
   for (const p of mapProjects.value) {
-    addProjectArea(p, p.id === popoverProject.value?.id || p.id === selectedProject.value?.id)
+    addProjectArea(p, [popoverProject.value?.id, selectedProject.value?.id, geometryProject.value?.id].some((id) => id != null && String(id) === String(p.id)))
   }
   await renderAreaCenterIcons()
   if (popoverProject.value) await renderSelectedProjectIcons(popoverProject.value)
   else if (selectedProject.value) await renderSelectedProjectIcons(selectedProject.value)
+  else if (geometryProject.value) await renderSelectedProjectIcons(geometryProject.value)
   syncAllProjectIcons()
 }
 
@@ -1245,6 +1966,7 @@ function clearSelection() {
   clearOverviewRoadLayer()
   popoverProject.value = null
   selectedProject.value = null
+  actionMenuOpen.value = false
   void renderAreaCenterIcons()
 
   if (activeId) {
@@ -1252,33 +1974,29 @@ function clearSelection() {
     if (project && isAreaView.value) addProjectArea(project, false)
   }
 
-  detailCardPos.visible = false
   rightPanelMode.value = 'list'
   isDetailFullscreen.value = false
   clearSelectedProjectIcons()
 }
 
 function handleBackToList() {
+  const projectToRestore = selectedProject.value || popoverProject.value
   clearSelection()
+  if (projectToRestore) {
+    const project = resolveMapProject(projectToRestore)
+    popoverProject.value = project
+    if (isAreaView.value) {
+      addProjectArea(project, true)
+      void renderSelectedProjectIcons(project)
+    }
+  }
   listExpanded.value = true
   activeEditTool.value = ''
 }
 
-function updateDetailCardPosition() {
-  const p = hoverProject.value
-  if (!p || !mapRef.value) { detailCardPos.visible = false; return }
-  const centroid = getProjectCentroid(p)
-  if (!centroid) { detailCardPos.visible = false; return }
-  const map = mapRef.value.getMap()
-  if (!map) return
-  const point = map.project(centroid)
-  detailCardPos.x = point.x
-  detailCardPos.y = point.y
-  detailCardPos.visible = true
-}
-
 function handleMapBlankClick(e) {
   if (!isAreaView.value) return
+  if (isEditing.value || isActionPanelOpen.value) return
   const map = mapRef.value?.getMap?.()
   if (!map) return
 
@@ -1428,8 +2146,7 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
     rightPanelMode.value = 'list'
     popoverProject.value = null
     selectedProject.value = null
-    hoverProject.value = null
-    detailCardPos.visible = false
+    if (isEditing.value) exitEditMode()
     isDetailFullscreen.value = false
     renderProjectsByStage('overview')
   }
@@ -1438,7 +2155,7 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
 const layerPanelOffset = computed(() => {
   if (isAreaView.value) return { left: '16px', bottom: '24px' }
   return {
-    left: 'calc(clamp(12px, 1.35vw, 26px) + clamp(240px, 23vw, 320px) + 16px)',
+    left: 'calc(clamp(12px, 1.35vw, 26px) + clamp(240px, 23vw, 410px) + 16px)',
     bottom: '24px',
   }
 })
@@ -1484,12 +2201,62 @@ function handleWizardSaveDraft(payload) {}
 function handleWizardSubmit(payload) { wizardVisible.value = false }
 
 // ==================== 生命周期 ====================
+// ==================== 生命周期 ====================
+const SHAANXI_BOUNDS = [[105.4, 31.6], [111.3, 39.6]]
+
+function fitGlobeZoom(map, fill = 0.7) {
+  const el = map.getContainer()
+  const short = Math.min(el.clientWidth, el.clientHeight)
+  if (!short) return 1.8
+  const BASE_RATIO = 0.32
+  const target = Math.max(0.4, Math.min(0.9, fill))
+  return Math.log2(target / BASE_RATIO)
+}
+
+// ==================== 生命周期 ====================
 function onMapReady() {
   mapReady.value = true
   renderSelectedProject(activeProject.value)
+
   const map = mapRef.value.getMap()
-  map.on('move', updateDetailCardPosition)
-  map.on('zoom', updateDetailCardPosition)
+
+  // ★ 1. 初始：地球 + 缓慢自转 + 隐藏城市标签
+  try {
+    map.setMinZoom(0)
+    const zoom = fitGlobeZoom(map, 0.8)        // 0.7 = 球直径约占短边 70%
+    map.jumpTo({ center: [108.9, 35.2], zoom:2, pitch: 0, bearing: 0 })
+    mapRef.value.startAutoRotate(3)            // 3°/s，约 2 分钟一圈
+    mapRef.value.setCentroidLabelsVisible?.(false)
+  } catch (err) {
+    console.warn('[map] 初始化地球视角失败:', err)
+  }
+
+  // ★ 2. 首次点击 → 停自转 + fitBounds 飞陕西 + 显示城市标签
+  const handleEnterMap = () => {
+    if (hasEntered) return
+    hasEntered = true
+    map.off('click', handleEnterMap)
+    mapRef.value.stopAutoRotate?.()
+
+    map.fitBounds(SHAANXI_BOUNDS, {
+      // padding 按左右面板宽度预留，避免陕西被 Panel 遮挡
+      padding: { top: 90, bottom: 140, left: 380, right: 340 },
+      pitch: 45,                               // 比 50 更不容易切边
+      bearing: 0,
+      // 兜底：防止 fitBounds 算出过大的 zoom 直接切到「场区视图」
+      maxZoom: AREA_ZOOM_THRESHOLD - 0.3,
+      duration: 3000,
+      essential: true,
+    })
+
+    // 动画结束后再显示城市名，避免飞行途中标签乱跳
+    map.once('moveend', () => {
+      mapRef.value.setCentroidLabelsVisible?.(true)
+    })
+  }
+  map.on('click', handleEnterMap)
+
+  // ====== 以下保持原有逻辑 ======
   map.on('click', handleMapBlankClick)
   bindZoomListener()
 
@@ -1498,6 +2265,7 @@ function onMapReady() {
   map.on('style.load', ensureShaanxiMask)
   ensureShaanxiMask()
   nextTick(() => { syncByZoom() })
+
   try {
     whlnPlugin = attachSxLayers(map, {
       initialVisibleIds: layerVisibleIds.value.filter((id) => WHLN_LAYER_IDS.includes(id)),
@@ -1517,33 +2285,26 @@ function onMapReady() {
 onMounted(async () => { await Promise.all([fetchStageList(), fetchProjectList(), fetchMapProjects()]) })
 
 onUnmounted(() => {
-  clearHideTimer()
+  try { mapRef.value?.stopAutoRotate?.() } catch (e) { /* 忽略 */ }
   unbindZoomListener()
   removeRoadLineLayers()
   whlnPlugin?.destroy?.()
   whlnPlugin = null
   const map = mapRef.value?.getMap?.()
   if (map) {
-    map.off('move', updateDetailCardPosition)
-    map.off('zoom', updateDetailCardPosition)
     map.off('click', handleMapBlankClick)
     map.off('zoom', syncMaskVisibility)
     map.off('move', syncMaskVisibility)
     map.off('style.load', ensureShaanxiMask)
   }
-  hoverHandlers.forEach((handlers, layerId) => {
-    if (map) { map.off('mouseenter', layerId, handlers.onEnter); map.off('mouseleave', layerId, handlers.onLeave) }
-  })
-  hoverHandlers.clear()
 })
 </script>
 
 <style scoped>
 .dashboard-page {
-  --global-head-height: 56px;
   position: relative;
   width: 100%;
-  height: calc(100dvh - var(--global-head-height));
+  height: 100%;  
   min-height: 0;
   overflow: hidden;
   background: #03162e;
@@ -1601,6 +2362,15 @@ onUnmounted(() => {
 
 .area-view-layer { position: absolute; z-index: 20; top: 60px; right: 12px; bottom: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; overflow: visible; }
 .panel-below { flex: 1; min-height: 0; }
+.create-project-fullpage {
+  position: absolute;
+  z-index: 40;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+.create-project-fullpage :deep(.create-project-form) { pointer-events: auto; }
 
 .area-list-view { position: absolute; z-index: 15; height: 100%; width: 100%; padding: 55px 20px; background: #fff; border-radius: 8px; box-shadow: 0 2px 16px rgba(0, 0, 0, 0.12); display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; }
 .list-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -1613,76 +2383,201 @@ onUnmounted(() => {
 .project-table :deep(.el-table__body tr:hover > td) { background: #f5f8ff; }
 .pagination-row { display: flex; justify-content: flex-end; padding-top: 12px; }
 
-.hover-tooltip {
-  position: absolute;
-  z-index: 30;
-  width: 280px;
-  padding: 16px 20px;
-  background: rgba(12, 20, 15, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  transform: translate(-50%, 15px);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  pointer-events: none;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-.corner {
-  position: absolute; width: 8px; height: 8px; pointer-events: none;
-}
-.corner.top-left {
-  top: -1px; left: -1px;
-  border-top: 2px solid; border-left: 2px solid;
-}
-.corner.bottom-left {
-  bottom: -1px; left: -1px;
-  border-bottom: 2px solid; border-left: 2px solid;
-}
-.tooltip-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 4px; }
-.tooltip-row { display: flex; align-items: flex-start; font-size: 13px; line-height: 1.4; }
-.tooltip-label { color: #A0AEC0; flex-shrink: 0; width: 70px; }
-.tooltip-value { color: #FFFFFF; flex: 1; word-break: break-all; }
-
 .right-top-card {
   position: absolute;
   z-index: 25;
   top: 60px;
   right: 12px;
-  width: 340px;
-  background: rgba(235, 240, 245, 0.85);
+  width: min(375px, calc(100vw - 24px));
+  height: 192px;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(235, 247, 255, 0.7) 100%);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-.right-top-card .tooltip-header { padding: 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.5); }
-.right-top-card .tooltip-status { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 6px; }
-.right-top-card .status-dot { width: 6px; height: 6px; border-radius: 50%; }
-.right-top-card .tooltip-title { font-size: 20px; font-weight: 700; color: #111827; line-height: 1.3; }
-.right-top-card .tooltip-grid { display: grid; grid-template-columns: 1fr 1fr; }
-.right-top-card .grid-item { padding: 16px; }
+.right-top-card .tooltip-header {
+  display: flex;
+  flex: 0 0 66px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(222, 225, 228, 0.72);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+}
+.right-top-card .tooltip-status { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; font-size: 12px; white-space: nowrap; }
+.right-top-card .status-dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 3px rgba(146, 84, 222, 0.14); }
+.right-top-card .tooltip-title {
+  display: block;
+  min-width: 0;
+  padding: 0;
+  color: #172033;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.right-top-card .tooltip-title:hover { color: #1677ff; }
+.right-top-card .tooltip-grid {
+  display: grid;
+  flex: 0 0 76px;
+  height: 76px;
+  grid-template-columns: 1fr 1fr;
+}
+.right-top-card .grid-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  gap: 6px;
+  height: 38px;
+  min-height: 38px;
+  padding: 3px 12px;
+  background: rgba(255, 255, 255, 0.24);
+}
 .right-top-card .border-right { border-right: 1px solid rgba(255, 255, 255, 0.6); }
 .right-top-card .border-bottom { border-bottom: 1px solid rgba(255, 255, 255, 0.6); }
-.right-top-card .grid-label { font-size: 13px; color: #6B7280; margin-bottom: 6px; }
-.right-top-card .grid-value { font-size: 20px; font-weight: 700; color: #111827; }
-.right-top-card .unit { font-size: 13px; font-weight: 400; color: #6B7280; margin-left: 2px; }
+.right-top-card .grid-label { flex: 0 0 auto; margin: 0; color: #6B7280; font-size: 12px; }
+.right-top-card .grid-value { min-width: 0; color: #111827; font-size: 14px; font-weight: 700; text-align: right; }
+.right-top-card .unit { font-size: 12px; font-weight: 400; color: #6B7280; margin-left: 2px; }
 .right-top-card .text-blue { color: #2563EB; }
 .right-top-card .text-red { color: #DC2626; }
 .right-top-card .bold { font-weight: 800; }
-.right-top-card .sub-text { font-size: 13px; color: #6B7280; font-weight: 400; margin-left: 2px; }
+.right-top-card .sub-text { font-size: 11px; color: #6B7280; font-weight: 400; margin-left: 2px; }
 .right-top-card .tooltip-footer {
-  display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;
-  background: rgba(200, 210, 220, 0.4); cursor: pointer; transition: background 0.2s;
+  display: flex;
+  flex: 0 0 48px;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 4px;
+  min-height: 48px;
+  padding: 6px 12px;
+  /* background: rgba(222, 225, 228, 0.75); */
+  transition: background 0.2s;
 }
-.right-top-card .tooltip-footer:hover { background: rgba(200, 210, 220, 0.7); }
-.right-top-card .footer-left { display: flex; align-items: center; gap: 6px; color: #374151; font-size: 13px; }
-.right-top-card .footer-right { display: flex; align-items: center; gap: 4px; color: #1677ff; font-size: 13px; font-weight: 500; }
+.right-top-card .footer-action {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 4px;
+  color: #172033;
+  font-size: 12px;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.right-top-card .footer-action:hover { color: #1677ff; }
+.right-top-card .footer-action.danger {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  color: #e5484d;
+  background: transparent;
+  border: 0;
+}
+.right-top-card .footer-action.danger:hover {
+  color: #d9363e;
+  background: transparent;
+}
+.action-menu-wrap { position: relative; flex: 0 0 auto; margin-left: 4px; }
+.action-menu-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: #101828;
+  font-size: 16px;
+  background: rgba(255, 255, 255, 0.24);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.action-menu-button:hover { background: rgba(255, 255, 255, 0.6); }
+.action-menu {
+  position: absolute;
+  z-index: 35;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: flex;
+  flex-direction: column;
+  min-width: 170px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+}
+.action-menu button {
+  padding: 9px 10px;
+  color: #273443;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.action-menu button.danger { color: #d9363e; }
+.action-menu button:hover { color: #1677ff; background: #eff6ff; }
+
+.geometry-edit-toolbar {
+  position: absolute;
+  z-index: 30;
+  top: 6px;
+  right: 12px;
+  left: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  padding: 5px 6px;
+  background: linear-gradient(149.65deg, rgba(255, 255, 255, 0.2) 4.61%, rgba(255, 255, 255, 0.15) 29.07%, rgba(255, 255, 255, 0.15) 49.01%, rgba(255, 255, 255, 0.1) 61.4%, rgba(255, 255, 255, 0.2) 74.74%, rgba(255, 255, 255, 0.22) 97.19%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(4px);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.12);
+}
+.geometry-edit-title { padding: 0 8px; color: #273443; font-size: 13px; font-weight: 700; }
+.edit-tool-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 10px;
+  color: #344054;
+  font-size: 12px;
+  white-space: nowrap;
+  background: rgba(239, 239, 239, 0.76);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.edit-tool-button:hover, .edit-tool-button.active { color: #2563eb; border-color: #0278e7; background: #efefef; }
+.edit-tool-button:disabled { opacity: 0.55; cursor: not-allowed; }
+.edit-tool-button.danger {
+  color: #e5484d;
+  background: rgba(239, 239, 239, 0.76); /* 与普通按钮一致的浅灰底 */
+  border-color: transparent;
+}
+.edit-tool-button.danger:hover {
+  color: #d9363e;
+  background: #fef2f2;        /* 悬停时极浅红底，仍以文字色为主 */
+  border-color: #e5484d;
+}
+.edit-tool-button.save { color: #fff; background: #1677ff; border-color: #1677ff; }
+.edit-tool-button.recalculate { color: #087443; border-color: #6ce9a6; background: #ecfdf3; }
+.edit-divider { width: 1px; height: 24px; background: #d0d5dd; }
 
 /* ---------- 道路 / 线路 hover 气泡 ---------- */
 .map-line-tip {
@@ -1724,4 +2619,35 @@ onUnmounted(() => {
 }
 .layer-legend-line.road { background: #2563eb; }
 .layer-legend-line.line { background: #eab308; }
+:deep(.layer-panel){
+
+}
+
+@media (max-width: 760px) {
+  .right-top-card {
+    top: 56px;
+    right: 8px;
+    width: min(375px, calc(100vw - 16px));
+  }
+  .right-top-card .tooltip-header { padding: 8px 10px; }
+  .right-top-card .tooltip-title { font-size: 14px; }
+  .right-top-card .tooltip-grid .grid-item { padding: 3px 8px; }
+  .right-top-card .grid-value { font-size: 13px; }
+  .right-top-card .tooltip-footer { gap: 2px; padding: 6px 8px; }
+  .right-top-card .footer-action { font-size: 11px; }
+  .right-top-card .footer-action.danger { padding: 6px 8px; }
+  .action-menu-button { width: 28px; height: 28px; }
+  .geometry-edit-toolbar { top: 6px; right: 8px; left: auto; max-width: calc(100vw - 16px); gap: 4px; padding: 5px; }
+  .edit-tool-button { gap: 3px; padding: 0 7px; font-size: 11px; }
+}
+
+/* :deep(.verify-panel){
+  background: linear-gradient(149.65deg, rgba(255, 255, 255, 0.2) 4.61%, rgba(255, 255, 255, 0.15) 29.07%, rgba(255, 255, 255, 0.3) 49.01%, rgba(255, 255, 255, 0.1) 61.4%, rgba(255, 255, 255, 0.2) 74.74%, rgba(255, 255, 255, 0.22) 97.19%);
+}
+:deep(.verify-tip){
+  background:rgba(255,255,255,0.5)
+}
+:deep(.verify-tip){
+  background:rgba(255,255,255,0.5)
+} */
 </style>

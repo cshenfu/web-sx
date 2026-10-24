@@ -80,30 +80,56 @@ async function handleUserCommand(command) {
 .app-header {
   position: fixed;
   top: 0;
-  left: 0;
+  left: 0; /* ★ 保持 0，让 Logo 贴着屏幕最左侧 */
   right: 0;
   z-index: 1000;
   height: 65px;
   display: flex;
   align-items: center;
+  justify-content: space-between; /* 左右内容自动靠边 */
   padding: 0 24px;
   box-sizing: border-box;
   background: #fff;
-  /* 去掉所有边框和阴影，实现视觉上的融为一体 */
   border: none;
   box-shadow: none;
 }
 
-/* 【核心修改 1】 左侧占据 flex: 1 空间，左对齐 */
+/* 左侧不需要 flex: 1 了，自然撑开即可 */
 .header-left {
-  flex: 1; 
-  min-width: 380px; /* 防止缩小的时候内容挤压 */
   display: flex;
   align-items: center;
   gap: 16px;
   justify-content: flex-start;
+  z-index: 2;
 }
 
+/* 右侧同样不需要 flex: 1 */
+.header-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  color: #1677ff;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+/* ★ 核心修改：导航栏绝对定位居中并向右偏移 */
+.module-nav {
+  position: absolute;
+  /* 50% 是屏幕中心，42.5px 是左侧边栏宽度的一半 (85/2) */
+  left: calc(50% + 42.5px); 
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%); /* 用 transform 把自身宽度往回拉，实现完美居中 */
+  
+  display: flex;
+  align-items: stretch;
+  gap: 30px;
+}
+
+/* 下面 module-link 等样式保持你原来的不变 */
 .logo {
   width: 160px; /* 按照你的要求设置为 160px */
   height: auto;
@@ -119,15 +145,6 @@ async function handleUserCommand(command) {
   white-space: nowrap;
 }
 
-/* 【核心修改 2】 中间导航取消 flex 分配，自适应宽度 */
-.module-nav {
-  flex: 0 1 auto; 
-  height: 100%;
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  gap: 30px;
-}
 
 .module-link {
   position: relative;

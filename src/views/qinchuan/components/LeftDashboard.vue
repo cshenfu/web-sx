@@ -38,7 +38,7 @@ function handleProjectSelect(row) {
 .left-dashboard {
   display: flex;
   flex-direction: column;
-  width: clamp(240px, 23vw, 320px);
+  width: 410px;
   height: 100%;
   box-sizing: border-box;
   padding-top: 20px; /* 给凸出面板的头部留出安全空间 */
@@ -48,8 +48,8 @@ function handleProjectSelect(row) {
 
 /* 按比例分配高度 */
 .left-dashboard > :nth-child(1) { flex: 307.5; min-height: 0; }
-.left-dashboard > :nth-child(2) { flex: 230; min-height: 0; }
-.left-dashboard > :nth-child(3) { flex: 297; min-height: 0; }
+.left-dashboard > :nth-child(2) { flex: 286; min-height: 0; }
+.left-dashboard > :nth-child(3) { flex: 237; min-height: 0; }
 
 .left-dashboard > :deep(.dashboard-panel) {
   margin-top: 0 !important;

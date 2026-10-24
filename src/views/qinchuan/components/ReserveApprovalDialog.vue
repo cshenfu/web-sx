@@ -129,4 +129,29 @@ function handleSave() {
 <style scoped>
 .section-bg { background: #f9fafc; padding: 20px 20px 0; border-radius: 8px; }
 .upload-tip { color: #f56c6c; font-size: 12px; }
+/* 限制弹窗最大高度 */
+:deep(.approval-dialog) {
+  max-height: 90vh; /* 弹窗最高占屏幕90% */
+  display: flex;
+  flex-direction: column;
+}
+
+/* 让中间的 body 区域撑满剩余空间，并在内部滚动 */
+:deep(.approval-dialog .el-dialog__body) {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 20px 20px;
+}
+
+/* 隐藏内部滚动条的默认样式（可选，让滚动条更细更美观） */
+:deep(.approval-dialog .el-dialog__body)::-webkit-scrollbar {
+  width: 6px;
+}
+:deep(.approval-dialog .el-dialog__body)::-webkit-scrollbar-thumb {
+  background: #dcdfe6;
+  border-radius: 4px;
+}
+:deep(.approval-dialog .el-dialog__body)::-webkit-scrollbar-track {
+  background: transparent;
+}
 </style>

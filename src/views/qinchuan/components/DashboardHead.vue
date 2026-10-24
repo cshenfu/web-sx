@@ -118,7 +118,7 @@ onUnmounted(() => {
 .head-right-info {
   position: absolute;
   right: clamp(24px, 2.5vw, 48px); /* 右边距，可根据实际效果图微调 */
-  top: 50%;
+  top: 40%;
   transform: translateY(-50%);
   z-index: 30;
   display: flex;

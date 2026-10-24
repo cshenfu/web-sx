@@ -25,7 +25,7 @@ const emit = defineEmits(['news-click'])
 .right-dashboard {
   display: flex;
   flex-direction: column;
-  width: clamp(238px, 23vw, 326px);
+  width: 410px;
   height: 100%;
   box-sizing: border-box;
   padding-top: 20px; /* 给悬浮头部留空间 */
