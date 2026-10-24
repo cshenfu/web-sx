@@ -15,7 +15,25 @@
       :offset="layerPanelOffset"
       :z-index="layerPanelZIndex"
       @toggle="onLayerToggle"
-    />
+    >
+      <template #legend>
+        <div class="layer-legend">
+          <span class="layer-legend-item">
+            <i class="layer-legend-line road" />道路
+          </span>
+          <span class="layer-legend-item">
+            <i class="layer-legend-line line" />线路
+          </span>
+        </div>
+      </template>
+    </LayerChipPanel>
+
+    <!-- 道路 / 线路 hover 气泡 -->
+    <div
+      v-if="lineTip.visible"
+      class="map-line-tip"
+      :style="{ left: lineTip.x + 'px', top: lineTip.y + 'px' }"
+    >{{ lineTip.text }}</div>
 
     <template v-if="!isAreaView">
       <DashboardHead class="head-layer" />
@@ -300,7 +318,7 @@ import { List, MapLocation, Plus, Search, Edit, ArrowRight } from '@element-plus
 
 import MapGL from '@/components/MapGL.vue'
 import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
-import { WHLN_LAYER_IDS } from '@/components/site-map/layerPanelConfig'
+import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPanelConfig'
 import { attachSxLayers } from '@/components/site-map/attachSxLayers'
 import { ICON_SIZE_WIND, ICON_SIZE_BOOSTER } from '@/components/site-map/iconSize.js'
 import DashboardHead from './components/DashboardHead.vue'
@@ -354,11 +372,37 @@ const ICON_AREA_FJ = 'icon-area-fj-overview'
 const ICON_AREA_GF = 'icon-area-gf-overview'
 const AREA_CENTER_LAYER_ID = 'overview-project-area-center-icons'
 let areaCenterIconRequestVersion = 0
-const OVERVIEW_ROAD_LAYER_ID = 'overview-project-road-glow'
+
+// —— 场区道路 / 线路图层 ——
+const ROAD_LAYER_ID = 'overview-project-road-layer'
+const LINE_LAYER_ID = 'overview-project-35kv-line-layer'
 let overviewRoadRequestVersion = 0
 let currentOverviewRoadProjectId = null
 const overviewRoadCache = new Map()
 const overviewRoadInFlight = new Map()
+
+// 道路：蓝色系；线路：黄色系
+const ROAD_LINE_COLORS = {
+  road: '#2563eb',
+  line: '#eab308',
+}
+const ROAD_PAINT = {
+  'line-color': ROAD_LINE_COLORS.road,
+  'line-width': 2.5,
+  'line-opacity': 0.95,
+}
+const LINE_PAINT = {
+  'line-color': ROAD_LINE_COLORS.line,
+  'line-width': 2.5,
+  'line-opacity': 0.95,
+}
+const lineTip = reactive({ visible: false, x: 0, y: 0, text: '' })
+
+// chip → 图层映射
+const PROJECT_ICON_LAYER_MAP = {
+  'wind-gh': ['overview-project-wind-all'],
+  booster: ['overview-project-booster-all'],
+}
 
 // 3D 地形
 const TERRAIN_SOURCE_ID = 'terrain-dem'
@@ -422,7 +466,7 @@ const mapReady = ref(false)
 const viewMode = ref('map')
 const showLayerPanel = ref(false)
 let whlnPlugin = null
-const layerVisibleIds = ref(['tdt-imagery'])
+const layerVisibleIds = ref([...DEFAULT_VISIBLE])
 const isDetailFullscreen = ref(false)
 
 const activeEditTool = ref('')
@@ -622,15 +666,27 @@ function handleTableSortChange({ prop, order }) {
 watch(() => filters.stage, () => { pagination.page = 1; fetchProjectList() })
 watch(viewMode, (val) => { if (val === 'list' && showLayerPanel.value) showLayerPanel.value = false })
 
-// ==================== 图层显示 ====================
-const layerVisible = reactive({ wind: true, booster: true })
-
-function applyLayerVisibility() {
+// ==================== 图层显隐：项目图标 + 道路/线路 ====================
+function setProjectIconVisible(chipId, visible) {
+  const layerIds = PROJECT_ICON_LAYER_MAP[chipId]
+  if (!layerIds) return
   const map = mapRef.value?.getMap?.()
   if (!map) return
-  const setVis = (id, visible) => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none') }
-  setVis('overview-project-wind-all', layerVisible.wind)
-  setVis('overview-project-booster-all', layerVisible.booster)
+  for (const layerId of layerIds) {
+    if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none')
+  }
+}
+function syncAllProjectIcons() {
+  for (const chipId of Object.keys(PROJECT_ICON_LAYER_MAP)) {
+    setProjectIconVisible(chipId, layerVisibleIds.value.includes(chipId))
+  }
+}
+
+function toggleCustomLayer(id, visible) {
+  if (id === 'road' || id === 'line') {
+    syncRoadLineVisibility()
+    return
+  }
 }
 
 function handleAddProject() { ElMessage.info('添加项目功能已停用') }
@@ -765,6 +821,138 @@ function appendOverviewLineSegments(features, pointRows, sourceType) {
   })
 }
 
+/** 把接口数据拆成「道路」和「线路」两个 Feature 数组 */
+function buildRoadLineFeatures(data) {
+  const roadFeatures = []
+  const lineFeatures = []
+
+  // 三种道路来源合并，统一显示为「道路」
+  const roadMap = data?.roadMap ?? data?.data?.roadMap ?? {}
+  for (const type of ['CNKJ', 'CNXJ', 'JZXJ']) {
+    const before = roadFeatures.length
+    appendOverviewLineSegments(roadFeatures, roadMap?.[type]?.roadpoint, type)
+    for (let i = before; i < roadFeatures.length; i += 1) {
+      roadFeatures[i].properties = {
+        ...roadFeatures[i].properties,
+        category: 'road',
+        label: '道路',
+      }
+    }
+  }
+
+  // 35kV 线路
+  const line35Kv = data?.line35Kv ?? data?.data?.line35Kv
+  const loops = line35Kv?.line?.loops ?? data?.line?.loops ?? []
+  if (Array.isArray(loops)) {
+    loops.forEach((loop, loopIndex) => {
+      const before = lineFeatures.length
+      appendOverviewLineSegments(lineFeatures, loop?.cablepoletower, `35kV-${loopIndex}`)
+      for (let i = before; i < lineFeatures.length; i += 1) {
+        lineFeatures[i].properties = {
+          ...lineFeatures[i].properties,
+          category: 'line',
+          label: loops.length > 1 ? `35kV 线路（${loopIndex + 1}）` : '35kV 线路',
+        }
+      }
+    })
+  }
+
+  return { roadFeatures, lineFeatures }
+}
+
+/** 创建/更新一个线图层，并绑定 hover */
+function upsertLineLayer(layerId, geojson, paint) {
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+  const sourceId = `${layerId}-src`
+
+  if (map.getSource(sourceId)) {
+    map.getSource(sourceId).setData(geojson)
+    if (!map.getLayer(layerId)) {
+      map.addLayer({ id: layerId, type: 'line', source: sourceId, layout: { visibility: 'visible' }, paint })
+    } else {
+      map.setLayoutProperty(layerId, 'visibility', 'visible')
+    }
+  } else {
+    map.addSource(sourceId, { type: 'geojson', data: geojson })
+    map.addLayer({ id: layerId, type: 'line', source: sourceId, layout: { visibility: 'visible' }, paint })
+  }
+
+  map.off('mousemove', layerId, onLineHoverMove)
+  map.off('mouseleave', layerId, onLineHoverLeave)
+  map.on('mousemove', layerId, onLineHoverMove)
+  map.on('mouseleave', layerId, onLineHoverLeave)
+
+  // 保持遮罩在最顶层
+  if (map.getLayer(MASK_LAYER_ID)) map.moveLayer(MASK_LAYER_ID)
+}
+
+/** 根据当前可见状态 + 缓存数据，同步道路/线路图层显隐 */
+function syncRoadLineVisibility() {
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+  const roadOn = layerVisibleIds.value.includes('road')
+  const lineOn = layerVisibleIds.value.includes('line')
+  const pid = popoverProject.value?.id ?? selectedProject.value?.id
+  const cached = pid != null ? overviewRoadCache.get(pid) : null
+
+  if (roadOn && cached?.roadFeatures?.length) {
+    upsertLineLayer(ROAD_LAYER_ID, { type: 'FeatureCollection', features: cached.roadFeatures }, ROAD_PAINT)
+  } else if (map.getLayer(ROAD_LAYER_ID)) {
+    map.setLayoutProperty(ROAD_LAYER_ID, 'visibility', 'none')
+  }
+
+  if (lineOn && cached?.lineFeatures?.length) {
+    upsertLineLayer(LINE_LAYER_ID, { type: 'FeatureCollection', features: cached.lineFeatures }, LINE_PAINT)
+  } else if (map.getLayer(LINE_LAYER_ID)) {
+    map.setLayoutProperty(LINE_LAYER_ID, 'visibility', 'none')
+  }
+
+  if (!roadOn && !lineOn) lineTip.visible = false
+}
+
+/** 只删图层/source/事件，不动请求版本 */
+function removeRoadLineLayers() {
+  const map = mapRef.value?.getMap?.()
+  if (map) {
+    for (const layerId of [ROAD_LAYER_ID, LINE_LAYER_ID]) {
+      map.off('mousemove', layerId, onLineHoverMove)
+      map.off('mouseleave', layerId, onLineHoverLeave)
+      if (map.getLayer(layerId)) map.removeLayer(layerId)
+      const sourceId = `${layerId}-src`
+      if (map.getSource(sourceId)) map.removeSource(sourceId)
+    }
+    map.getCanvas().style.cursor = ''
+  }
+  lineTip.visible = false
+}
+
+/** 清空选中项目时调用：让进行中的请求失效 + 删图层 */
+function clearOverviewRoadLayer() {
+  overviewRoadRequestVersion += 1
+  overviewRoadInFlight.clear()
+  currentOverviewRoadProjectId = null
+  removeRoadLineLayers()
+}
+
+function onLineHoverMove(e) {
+  const feature = e.features?.[0]
+  if (!feature) return
+  const props = feature.properties || {}
+  lineTip.text = props.label || (props.category === 'line' ? '35kV 线路' : '道路')
+  lineTip.x = e.point.x
+  lineTip.y = e.point.y
+  lineTip.visible = true
+  const map = mapRef.value?.getMap?.()
+  if (map) map.getCanvas().style.cursor = 'pointer'
+}
+
+function onLineHoverLeave() {
+  lineTip.visible = false
+  const map = mapRef.value?.getMap?.()
+  if (map) map.getCanvas().style.cursor = ''
+}
+
 async function loadOverviewRoadData(projectId) {
   const isActive = () => {
     const pid = String(projectId)
@@ -773,59 +961,36 @@ async function loadOverviewRoadData(projectId) {
   }
   if (!isActive()) return
 
-  // ★ 幂等：当前 layer 显示的就是这个项目，直接 return，不重绘
-  if (
-    currentOverviewRoadProjectId === String(projectId) &&
-    mapRef.value?.getMap?.()?.getSource(OVERVIEW_ROAD_LAYER_ID)
-  ) return
-
-  const cachedLayer = overviewRoadCache.get(projectId)
-  if (cachedLayer) {
-    mapRef.value?.addGlowLine(cachedLayer)
-    currentOverviewRoadProjectId = String(projectId)
+  // ★ 命中缓存：直接按当前 chip 状态重建
+  const cached = overviewRoadCache.get(projectId)
+  if (cached) {
+    if (currentOverviewRoadProjectId !== String(projectId)) {
+      removeRoadLineLayers()
+      currentOverviewRoadProjectId = String(projectId)
+    }
+    syncRoadLineVisibility()
     return
   }
   if (overviewRoadInFlight.has(projectId)) return
 
   const requestVersion = ++overviewRoadRequestVersion
   overviewRoadInFlight.set(projectId, requestVersion)
+  removeRoadLineLayers()
+  currentOverviewRoadProjectId = null
 
   try {
     const res = await newApi.getRoadData(projectId)
     if (requestVersion !== overviewRoadRequestVersion || !isActive()) return
 
     const data = unwrapOverviewRoadResponse(res)
-    const roadMap = data?.roadMap ?? data?.data?.roadMap ?? {}
-    const features = []
-
-    for (const type of ['CNKJ', 'CNXJ', 'JZXJ']) {
-      appendOverviewLineSegments(features, roadMap?.[type]?.roadpoint, type)
-    }
-
-    const line35Kv = data?.line35Kv ?? data?.data?.line35Kv
-    const loops = line35Kv?.line?.loops ?? data?.line?.loops ?? []
-    if (Array.isArray(loops)) {
-      loops.forEach((loop, loopIndex) => {
-        appendOverviewLineSegments(features, loop?.cablepoletower, `35kV-${loopIndex}`)
-      })
-    }
-
-    if (requestVersion !== overviewRoadRequestVersion || !isActive()) return
-    if (!features.length || !mapRef.value) {
-      console.warn('[overview-road] 接口未返回可绘制的道路或线路点位')
-      return
-    }
-
-    const layerData = {
-      id: OVERVIEW_ROAD_LAYER_ID,
-      geojson: { type: 'FeatureCollection', features },
-      color: '#00e6c8',
-      coreColor: '#65f8df',
-      width: 1.5,
-    }
-    overviewRoadCache.set(projectId, layerData)
-    mapRef.value.addGlowLine(layerData)
+    const { roadFeatures, lineFeatures } = buildRoadLineFeatures(data)
+    overviewRoadCache.set(projectId, { roadFeatures, lineFeatures })
     currentOverviewRoadProjectId = String(projectId)
+    syncRoadLineVisibility()
+
+    if (!roadFeatures.length && !lineFeatures.length) {
+      ElMessage.info('接口未返回可绘制的道路或线路点位')
+    }
   } catch (err) {
     console.warn('[overview-road] 道路/线路数据加载失败:', err)
     ElMessage.warning(err?.message || '道路或线路数据加载失败')
@@ -834,13 +999,6 @@ async function loadOverviewRoadData(projectId) {
       overviewRoadInFlight.delete(projectId)
     }
   }
-}
-
-function clearOverviewRoadLayer() {
-  overviewRoadRequestVersion += 1
-  overviewRoadInFlight.clear()
-  mapRef.value?.removeLayer(OVERVIEW_ROAD_LAYER_ID)
-  currentOverviewRoadProjectId = null
 }
 
 function buildAreaFeature(project) {
@@ -1028,7 +1186,7 @@ async function renderSelectedProjectIcons(project) {
   if (bf.features.length) {
     await safeAddIcon({ layerId: 'overview-project-booster-all', featureCollection: bf, iconId: ICON_SHENGYAZHAN, iconUrl: shengyazhanIcon, iconSize: ICON_SIZE_BOOSTER, iconAnchor: 'bottom' })
   }
-  applyLayerVisibility()
+  syncAllProjectIcons()
 }
 
 function clearSelectedProjectIcons() {
@@ -1052,6 +1210,7 @@ async function renderProjectsByStage(stage) {
   await renderAreaCenterIcons()
   if (popoverProject.value) await renderSelectedProjectIcons(popoverProject.value)
   else if (selectedProject.value) await renderSelectedProjectIcons(selectedProject.value)
+  syncAllProjectIcons()
 }
 
 async function fetchMapProjects() {
@@ -1205,14 +1364,23 @@ function ensureShaanxiMask() {
 
 function onLayerToggle(item) {
   const isOn = layerVisibleIds.value.includes(item.id)
-  const next = isOn
-    ? layerVisibleIds.value.filter((id) => id !== item.id)
-    : [...layerVisibleIds.value, item.id]
-  layerVisibleIds.value = next
+  const nextOn = !isOn
+
+  // ★ 先更新可见集合，再分发
+  if (isOn) {
+    layerVisibleIds.value = layerVisibleIds.value.filter((id) => id !== item.id)
+  } else {
+    layerVisibleIds.value = [...layerVisibleIds.value, item.id]
+  }
+
   if (item.type === 'whln') {
-    whlnPlugin?.setVisibleIds?.(next.filter((id) => WHLN_LAYER_IDS.includes(id)))
+    whlnPlugin?.setVisibleIds?.(layerVisibleIds.value.filter((id) => WHLN_LAYER_IDS.includes(id)))
+  } else if (item.type === 'project') {
+    setProjectIconVisible(item.id, nextOn)
   } else if (item.type === 'terrain') {
-    toggleTerrain(!isOn)
+    toggleTerrain(nextOn)
+  } else if (item.type === 'custom') {
+    toggleCustomLayer(item.id, nextOn)
   }
 }
 
@@ -1333,6 +1501,7 @@ onMounted(async () => { await Promise.all([fetchStageList(), fetchProjectList(),
 onUnmounted(() => {
   clearHideTimer()
   unbindZoomListener()
+  removeRoadLineLayers()
   whlnPlugin?.destroy?.()
   whlnPlugin = null
   const map = mapRef.value?.getMap?.()
@@ -1496,4 +1665,45 @@ onUnmounted(() => {
 .right-top-card .tooltip-footer:hover { background: rgba(200, 210, 220, 0.7); }
 .right-top-card .footer-left { display: flex; align-items: center; gap: 6px; color: #374151; font-size: 13px; }
 .right-top-card .footer-right { display: flex; align-items: center; gap: 4px; color: #1677ff; font-size: 13px; font-weight: 500; }
+
+/* ---------- 道路 / 线路 hover 气泡 ---------- */
+.map-line-tip {
+  position: absolute;
+  z-index: 26;
+  padding: 4px 8px;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  background: rgba(17, 24, 39, 0.9);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  transform: translate(12px, 12px);
+}
+
+/* ---------- 图层图例（传入 LayerChipPanel 的 #legend） ---------- */
+.layer-legend {
+  display: flex;
+  gap: 14px;
+  padding: 8px 2px 2px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+.layer-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #606266;
+  font-size: 12px;
+  user-select: none;
+}
+.layer-legend-line {
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+}
+.layer-legend-line.road { background: #2563eb; }
+.layer-legend-line.line { background: #eab308; }
 </style>

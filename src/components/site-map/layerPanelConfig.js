@@ -23,7 +23,7 @@ export const PANEL_GROUPS = [
     label: '规划元素',
     items: [
       { id: 'measure-tower', name: '测风塔',  icon: 'Odometer',   type: 'custom' },
-      { id: 'wind-farm',     name: '风机',    icon: 'Picture',    type: 'project' },
+      { id: 'wind-gh',     name: '风机',    icon: 'Picture',    type: 'project' },
       { id: 'booster',       name: '升压塔',  icon: 'Lightning',  type: 'project' },
       { id: 'access-tower',  name: '接入塔',  icon: 'Connection', type: 'custom' },
       { id: 'road',          name: '道路',    icon: 'Guide',      type: 'custom' },
@@ -53,6 +53,7 @@ export const PANEL_GROUPS = [
       { id: 'rivers',          name: '水系',      color: '#3D8EC8', type: 'whln' },
       { id: 'pv-station',      name: '光伏场站',  color: '#EAB308', type: 'whln' },
       { id: 'substation',      name: '变电站',    color: '#F59E0B', type: 'whln' },
+      { id: 'wind-farm',      name: '已建风场',    color: '#c026d3', type: 'whln' },
       { id: 'collection-line', name: '电网',      color: '#f97316', type: 'whln' },
     ],
   },
@@ -64,6 +65,9 @@ export const WHLN_LAYER_IDS = PANEL_GROUPS.flatMap(g => g.items)
 
 export const DEFAULT_VISIBLE = [
   'tdt-imagery',
-  'wind-farm',
-  'booster',
+  'wind-farm',   // 已建风场（whln，保留原默认）
+  'wind-gh',     // 场区风机
+  'booster',     // 升压塔
+  'road',        // 道路
+  'line',        // 线路
 ]
