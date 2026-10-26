@@ -2,13 +2,14 @@
     <div class="weather-home-content">
         <div class="weather-map-template">
             <maplibreMap
-                ref="maplibreMapRef"
-                @toPostLngLat="getDataFromClick"
-                @updateCesiumMapScale="getCesiumMapScale"
-                :roadKey="roadKey"
-                :resourceMapKey="resourceMapKey"
-                :terrainMapKey="terrainMapKey"
-            >
+  ref="maplibreMapRef"
+  @toPostLngLat="getDataFromClick"
+  @updateCesiumMapScale="getCesiumMapScale"
+  :roadKey="roadKey"
+  :resourceMapKey="resourceMapKey"
+  :ghiMapKey="ghiMapKey"
+  :terrainMapKey="terrainMapKey"
+>
                 <div class="weather-map-tools">
                     <div class="weather-map-search">
                         <span
@@ -19,7 +20,7 @@
                             <iconpark-icon size="11" name="zifubai" v-if="activeIndex == 0"></iconpark-icon>
                             <iconpark-icon size="11" name="zifulan" v-else></iconpark-icon>
                         </span>
-                        
+
                         <span class="search-input" v-if="activeIndex == 0">
                             <el-input
                                 v-model="mapSearchValue"
@@ -40,12 +41,12 @@
                                 <iconpark-icon name="shanchu"></iconpark-icon>
                             </span>
                         </span>
-                        
+
                         <span class="search-handle" @click="searchFlyTo">
                             <iconpark-icon size="18" color="#a8adbe" name="feiji"></iconpark-icon>
                         </span>
                     </div>
-                    
+
                     <!-- 文件操作模块 -->
                     <div v-if="activeIndex == 1 && !weatherResultKey" class="weather-map-fileBox">
                         <header>场区范围上传</header>
@@ -64,7 +65,7 @@
                             </template>
                         </Upload>
                     </div>
-                    
+
                     <!-- 点位搜索结果面板 -->
                     <div class="weather-map-resultBox" v-if="weatherPointLngLat.length && weatherResultKey">
                         <div class="result-box-header">
@@ -109,29 +110,46 @@
                             </ul>
                             <div class="loading-template" v-if="weatherResultLoading">
                                 <el-icon class="is-loading"><Loading /></el-icon>
-                            </div> 
+                            </div>
                         </div>
                     </div>
-                    
+
                     <!-- 操作地图面板 -->
                     <div class="weather-map-handle">
-                        <span
-                            @click="resourceMapKey = !resourceMapKey, roadKey = false, terrainMapKey = false"
-                            :class="resourceMapKey ? 'active' : ''"
-                        >
-                            <iconpark-icon size="14" :name="resourceMapKey ? 'ziyuantupuxuanzhong' : 'ziyuantupumoren'"></iconpark-icon>
-                            <i>资源图谱</i>
-                        </span>
-                        <span @click="roadKey = !roadKey, terrainMapKey = false, resourceMapKey = false" :class="roadKey ? 'active' : ''">
-                            <iconpark-icon size="14" :name="roadKey ? 'luwangxuanzhong' : 'luwangmoren'"></iconpark-icon>
-                            <i>路网</i>
-                        </span>
-                        <span @click="terrainMapKey = !terrainMapKey, roadKey = false, resourceMapKey = false" :class="terrainMapKey ? 'active' : ''">
-                            <iconpark-icon size="14" :name="terrainMapKey ? '3Dxuanzhong' : '3Dmoren'"></iconpark-icon>
-                            <i>3D地形</i>
-                        </span>
-                    </div>
-                    
+  <span
+    :class="resourceMapKey ? 'active' : ''"
+    @click="resourceMapKey = !resourceMapKey"
+  >
+    <el-icon><WindPower /></el-icon>
+    <i>风资源</i>
+  </span>
+  <span
+    :class="ghiMapKey ? 'active' : ''"
+    @click="ghiMapKey = !ghiMapKey"
+  >
+    <el-icon><Sunny /></el-icon>
+    <i>光资源</i>
+  </span>
+  <span
+    :class="roadKey ? 'active' : ''"
+    @click="roadKey = !roadKey"
+  >
+    <el-icon><Guide /></el-icon>
+    <i>路网</i>
+  </span>
+  <span
+    :class="terrainMapKey ? 'active' : ''"
+    @click="terrainMapKey = !terrainMapKey"
+  >
+    <el-icon><Grid /></el-icon>
+    <i>3D地形</i>
+  </span>
+  <span class="my-download" @click="goToDownloadList">
+    <iconpark-icon size="14" name="xiazai"></iconpark-icon>
+    <i>我的下载</i>
+  </span>
+</div>
+
                     <div class="weather-address-search" v-if="isShowAddressResult">
                         <ul>
                             <li
@@ -144,7 +162,7 @@
                             </li>
                         </ul>
                     </div>
-                    
+
                     <!-- 地图比例尺面板 -->
                     <div class="weather-map-info">
                         <div class="thermalMapPro">
@@ -160,7 +178,7 @@
             </maplibreMap>
         </div>
     </div>
-    
+
     <!-- 套餐提示弹窗 -->
     <projectPackage
         :TipsDialogVisible="TipsDialogVisible"
@@ -178,7 +196,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
 
 // 引入 MapLibre 组件（请确认刚才写的 maplibreMap.vue 的路径）
-import maplibreMap from '@/components/polyMap/maplibreMap.vue'; 
+import maplibreMap from '@/components/polyMap/maplibreMap.vue';
 
 // 引入业务组件和 API
 import { checkPackageEffective } from '@/api/modules/reportIndex.js';
@@ -197,7 +215,7 @@ import isInChinaMainlandPrecise from '@/utils/checkPointInChinaMainland';
 import { isWithinDateRange } from '@/utils/isWithinDateRange.js';
 import { getHasDownloadHistory, postCreateDownloadTask, getHeightAndDetail } from '@/api/modules/weather';
 import chinaCounty from '@/assets/js/chinaCounty.json';
-
+import { WindPower, Sunny, Guide, Grid } from '@element-plus/icons-vue'
 // 定义事件，用于通知父组件打开下载列表
 const emit = defineEmits(['open-download']);
 
@@ -211,6 +229,7 @@ const downLoadDisabled = ref(false);
 const weatherResultLoading = ref(false);
 const roadKey = ref(false);
 const resourceMapKey = ref(false);
+const ghiMapKey = ref(false)      // 光资源
 const terrainMapKey = ref(false);
 const hubHeight = ref(100);
 const activeIndex = ref(0);
@@ -243,6 +262,11 @@ const weatherResultData = ref([
     { name: 'Weibull K', code: 'weibullK', value: '' },
 ]);
 
+// 打开我的下载列表（复用父组件的下载覆盖层）
+const goToDownloadList = () => {
+    emit('open-download');
+};
+
 // 根据经纬度获取地址信息 (天地图逆地理编码)
 const getAddress = async (lng, lat) => {
     axios.get(`https://api.tianditu.gov.cn/geocoder?postStr={'lon':${lng},'lat':${lat},'ver':1}&type=geocod&tk=` + tdKeyList[Math.floor(Math.random() * tdKeyList.length)])
@@ -251,7 +275,7 @@ const getAddress = async (lng, lat) => {
                 const addressData = res.data.result.addressComponent;
                 const addressStr = `${addressData.province}${addressData.city}${addressData.county}${addressData.town}${addressData.poi}${addressData.poi_distance ? addressData.poi_position : ''}${addressData.poi_distance ? addressData.poi_distance + '米' : ''}`;
                 weatherPointAddress.value = addressStr;
-                
+
                 // 绘制行政区边界
                 const features = chinaCounty.features;
                 const county_code = addressData.county_code;
@@ -273,7 +297,7 @@ const getFileDataToHandle = async (file, data, isPoint) => {
             centerPointArr.push(getPolygonCenterPoint(polygonData[index]));
         }
     }
-    
+
     function reverseAndMergeArrays(arrays) {
         const reversedArrays = arrays[0].map((subArray) => subArray.reverse());
         return reversedArrays.flat().map((item) => Number(item));
@@ -297,7 +321,7 @@ const getFileDataToHandle = async (file, data, isPoint) => {
         getWeatherData({ lng: centerPointArr[0]['longitude'], lat: centerPointArr[0]['latitude'] });
         getAddress(centerPointArr[0]['longitude'], centerPointArr[0]['latitude']);
     }
-    
+
     weatherFile.value = [file];
     let uploadResult = await ossUpload.uploadFile(file, sessionStorage.getItem('obsFilePath'));
     weatherFileInfo.value.push({
@@ -342,7 +366,7 @@ const proFormatKMLFile = async (file) => {
             getFileDataToHandle(file, datas, isPoint);
         }
     };
-    
+
     const kmzFileEvent = async (fileParams) => {
         const jszip = new JSZip();
         const jszipResult = await jszip.loadAsync(fileParams);
@@ -398,7 +422,7 @@ const hubHeightChangeEvent = () => {
     }
 };
 
-// 创建下载任务（注意这里替换成了 ElMessageBox）
+// 创建下载任务
 const createDownloadTask = async (params) => {
     const isDownload = await getHasDownloadHistory(params);
     if (isDownload.code === 200) {
@@ -407,8 +431,8 @@ const createDownloadTask = async (params) => {
                 confirmButtonText: '前去查看',
                 callback: (action) => {
                     if (action === 'confirm') {
-                        // 👇 核心修改：通知父组件打开下载覆盖层
-                        emit('open-download');
+                        // 复用统一的打开下载入口
+                        goToDownloadList();
                     }
                 }
             });
@@ -419,8 +443,8 @@ const createDownloadTask = async (params) => {
                     confirmButtonText: '前去查看',
                     callback: (action) => {
                         if (action === 'confirm') {
-                            // 👇 核心修改：通知父组件打开下载覆盖层
-                            emit('open-download');
+                            // 复用统一的打开下载入口
+                            goToDownloadList();
                         }
                     }
                 });
@@ -437,13 +461,13 @@ const downloadFileData = async (itemType) => {
         return false;
     }
     if (await isWithinDateRange()) return false;
-    
+
     const index = weatherResultData.value.findIndex((ele) => ele.code == ['winds']);
     let eachHeightSpeed = weatherResultData.value[index]['value'];
     if (!eachHeightSpeed || eachHeightSpeed == '--') {
         eachHeightSpeed = null;
     }
-    
+
     const obj = {
         companyId: sessionStorage.getItem('userId'),
         dataType: itemType ? 2 : 1,
@@ -453,7 +477,7 @@ const downloadFileData = async (itemType) => {
         eachHeightSpeed: eachHeightSpeed,
         height: hubHeight.value,
     };
-    
+
     if (itemType) {
         const params = { companyId: sessionStorage.getItem('userId'), itemType: itemType };
         const data = await checkPackageEffective(params, itemType);
@@ -498,7 +522,7 @@ const formatStr = (str) => {
 const searchFlyTo = () => {
     isShowAddressResult.value = false;
     if (!mapSearchValue.value) return false;
-    
+
     mapSearchValue.value = formatStr(mapSearchValue.value);
     if (isLonLat(mapSearchValue.value) && !/[\u4E00-\u9FA5\uF900-\uFA2D]/.test(mapSearchValue.value)) {
         const [lon, lat] = mapSearchValue.value.split(',');
@@ -540,13 +564,13 @@ const getWeatherData = async (lngLat) => {
     if (!hubHeight.value) return false;
     weatherResultLoading.value = true;
     weatherPointLngLat.value = [(lngLat.lng * 1).toFixed(6), (lngLat.lat * 1).toFixed(6)];
-    
+
     const res = await getHeightAndDetail({
         lng: weatherPointLngLat.value[0],
         lat: weatherPointLngLat.value[1],
         height: hubHeight.value,
     });
-    
+
     if (res.code == 200 && res.data) {
         for (let i = 0; i < weatherResultData.value.length; i++) {
             const ele = weatherResultData.value[i];
@@ -586,7 +610,7 @@ onMounted(() => {
 <style scoped lang="scss">
     /* 你的原有样式 */
     @import './home.scss';
-    
+
     /* 补充 Element Plus loading icon 颜色兼容 */
     .loading-template {
         display: flex;
@@ -596,6 +620,14 @@ onMounted(() => {
         .is-loading {
             font-size: 24px;
             color: #409eff;
+        }
+    }
+
+    /* 我的下载按钮：与左侧三个 tab 间距 15px */
+    .weather-map-handle {
+        .my-download {
+            margin-left: 15px;
+            cursor: pointer;
         }
     }
 </style>

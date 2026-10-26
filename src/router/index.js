@@ -150,11 +150,18 @@ const routes = [
       },
 
       // 7. 避让区域
+            // 7. 避让区域
       {
         path: 'avoidzone',
         name: 'HucangAvoidZone',
-        component: () => import('@/views/hucang/ComingSoon.vue'),
-        meta: { title: '避让区域', module: 'hucang', sidebar: 'hucang', key: 'avoidzone' }
+        // 指向你刚才新建的避让区域主页面
+        component: () => import('@/views/hucang/avoidance/AvoidanceArea.vue'),
+        meta: { 
+          title: '避让区域', 
+          module: 'hucang', 
+          sidebar: 'hucang', 
+          key: 'avoidzone' 
+        }
       },
 
       // 8. 电网 (对应旧项目 /currentPower/...)

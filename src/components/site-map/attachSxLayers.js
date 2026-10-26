@@ -18,7 +18,7 @@ const BENEATH_PREFIXES = [
 // WMTS 地址生成
 // ============================================================
 const SX_MAP_WMTS_BASE =
-  'https://gis.wh-ge.com/sx-map-service/prod/gwc/service/wmts'
+  'https://gis.wh-ge.com/sx-map-service/ghi/gwc/service/wmts'
 
 const WMTS_FORMAT_VECTOR = 'application/vnd.mapbox-vector-tile'
 const WMTS_FORMAT_RASTER = 'image/png'

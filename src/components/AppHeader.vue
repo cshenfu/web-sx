@@ -183,7 +183,6 @@ async function handleUserCommand(command) {
 
 /* 【核心修改 3】 右侧同样占据 flex: 1 空间，右对齐，确保中间完美居中 */
 .header-right {
-  flex: 1; 
   min-width: 150px;
   display: flex;
   align-items: center;

@@ -3,7 +3,7 @@
   <div
     ref="mapContainer"
     class="map-container"
-    :style="{ backgroundImage: `url(${bgImg})` }"
+    :style="isDashboard?null:{ backgroundImage: `url(${bgImg})` }"
   />
 </template>
 
@@ -18,6 +18,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { addGradientExtrusion } from '@/utils/gradientExtrusion'
 
 import bgImg from '@/assets/img/qinchuan/dashbord/bg.png'
+import { MaplibreStarfieldLayer } from '@geoql/maplibre-gl-starfield'
 
 if (typeof maplibregl.setWorkerUrl === 'function') {
   maplibregl.setWorkerUrl(workerUrl)
@@ -37,8 +38,9 @@ const props = defineProps({
   },
   center: { type: Array, default: () => [0, 20] },
   zoom: { type: Number, default: 1.5 },
-  // ★ 新增：初始化 load 完成后是否自动 flyToShaanxi
   flyToOnLoad: { type: Boolean, default: true },
+  // ★ 控制是否为主页模式（星空、大气光晕、夜半球、自转）
+  isDashboard: { type: Boolean, default: false },
 })
 
 const mapContainer = ref(null)
@@ -59,13 +61,15 @@ const boxOverlayId = 'box-select-overlay'
 let mousedownPoint = null
 let mousedownFeatureId = null
 
-// point-in-polygon 用
 let cityBoundariesCache = null
 
-// ★ 纯 HTML 城市标签
 let labelsContainer = null
 let cityLabels = []
 let cityLabelMoveHandler = null
+
+// 大屏模式专属变量
+let starfieldLayer = null
+let nightOverlay = null
 
 const drawStyles = [
   {
@@ -117,7 +121,6 @@ const drawStyles = [
   },
 ]
 
-// ★ 城市标签可见状态（跨容器重建保持）
 let labelsVisible = true
 
 function setCentroidLabelsVisible(visible) {
@@ -146,6 +149,7 @@ onMounted(() => {
 
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
   map.on('dragstart', () => stopAutoRotate())
+  
   draw = new MapboxDraw({
     displayControlsDefault: false,
     userProperties: true,
@@ -164,42 +168,114 @@ onMounted(() => {
   bindPointInteraction()
   bindBoxSelect()
 
-  // 城市点击：point-in-polygon
   map.on('click', (e) => {
     if (!cityBoundariesCache) return
     const feature = findCityAtLngLat(e.lngLat)
     if (feature) emit('city-click', feature)
   })
 
+  // ---------------- 全局：提前设置球体投影（避免 2D 闪烁） ----------------
+  map.on('style.load', () => {
+    map.setProjection({ type: 'globe' })
+  })
+
   map.on('load', () => {
-  map.setProjection({ type: 'globe' })
+    // ---------------- 全局：背景透明处理 ----------------
+    try {
+      const styleLayers = map.getStyle()?.layers || []
+      styleLayers.forEach((layer) => {
+        if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-opacity', 0)
+      })
+    } catch (e) { /* 忽略 */ }
 
-  try {
-    const styleLayers = map.getStyle()?.layers || []
-    styleLayers.forEach((layer) => {
-      if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-opacity', 0)
-    })
-  } catch (e) { /* 忽略 */ }
+    if (props.isDashboard) {
+      // =========================================================
+      // 主页（大屏）专属：星空、大气光晕、夜半球（去除强光照明）
+      // =========================================================
+      
+      // 1. 设置大气光晕（核心）
+      try {
+        map.setSky({
+          'sky-color': 'rgba(0, 0, 0, 0)', 
+          'horizon-color': 'rgba(0, 0, 0, 0)',
+          'fog-color': 'rgba(0, 0, 0, 0)', 
+          'sky-horizon-blend': 0.5,
+          'horizon-fog-blend': 0.5, 
+          'fog-ground-blend': 0.5,
+          // 在大屏地球层级（zoom ≤ 3.5）显示光晕，3.5~5 之间逐渐消失
+          'atmosphere-blend': [
+            'interpolate', ['linear'], ['zoom'],
+            0, 1.0, 3.5, 1.0, 5, 0.0,
+          ],
+        })
+      } catch (e) { /* 忽略 */ }
 
-  try {
-    map.setSky({
-      'sky-color': 'rgba(0, 0, 0, 0)', 'horizon-color': 'rgba(0, 0, 0, 0)',
-      'fog-color': 'rgba(0, 0, 0, 0)', 'sky-horizon-blend': 0.5,
-      'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.5,
-    })
-  } catch (e) { /* 忽略 */ }
+      // 2. 取消强烈的方向光照明，改为极弱的全局均光，增强立体感但不产生明显的阴影
+      try {
+        map.setLight({
+          anchor: 'viewport',
+          color: '#ffffff',
+          intensity: 0.1, // 很低的强度，避免左亮右暗
+          position: [1.15, 200, 45],
+        })
+      } catch (e) { /* 忽略 */ }
 
-  try {
-    map.setLight({ anchor: 'viewport', color: '#ffffff', intensity: 0.4, position: [1.15, 200, 45] })
-  } catch (e) { /* 忽略 */ }
+      // 3. 星空
+      try {
+        starfieldLayer = new MaplibreStarfieldLayer({
+          starCount: 40000,
+          starSize: 3.0,
+        })
+        map.addLayer(starfieldLayer, map.getStyle().layers[0]?.id)
+      } catch (e) {
+        console.warn('[MapGL] 星空插件加载失败', e)
+      }
 
-  if (props.flyToOnLoad) flyToShaanxi()   // ★ 条件执行
-  emit('ready')
-})
+      // 4. 夜半球（如果不需要昼夜交替的黑暗面，可以将这里注释掉）
+      // import('crepuscule')
+      //   .then(({ CrepusculeLive }) => {
+      //     try {
+      //       nightOverlay = new CrepusculeLive(map, { color: [0, 12, 55] })
+      //     } catch (e) {}
+      //   })
+      //   .catch(() => {})
+        
+    } else {
+      // =========================================================
+      // 普通业务模式：默认透明天空和基础光照
+      // =========================================================
+      try {
+        map.setSky({
+          'sky-color': 'rgba(0, 0, 0, 0)', 'horizon-color': 'rgba(0, 0, 0, 0)',
+          'fog-color': 'rgba(0, 0, 0, 0)', 'sky-horizon-blend': 0.5,
+          'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.5,
+        })
+      } catch (e) { /* 忽略 */ }
+
+      try {
+        map.setLight({ anchor: 'viewport', color: '#ffffff', intensity: 0.4, position: [1.15, 200, 45] })
+      } catch (e) { /* 忽略 */ }
+    }
+
+    if (props.flyToOnLoad) flyToShaanxi()
+    emit('ready')
+  })
 })
 
 onUnmounted(() => {
   stopAutoRotate()
+  
+  if (props.isDashboard && map) {
+    if (nightOverlay) {
+      try { nightOverlay.destroy?.() } catch (e) {}
+      nightOverlay = null
+    }
+    if (starfieldLayer && map.getLayer(starfieldLayer.id)) {
+      try { map.removeLayer(starfieldLayer.id) } catch (e) {}
+      starfieldLayer = null
+    }
+  }
+
   for (const [layerId, handler] of hoverHandlers) {
     if (handler.onMouseMove) map?.off('mousemove', handler.onMouseMove)
     if (handler.onMouseLeave && map) map.getCanvas().removeEventListener('mouseleave', handler.onMouseLeave)
@@ -394,15 +470,14 @@ let spinTimer = null
 let spinSpeedDegPerSec = 3
 
 function startAutoRotate(degPerSec = 3) {
-  if (!map) return
+  if (!map || !props.isDashboard) return // 仅在主页允许自转
   stopAutoRotate()
   spinSpeedDegPerSec = degPerSec
-  // 每 50ms 推进一次经度，避免每帧 jumpTo 触发过多 render
   spinTimer = setInterval(() => {
     if (!map) return
     try {
       const c = map.getCenter()
-      let lng = c.lng + spinSpeedDegPerSec * 0.05
+      let lng = c.lng - spinSpeedDegPerSec * 0.05 // 修正自转方向：自西向东
       while (lng > 180) lng -= 360
       while (lng < -180) lng += 360
       map.jumpTo({ center: [lng, c.lat] })
@@ -533,7 +608,7 @@ function createColorExpression(opts) {
   const heightExpression = heightField ? ['*', ['coalesce', ['get', heightField], 0], heightMultiplier] : defaultHeight
   return { color: colorExpression, height: heightExpression }
 }
-// 颜色插值工具
+
 function hexToRgb(hex) {
   const h = hex.replace('#', '')
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
@@ -552,7 +627,6 @@ function interpolateColors(colors, t) {
   const c2 = hexToRgb(colors[i + 1])
   return rgbToHex(c1[0] + (c2[0] - c1[0]) * f, c1[1] + (c2[1] - c1[1]) * f, c1[2] + (c2[2] - c1[2]) * f)
 }
-// 边界细条 GeoJSON
 function buildBorderGeoJSON(geojson, widthM) {
   const h = widthM / 2 / 111320
   const features = []
@@ -600,13 +674,6 @@ function buildBorderGeoJSON(geojson, widthM) {
   return { type: 'FeatureCollection', features }
 }
 
-// ============================================================================
-// addExtrusion：五层完全分离，彻底消除 z-fighting
-//   侧面 band：0 ~ topBase-50（19650）
-//   顶面     ：topBase-50 ~ defaultHeight（19650 ~ 20000）
-//   边界     ：defaultHeight+50 ~ defaultHeight+50+borderHeight（20050 ~ 20170+offset）
-//   hover    ：动态改顶面 color，无独立图层
-// ============================================================================
 function addExtrusion(opts) {
   const {
     id, geojson, heightField = null, heightMultiplier = 1, defaultHeight = 180000,
@@ -616,7 +683,7 @@ function addExtrusion(opts) {
     borderWidth = 1000, borderHeight = 120,
     sideColors = null, sideBands = 10,
     topThickness = 300,
-    useVerticalGradient = true,   // ★ 新增：默认走单层渐变，彻底无闪
+    useVerticalGradient = true,
   } = opts
 
   if (!map || !geojson?.features) return
@@ -638,7 +705,6 @@ function addExtrusion(opts) {
     map.getSource(id).setData(mapData)
   }
 
-  // 清理旧 side 层
   const oldSideLayers = Array.from(addedLayers).filter(lId => lId.startsWith(`${id}-side-`))
   oldSideLayers.forEach((lid) => {
     if (map.getLayer(lid)) map.removeLayer(lid)
@@ -646,12 +712,6 @@ function addExtrusion(opts) {
   })
 
   if (useVerticalGradient) {
-    // ==========================================================================
-    // ★ 方案 B：单层 fill-extrusion + vertical gradient
-    //   - 只有一个 geometry，没有任何共面，拖动绝对不闪
-    //   - 侧面颜色由 MapLibre 按光照自动计算，视觉接近 #0072FF → 白
-    //   - 顶面是该 geometry 的顶面，颜色 = fill-extrusion-color
-    // ==========================================================================
     const paint = {
       'fill-extrusion-color': baseColorExpr,
       'fill-extrusion-height': expressions.height,
@@ -666,9 +726,6 @@ function addExtrusion(opts) {
       Object.entries(paint).forEach(([k, v]) => map.setPaintProperty(id, k, v))
     }
   } else {
-    // ==========================================================================
-    // 方案 A：多 band 渐变（保留精确颜色，可能有轻微 z-fighting）
-    // ==========================================================================
     const topBase = defaultHeight - topThickness
     const useSideColors = Array.isArray(sideColors) && sideColors.length > 0 && !heightField
 
@@ -713,7 +770,6 @@ function addExtrusion(opts) {
     }
   }
 
-  // ---- 边界：抬到顶面之上，无重叠 ----
   const borderId = `${id}-border`
   const BORDER_LIFT = 50
   const borderBaseExpr = isDynamicHeight
@@ -741,7 +797,6 @@ function addExtrusion(opts) {
     Object.entries(borderPaint).forEach(([k, v]) => map.setPaintProperty(borderId, k, v))
   }
 
-  // ---- hover：直接改顶面颜色 ----
   if (enableHover) {
     unbindHover(id)
     let currentHoverName = null
@@ -773,7 +828,7 @@ function unbindHover(id) {
   const old = hoverHandlers.get(id)
   if (old.onMouseMove) map?.off('mousemove', old.onMouseMove)
   if (old.onMouseLeave && map) map.getCanvas().removeEventListener('mouseleave', old.onMouseLeave)
-  if (old.setHoverCity) old.setHoverCity(null)  // 恢复默认色
+  if (old.setHoverCity) old.setHoverCity(null)
   if (map) map.getCanvas().style.cursor = ''
   hoverHandlers.delete(id)
 }
@@ -804,9 +859,6 @@ function centroidOfFeature(feature) {
   return n ? [sx / n, sy / n] : null
 }
 
-// ============================================================================
-// addCentroidLabels：纯 HTML 绝对定位层，不受 pitch 影响
-// ============================================================================
 function addCentroidLabels(opts) {
   const {
     id, geojson,
@@ -818,7 +870,6 @@ function addCentroidLabels(opts) {
 
   if (!map || !geojson?.features || !mapContainer.value) return
 
-  // 清理旧
   if (labelsContainer) {
     labelsContainer.remove()
     labelsContainer = null
@@ -914,7 +965,6 @@ function addGlowLine({ id, geojson, color = '#00e6c8', coreColor = '#65f8df', wi
   else if (glowLineGeoJSONCache.get(id) !== geojson) existingSource.setData(geojson)
   glowLineGeoJSONCache.set(id, geojson)
 
-  // 三层叠加：宽而淡的外晕、较窄的近光晕、半透明的青绿色核心线
   const layers = [
     { suffix: 'halo', lineColor: color, lineWidth: width * 7, lineOpacity: 0.08, lineBlur: 6 },
     { suffix: 'glow', lineColor: color, lineWidth: width * 3.2, lineOpacity: 0.18, lineBlur: 3 },
@@ -989,11 +1039,10 @@ async function addImagePoints({
   iconSize = 0.5, iconAnchor = 'center', allowOverlap = true,
   textField = null, textSize = 11, textColor = '#ffffff',
   textHaloColor = '#000000', textHaloWidth = 1, textOffset = [0, 1.4],
-  // ★ 新增
-  iconImage = null,             // 传表达式如 ['get','iconId'] 时走数据驱动
-  iconPitchAlignment = null,    // 'map' | 'viewport' | 'auto'
-  iconRotationAlignment = null, // 'map' | 'viewport' | 'auto'
-  extraLayout = null,           // 最后合并，可覆盖默认 layout
+  iconImage = null,
+  iconPitchAlignment = null,
+  iconRotationAlignment = null,
+  extraLayout = null,
 }) {
   if (!map || !geojson?.features) return
   if (iconUrl) await ensureImage(iconId, iconUrl)
@@ -1029,13 +1078,11 @@ async function addImagePoints({
   addedLayers.add(id)
 }
 
-// ★ removeLayer：先移除所有 layer，再移除 source；含 labels 清理
 function removeLayer(id) {
   if (!map) return
   unbindHover(id)
   clearHighlight(id)
 
-  // 清理 HTML 标签
   if (labelsContainer) {
     labelsContainer.remove()
     labelsContainer = null
@@ -1047,12 +1094,10 @@ function removeLayer(id) {
     cityLabelMoveHandler = null
   }
 
-  // 收集所有需要移除的 layer（含 hover-layer 这类没有登记在 addedLayers 的）
   const toRemove = new Set()
   addedLayers.forEach((lId) => {
     if (lId === id || lId.startsWith(`${id}-`)) toRemove.add(lId)
   })
-  // 从 style 里扫描兜底
   const styleLayers = map.getStyle()?.layers || []
   styleLayers.forEach((l) => {
     if (l.id === id || l.id.startsWith(`${id}-`)) toRemove.add(l.id)

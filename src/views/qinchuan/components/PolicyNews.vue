@@ -97,15 +97,17 @@ const emit = defineEmits(['news-click', 'more-click'])
   z-index: 0;
   top: 0;
   bottom: 0;
-  left: 15%;
-  width: 85%;
+  left: 10%;
+  width: 90%;
   pointer-events: none;
-  background: linear-gradient(
-    90deg,
-    rgba(41, 145, 247, 0.28) 0%,
-    rgba(41, 145, 247, 0.16) 44%,
-    rgba(41, 145, 247, 0) 100%
-  );
+   border: 0.93px solid transparent;
+  border-image: linear-gradient(162.05deg, rgba(165, 199, 238, 0.0001) 21.01%, #0077FF 51.91%, rgba(165, 199, 238, 0.2) 91.52%) 1;
+  border-top: none; border-radius: 0px 0px 11px 11px;
+  background: 
+    linear-gradient(180deg, rgba(16, 98, 222, 0.12) 0%, rgba(57, 126, 233, 0.11) 54.88%, rgba(19, 98, 215, 0.05) 75.82%, rgba(0, 95, 223, 0.03) 100%), 
+    linear-gradient(180deg, rgba(0, 40, 96, 0) 0%, rgba(0, 42, 95, 0.09) 23.24%, rgba(0, 42, 97, 0.23) 44.61%, rgba(0, 40, 96, 0.27) 100%);
+  backdrop-filter: blur(14px); 
+  box-shadow: inset 0 0 24px rgba(20, 136, 237, 0.1), 0 0 16px rgba(0, 116, 224, 0.13);
 }
 
 /* 左右布局 */
@@ -133,8 +135,10 @@ const emit = defineEmits(['news-click', 'more-click'])
 }
 
 .big-icon {
-  width: 100%;
-  height: 100%;
+  position:absolute;
+  top:-5px;
+  /* width: 123%; */
+  height: 123%;
   object-fit: contain;
   filter: drop-shadow(0 0 10px rgba(0, 150, 255, 0.6));
 }

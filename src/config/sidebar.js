@@ -92,10 +92,10 @@ export const sidebarConfig = {
     },
     { 
       key: 'avoidzone', 
-      icon: 'AvoidZone', 
+      icon: 'AvoidZone', // 图标名称
       label: '避让区域', 
       path: '/hucang/avoidzone', 
-      roles: ['admin'] 
+      roles: ['admin', 'user', 'viewer'] // 原先配置是 ['admin']，如需全员可见请改这里
     },
     { 
       key: 'currentPower', 

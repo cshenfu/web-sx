@@ -10,9 +10,10 @@ export const PANEL_GROUPS = [
   {
     label: '底图',
     items: [
-      { id: 'tdt-imagery',    name: '天地图影像', icon: 'Compass',     type: 'whln' },
-      { id: 'tdt-annotation', name: '天地图注记', icon: 'MapLocation', type: 'whln' },
-      { id: 'hd-imagery',     name: '高清影像',   icon: 'Camera',      type: 'whln' },
+      { id: 'tdt-imagery',    name: '图源1', icon: 'Compass',     type: 'whln' },
+       { id: 'hd-imagery',     name: '图源2',   icon: 'Camera',      type: 'whln' },
+      { id: 'tdt-annotation', name: '底图注记', icon: 'MapLocation', type: 'whln' },
+     
       { id: 'wind-resource',  name: '风资源图谱', icon: 'WindPower',   type: 'whln' },
       { id: 'solar-resource', name: '光资源图谱', icon: 'Sunny',       type: 'whln' },
       
@@ -36,7 +37,7 @@ export const PANEL_GROUPS = [
     label: '地物元素',
     items: [
       // ============ 原有 ============
-      { id: 'buildings-2025',        name: '建筑物体',  color: '#1e40af', type: 'whln' },
+      // { id: 'buildings-2025',        name: '建筑物体',  color: '#1e40af', type: 'whln' },
       { id: 'forest',          name: '林地',      color: '#4ade80', type: 'whln' },
       { id: 'farmland',        name: '耕地',      color: '#14b8a6', type: 'whln' },
       { id: 'water',           name: '水域',      color: '#3b82f6', type: 'whln' },

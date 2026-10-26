@@ -4,7 +4,8 @@
     <MapGL
   ref="mapRef"
   :style="satelliteStyle"
-  :fly-to-on-load="false"     
+  :fly-to-on-load="false"   
+  :isDashboard="true"  
   @ready="onMapReady"
   @city-click="onCityClick"
   @draw-update="onDrawChange"

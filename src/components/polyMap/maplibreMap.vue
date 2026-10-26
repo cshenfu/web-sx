@@ -1,309 +1,629 @@
 <template>
-    <div class="maplibre-map-template">
-        <div id="mapContainer"></div>
-        <slot></slot>
-    </div>
+  <div class="maplibre-map-template">
+    <div ref="mapContainerRef" class="map-container"></div>
+    <slot />
+  </div>
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
-import * as maplibregl from 'maplibre-gl'; 
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import * as maplibregl from 'maplibre-gl'
+import { setWorkerUrl } from 'maplibre-gl'
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 
-// 解决 Worker 报错
-import { setWorkerUrl } from 'maplibre-gl';
-import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
-setWorkerUrl(maplibreWorkerUrl);
+import 'maplibre-gl/dist/maplibre-gl.css'
+import pointIcon from '@/assets/img/mapIcon/pointIcon.png'
+import { ElMessage } from 'element-plus'
+import isInChina from '@/utils/checkPointInChinaMainland'
 
-import 'maplibre-gl/dist/maplibre-gl.css';
-import pointIcon from '@/assets/img/mapIcon/pointIcon.png';
-import { ElMessage } from 'element-plus';
-import isInChina from '@/utils/checkPointInChinaMainland';
+import { satelliteStyle, SX_OVERLAY_ANCHOR_ID } from './mapConfig'
+import { attachSxLayers } from '@/components/site-map/attachSxLayers'
+import { WHLN_LAYER_IDS } from '@/components/site-map/layerPanelConfig'
 
-import { satelliteStyle } from './mapConfig'; 
-import { attachSxLayers } from '@/components/site-map/attachSxLayers';
-import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPanelConfig';
+setWorkerUrl(maplibreWorkerUrl)
 
 const props = defineProps({
-    roadKey: { type: Boolean, default: false },
-    resourceMapKey: { type: Boolean, default: false },
-    terrainMapKey: { type: Boolean, default: false },
-    ghiMapKey: { type: Boolean, default: false },
-});
+  // 风资源按钮
+  resourceMapKey: { type: Boolean, default: false },
+  // 光资源按钮
+  ghiMapKey: { type: Boolean, default: false },
+  // 路网按钮
+  roadKey: { type: Boolean, default: false },
+  // 普通地形栅格预览按钮；不启用高程
+  terrainMapKey: { type: Boolean, default: false },
+})
 
-const emits = defineEmits(['toPostLngLat', 'updateCesiumMapScale', 'getWeatherData']);
+const emits = defineEmits([
+  'toPostLngLat',
+  'updateCesiumMapScale',
+  'getWeatherData',
+])
 
-let map = null;
-let whlnPlugin = null; 
+const mapContainerRef = ref(null)
 
-let currentMarker = null;
-let measurePoints = [];
-let isDrawing = ref(false);
+let map = null
+let whlnPlugin = null
+let currentMarker = null
+let measurePoints = []
+const isDrawing = ref(false)
 
-const onInitMap = () => {
-    const finalStyle = {
-        version: 8,
-        projection: { type: 'globe' },
-        sources: { ...(satelliteStyle.sources || {}) },
-        layers: [ ...(satelliteStyle.layers || {}) ]
-    };
+let lastMoveTime = 0
 
-    map = new maplibregl.Map({
-        container: 'mapContainer',
-        style: finalStyle,
-        center: [104.195397, 35.86166],
-        zoom: 1.5,
-        pitch: 0,
-        bearing: 0,
-        attributionControl: false,
-        maxZoom: 18,
-        minZoom: 0,
-        projection: 'globe'
-    });
+const BASE_LAYER_ID = 'tdt-imagery'
 
-    map.doubleClickZoom.disable();
+const WIND_SOURCE_ID = 'wind-res'
+const WIND_LAYER_ID = 'layer-wind-res'
 
-    map.on('style.load', () => {
-        if (map.setSky) {
-            map.setSky({
-                'sky-color': '#199EF3',
-                'sky-horizon-blend': 0.5,
-                'horizon-color': '#ffffff',
-                'horizon-fog-blend': 0.5,
-                'fog-color': '#000000',
-                'fog-ground-blend': 0.5
-            });
-        }
-    });
+const SOLAR_SOURCE_ID = 'ghi-res'
+const SOLAR_LAYER_ID = 'layer-ghi-res'
 
-    map.on('load', () => {
-        addBusinessLayers();
-        try {
-            whlnPlugin = attachSxLayers(map, { 
-                initialVisibleIds: DEFAULT_VISIBLE.filter(id => WHLN_LAYER_IDS.includes(id))
-            });
-        } catch (err) {
-            console.warn('[whln] 图层控制挂载失败:', err);
-        }
-    });
+const TERRAIN_SOURCE_ID = 'dem'
+const TERRAIN_LAYER_ID = 'layer-dem'
 
-    bindMapEvents();
-    map.on('move', () => calculateScale());
-    map.on('moveend', () => calculateScale());
-    map.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }), 'bottom-left');
-};
+const WIND_TILES =
+  'https://gis.wh-ge.com/sx-map-service/wind/gwc/service/wmts?layer=wind:sx-windspeed&style=&tilematrixset=EPSG:900913&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image/png&TileMatrix=EPSG:900913:{z}&TileCol={x}&TileRow={y}'
 
-const addBusinessLayers = () => {
-    if (!map) return;
-    map.addSource('wind-res', {
-        type: 'raster',
-        tiles: ['https://gis.wh-ge.com/whln-map-service/wind/gwc/service/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=wind:speed&STYLE=&TILEMATRIXSET=EPSG:4326&FORMAT=image/png&TILEMATRIX=EPSG:4326:{z}&TILEROW={y}&TILECOL={x}'],
-        tileSize: 256,
-    });
-    map.addLayer({ id: 'layer-wind-res', type: 'raster', source: 'wind-res', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.6 } });
+const SOLAR_TILES =
+  'https://gis.wh-ge.com/sx-map-service/ghi/gwc/service/wmts?layer=ghi:sx-ghi&style=&tilematrixset=EPSG:900913&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image/png&TileMatrix=EPSG:900913:{z}&TileCol={x}&TileRow={y}'
 
-    map.addSource('ghi-res', {
-        type: 'raster',
-        tiles: ['https://gis.wh-ge.com/whln-map-service/ghi/gwc/service/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ghi:china-ghi&STYLE=&TILEMATRIXSET=EPSG:4326&FORMAT=image/png&TILEMATRIX=EPSG:4326:{z}&TILEROW={y}&TILECOL={x}'],
-        tileSize: 256,
-    });
-    map.addLayer({ id: 'layer-ghi-res', type: 'raster', source: 'ghi-res', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.6 } });
+// 普通 PNG 栅格预览，不是 raster-dem，不会改变地图高程。
+const TERRAIN_TILES =
+  'https://gis-rustfs.wh-ge.com/terrain/china-dem/{z}/{x}/{y}.png'
 
-    map.addSource('road-net', { type: 'raster', tiles: ['https://gis.wh-ge.com/data/gaode/{z}/{x}/{y}.png'], tileSize: 256 });
-    map.addLayer({ id: 'layer-road-net', type: 'raster', source: 'road-net', layout: { visibility: 'none' } });
+function createMapStyle() {
+  return {
+    version: 8,
+    projection: { type: 'globe' },
+    sources: { ...(satelliteStyle.sources || {}) },
+    layers: [...(satelliteStyle.layers || [])],
+  }
+}
 
-    map.addSource('dem', { type: 'raster', tiles: ['https://gis.wh-ge.com/data/dem/{z}/{x}/{y}.png'], tileSize: 256 });
-    map.addLayer({ id: 'layer-dem', type: 'raster', source: 'dem', layout: { visibility: 'none' } });
-};
+function onInitMap() {
+  if (!mapContainerRef.value) return
 
-const updateWhlnLayers = (ids) => {
-    if (!map) return;
-    const layerMap = {
-        'wind-resource': 'layer-wind-res',
-        'solar-resource': 'layer-ghi-res',
-        'road-network': 'layer-road-net',
-        'terrain-3d': 'layer-dem',
-    };
-    Object.keys(layerMap).forEach(key => {
-        const layerId = layerMap[key];
-        const isVisible = ids.includes(key);
-        if (layerId && map.getLayer(layerId)) {
-            map.setLayoutProperty(layerId, 'visibility', isVisible ? 'visible' : 'none');
-        }
-    });
-    if (whlnPlugin) {
-        const pluginIds = ids.filter(id => WHLN_LAYER_IDS.includes(id) && !layerMap[id]);
-        whlnPlugin.setVisibleIds?.(pluginIds);
+  map = new maplibregl.Map({
+    container: mapContainerRef.value,
+    style: createMapStyle(),
+    center: [104.195397, 35.86166],
+    zoom: 1.5,
+    pitch: 0,
+    bearing: 0,
+    attributionControl: false,
+    maxZoom: 18,
+    minZoom: 0,
+    projection: 'globe',
+  })
+
+  map.doubleClickZoom.disable()
+
+  map.on('style.load', () => {
+    if (map?.setSky) {
+      map.setSky({
+        'sky-color': '#199EF3',
+        'sky-horizon-blend': 0.5,
+        'horizon-color': '#ffffff',
+        'horizon-fog-blend': 0.5,
+        'fog-color': '#000000',
+        'fog-ground-blend': 0.5,
+      })
     }
-};
+  })
 
-const syncLayersByProps = () => {
-    const ids = [];
-    if (props.resourceMapKey) ids.push('wind-resource');
-    if (props.ghiMapKey) ids.push('solar-resource');
-    if (props.roadKey) ids.push('road-network');
-    if (props.terrainMapKey) ids.push('terrain-3d');
-    updateWhlnLayers(ids);
-};
+  map.on('load', onMapLoad)
 
-watch(() => [props.resourceMapKey, props.roadKey, props.terrainMapKey, props.ghiMapKey], () => { syncLayersByProps(); }, { deep: true });
+  bindMapEvents()
 
-// 👇 【修复 1】给 mousemove 加节流，防止疯狂更新导致崩溃
-let lastMoveTime = 0;
-const bindMapEvents = () => {
-    map.on('click', async (e) => {
-        if (isDrawing.value) return;
-        const lng = e.lngLat.lng;
-        const lat = e.lngLat.lat;
-        if (!isInChina(lng, lat)) {
-            ElMessage.error('暂不支持该区域数据查询！');
-            return;
-        }
-        addSurfacePoint(lng, lat);
-        emits('toPostLngLat', { lng, lat });
-    });
+  map.on('move', calculateScale)
+  map.on('moveend', calculateScale)
+  map.addControl(
+    new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }),
+    'bottom-left',
+  )
+}
 
-    map.on('mousemove', (e) => {
-        if (isDrawing.value) return;
-        const now = Date.now();
-        if (now - lastMoveTime < 100) return; // 100ms 节流
-        lastMoveTime = now;
-        emits('toPostLngLat', { lng: e.lngLat.lng, lat: e.lngLat.lat, isMove: true });
-    });
-};
 
-const addSurfacePoint = (lng, lat) => {
-    if (currentMarker) currentMarker.remove();
-    const el = document.createElement('div');
-    el.className = 'custom-marker';
-    el.style.backgroundImage = `url(${pointIcon})`;
-    el.style.width = '24px'; el.style.height = '24px';
-    el.style.backgroundSize = 'contain'; el.style.backgroundRepeat = 'no-repeat';
-    el.style.cursor = 'pointer';
+const TDT_ANNOTATION_PREFIX = 'eng-r-tdt-annotation-'
+const TDT_IMAGERY_PREFIX = 'eng-r-tdt-imagery-'
+const HD_IMAGERY_PREFIX = 'eng-r-hd-imagery-'
 
-    currentMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([lng, lat]).addTo(map);
-    map.flyTo({ center: [lng, lat], zoom: 12, essential: true, duration: 1500 });
-};
+function getRasterOverlayBeforeId() {
+  const layers = map?.getStyle()?.layers || []
 
-const calculateScale = () => {
-    if (!map) return;
-    const y = map.getContainer().clientHeight / 2;
-    const left = map.unproject([0, y]);
-    const right = map.unproject([100, y]);
-    const scale = left.distanceTo(right) / 100;
-    if (scale < 1) emits('updateCesiumMapScale', (scale * 100).toFixed(2) + 'm');
-    else if (scale < 1000) emits('updateCesiumMapScale', scale.toFixed(2) + 'm');
-    else emits('updateCesiumMapScale', (scale / 1000).toFixed(2) + 'km');
-};
+  // 有天地图注记时，把业务栅格放在注记下方，
+  // 保持地名文字仍可见。
+  const annotationLayer = layers.find((layer) =>
+    layer.id.startsWith(TDT_ANNOTATION_PREFIX),
+  )
+  if (annotationLayer) return annotationLayer.id
 
-const flyToCenter = (point) => {
-    if (!map) return;
-    const { x, y, z } = point;
-    let zoomLevel = 12;
-    if (z) { if (z > 100000) zoomLevel = 5; else if (z > 50000) zoomLevel = 7; else if (z > 20000) zoomLevel = 9; else if (z > 10000) zoomLevel = 10; else zoomLevel = 13; }
-    map.flyTo({ center: [Number(x), Number(y)], zoom: zoomLevel, essential: true, duration: 1500 });
-    addSurfacePoint(Number(x), Number(y));
-};
+  // 没有注记时，放在第一条矢量业务层之前，
+  // 这样栅格在天地图影像上方、路网等矢量层下方。
+  const firstVectorOverlay = layers.find((layer) => {
+    if (!layer.id.startsWith('eng-r-')) return false
 
-// 👇 【修复 2】极其健壮的坐标转换，自动兼容 [lng,lat] 和 [[lng,lat]] 以及更深层
-const addPolygonData = (polygonData) => {
-    if (!map) return;
-    
-    let coordinates = [];
+    return ![
+      TDT_IMAGERY_PREFIX,
+      HD_IMAGERY_PREFIX,
+      TDT_ANNOTATION_PREFIX,
+    ].some((prefix) => layer.id.startsWith(prefix))
+  })
 
-    // 情况 1: [[lng, lat], [lng, lat]]
-    if (Array.isArray(polygonData[0]?.[0]) && typeof polygonData[0][0][0] === 'number') {
-        coordinates = [polygonData];
-    } 
-    // 情况 2: [[[lng, lat], [lng, lat]]] （已经是多边形环）
-    else if (Array.isArray(polygonData[0]?.[0]?.[0]) && typeof polygonData[0][0][0][0] === 'number') {
-        coordinates = polygonData;
-    }
-    // 情况 3: [lng, lat, lng, lat] 平铺数组
-    else if (typeof polygonData[0] === 'number') {
-        const ring = [];
-        for (let i = 0; i < polygonData.length; i += 2) {
-            ring.push([polygonData[i], polygonData[i+1]]);
-        }
-        coordinates = [ring];
-    }
+  if (firstVectorOverlay) return firstVectorOverlay.id
+  if (map?.getLayer(SX_OVERLAY_ANCHOR_ID)) return SX_OVERLAY_ANCHOR_ID
 
-    if (!coordinates.length) return;
+  return undefined
+}
 
-    // 确保多边形首尾闭合
-    const closedCoordinates = coordinates.map(ring => {
-        if (ring.length > 0) {
-            const first = ring[0];
-            const last = ring[ring.length - 1];
-            if (first[0] !== last[0] || first[1] !== last[1]) {
-                return [...ring, first];
-            }
-        }
-        return ring;
-    });
+function moveRasterOverlaysAboveTdt() {
+  if (!map) return
 
-    const geojson = {
-        type: 'FeatureCollection',
-        features: [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: closedCoordinates }, properties: {} }]
-    };
+  const beforeId = getRasterOverlayBeforeId()
+  const rasterLayerIds = [
+    WIND_LAYER_ID,
+    SOLAR_LAYER_ID,
+    TERRAIN_LAYER_ID,
+  ]
 
-    if (!map.getSource('draw-polygon')) {
-        map.addSource('draw-polygon', { type: 'geojson', data: geojson });
-        map.addLayer({ id: 'draw-polygon-layer', type: 'fill', source: 'draw-polygon', paint: { 'fill-color': '#F5DEB3', 'fill-opacity': 0.4 } });
-        map.addLayer({ id: 'draw-polygon-outline', type: 'line', source: 'draw-polygon', paint: { 'line-color': '#F5DEB3', 'line-width': 2 } });
+  for (const layerId of rasterLayerIds) {
+    if (!map.getLayer(layerId)) continue
+
+    if (beforeId && beforeId !== layerId) {
+      map.moveLayer(layerId, beforeId)
     } else {
-        map.getSource('draw-polygon').setData(geojson);
+      // 找不到锚点时移到最上层，至少确保不被底图盖住。
+      map.moveLayer(layerId)
     }
-};
+  }
+}
 
-const changeMapMode = (index) => {};
+function onMapLoad() {
+  if (!map) return
 
-const drawLineMeasureGraphics = (type) => {
-    if (isDrawing.value) return;
-    isDrawing.value = true;
-    measurePoints = [];
-    map.getContainer().style.cursor = 'crosshair';
-    if (!map.getSource('draw-line')) {
-        map.addSource('draw-line', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-        map.addLayer({ id: 'draw-line-layer', type: 'line', source: 'draw-line', paint: { 'line-color': '#F5DEB3', 'line-width': 3 } });
+  try {
+    // 天地图影像是固定底图，初始化时始终可见。
+    whlnPlugin = attachSxLayers(map, {
+      initialVisibleIds: [BASE_LAYER_ID],
+    })
+  } catch (err) {
+    console.warn('[whln] 图层控制挂载失败:', err)
+  }
+
+  addBusinessLayers()
+  syncLayersByProps()
+}
+
+function addRasterOverlay(sourceId, layerId, tiles, opacity = 0.65) {
+  if (!map) return
+
+  if (!map.getSource(sourceId)) {
+    map.addSource(sourceId, {
+      type: 'raster',
+      tiles: [tiles],
+      tileSize: 256,
+    })
+  }
+
+  if (!map.getLayer(layerId)) {
+    const layer = {
+      id: layerId,
+      type: 'raster',
+      source: sourceId,
+      layout: { visibility: 'none' },
+      paint: {
+        'raster-opacity': opacity,
+        'raster-fade-duration': 0,
+      },
     }
-    const onDrawClick = (e) => {
-        const coords = [e.lngLat.lng, e.lngLat.lat];
-        measurePoints.push(coords);
-        const el = document.createElement('div');
-        el.style.width = '6px'; el.style.height = '6px';
-        el.style.backgroundColor = '#F5DEB3'; el.style.borderRadius = '50%';
-        new maplibregl.Marker({ element: el }).setLngLat(coords).addTo(map);
-        if (type === 'Polyline' && measurePoints.length > 1) {
-            map.getSource('draw-line').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: measurePoints } });
-        }
-    };
-    map.on('click', onDrawClick);
-    const onRightClick = (e) => {
-        e.preventDefault();
-        isDrawing.value = false;
-        map.getContainer().style.cursor = '';
-        map.off('click', onDrawClick);
-        map.off('contextmenu', onRightClick);
-        measurePoints = [];
-    };
-    map.on('contextmenu', onRightClick);
-};
 
-defineExpose({ flyToCenter, addPolygonData, changeMapMode, drawLineMeasureGraphics, updateWhlnLayers });
+    // 在空底图中，插件锚点位于天地图底图上方；
+    // 将栅格覆盖层放到锚点之前，叠在天地图影像之上。
+    if (map.getLayer(SX_OVERLAY_ANCHOR_ID)) {
+      map.addLayer(layer, SX_OVERLAY_ANCHOR_ID)
+    } else {
+      map.addLayer(layer)
+    }
+  }
+}
 
-onMounted(() => { nextTick(() => onInitMap()); });
+function addBusinessLayers() {
+  if (!map) return
+
+  // PNG 栅格覆盖层：按钮初始为 false，因此这些图层初始隐藏。
+  addRasterOverlay(WIND_SOURCE_ID, WIND_LAYER_ID, WIND_TILES, 0.55)
+  addRasterOverlay(SOLAR_SOURCE_ID, SOLAR_LAYER_ID, SOLAR_TILES, 0.55)
+  addRasterOverlay(TERRAIN_SOURCE_ID, TERRAIN_LAYER_ID, TERRAIN_TILES, 0.65)
+
+  // 路网不在这里创建栅格源。
+  // 它由 attachSxLayers 中 road-network 的矢量 WMTS 配置创建。
+}
+
+function setLayerVisibility(layerId, visible) {
+  if (!map?.getLayer(layerId)) return
+
+  map.setLayoutProperty(
+    layerId,
+    'visibility',
+    visible ? 'visible' : 'none',
+  )
+}
+
+function updateWhlnLayers(ids = []) {
+  if (!map) return
+
+  const selectedIds = new Set(ids)
+  const pluginIds = ['tdt-imagery']
+
+  if (selectedIds.has('road-network')) {
+    pluginIds.push('road-network')
+  }
+
+  const validPluginIds = pluginIds.filter((id) =>
+    WHLN_LAYER_IDS.includes(id),
+  )
+
+  let result
+
+  if (whlnPlugin) {
+    result = whlnPlugin.setVisibleIds?.(validPluginIds)
+  }
+
+  setLayerVisibility(WIND_LAYER_ID, selectedIds.has('wind-resource'))
+  setLayerVisibility(SOLAR_LAYER_ID, selectedIds.has('solar-resource'))
+  setLayerVisibility(TERRAIN_LAYER_ID, selectedIds.has('terrain-3d'))
+
+  const reorder = () => {
+    requestAnimationFrame(moveRasterOverlaysAboveTdt)
+  }
+
+  // 插件可能异步调整图层顺序；等它完成后再把栅格放回正确位置。
+  if (result && typeof result.then === 'function') {
+    result.then(reorder, reorder)
+  } else {
+    reorder()
+  }
+}
+
+function syncLayersByProps() {
+  const ids = []
+
+  if (props.resourceMapKey) ids.push('wind-resource')
+  if (props.ghiMapKey) ids.push('solar-resource')
+  if (props.roadKey) ids.push('road-network')
+  if (props.terrainMapKey) ids.push('terrain-3d')
+
+  updateWhlnLayers(ids)
+}
+
+watch(
+  () => [
+    props.resourceMapKey,
+    props.ghiMapKey,
+    props.roadKey,
+    props.terrainMapKey,
+  ],
+  syncLayersByProps,
+)
+
+function bindMapEvents() {
+  if (!map) return
+
+  map.on('click', (event) => {
+    if (isDrawing.value) return
+
+    const { lng, lat } = event.lngLat
+
+    if (!isInChina(lng, lat)) {
+      ElMessage.error('暂不支持该区域数据查询！')
+      return
+    }
+
+    addSurfacePoint(lng, lat)
+    emits('toPostLngLat', { lng, lat })
+  })
+
+  map.on('mousemove', (event) => {
+    if (isDrawing.value) return
+
+    const now = Date.now()
+    if (now - lastMoveTime < 100) return
+    lastMoveTime = now
+
+    emits('toPostLngLat', {
+      lng: event.lngLat.lng,
+      lat: event.lngLat.lat,
+      isMove: true,
+    })
+  })
+}
+
+function addSurfacePoint(lng, lat) {
+  if (!map) return
+
+  currentMarker?.remove()
+
+  const element = document.createElement('div')
+  element.className = 'custom-marker'
+  element.style.backgroundImage = `url(${pointIcon})`
+  element.style.width = '24px'
+  element.style.height = '24px'
+  element.style.backgroundSize = 'contain'
+  element.style.backgroundRepeat = 'no-repeat'
+  element.style.cursor = 'pointer'
+
+  currentMarker = new maplibregl.Marker({
+    element,
+    anchor: 'bottom',
+  })
+    .setLngLat([lng, lat])
+    .addTo(map)
+
+  map.flyTo({
+    center: [lng, lat],
+    zoom: 12,
+    essential: true,
+    duration: 1500,
+  })
+}
+
+function calculateScale() {
+  if (!map) return
+
+  const y = map.getContainer().clientHeight / 2
+  const left = map.unproject([0, y])
+  const right = map.unproject([100, y])
+  const scale = left.distanceTo(right) / 100
+
+  if (scale < 1) {
+    emits('updateCesiumMapScale', `${(scale * 100).toFixed(2)}m`)
+  } else if (scale < 1000) {
+    emits('updateCesiumMapScale', `${scale.toFixed(2)}m`)
+  } else {
+    emits('updateCesiumMapScale', `${(scale / 1000).toFixed(2)}km`)
+  }
+}
+
+function flyToCenter(point) {
+  if (!map || !point) return
+
+  const { x, y, z } = point
+  let zoomLevel = 12
+
+  if (z) {
+    if (z > 100000) zoomLevel = 5
+    else if (z > 50000) zoomLevel = 7
+    else if (z > 20000) zoomLevel = 9
+    else if (z > 10000) zoomLevel = 10
+    else zoomLevel = 13
+  }
+
+  const lng = Number(x)
+  const lat = Number(y)
+
+  map.flyTo({
+    center: [lng, lat],
+    zoom: zoomLevel,
+    essential: true,
+    duration: 1500,
+  })
+
+  addSurfacePoint(lng, lat)
+}
+
+function normalizePolygonCoordinates(polygonData) {
+  if (!Array.isArray(polygonData) || polygonData.length === 0) return []
+
+  // 支持 [lng, lat, lng, lat, ...]
+  if (typeof polygonData[0] === 'number') {
+    const ring = []
+    for (let i = 0; i + 1 < polygonData.length; i += 2) {
+      ring.push([Number(polygonData[i]), Number(polygonData[i + 1])])
+    }
+    return ring.length ? [ring] : []
+  }
+
+  const isPosition = (value) =>
+    Array.isArray(value) &&
+    value.length >= 2 &&
+    typeof value[0] === 'number' &&
+    typeof value[1] === 'number'
+
+  // 支持 [[lng, lat], ...]，即一个闭合环。
+  if (isPosition(polygonData[0])) {
+    return [polygonData]
+  }
+
+  // 支持 [[[lng, lat], ...], ...]，即一个或多个环。
+  if (Array.isArray(polygonData[0]) && isPosition(polygonData[0][0])) {
+    return polygonData
+  }
+
+  // 支持更深一层的 Polygon 坐标：[[[[lng, lat], ...]]]
+  if (
+    Array.isArray(polygonData[0]) &&
+    Array.isArray(polygonData[0][0]) &&
+    isPosition(polygonData[0][0][0])
+  ) {
+    return polygonData[0]
+  }
+
+  return []
+}
+
+function addPolygonData(polygonData) {
+  if (!map) return
+
+  const coordinates = normalizePolygonCoordinates(polygonData)
+  if (!coordinates.length) return
+
+  const closedCoordinates = coordinates.map((ring) => {
+    if (!ring.length) return ring
+
+    const first = ring[0]
+    const last = ring[ring.length - 1]
+    const isClosed = first[0] === last[0] && first[1] === last[1]
+
+    return isClosed ? ring : [...ring, first]
+  })
+
+  const geojson = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: closedCoordinates,
+        },
+        properties: {},
+      },
+    ],
+  }
+
+  if (!map.getSource('draw-polygon')) {
+    map.addSource('draw-polygon', {
+      type: 'geojson',
+      data: geojson,
+    })
+
+    map.addLayer({
+      id: 'draw-polygon-layer',
+      type: 'fill',
+      source: 'draw-polygon',
+      paint: {
+        'fill-color': '#F5DEB3',
+        'fill-opacity': 0.4,
+      },
+    })
+
+    map.addLayer({
+      id: 'draw-polygon-outline',
+      type: 'line',
+      source: 'draw-polygon',
+      paint: {
+        'line-color': '#F5DEB3',
+        'line-width': 2,
+      },
+    })
+  } else {
+    map.getSource('draw-polygon').setData(geojson)
+  }
+}
+
+function changeMapMode() {
+  // 保留原组件 API；当前没有额外地图模式需要切换。
+}
+
+function drawLineMeasureGraphics(type) {
+  if (!map || isDrawing.value) return
+
+  isDrawing.value = true
+  measurePoints = []
+  map.getContainer().style.cursor = 'crosshair'
+
+  if (!map.getSource('draw-line')) {
+    map.addSource('draw-line', {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: [],
+      },
+    })
+
+    map.addLayer({
+      id: 'draw-line-layer',
+      type: 'line',
+      source: 'draw-line',
+      paint: {
+        'line-color': '#F5DEB3',
+        'line-width': 3,
+      },
+    })
+  }
+
+  const onDrawClick = (event) => {
+    const coords = [event.lngLat.lng, event.lngLat.lat]
+    measurePoints.push(coords)
+
+    const element = document.createElement('div')
+    element.style.width = '6px'
+    element.style.height = '6px'
+    element.style.backgroundColor = '#F5DEB3'
+    element.style.borderRadius = '50%'
+
+    new maplibregl.Marker({ element })
+      .setLngLat(coords)
+      .addTo(map)
+
+    if (type === 'Polyline' && measurePoints.length > 1) {
+      map.getSource('draw-line').setData({
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: measurePoints,
+        },
+      })
+    }
+  }
+
+  const onRightClick = (event) => {
+    event.preventDefault()
+    isDrawing.value = false
+    map.getContainer().style.cursor = ''
+    map.off('click', onDrawClick)
+    map.off('contextmenu', onRightClick)
+    measurePoints = []
+  }
+
+  map.on('click', onDrawClick)
+  map.on('contextmenu', onRightClick)
+}
+
+defineExpose({
+  flyToCenter,
+  addPolygonData,
+  changeMapMode,
+  drawLineMeasureGraphics,
+  updateWhlnLayers,
+})
+
+onMounted(async () => {
+  await nextTick()
+  onInitMap()
+})
+
 onUnmounted(() => {
-    if (whlnPlugin) { whlnPlugin.destroy?.(); whlnPlugin = null; }
-    if (map) { map.remove(); map = null; }
-});
+  if (whlnPlugin) {
+    whlnPlugin.destroy?.()
+    whlnPlugin = null
+  }
+
+  if (currentMarker) {
+    currentMarker.remove()
+    currentMarker = null
+  }
+
+  if (map) {
+    map.remove()
+    map = null
+  }
+})
 </script>
 
 <style lang="scss" scoped>
 .maplibre-map-template {
-    position: relative;
-    height: 100%;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #0b1e3a;
+
+  .map-container {
     width: 100%;
-    background: #0b1e3a;
-    #mapContainer { width: 100%; height: 100%; }
+    height: 100%;
+  }
+}
+
+:deep(.custom-marker) {
+  background-position: center;
 }
 </style>
