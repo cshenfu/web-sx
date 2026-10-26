@@ -7,38 +7,28 @@ export const SX_OVERLAY_ANCHOR_ID = 'sx-overlay-anchor'
 // 服务基础地址
 // ============================================================
 
-// 通用 GIS 服务：建筑物 / 水域 / 路网 / 铁路 等 11 个
 const NEW_GIS_BASE_URL = 'https://gis.wh-ge.com/sx-map-service'
-
-// STAC 服务：风资源图谱
-// ⚠️ 改成老项目里 wind-resource 实际用的 STAC 地址；
-//    如果它确实走 sx-map-service 的 wind workspace，保持等于 NEW_GIS_BASE_URL
 const NEW_STAC_BASE_URL = NEW_GIS_BASE_URL
-
-// TiTiler 服务：光资源图谱
-// ⚠️ 改成老项目里 solar-resource 实际用的 TiTiler 地址；
-//    如果它确实走 sx-map-service 的 ghi workspace，保持等于 NEW_GIS_BASE_URL
 const NEW_TITILER_BASE_URL = NEW_GIS_BASE_URL
 
 // 占位符 → 真实地址
+// 注意：不含 {powerInfraUrl}。电网由 options.powerInfraUrl 显式注入，
+// 不注入时保留占位符并 warn，避免被错误替换成 sx-map-service。
 const PLACEHOLDER_MAP = {
   '{mapServiceBaseUrl}': NEW_GIS_BASE_URL,
-  '{powerInfraUrl}':     NEW_GIS_BASE_URL,
   '{stacBaseUrl}':       NEW_STAC_BASE_URL,
   '{titilerBaseUrl}':    NEW_TITILER_BASE_URL,
 }
 
-// 占位符正则缓存（避免每次 new RegExp）
 const PLACEHOLDER_REGEX_MAP = Object.keys(PLACEHOLDER_MAP).reduce((acc, ph) => {
   acc[ph] = new RegExp(ph.replace(/[{}]/g, '\\$&'), 'g')
   return acc
 }, {})
 
-// 完全跳过硬替换的图层 id（按需加）
-// 用途：某些图层的地址由业务层或插件 endpoints 注入，不希望这里动它
+// 完全跳过通用占位符替换的图层 id
+// - collection-line：url 是 {powerInfraUrl}，由 applyPowerInfraUrl 单独处理
 const SKIP_OVERRIDE_IDS = new Set([
-  // 'wind-resource',
-  // 'solar-resource',
+  'collection-line',
 ])
 
 // ============================================================
@@ -48,17 +38,26 @@ const SKIP_OVERRIDE_IDS = new Set([
 /**
  * 生成陕西宿主图层配置
  *
- * @returns {object} createDefaultConfig() 的返回值（已替换占位符）
+ * @param {object} [options]
+ * @param {string} [options.powerInfraUrl] 电网（power-infra）服务地址
+ * @returns {object} createDefaultConfig() 的返回值
  */
-export function createSxLayerConfig() {
+export function createSxLayerConfig(options = {}) {
   const config = createDefaultConfig()
 
   // 1. 追加天地图注记
   config.layers[TDT_ANNOTATION_LAYER_ID] = buildTdtAnnotationLayer()
   insertAnnotationInTransport(config)
 
-  // 2. 批量替换占位符
+  // 2. 批量替换占位符（跳过电网）
   overrideAllLayerSources(config)
+
+  // 3. 电网单独处理
+  if (options.powerInfraUrl) {
+    applyPowerInfraUrl(config, options.powerInfraUrl)
+  } else {
+    warnPowerInfraUrlMissing(config)
+  }
 
   return config
 }
@@ -67,13 +66,6 @@ export function createSxLayerConfig() {
 // 占位符替换
 // ============================================================
 
-/**
- * 批量替换 config 中所有图层 source 的占位符。
- * 支持 source.url 字符串、source.tiles 数组、layer.url 兜底。
- *
- * @param {object} config createDefaultConfig() 的返回值
- * @returns {void}
- */
 function overrideAllLayerSources(config) {
   if (!config?.layers) return
 
@@ -83,29 +75,18 @@ function overrideAllLayerSources(config) {
     const layer = config.layers[id]
     if (!layer) return
 
-    // ① source.url 字符串
     if (layer.source && typeof layer.source.url === 'string') {
       layer.source.url = replacePlaceholders(layer.source.url)
     }
-
-    // ② source.tiles 数组
     if (layer.source && Array.isArray(layer.source.tiles)) {
       layer.source.tiles = layer.source.tiles.map(replacePlaceholders)
     }
-
-    // ③ 兜底：没有 source，直接挂 layer.url
     if (!layer.source && typeof layer.url === 'string') {
       layer.url = replacePlaceholders(layer.url)
     }
   })
 }
 
-/**
- * 替换单个 URL 中的全部占位符
- *
- * @param {string} url
- * @returns {string}
- */
 function replacePlaceholders(url) {
   if (typeof url !== 'string') return url
   let result = url
@@ -116,12 +97,44 @@ function replacePlaceholders(url) {
 }
 
 // ============================================================
-// 天地图注记
+// 电网（power-infra）
 // ============================================================
 
 /**
- * 天地图注记 WMTS
+ * 把 collection-line 的 {powerInfraUrl} 替换成真实地址。
+ *
+ * @param {object} config
+ * @param {string} powerInfraUrl
+ * @returns {void}
  */
+function applyPowerInfraUrl(config, powerInfraUrl) {
+  const layer = config?.layers?.['collection-line']
+  if (!layer?.source) return
+  if (typeof layer.source.url === 'string') {
+    layer.source.url = layer.source.url.split('{powerInfraUrl}').join(powerInfraUrl)
+  }
+}
+
+/**
+ * 电网地址未注入时提醒：{powerInfraUrl} 残留会导致 power-infra 源不可用。
+ *
+ * @param {object} config
+ * @returns {void}
+ */
+function warnPowerInfraUrlMissing(config) {
+  const url = config?.layers?.['collection-line']?.source?.url
+  if (typeof url === 'string' && url.includes('{powerInfraUrl}')) {
+    console.warn(
+      '[sxLayerConfig] collection-line 的 {powerInfraUrl} 未注入，' +
+      '请在 createSxLayerConfig({ powerInfraUrl }) 或业务层补上。',
+    )
+  }
+}
+
+// ============================================================
+// 天地图注记
+// ============================================================
+
 function buildTdtAnnotationLayer() {
   return {
     name: '天地图注记',
@@ -148,12 +161,6 @@ function buildTdtAnnotationLayer() {
   }
 }
 
-/**
- * 把注记插到 transport 组高清影像之后
- *
- * @param {object} config
- * @returns {void}
- */
 function insertAnnotationInTransport(config) {
   const transport = config.groups.find((g) => g.id === 'transport')
   if (!transport) return

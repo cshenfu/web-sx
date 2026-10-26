@@ -169,7 +169,7 @@ const routes = [
         path: 'currentPower',
         redirect: '/hucang/currentPower/list',
         children: [
-          { path: 'list', name: 'HucangGridList', component: () => import('@/views/hucang/commonDataManage/currentPower/CurrentPower.vue'), meta: { title: '电网现状数据库', module: 'hucang', sidebar: 'hucang', key: 'currentPower' } },
+          { path: 'list', name: 'HucangGridList',  component: () => import('@/views/hucang/commonDataManage/currentPower/PowerGridMap.vue'), meta: { title: '电网现状数据库', module: 'hucang', sidebar: 'hucang', key: 'currentPower' } },
           { path: 'add', name: 'HucangGridAdd', component: () => import('@/views/hucang/commonDataManage/currentPower/AddCurrentPower.vue'), meta: { title: '电网现状数据管理', module: 'hucang', sidebar: 'hucang', key: 'currentPower' } },
           { path: 'detail', name: 'HucangGridDetail', component: () => import('@/views/hucang/commonDataManage/currentPower/CurrentPowerDetail.vue'), meta: { title: '电网数据详情', module: 'hucang', sidebar: 'hucang', key: 'currentPower' } }
         ]
