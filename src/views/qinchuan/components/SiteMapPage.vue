@@ -948,6 +948,10 @@ const windCount = computed(() => selectedProject.value?.windTurbinePoints?.lengt
 const altCount = computed(() => (selectedProject.value?.windTurbinePoints || []).filter((p) => Number(p.isReserve) === 1).length)
 
 async function onProjectClick(projectId) {
+  if (showCreateProject.value || showEditProject.value) {
+    // ElMessage.warning('请关闭当前面板后再进行场区选择')
+    return
+  }
   if (String(selectedProject.value?.id ?? '') === String(projectId)) return
   clearSelectionLayers({ restoreAreaCenter: false })
   const project = allMapProjects.value.find((p) => String(p.id) === String(projectId)); if (!project) return
