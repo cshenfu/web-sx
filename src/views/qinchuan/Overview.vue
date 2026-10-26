@@ -2043,6 +2043,7 @@ function onProjectStageSelect(row) {
 
 // ==================== 遮罩与阈值 ====================
 const MASK_LAYER_ID = 'shaanxi-mask'
+const MASK_PATTERN = 'shaanxi-starfield-mask'
 const MASK_COLOR = '#000000'
 const MASK_MAX_OPACITY = 1.0
 const MASK_FADE_DURATION = 300
@@ -2132,8 +2133,15 @@ async function ensureShaanxiMask() {
     const boundary = await loadShaanxiBoundary()
     if (!boundary) return
     const data = buildMaskGeoJSON(boundary); if (!data.features.length) return
-    mapRef.value.addMaskLayer({ id: MASK_LAYER_ID, geojson: data, color: MASK_COLOR, opacity: 0, fadeDuration: MASK_FADE_DURATION })
-    lastMaskOpacity = -1; syncMaskVisibility(true)
+    mapRef.value.addMaskLayer({
+      id: MASK_LAYER_ID,
+      geojson: data,
+      pattern: MASK_PATTERN,
+      color: MASK_COLOR,
+      opacity: 0,
+      fadeDuration: MASK_FADE_DURATION,
+    })    
+lastMaskOpacity = -1; syncMaskVisibility(true)
   } catch (err) { console.error('[mask] 陕西省遮罩加载失败:', err) }
 }
 
@@ -2301,6 +2309,10 @@ async function onMapReady() {
 
   try {
     map.setMinZoom(0)
+
+    // ✅ 修复：再次兜底确保 globe 投影（防止被外部插件/style 重载覆盖）
+    try { map.setProjection({ type: 'globe' }) } catch (e) { try { map.setProjection('globe') } catch (e2) {} }
+
     const zoom = fitGlobeZoom(map, 0.8)
     map.jumpTo({ center: [108.9, 35.2], zoom: 2, pitch: 0, bearing: 0 })
     mapRef.value.startAutoRotate(3)

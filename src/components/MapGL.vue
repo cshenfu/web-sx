@@ -1,10 +1,6 @@
 <!-- MapGL.vue -->
 <template>
-  <div
-    ref="mapContainer"
-    class="map-container"
-    :style="isDashboard?null:{ backgroundImage: `url(${bgImg})` }"
-  />
+  <div ref="mapContainer" class="map-container" />
 </template>
 
 <script setup>
@@ -17,7 +13,6 @@ import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { addGradientExtrusion } from '@/utils/gradientExtrusion'
 
-import bgImg from '@/assets/img/qinchuan/dashbord/bg.png'
 import { MaplibreStarfieldLayer } from '@geoql/maplibre-gl-starfield'
 
 if (typeof maplibregl.setWorkerUrl === 'function') {
@@ -39,7 +34,7 @@ const props = defineProps({
   center: { type: Array, default: () => [0, 20] },
   zoom: { type: Number, default: 1.5 },
   flyToOnLoad: { type: Boolean, default: true },
-  // ★ 控制是否为主页模式（星空、大气光晕、夜半球、自转）
+  // ★ 控制是否为主页模式（星空、大气光晕、夜半球、自转、可倾斜）
   isDashboard: { type: Boolean, default: false },
 })
 
@@ -52,6 +47,9 @@ const lastHighlightBySource = new Map()
 const clickHandlers = new Map()
 const imageCache = new Map()
 const glowLineGeoJSONCache = new Map()
+
+// ✅ 修复：声明 activeProjection，避免 style.load 回调抛 ReferenceError
+let activeProjection = 'globe'
 
 let draggingFeatureId = null
 let isBoxSelecting = false
@@ -139,17 +137,30 @@ const vertexOnlyDirectSelectMode = {
   },
 }
 
+// ✅ 全局统一设置 globe 投影（兼容 v4/v5 API）
+function applyGlobeProjection() {
+  if (!map) return
+  try {
+    map.setProjection({ type: 'globe' })
+  } catch (e) {
+    try { map.setProjection('globe') } catch (e2) { /* 忽略 */ }
+  }
+}
+
 onMounted(() => {
   map = new maplibregl.Map({
     container: mapContainer.value,
     style: props.style,
     center: props.center,
     zoom: props.zoom,
+    projection: 'globe',
+    // ★ 大屏允许倾斜，业务地图永远正俯视
+    maxPitch: props.isDashboard ? 60 : 0,
   })
 
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
   map.on('dragstart', () => stopAutoRotate())
-  
+
   draw = new MapboxDraw({
     displayControlsDefault: false,
     userProperties: true,
@@ -176,10 +187,14 @@ onMounted(() => {
 
   // ---------------- 全局：提前设置球体投影（避免 2D 闪烁） ----------------
   map.on('style.load', () => {
-    map.setProjection({ type: 'globe' })
+    activeProjection = 'globe'
+    applyGlobeProjection()
   })
 
   map.on('load', () => {
+    // ✅ load 后兜底确保 globe（防止任何 setStyle / 插件覆盖）
+    applyGlobeProjection()
+
     // ---------------- 全局：背景透明处理 ----------------
     try {
       const styleLayers = map.getStyle()?.layers || []
@@ -188,19 +203,33 @@ onMounted(() => {
       })
     } catch (e) { /* 忽略 */ }
 
+    // =========================================================
+    // ✅ 通用：星空层（所有模式都有）
+    // 加在 style 最底层（background 之下），只在球体外围可见
+    // =========================================================
+    try {
+      starfieldLayer = new MaplibreStarfieldLayer({
+        starCount: 40000,
+        starSize: 3.0,
+      })
+      map.addLayer(starfieldLayer, map.getStyle().layers[0]?.id)
+    } catch (e) {
+      console.warn('[MapGL] 星空插件加载失败', e)
+    }
+
     if (props.isDashboard) {
       // =========================================================
-      // 主页（大屏）专属：星空、大气光晕、夜半球（去除强光照明）
+      // 主页（大屏）专属：大气光晕、夜半球（去除强光照明）
       // =========================================================
-      
+
       // 1. 设置大气光晕（核心）
       try {
         map.setSky({
-          'sky-color': 'rgba(0, 0, 0, 0)', 
+          'sky-color': 'rgba(0, 0, 0, 0)',
           'horizon-color': 'rgba(0, 0, 0, 0)',
-          'fog-color': 'rgba(0, 0, 0, 0)', 
+          'fog-color': 'rgba(0, 0, 0, 0)',
           'sky-horizon-blend': 0.5,
-          'horizon-fog-blend': 0.5, 
+          'horizon-fog-blend': 0.5,
           'fog-ground-blend': 0.5,
           // 在大屏地球层级（zoom ≤ 3.5）显示光晕，3.5~5 之间逐渐消失
           'atmosphere-blend': [
@@ -220,18 +249,7 @@ onMounted(() => {
         })
       } catch (e) { /* 忽略 */ }
 
-      // 3. 星空
-      try {
-        starfieldLayer = new MaplibreStarfieldLayer({
-          starCount: 40000,
-          starSize: 3.0,
-        })
-        map.addLayer(starfieldLayer, map.getStyle().layers[0]?.id)
-      } catch (e) {
-        console.warn('[MapGL] 星空插件加载失败', e)
-      }
-
-      // 4. 夜半球（如果不需要昼夜交替的黑暗面，可以将这里注释掉）
+      // 3. 夜半球（如果不需要昼夜交替的黑暗面，可以将这里注释掉）
       // import('crepuscule')
       //   .then(({ CrepusculeLive }) => {
       //     try {
@@ -239,10 +257,10 @@ onMounted(() => {
       //     } catch (e) {}
       //   })
       //   .catch(() => {})
-        
+
     } else {
       // =========================================================
-      // 普通业务模式：默认透明天空和基础光照
+      // 普通业务模式：默认透明天空和基础光照（星空已在上面加载）
       // =========================================================
       try {
         map.setSky({
@@ -264,8 +282,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopAutoRotate()
-  
-  if (props.isDashboard && map) {
+
+  // ✅ 星空 / 夜半球清理无条件化（各自判空）
+  if (map) {
     if (nightOverlay) {
       try { nightOverlay.destroy?.() } catch (e) {}
       nightOverlay = null
@@ -463,8 +482,16 @@ function stopBoxSelect() {
 
 // ======================== 基础方法 ========================
 function flyToShaanxi() {
-  map?.flyTo({ center: [108.9, 35], zoom: 6, pitch: 50, bearing: 0, duration: 3500, essential: true })
+  map?.flyTo({
+    center: [108.9, 35],
+    zoom: 6,
+    pitch: props.isDashboard ? 50 : 0, // 大屏倾斜飞入，业务页正俯视
+    bearing: 0,
+    duration: 3500,
+    essential: true,
+  })
 }
+
 // ---------- 地球自转 ----------
 let spinTimer = null
 let spinSpeedDegPerSec = 3
@@ -547,18 +574,91 @@ function addFillLayer({ id, geojson, fillColor = '#4fc3ff', fillOpacity = 0.5, o
   addedLayers.add(`${id}-outline`)
 }
 
-function addMaskLayer({ id, geojson, color = '#000000', opacity = 0, fadeDuration = 300 }) {
+function ensureStarMaskPattern(imageId) {
+  if (!map || map.hasImage(imageId)) return
+
+  const size = 512
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('无法创建星空遮罩纹理')
+
+  ctx.fillStyle = '#030817'
+  ctx.fillRect(0, 0, size, size)
+
+  // 固定随机种子，避免每次刷新星点位置都改变
+  let seed = 0x51a7
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0
+    return seed / 4294967296
+  }
+
+  for (let i = 0; i < 180; i++) {
+    const x = random() * size
+    const y = random() * size
+    const radius = random() < 0.9 ? 0.5 + random() * 0.7 : 1.2 + random() * 1.1
+    const alpha = 0.35 + random() * 0.65
+    const blueStar = random() < 0.22
+
+    ctx.beginPath()
+    ctx.arc(x, y, radius, 0, Math.PI * 2)
+    ctx.fillStyle = blueStar
+      ? `rgba(150, 210, 255, ${alpha})`
+      : `rgba(245, 249, 255, ${alpha})`
+
+    if (radius > 1.7) {
+      ctx.shadowBlur = 5
+      ctx.shadowColor = 'rgba(120, 190, 255, 0.8)'
+    }
+    ctx.fill()
+    ctx.shadowBlur = 0
+  }
+
+  map.addImage(imageId, ctx.getImageData(0, 0, size, size), { pixelRatio: 1 })
+}
+
+function addMaskLayer({
+  id,
+  geojson,
+  color = '#000000',
+  pattern = null,
+  opacity = 1,
+  fadeDuration = 300,
+}) {
   if (!map) return false
+
+  if (pattern) ensureStarMaskPattern(pattern)
+
   if (map.getSource(id)) {
     map.getSource(id).setData(geojson)
-    if (map.getLayer(id)) map.setPaintProperty(id, 'fill-color', color)
+  } else {
+    map.addSource(id, { type: 'geojson', data: geojson })
+  }
+
+  const fillPaint = pattern
+    ? { 'fill-pattern': pattern }
+    : { 'fill-color': color }
+
+  if (map.getLayer(id)) {
+    Object.entries(fillPaint).forEach(([property, value]) => {
+      map.setPaintProperty(id, property, value)
+    })
     return true
   }
-  map.addSource(id, { type: 'geojson', data: geojson })
+
   map.addLayer({
-    id, type: 'fill', source: id,
-    paint: { 'fill-color': color, 'fill-opacity': opacity, 'fill-opacity-transition': { duration: fadeDuration, delay: 0 } },
+    id,
+    type: 'fill',
+    source: id,
+    paint: {
+      ...fillPaint,
+      'fill-opacity': opacity,
+      'fill-opacity-transition': { duration: fadeDuration, delay: 0 },
+    },
   })
+
   addedLayers.add(id)
   return true
 }
@@ -1145,10 +1245,8 @@ defineExpose({
   inset: 0;
   width: 100%;
   height: 100%;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-color: transparent;
+  /* ✅ 深色兜底：星空插件加载失败或球体外围无星空时，也不会露出浅色底 */
+  background-color: #030817;
 }
 :deep(.maplibregl-ctrl-top-right) { display: none; }
 :deep(.maplibregl-ctrl-bottom-right) { display: none; }

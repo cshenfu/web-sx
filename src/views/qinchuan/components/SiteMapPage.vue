@@ -14,7 +14,16 @@
     </section>
 
     <div class="map-layer">
-      <MapGL ref="mapRef" :style="satelliteStyle" @ready="onMapReady" @draw-update="onDrawChange" @draw-create="onDrawChange" @draw-delete="onDrawChange" @box-select="handleBoxSelect" />
+      <!-- ✅ 修复：关闭 flyToOnLoad，让本页自己控制相机；避免飞向 zoom6/pitch0 的"平面"视角 -->
+      <MapGL
+        ref="mapRef"
+        :style="satelliteStyle"
+        @ready="onMapReady"
+        @draw-update="onDrawChange"
+        @draw-create="onDrawChange"
+        @draw-delete="onDrawChange"
+        @box-select="handleBoxSelect"
+      />
     </div>
 
     <template v-if="!showConfig && !showCreateProject && !showEditProject">
@@ -263,6 +272,8 @@ import {
 
 // ✅ WFS 边界加载（替代本地 610000.json / 610000_full.json）
 import { loadShaanxiProvince, loadShaanxiCities } from '@/utils/shaanxiBoundary'
+// ✅ 修复：移除 useFlatViewLock（该 hook 会把 globe 锁成平面，导致"所有 GIS 变二维"）
+
 
 const props = defineProps({
   stage: { type: String, default: '' },
@@ -349,6 +360,7 @@ const AREA_STYLE = {
 
 const mapRef = ref(null)
 const mapReady = ref(false)
+// ✅ 修复：删除 useFlatViewLock 调用（该 hook 会把 globe 投影改为 mercator，导致 GIS 变平面）
 const route = useRoute()
 const viewMode = ref(route.query.view === 'list' ? 'list' : 'map')
 const showConfig = ref(false)
@@ -716,10 +728,12 @@ async function renderCityStats() {
   mapRef.value.addFillLayer({ id: CITY_LAYER_ID, geojson: { type: 'FeatureCollection', features }, fillColor: theme.value.cityFillStops, fillOpacity: 0.55, outlineColor: theme.value.cityOutline, outlineWidth: 1.2 })
   const labelFeatures = features.filter((f) => Array.isArray(f.properties.center) && f.properties.center.length === 2).map((f) => ({ type: 'Feature', properties: f.properties, geometry: { type: 'Point', coordinates: f.properties.center } }))
   mapRef.value.addSymbolLayer({ id: `${CITY_LAYER_ID}-labels`, geojson: { type: 'FeatureCollection', features: labelFeatures }, layout: { 'text-field': ['format', ['get', 'totalCapacity'], { 'font-scale': 1.25 }, 'MW', { 'font-scale': 0.85 }, '\n', ['get', 'regionName'], { 'font-scale': 0.85 }], 'text-size': 13, 'text-anchor': 'center', 'text-allow-overlap': true, 'text-ignore-placement': true, 'text-line-height': 1.1 }, paint: { 'text-color': '#ffffff', 'text-halo-color': '#000000', 'text-halo-width': 1.6 } })
+  syncMaskVisibility()
 }
 function hideCityStats() { mapRef.value?.removeLayer(CITY_LAYER_ID); mapRef.value?.removeLayer(`${CITY_LAYER_ID}-labels`) }
 
 const MASK_LAYER_ID = 'shaanxi-mask'
+const MASK_PATTERN = 'shaanxi-starfield-mask'
 const MASK_SOURCE_ID = 'shaanxi-mask-src'
 const SHAANXI_BOUNDS = [[105.4, 31.7], [111.2, 39.6]]
 let lastMaskOpacity = -1
@@ -746,8 +760,15 @@ async function ensureShaanxiMask() {
     const boundary = await loadShaanxiBoundary(); if (!boundary) return
     const data = buildMaskGeoJSON(boundary); if (!data.features.length) return
     if (!map.getSource(MASK_SOURCE_ID)) map.addSource(MASK_SOURCE_ID, { type: 'geojson', data })
-    map.addLayer({ id: MASK_LAYER_ID, type: 'fill', source: MASK_SOURCE_ID, paint: { 'fill-color': props.maskColor, 'fill-opacity': 0, 'fill-opacity-transition': { duration: props.maskFadeDuration, delay: 0 } } })
-    lastMaskOpacity = -1; syncMaskVisibility(true)
+    mapRef.value.addMaskLayer({
+      id: MASK_LAYER_ID,
+      geojson: data,
+      pattern: MASK_PATTERN,
+      color: props.maskColor,
+      opacity: props.maskMaxOpacity,
+      fadeDuration: props.maskFadeDuration,
+    })    
+lastMaskOpacity = -1; syncMaskVisibility(true)
   } catch (err) { console.warn('[mask] 陕西省遮罩加载失败:', err) }
 }
 function viewIntersectsShaanxi(map) {
@@ -759,11 +780,10 @@ function viewIntersectsShaanxi(map) {
   return !(e < sw || w > ne || n < ss || s > nn)
 }
 function smoothstep(e0, e1, x) { if (e1 <= e0) return x >= e1 ? 1 : 0; const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t) }
-function computeMaskOpacity() {
-  if (!props.enableShaanxiMask) return 0
-  const map = mapRef.value?.getMap?.(); if (!map || !viewIntersectsShaanxi(map)) return 0
-  return smoothstep(props.maskMinZoom, props.maskFullZoom, map.getZoom()) * props.maskMaxOpacity
-}
+ function computeMaskOpacity() {
+   if (!props.enableShaanxiMask) return 0
+   return props.maskMaxOpacity
+ }
 function syncMaskVisibility(force = false) {
   if (!props.enableShaanxiMask) return
   const map = mapRef.value?.getMap?.(); if (!map || !map.getLayer(MASK_LAYER_ID)) return
@@ -1278,7 +1298,7 @@ function handleCityFillClick(e) {
   if (!features.length) return
   const center = getCityCenterFromFeature(features[0])
   if (!center) return
-  map.flyTo({ center, zoom: CITY_CLICK_ZOOM_TARGET, pitch: 45, duration: 1500 })
+  map.flyTo({ center, zoom: CITY_CLICK_ZOOM_TARGET, duration: 1500 })
 }
 
 async function onVerifySaved() {
@@ -1432,7 +1452,16 @@ function cancelEdit() { exitEditMode() }
 const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoomThresholdSwitch({
   mapRef,
   onEnter: () => { hideCityStats(); renderProjectsByStage('area') },
-  onExit: () => { clearSelectionLayers(); renderProjectsByStage('overview'); if (cityStats.value.length) renderCityStats() },
+  onExit: () => {
+    clearSelectionLayers()
+    renderProjectsByStage('overview')
+    if (cityStats.value.length) renderCityStats()
+    // ✅ 修复：退出场区回到 Overview 时，再次确保 globe 投影
+    const map = mapRef.value?.getMap?.()
+    if (map) {
+      try { map.setProjection({ type: 'globe' }) } catch (e) { try { map.setProjection('globe') } catch (e2) {} }
+    }
+  },
 })
 
 async function onMapReady() {
@@ -1440,15 +1469,23 @@ async function onMapReady() {
   await Promise.allSettled([loadShaanxiBoundary(), loadCityGeoJSON()])
 
   mapReady.value = true
+  // ✅ 修复：删除 lockFlatView() 调用（该 hook 是本次"全部变平面"的直接元凶）
+
   if (showCreateProject.value) nextTick(() => startCreateDrawing())
   const map = mapRef.value.getMap()
+
+  // ✅ 修复：主动设置 globe 投影（兜底防止插件 / style 重载覆盖）
+  try { map.setProjection({ type: 'globe' }) } catch (e) { try { map.setProjection('globe') } catch (e2) {} }
+
+ 
+
   map.on('move', updateDetailCardPosition); map.on('zoom', updateDetailCardPosition)
   map.on('click', handleMapBlankClick)
   map.on('click', handleCityFillClick)
-  bindZoomListener(); syncByZoom()
   if (isAreaView.value) { hideCityStats(); renderProjectsByStage('area') } else await renderCityStats()
   map.on('zoom', syncMaskVisibility); map.on('move', syncMaskVisibility); map.on('style.load', ensureShaanxiMask)
   await ensureShaanxiMask()
+  bindZoomListener()
   try {
     whlnPlugin = attachSxLayers(map, { initialVisibleIds: layerVisibleIds.value.filter((id) => WHLN_LAYER_IDS.includes(id)) })
     whlnPlugin.subscribe?.((ids) => { layerVisibleIds.value = [...layerVisibleIds.value.filter((id) => !WHLN_LAYER_IDS.includes(id)), ...ids]; emits('featureVisibleChange', ids); syncMaskVisibility() })

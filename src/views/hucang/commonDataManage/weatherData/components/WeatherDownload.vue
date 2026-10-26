@@ -146,7 +146,7 @@ const handleDownload = (row) => { ElMessage.success(`开始下载任务: ${row.t
   background: linear-gradient(122.01deg, #E6EEF8 0%, #D2E0F4 100%), #FFFFFF;
   display: flex;
   flex-direction: column;
-  border-radius: 24px 0 0 0;
+  // border-radius: 24px 0 0 0;
   overflow: hidden;
 }
 
