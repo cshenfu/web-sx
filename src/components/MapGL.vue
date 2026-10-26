@@ -463,7 +463,7 @@ function stopBoxSelect() {
 
 // ======================== 基础方法 ========================
 function flyToShaanxi() {
-  map?.flyTo({ center: [108.9, 35.2], zoom: 6.5, pitch: 50, bearing: 0, duration: 3000, essential: true })
+  map?.flyTo({ center: [108.9, 35], zoom: 6, pitch: 50, bearing: 0, duration: 3500, essential: true })
 }
 // ---------- 地球自转 ----------
 let spinTimer = null

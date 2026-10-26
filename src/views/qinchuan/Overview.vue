@@ -2,17 +2,17 @@
 <template>
   <main class="dashboard-page">
     <MapGL
-  ref="mapRef"
-  :style="satelliteStyle"
-  :fly-to-on-load="false"   
-  :isDashboard="true"  
-  @ready="onMapReady"
-  @city-click="onCityClick"
-  @draw-update="onDrawChange"
-  @draw-create="onDrawChange"
-  @draw-delete="onDrawChange"
-  @box-select="handleBoxSelect"
-/>
+      ref="mapRef"
+      :style="satelliteStyle"
+      :fly-to-on-load="false"   
+      :isDashboard="true"  
+      @ready="onMapReady"
+      @city-click="onCityClick"
+      @draw-update="onDrawChange"
+      @draw-create="onDrawChange"
+      @draw-delete="onDrawChange"
+      @box-select="handleBoxSelect"
+    />
     <div class="map-overlay" aria-hidden="true" />
 
     <LayerChipPanel
@@ -423,12 +423,14 @@ import {
 import { cloneValue } from './js/geoUtils'
 import { useZoomThresholdSwitch } from './js/useZoomThresholdSwitch'
 
+// ✅ WFS 边界加载（替代本地 610000.json / 610000_full.json）
+import { loadShaanxiProvince, loadShaanxiCities } from '@/utils/shaanxiBoundary'
+
 import fjIcon from '@/assets/img/mapIcon/fj-icon.png'
 import gfIcon from '@/assets/img/mapIcon/gf-icon.png'
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
 import fengjiBxIcon from '@/assets/img/mapIcon/fengji-bx.png'
 import shengyazhanIcon from '@/assets/img/mapIcon/syz.png'
-import shaanxiOutline610000 from '/public/geojson/610000.json'
 import {
   getIconNaturalWidth,
   getCoordsBounds,
@@ -461,7 +463,6 @@ let currentOverviewRoadProjectId = null
 const overviewRoadCache = new Map()
 const overviewRoadInFlight = new Map()
 
-// 道路：蓝色系；线路：黄色系
 const ROAD_LINE_COLORS = {
   road: '#2563eb',
   line: '#eab308',
@@ -478,13 +479,11 @@ const LINE_PAINT = {
 }
 const lineTip = reactive({ visible: false, x: 0, y: 0, text: '' })
 
-// chip → 图层映射
 const PROJECT_ICON_LAYER_MAP = {
   'wind-gh': ['overview-project-wind-all', 'overview-project-wind-bx-all'],
   booster: ['overview-project-booster-all'],
 }
 
-// 3D 地形
 const TERRAIN_SOURCE_ID = 'terrain-dem'
 const HILLSHADE_SOURCE_ID = 'hillshade-dem'
 const HILLSHADE_LAYER_ID = 'terrain-hillshade'
@@ -563,7 +562,7 @@ const mapRef = ref(null)
 const selectedStage = ref(null)
 const activeProject = ref(null)
 const mapReady = ref(false)
-let hasEntered = false   // ★ 是否已经点击进入陕西
+let hasEntered = false
 const viewMode = ref('map')
 const showLayerPanel = ref(false)
 let whlnPlugin = null
@@ -583,13 +582,8 @@ const selectedProject = ref(null)
 
 const popoverActions = computed(() => {
   const actions = STAGE_ACTIONS[popoverProject.value?.projectStage] || STAGE_ACTIONS.PRELIMINARY_SELECTION
-  // 1. 规定除了删除以外其他按钮的显示顺序（把 delete 从里面去掉）
   const displayOrder = ['edit', 'reserve', 'verify', 'assign']
-  
-  // 2. 找出不在 displayOrder 里的其他操作（比如 material, establishMeeting 等），排除 delete
   const otherActions = actions.filter((action) => !displayOrder.includes(action) && action !== 'delete')
-  
-  // 3. 合并起来，最后强制把 delete 塞到数组的最末尾
   const result = [
     ...displayOrder.filter((action) => actions.includes(action)),
     ...otherActions,
@@ -603,23 +597,20 @@ const popoverActions = computed(() => {
 const visiblePopoverActions = computed(() => {
   const all = popoverActions.value
   if (all.length <= 5) return all
-  
-  // 4. 如果按钮总数超过 5 个，确保「删除」一定在主面板显示，且永远排在最后一个
+
   const withoutDelete = all.filter(a => a !== 'delete')
   const hasDelete = all.includes('delete')
-  
-  // 取前 4 个常规操作 + 删除
+
   return hasDelete ? [...withoutDelete.slice(0, 4), 'delete'] : withoutDelete.slice(0, 5)
 })
 
 const overflowPopoverActions = computed(() => {
   const all = popoverActions.value
   if (all.length <= 5) return []
-  
-  // 5. 多余的按钮进入「更多」下拉菜单（此时删除已经在主面板，所以这里去掉它）
+
   const withoutDelete = all.filter(a => a !== 'delete')
   const hasDelete = all.includes('delete')
-  
+
   return hasDelete ? withoutDelete.slice(4) : withoutDelete.slice(5)
 })
 const actionMenuOpen = ref(false)
@@ -702,7 +693,7 @@ function getHoverThemeColor(projectStage) {
 }
 function onCityClick(feature) {
   if (isAreaView.value) return
-  if (!hasEntered) return          // ★ 未进入前不处理
+  if (!hasEntered) return
   const name = feature?.properties?.name
   if (name) focusCity(name)
 }
@@ -1382,7 +1373,7 @@ function handleTableSortChange({ prop, order }) {
 watch(() => filters.stage, () => { pagination.page = 1; fetchProjectList() })
 watch(viewMode, (val) => { if (val === 'list' && showLayerPanel.value) showLayerPanel.value = false })
 
-// ==================== 图层显隐：项目图标 + 道路/线路 ====================
+// ==================== 图层显隐 ====================
 function setProjectIconVisible(chipId, visible) {
   const layerIds = PROJECT_ICON_LAYER_MAP[chipId]
   if (!layerIds) return
@@ -1521,12 +1512,6 @@ function toOverviewMapCoordinate(point) {
   return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null
 }
 
-/**
- * 把一组点（或点数组的数组）压成 LineString Feature。
- * - 一维数组：[{lon,lat}, ...] → 一条 LineString
- * - 二维数组：[[{lon,lat}, ...], ...] → 每条子数组一条 LineString
- * - 点数 < 2 / 无有效坐标 → 跳过（不加载）
- */
 function pushOverviewLineFeatures(target, rows, baseProps) {
   if (!Array.isArray(rows) || rows.length === 0) return 0
   const groups = Array.isArray(rows[0]) ? rows : [rows]
@@ -1545,12 +1530,10 @@ function pushOverviewLineFeatures(target, rows, baseProps) {
   return count
 }
 
-/** 把接口数据拆成「道路」和「线路」两个 Feature 数组 */
 function buildRoadLineFeatures(data) {
   const roadFeatures = []
   const lineFeatures = []
 
-  // 道路：CNKJ / CNXJ / JZXJ 各自数组 → 各自一条线
   const roadMap = data?.roadMap ?? data?.data?.roadMap ?? {}
   for (const type of ['CNKJ', 'CNXJ', 'JZXJ']) {
     pushOverviewLineFeatures(
@@ -1560,7 +1543,6 @@ function buildRoadLineFeatures(data) {
     )
   }
 
-  // 线路：每个 loop 的 cablepoletower 数组 → 一条线；无坐标跳过
   const line35Kv = data?.line35Kv ?? data?.data?.line35Kv
   const loops = line35Kv?.line?.loops ?? data?.line?.loops ?? []
   if (Array.isArray(loops)) {
@@ -1584,7 +1566,6 @@ function buildRoadLineFeatures(data) {
   return { roadFeatures, lineFeatures }
 }
 
-/** 创建/更新一个线图层，并绑定 hover */
 function upsertLineLayer(layerId, geojson, paint) {
   const map = mapRef.value?.getMap?.()
   if (!map) return
@@ -1607,11 +1588,9 @@ function upsertLineLayer(layerId, geojson, paint) {
   map.on('mousemove', layerId, onLineHoverMove)
   map.on('mouseleave', layerId, onLineHoverLeave)
 
-  // 保持遮罩在最顶层
   if (mapRef.value?.hasMaskLayer?.(MASK_LAYER_ID)) mapRef.value.bringMaskToTop(MASK_LAYER_ID)
 }
 
-/** 根据当前可见状态 + 缓存数据，同步道路/线路图层显隐 */
 function syncRoadLineVisibility() {
   const map = mapRef.value?.getMap?.()
   if (!map) return
@@ -1635,7 +1614,6 @@ function syncRoadLineVisibility() {
   if (!roadOn && !lineOn) lineTip.visible = false
 }
 
-/** 只删图层/source/事件，不动请求版本 */
 function removeRoadLineLayers() {
   const map = mapRef.value?.getMap?.()
   if (map) {
@@ -1651,7 +1629,6 @@ function removeRoadLineLayers() {
   lineTip.visible = false
 }
 
-/** 清空选中项目时调用：让进行中的请求失效 + 删图层 */
 function clearOverviewRoadLayer() {
   overviewRoadRequestVersion += 1
   overviewRoadInFlight.clear()
@@ -1695,7 +1672,6 @@ async function loadOverviewRoadData(projectId) {
   }
   if (!isActive()) return
 
-  // ★ 命中缓存：直接按当前 chip 状态重建
   const cached = overviewRoadCache.get(projectId)
   if (cached) {
     if (currentOverviewRoadProjectId !== String(projectId)) {
@@ -1784,8 +1760,30 @@ function addProjectArea(project, highlighted = false) {
   if (!area) return
   const layerId = `overview-project-area-${project.id}`
   const base = getAreaStyleByStage(project.projectStage)
-  const style = highlighted ? { ...base, opacity: base.opacity + 0.16 } : base
-  mapRef.value.addPolygon({ id: layerId, geojson: area, color: style.color, opacity: style.opacity, outlineColor: style.outlineColor })
+
+  // ✅ 与 SiteMapPage 一致：选中时透明只留描边，未选中时填充
+  const style = highlighted
+    ? {
+        color: 'transparent',
+        opacity: 0,
+        outlineColor: base.outlineColor,
+        outlineWidth: 3,
+      }
+    : {
+        color: base.color,
+        opacity: base.opacity,
+        outlineColor: base.outlineColor,
+        outlineWidth: 1.5,
+      }
+
+  mapRef.value.addPolygon({
+    id: layerId,
+    geojson: area,
+    color: style.color,
+    opacity: style.opacity,
+    outlineColor: style.outlineColor,
+    outlineWidth: style.outlineWidth,
+  })
   renderedMapLayerIds.add(layerId)
   const fillLayerId = `${layerId}-fill`
 
@@ -1889,8 +1887,6 @@ async function renderSelectedProjectIcons(project) {
   clearSelectedProjectIcons()
   const wf = buildWindFC(project)
   const bf = buildBoosterFC(project)
-  // 保留空图层：编辑时点位的 isReserve / isBest 状态改变后，
-  // refreshAllPointsLayers 可以直接更新对应 source，不必重建图层。
   await safeAddIcon({
     layerId: 'overview-project-wind-all',
     featureCollection: wf.normal,
@@ -2089,21 +2085,101 @@ function syncMaskVisibility(force = false) {
   mapRef.value.setMaskOpacity(MASK_LAYER_ID, target)
 }
 
-function ensureShaanxiMask() {
+// ==================== 边界数据加载（WFS） ====================
+let cityGeoJSONCache = null
+let shaanxiBoundaryCache = null
+let boundaryLoadingPromise = null
+let citiesLoadingPromise = null
+
+async function loadShaanxiBoundary() {
+  if (shaanxiBoundaryCache) return shaanxiBoundaryCache
+  if (!boundaryLoadingPromise) {
+    boundaryLoadingPromise = loadShaanxiProvince()
+      .then((data) => {
+        shaanxiBoundaryCache = data
+        return data
+      })
+      .catch((err) => {
+        boundaryLoadingPromise = null
+        console.error('[overview] 陕西省界加载失败:', err)
+        return null
+      })
+  }
+  return boundaryLoadingPromise
+}
+
+async function loadCityGeoJSON() {
+  if (cityGeoJSONCache) return cityGeoJSONCache
+  if (!citiesLoadingPromise) {
+    citiesLoadingPromise = loadShaanxiCities()
+      .then((data) => {
+        cityGeoJSONCache = data
+        return data
+      })
+      .catch((err) => {
+        citiesLoadingPromise = null
+        console.error('[overview] 陕西省市界加载失败:', err)
+        return null
+      })
+  }
+  return citiesLoadingPromise
+}
+
+async function ensureShaanxiMask() {
   if (!mapRef.value || !mapReady.value) return
   if (mapRef.value.hasMaskLayer(MASK_LAYER_ID)) { syncMaskVisibility(true); return }
   try {
-    const data = buildMaskGeoJSON(shaanxiOutline610000); if (!data.features.length) return
+    const boundary = await loadShaanxiBoundary()
+    if (!boundary) return
+    const data = buildMaskGeoJSON(boundary); if (!data.features.length) return
     mapRef.value.addMaskLayer({ id: MASK_LAYER_ID, geojson: data, color: MASK_COLOR, opacity: 0, fadeDuration: MASK_FADE_DURATION })
     lastMaskOpacity = -1; syncMaskVisibility(true)
   } catch (err) { console.error('[mask] 陕西省遮罩加载失败:', err) }
+}
+
+// ============================================================
+// 陕西省市界线图层（替代无效的矢量切片，确保 Overview 和电网一致）
+// ============================================================
+const CITY_BOUNDARY_LAYER_ID = 'sx-city-boundary-line'
+const CITY_BOUNDARY_SOURCE_ID = 'sx-city-boundary-src'
+
+async function ensureCityBoundaryLine() {
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+  if (map.getLayer(CITY_BOUNDARY_LAYER_ID)) return // 幂等
+
+  const cities = await loadCityGeoJSON()
+  if (!cities) return
+
+  if (!map.getSource(CITY_BOUNDARY_SOURCE_ID)) {
+    map.addSource(CITY_BOUNDARY_SOURCE_ID, {
+      type: 'geojson',
+      data: cities,
+    })
+  }
+  if (!map.getLayer(CITY_BOUNDARY_LAYER_ID)) {
+    map.addLayer({
+      id: CITY_BOUNDARY_LAYER_ID,
+      type: 'line',
+      source: CITY_BOUNDARY_SOURCE_ID,
+      layout: { visibility: 'visible' },
+      paint: {
+        'line-color': '#7dd3fc',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 4, 1, 10, 2],
+        'line-opacity': 0.9,
+      },
+    })
+  }
+
+  if (mapRef.value?.hasMaskLayer?.(MASK_LAYER_ID)) {
+    mapRef.value.bringMaskToTop(MASK_LAYER_ID)
+  }
 }
 
 function onLayerToggle(item) {
   const isOn = layerVisibleIds.value.includes(item.id)
   const nextOn = !isOn
 
-  // ★ 先更新可见集合，再分发
   if (isOn) {
     layerVisibleIds.value = layerVisibleIds.value.filter((id) => id !== item.id)
   } else {
@@ -2127,6 +2203,7 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
   onAboveThreshold: () => { const map = mapRef.value?.getMap?.(); if (map?.getLayer(PROVINCE_EXTRUSION_ID)) mapRef.value.removeLayer(PROVINCE_EXTRUSION_ID) },
   onEnter: () => {
     ensureShaanxiMask()
+    ensureCityBoundaryLine() // ✅ 切换视图时重新确保市界线存在
     rightPanelMode.value = 'list'
     listExpanded.value = false
     activeEditTool.value = ''
@@ -2202,7 +2279,6 @@ function handleWizardSaveDraft(payload) {}
 function handleWizardSubmit(payload) { wizardVisible.value = false }
 
 // ==================== 生命周期 ====================
-// ==================== 生命周期 ====================
 const SHAANXI_BOUNDS = [[105.4, 31.6], [111.3, 39.6]]
 
 function fitGlobeZoom(map, fill = 0.7) {
@@ -2214,25 +2290,25 @@ function fitGlobeZoom(map, fill = 0.7) {
   return Math.log2(target / BASE_RATIO)
 }
 
-// ==================== 生命周期 ====================
-function onMapReady() {
+async function onMapReady() {
+  // ✅ 边界数据守卫：先确保省界和市界就绪
+  await Promise.allSettled([loadShaanxiBoundary(), loadCityGeoJSON()])
+
   mapReady.value = true
   renderSelectedProject(activeProject.value)
 
   const map = mapRef.value.getMap()
 
-  // ★ 1. 初始：地球 + 缓慢自转 + 隐藏城市标签
   try {
     map.setMinZoom(0)
-    const zoom = fitGlobeZoom(map, 0.8)        // 0.7 = 球直径约占短边 70%
-    map.jumpTo({ center: [108.9, 35.2], zoom:2, pitch: 0, bearing: 0 })
-    mapRef.value.startAutoRotate(3)            // 3°/s，约 2 分钟一圈
+    const zoom = fitGlobeZoom(map, 0.8)
+    map.jumpTo({ center: [108.9, 35.2], zoom: 2, pitch: 0, bearing: 0 })
+    mapRef.value.startAutoRotate(3)
     mapRef.value.setCentroidLabelsVisible?.(false)
   } catch (err) {
     console.warn('[map] 初始化地球视角失败:', err)
   }
 
-  // ★ 2. 首次点击 → 停自转 + fitBounds 飞陕西 + 显示城市标签
   const handleEnterMap = () => {
     if (hasEntered) return
     hasEntered = true
@@ -2240,31 +2316,28 @@ function onMapReady() {
     mapRef.value.stopAutoRotate?.()
 
     map.fitBounds(SHAANXI_BOUNDS, {
-      // padding 按左右面板宽度预留，避免陕西被 Panel 遮挡
       padding: { top: 90, bottom: 140, left: 380, right: 340 },
-      pitch: 45,                               // 比 50 更不容易切边
+      pitch: 45,
       bearing: 0,
-      // 兜底：防止 fitBounds 算出过大的 zoom 直接切到「场区视图」
       maxZoom: AREA_ZOOM_THRESHOLD - 0.3,
       duration: 3000,
       essential: true,
     })
 
-    // 动画结束后再显示城市名，避免飞行途中标签乱跳
     map.once('moveend', () => {
       mapRef.value.setCentroidLabelsVisible?.(true)
     })
   }
   map.on('click', handleEnterMap)
 
-  // ====== 以下保持原有逻辑 ======
   map.on('click', handleMapBlankClick)
   bindZoomListener()
 
   map.on('zoom', syncMaskVisibility)
   map.on('move', syncMaskVisibility)
   map.on('style.load', ensureShaanxiMask)
-  ensureShaanxiMask()
+  await ensureShaanxiMask()
+  await ensureCityBoundaryLine() // ✅ 初次挂载时加载市界线
   nextTick(() => { syncByZoom() })
 
   try {
@@ -2283,7 +2356,12 @@ function onMapReady() {
   }
 }
 
-onMounted(async () => { await Promise.all([fetchStageList(), fetchProjectList(), fetchMapProjects()]) })
+onMounted(async () => {
+  // 提前预取边界，和业务请求并行
+  void loadShaanxiBoundary()
+  void loadCityGeoJSON()
+  await Promise.all([fetchStageList(), fetchProjectList(), fetchMapProjects()])
+})
 
 onUnmounted(() => {
   try { mapRef.value?.stopAutoRotate?.() } catch (e) { /* 忽略 */ }
@@ -2463,7 +2541,6 @@ onUnmounted(() => {
   gap: 4px;
   min-height: 48px;
   padding: 6px 12px;
-  /* background: rgba(222, 225, 228, 0.75); */
   transition: background 0.2s;
 }
 .right-top-card .footer-action {
@@ -2568,19 +2645,18 @@ onUnmounted(() => {
 .edit-tool-button:disabled { opacity: 0.55; cursor: not-allowed; }
 .edit-tool-button.danger {
   color: #e5484d;
-  background: rgba(239, 239, 239, 0.76); /* 与普通按钮一致的浅灰底 */
+  background: rgba(239, 239, 239, 0.76);
   border-color: transparent;
 }
 .edit-tool-button.danger:hover {
   color: #d9363e;
-  background: #fef2f2;        /* 悬停时极浅红底，仍以文字色为主 */
+  background: #fef2f2;
   border-color: #e5484d;
 }
 .edit-tool-button.save { color: #fff; background: #1677ff; border-color: #1677ff; }
 .edit-tool-button.recalculate { color: #087443; border-color: #6ce9a6; background: #ecfdf3; }
 .edit-divider { width: 1px; height: 24px; background: #d0d5dd; }
 
-/* ---------- 道路 / 线路 hover 气泡 ---------- */
 .map-line-tip {
   position: absolute;
   z-index: 26;
@@ -2596,7 +2672,6 @@ onUnmounted(() => {
   transform: translate(12px, 12px);
 }
 
-/* ---------- 图层图例（传入 LayerChipPanel 的 #legend） ---------- */
 .layer-legend {
   display: flex;
   gap: 14px;
@@ -2620,15 +2695,12 @@ onUnmounted(() => {
 }
 .layer-legend-line.road { background: #2563eb; }
 .layer-legend-line.line { background: #eab308; }
-:deep(.layer-panel){
-
-}
 
 @media (max-width: 760px) {
   .right-top-card {
     top: 56px;
     right: 8px;
-    width: min(375px, calc(100vw - 16px));
+    width: min(375px, calc(100vw - 24px));
   }
   .right-top-card .tooltip-header { padding: 8px 10px; }
   .right-top-card .tooltip-title { font-size: 14px; }
@@ -2641,14 +2713,4 @@ onUnmounted(() => {
   .geometry-edit-toolbar { top: 6px; right: 8px; left: auto; max-width: calc(100vw - 16px); gap: 4px; padding: 5px; }
   .edit-tool-button { gap: 3px; padding: 0 7px; font-size: 11px; }
 }
-
-/* :deep(.verify-panel){
-  background: linear-gradient(149.65deg, rgba(255, 255, 255, 0.2) 4.61%, rgba(255, 255, 255, 0.15) 29.07%, rgba(255, 255, 255, 0.3) 49.01%, rgba(255, 255, 255, 0.1) 61.4%, rgba(255, 255, 255, 0.2) 74.74%, rgba(255, 255, 255, 0.22) 97.19%);
-}
-:deep(.verify-tip){
-  background:rgba(255,255,255,0.5)
-}
-:deep(.verify-tip){
-  background:rgba(255,255,255,0.5)
-} */
 </style>

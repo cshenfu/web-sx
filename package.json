@@ -19,6 +19,7 @@
     "@geoql/maplibre-gl-starfield": "^0.1.2",
     "@icon-park/vue-next": "^1.4.2",
     "@mapbox/mapbox-gl-draw": "^1.5.1",
+    "@turf/turf": "^7.4.0",
     "@wangeditor/editor": "^5.1.23",
     "@wangeditor/editor-for-vue": "^5.1.12",
     "@whln/layer-control": "^0.3.2",

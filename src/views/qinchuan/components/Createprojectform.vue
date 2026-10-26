@@ -275,7 +275,34 @@ import { resolveRegionByPoints, isPolygonWithinRadius } from '../js/useTiandituG
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
 import shengyazhanIcon from '@/assets/img/mapIcon/syz.png'
 
+
+// turf
+// turf 7.x（推荐，按需引入，tree-shaking 友好）
+import booleanPointInPolygon from '@turf/boolean-point-in-polygon'
+import pointToLineDistance from '@turf/point-to-line-distance'
+import { point as turfPoint, polygon as turfPolygon } from '@turf/helpers'
+
 const MAX_SITE_RANGE_RADIUS_KM = 25
+
+
+const BOUNDARY_EPS_METERS = 0.5   // 边界容差，按数据精度调整
+
+// 场区环 → turf Polygon（无效时返回 null）
+function buildSitePolygon() {
+  const ring = getSiteRangeRing()   // 已闭合，[lng, lat]
+  if (!ring || ring.length < 4) return null
+  return turfPolygon([ring])
+}
+
+// 点是否在场区内（边界算内 + 容差兜底）
+function isPointInSiteRange(poly, lng, lat) {
+  if (!poly) return true            // 没有场区时不做拦截（与原逻辑一致）
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return false
+  const pt = turfPoint([lng, lat])
+  if (booleanPointInPolygon(pt, poly, { ignoreBoundary: false })) return true
+  // 浮点误差兜底：距边界 0.5m 内也算在内
+  return pointToLineDistance(pt, poly, { units: 'meters' }) <= BOUNDARY_EPS_METERS
+}
 
 // ★ 改动：新增 mode / project
 const props = defineProps({
@@ -441,14 +468,14 @@ function centroidOfRing(ring) {
 
 /* ==================== 范围校验 ==================== */
 function checkWindPointsInRange() {
-  const ring = getSiteRangeRing()
-  if (!ring) {
+  const poly = buildSitePolygon()
+  if (!poly) {
     windOutOfRangeList.value = []
     return
   }
   const list = []
   windTurbinePoints.value.forEach((p, index) => {
-    if (!pointInPolygon([Number(p.lng), Number(p.lat)], ring)) {
+    if (!isPointInSiteRange(poly, Number(p.lng), Number(p.lat))) {
       list.push({ index, lng: p.lng, lat: p.lat })
     }
   })
@@ -457,20 +484,26 @@ function checkWindPointsInRange() {
 }
 
 function checkBoosterPointsInRange() {
-  const ring = getSiteRangeRing()
-  if (!ring) {
+  const poly = buildSitePolygon()
+  if (!poly) {
     boosterOutOfRangeList.value = []
     return
   }
   const list = []
   boosterPoints.value.forEach((p, index) => {
-    if (p.placement === 'closure' && p.geometry) {
-      const center = p.geometry[0][0]
-      if (!pointInPolygon(center, ring)) list.push({ index, lng: p.lng, lat: p.lat })
-      return
+    let lng = Number(p.lng)
+    let lat = Number(p.lat)
+
+    // closure 且 lng/lat 无效时，用环质心兜底
+    if ((!Number.isFinite(lng) || !Number.isFinite(lat))
+        && p.placement === 'closure' && p.geometry?.[0]?.length >= 3) {
+      const [cx, cy] = centroidOfRing(p.geometry[0])
+      lng = cx; lat = cy
     }
-    if (!p.lng || !p.lat) return
-    if (!pointInPolygon([Number(p.lng), Number(p.lat)], ring)) {
+
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return   // 空坐标跳过，与原逻辑一致
+
+    if (!isPointInSiteRange(poly, lng, lat)) {
       list.push({ index, lng: p.lng, lat: p.lat })
     }
   })

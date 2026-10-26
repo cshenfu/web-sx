@@ -170,6 +170,9 @@ watch(() => props.modelValueExpanded, () => {})
 }
 
 .expand-toggle {
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;

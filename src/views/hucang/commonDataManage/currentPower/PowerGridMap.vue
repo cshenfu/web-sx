@@ -5,12 +5,11 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import MapGL from '@/components/MapGL.vue'
 import { satelliteStyle } from '@/views/qinchuan/js/mapConfig'
 import { attachSxLayers } from '@/components/site-map/attachSxLayers'
-import shaanxiBoundaryData from '@/assets/js/610000.json'
-import cityGeoJSONData from '@/assets/js/610000_full.json'
+import { loadShaanxiProvince, loadShaanxiCities } from '@/utils/shaanxiBoundary'
 
 // ⚠️ 电网（power-infra）服务地址，必须填。
 // 留空时 attachSxLayers 会在控制台 warn，且电网图层加载不出来。
@@ -20,10 +19,39 @@ const mapRef = ref(null)
 let whlnPlugin = null
 
 // ============================================================
+// 边界数据（WFS 加载，带本地兜底）
+// ============================================================
+// 在 onMounted 就开始加载，MapGL 初始化期间并行拉数据；
+// onMapReady 里如果还没就绪会 await 同一个 Promise。
+let provincePromise = null
+let citiesPromise = null
+
+function ensureProvince() {
+  if (!provincePromise) {
+    provincePromise = loadShaanxiProvince().catch((err) => {
+      console.error('[power-grid] 陕西省界加载失败:', err)
+      return null
+    })
+  }
+  return provincePromise
+}
+
+function ensureCities() {
+  if (!citiesPromise) {
+    citiesPromise = loadShaanxiCities().catch((err) => {
+      console.error('[power-grid] 陕西省市界加载失败:', err)
+      return null
+    })
+  }
+  return citiesPromise
+}
+
+// ============================================================
 // 陕西省遮罩（世界外圈 + 陕西省内洞）
 // ============================================================
 const MASK_LAYER_ID = 'shaanxi-mask'
 const MASK_SOURCE_ID = 'shaanxi-mask-src'
+const MASK_COLOR = '#0b1e3a'
 
 function ensureClosed(ring) {
   if (!ring || ring.length < 3) return ring
@@ -82,8 +110,13 @@ function buildMaskGeoJSON(boundary) {
 async function ensureMask() {
   const map = mapRef.value?.getMap?.()
   if (!map) return
-  const data = buildMaskGeoJSON(shaanxiBoundaryData)
+
+  const boundary = await ensureProvince()
+  if (!boundary) return
+
+  const data = buildMaskGeoJSON(boundary)
   if (!data.features.length) return
+
   if (!map.getSource(MASK_SOURCE_ID)) {
     map.addSource(MASK_SOURCE_ID, { type: 'geojson', data })
   }
@@ -93,7 +126,7 @@ async function ensureMask() {
       type: 'fill',
       source: MASK_SOURCE_ID,
       paint: {
-        'fill-color': '#0b1e3a',
+        'fill-color': MASK_COLOR,
         'fill-opacity': 1,
       },
     })
@@ -110,10 +143,14 @@ const CITY_BOUNDARY_SOURCE_ID = 'city-boundary-src'
 async function ensureCityBoundary() {
   const map = mapRef.value?.getMap?.()
   if (!map) return
+
+  const cities = await ensureCities()
+  if (!cities) return
+
   if (!map.getSource(CITY_BOUNDARY_SOURCE_ID)) {
     map.addSource(CITY_BOUNDARY_SOURCE_ID, {
       type: 'geojson',
-      data: cityGeoJSONData,
+      data: cities,
     })
   }
   if (!map.getLayer(CITY_BOUNDARY_LAYER_ID)) {
@@ -134,14 +171,19 @@ async function ensureCityBoundary() {
 // ============================================================
 // 主流程
 // ============================================================
+function raiseMask() {
+  const map = mapRef.value?.getMap?.()
+  if (map?.getLayer(MASK_LAYER_ID)) map.moveLayer(MASK_LAYER_ID)
+}
+
 async function onMapReady() {
-  const map = mapRef.value.getMap()
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
 
-  // 1. 遮罩 + 市界
-  await ensureMask()
-  await ensureCityBoundary()
+  // 1. 遮罩 + 市界（内部各自 await 边界数据）
+  await Promise.all([ensureMask(), ensureCityBoundary()])
 
-  // 2. 只挂载电网一个 whln 图层
+  // 2. 挂载电网图层
   try {
     whlnPlugin = attachSxLayers(map, {
       initialVisibleIds: ['collection-line'],
@@ -151,15 +193,25 @@ async function onMapReady() {
     console.warn('[power-grid] 图层挂载失败:', err)
   }
 
-  // 3. 保持遮罩在最上层（防止后续图层把遮罩压下去）
-  map.on('styledata', () => {
-    if (map.getLayer(MASK_LAYER_ID)) map.moveLayer(MASK_LAYER_ID)
-  })
+  // 3. 保持遮罩在最上层
+  map.on('styledata', raiseMask)
 }
+
+onMounted(() => {
+  // 提前拉取，和 MapGL 初始化并行
+  void ensureProvince()
+  void ensureCities()
+})
 
 onBeforeUnmount(() => {
   whlnPlugin?.destroy?.()
   whlnPlugin = null
+
+  const map = mapRef.value?.getMap?.()
+  if (map) map.off('styledata', raiseMask)
+
+  provincePromise = null
+  citiesPromise = null
 })
 </script>
 

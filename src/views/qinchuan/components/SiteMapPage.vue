@@ -125,7 +125,6 @@
           <el-icon><ArrowLeft v-if="showProjectDrawer" /><ArrowRight v-else /></el-icon>
         </button>
 
-        <!-- 道路 / 线路 hover 气泡 -->
         <div
           v-if="lineTip.visible"
           class="map-line-tip"
@@ -218,7 +217,6 @@
     <ProjectDetailPanel :visible="showDetailPanel" :project="selectedProject" :stage="stage" :initial-tab="detailPanelTab" @close="showDetailPanel = false" @action="onDetailPanelAction" />
     <GenerateReportPanel :visible="showGeneratePanel" :project="generatePanelProject" :action-key="generatePanelActionKey" :sub-code="generatePanelSubCode" @close="showGeneratePanel = false" @generated="onReportGenerated" />
     <AssignDialog v-model="showAssignDialog" :project="assignTargetProject" @success="onAssignSuccess" />
-
     <ReserveApprovalDialog v-model="showReserveDialog" :project="selectedProject" @saved="onReserveSaved" />
 
     <slot name="page-extra" />
@@ -263,8 +261,8 @@ import {
   buildIconSizeExpression,
 } from '@/components/site-map/areaCenterIcon'
 
-import cityGeoJSONData from '@/assets/js/610000_full.json'
-import shaanxiBoundaryData from '@/assets/js/610000.json'
+// ✅ WFS 边界加载（替代本地 610000.json / 610000_full.json）
+import { loadShaanxiProvince, loadShaanxiCities } from '@/utils/shaanxiBoundary'
 
 const props = defineProps({
   stage: { type: String, default: '' },
@@ -293,7 +291,6 @@ let areaCenterIconRequestVersion = 0
 const CITY_LAYER_ID = 'site-city-stats'
 const PROVINCE_CODE = '610000'
 
-// ★ 风机 chip id 与 layerPanelConfig 保持一致
 const PROJECT_ICON_LAYER_MAP = { 'wind-gh': ['project-wind-all', 'project-wind-bx-all'], booster: ['project-booster-all'] }
 const SELECTED_ICON_LAYER_IDS = ['project-wind-all', 'project-wind-bx-all', 'project-booster-all']
 const DRAWER_WIDTH = 460
@@ -387,8 +384,13 @@ const customLayerState = reactive({})
 
 const overviewStats = reactive({ totalCapacity: 0, totalCount: 0, windCapacity: 0, windCount: 0, solarCapacity: 0, solarCount: 0 })
 const cityStats = ref([])
-let cityGeoJSONCache = cityGeoJSONData
-let shaanxiBoundaryCache = shaanxiBoundaryData
+
+// ✅ 边界数据缓存（由 WFS 填充；不再 import 本地 JSON）
+let cityGeoJSONCache = null
+let shaanxiBoundaryCache = null
+// 模块级 Promise 缓存，避免并发调用重复请求
+let boundaryLoadingPromise = null
+let citiesLoadingPromise = null
 
 const editTools = [
   { key: 'area', label: '编辑场区', icon: Location },
@@ -398,11 +400,9 @@ const editTools = [
 ]
 const expandButtonStyle = computed(() => ({ right: showProjectDrawer.value ? `${DRAWER_WIDTH + DRAWER_GAP}px` : '0px' }))
 
-// —— 场区道路 / 线路图层 ——
 const ROAD_LAYER_ID = 'project-road-layer'
 const LINE_LAYER_ID = 'project-35kv-line-layer'
 
-// 道路：蓝色系；线路：黄色系
 const ROAD_LINE_COLORS = {
   road: '#2563eb',
   line: '#eab308',
@@ -432,7 +432,6 @@ function onLayerToggle(item) {
   const isOn = layerVisibleIds.value.includes(item.id)
   const nextOn = !isOn
 
-  // ★ 先更新可见集合，保证后续渲染逻辑读到最新状态
   if (isOn) {
     layerVisibleIds.value = layerVisibleIds.value.filter((id) => id !== item.id)
   } else {
@@ -456,7 +455,6 @@ function toggleCustomLayer(id, visible) {
     syncRoadLineVisibility()
     return
   }
-  // 测风塔 / 接入塔 / 噪音距离等其余 custom 覆盖物按需实现
 }
 
 function onLayerInputChange({ id, value }) { layerInputs[id] = value }
@@ -668,8 +666,42 @@ async function fetchCityStats() {
   } catch (err) { console.error('[stats] provinceViewData 失败:', err) }
 }
 
-function loadCityGeoJSON() { return Promise.resolve(cityGeoJSONCache) }
-function loadShaanxiBoundary() { return Promise.resolve(shaanxiBoundaryCache) }
+// ============================================================
+// 边界数据加载（WFS）
+// ============================================================
+async function loadShaanxiBoundary() {
+  if (shaanxiBoundaryCache) return shaanxiBoundaryCache
+  if (!boundaryLoadingPromise) {
+    boundaryLoadingPromise = loadShaanxiProvince()
+      .then((data) => {
+        shaanxiBoundaryCache = data
+        return data
+      })
+      .catch((err) => {
+        boundaryLoadingPromise = null
+        console.error('[site-map] 陕西省界加载失败:', err)
+        return null
+      })
+  }
+  return boundaryLoadingPromise
+}
+
+async function loadCityGeoJSON() {
+  if (cityGeoJSONCache) return cityGeoJSONCache
+  if (!citiesLoadingPromise) {
+    citiesLoadingPromise = loadShaanxiCities()
+      .then((data) => {
+        cityGeoJSONCache = data
+        return data
+      })
+      .catch((err) => {
+        citiesLoadingPromise = null
+        console.error('[site-map] 陕西省市界加载失败:', err)
+        return null
+      })
+  }
+  return citiesLoadingPromise
+}
 
 async function renderCityStats() {
   if (!mapReady.value || !mapRef.value) return
@@ -711,7 +743,8 @@ async function ensureShaanxiMask() {
   const map = mapRef.value?.getMap?.(); if (!map) return
   if (map.getLayer(MASK_LAYER_ID)) { syncMaskVisibility(true); return }
   try {
-    const data = buildMaskGeoJSON(await loadShaanxiBoundary()); if (!data.features.length) return
+    const boundary = await loadShaanxiBoundary(); if (!boundary) return
+    const data = buildMaskGeoJSON(boundary); if (!data.features.length) return
     if (!map.getSource(MASK_SOURCE_ID)) map.addSource(MASK_SOURCE_ID, { type: 'geojson', data })
     map.addLayer({ id: MASK_LAYER_ID, type: 'fill', source: MASK_SOURCE_ID, paint: { 'fill-color': props.maskColor, 'fill-opacity': 0, 'fill-opacity-transition': { duration: props.maskFadeDuration, delay: 0 } } })
     lastMaskOpacity = -1; syncMaskVisibility(true)
@@ -958,17 +991,6 @@ function toMapCoordinate(point) {
   return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null
 }
 
-/**
- * 把一组点（或点数组的数组）压成 LineString Feature。
- * - 一维数组：[{lon,lat}, ...] → 一条 LineString
- * - 二维数组：[[{lon,lat}, ...], ...] → 每条子数组一条 LineString
- * - 点数 < 2 / 无有效坐标 → 跳过（不加载）
- *
- * @param {Array} target   输出 Feature 数组（原地 push）
- * @param {Array} rows     点位数组
- * @param {object} baseProps 写入每个 Feature 的属性
- * @returns {number}       实际生成的 LineString 数量
- */
 function pushLineFeatures(target, rows, baseProps) {
   if (!Array.isArray(rows) || rows.length === 0) return 0
   const groups = Array.isArray(rows[0]) ? rows : [rows]
@@ -977,7 +999,6 @@ function pushLineFeatures(target, rows, baseProps) {
     if (!Array.isArray(group)) return
     const coords = group.map(toMapCoordinate).filter(Boolean)
 
-    // ===== diag：每条线路的经纬度数组 =====
     console.groupCollapsed(
       `[diag-line] ${baseProps.category === 'line' ? '线路' : '道路'} ${baseProps.loopName || baseProps.sourceType || ''} 组#${groupIdx} → ${coords.length} 点`
     )
@@ -985,7 +1006,6 @@ function pushLineFeatures(target, rows, baseProps) {
     console.log('坐标数组 [lng, lat]:', coords)
     console.table(coords.map((c, i) => ({ '#': i, lng: c[0], lat: c[1] })))
     console.groupEnd()
-    // ===== diag =====
 
     if (coords.length < 2) return
     target.push({
@@ -998,12 +1018,10 @@ function pushLineFeatures(target, rows, baseProps) {
   return count
 }
 
-/** 把接口数据拆成「道路」和「线路」两个 Feature 数组 */
 function buildRoadLineFeatures(data) {
   const roadFeatures = []
   const lineFeatures = []
 
-  // 道路：CNKJ / CNXJ / JZXJ 各自数组 → 各自一条线
   const roadMap = data?.roadMap ?? data?.data?.roadMap ?? {}
   for (const type of ['CNKJ', 'CNXJ', 'JZXJ']) {
     pushLineFeatures(
@@ -1013,7 +1031,6 @@ function buildRoadLineFeatures(data) {
     )
   }
 
-  // 线路：每个 loop 的 cablepoletower → 一条线；空数组跳过
   const line35Kv = data?.line35Kv ?? data?.data?.line35Kv
   const loops =
     line35Kv?.loops ??
@@ -1043,7 +1060,6 @@ function buildRoadLineFeatures(data) {
   return { roadFeatures, lineFeatures }
 }
 
-/** 创建/更新一个线图层，并绑定 hover */
 function upsertLineLayer(layerId, geojson, paint) {
   const map = mapRef.value?.getMap?.()
   if (!map) return
@@ -1066,11 +1082,9 @@ function upsertLineLayer(layerId, geojson, paint) {
   map.on('mousemove', layerId, onLineHoverMove)
   map.on('mouseleave', layerId, onLineHoverLeave)
 
-  // 确保陕西省遮罩仍在最顶层
   if (map.getLayer(MASK_LAYER_ID)) map.moveLayer(MASK_LAYER_ID)
 }
 
-/** 根据当前可见状态 + 缓存数据，同步道路/线路图层显隐 */
 function syncRoadLineVisibility() {
   const map = mapRef.value?.getMap?.()
   if (!map) return
@@ -1094,7 +1108,6 @@ function syncRoadLineVisibility() {
   if (!roadOn && !lineOn) lineTip.visible = false
 }
 
-/** 只删图层/source/事件，不动请求版本 */
 function removeRoadLineLayers() {
   const map = mapRef.value?.getMap?.()
   if (map) {
@@ -1110,7 +1123,6 @@ function removeRoadLineLayers() {
   lineTip.visible = false
 }
 
-/** 清空选中项目时调用：让进行中的请求失效 + 删图层 */
 function clearRoadLayer() {
   roadRequestVersion += 1
   roadInFlight.clear()
@@ -1149,7 +1161,6 @@ function onLineHoverLeave() {
 async function fetchAndRenderRoadData(projectId) {
   if (String(selectedProject.value?.id ?? '') !== String(projectId)) return
 
-  // ★ 命中缓存：直接按当前 chip 状态重建
   const cached = roadDataCache.get(projectId)
   if (cached) {
     if (currentRoadProjectId !== String(projectId)) {
@@ -1172,21 +1183,18 @@ async function fetchAndRenderRoadData(projectId) {
     if (requestVersion !== roadRequestVersion || String(selectedProject.value?.id ?? '') !== String(projectId)) return
 
     const data = unwrapApiPayload(res)
-    // ===== diag =====
-console.log('[diag-line] ① raw response:', res)
-console.log('[diag-line] ① unwrapped data:', data)
-console.log('[diag-line] ① data keys:', data && typeof data === 'object' ? Object.keys(data) : typeof data)
-// 不同可能的路径逐个探测
-console.log('[diag-line] ① line35Kv 探测:', {
-  'data.line35Kv': !!data?.line35Kv,
-  'data.data.line35Kv': !!data?.data?.line35Kv,
-  'data.line': !!data?.line,
-  'data.loops.length': Array.isArray(data?.loops) ? data.loops.length : 'n/a',
-  'data.line35Kv.loops.length': Array.isArray(data?.line35Kv?.loops) ? data.line35Kv.loops.length : 'n/a',
-  'data.line35Kv.line.loops.length': Array.isArray(data?.line35Kv?.line?.loops) ? data.line35Kv.line.loops.length : 'n/a',
-  'data.line.loops.length': Array.isArray(data?.line?.loops) ? data.line.loops.length : 'n/a',
-})
-// ===== diag =====
+    console.log('[diag-line] ① raw response:', res)
+    console.log('[diag-line] ① unwrapped data:', data)
+    console.log('[diag-line] ① data keys:', data && typeof data === 'object' ? Object.keys(data) : typeof data)
+    console.log('[diag-line] ① line35Kv 探测:', {
+      'data.line35Kv': !!data?.line35Kv,
+      'data.data.line35Kv': !!data?.data?.line35Kv,
+      'data.line': !!data?.line,
+      'data.loops.length': Array.isArray(data?.loops) ? data.loops.length : 'n/a',
+      'data.line35Kv.loops.length': Array.isArray(data?.line35Kv?.loops) ? data.line35Kv.loops.length : 'n/a',
+      'data.line35Kv.line.loops.length': Array.isArray(data?.line35Kv?.line?.loops) ? data.line35Kv.line.loops.length : 'n/a',
+      'data.line.loops.length': Array.isArray(data?.line?.loops) ? data.line.loops.length : 'n/a',
+    })
     const { roadFeatures, lineFeatures } = buildRoadLineFeatures(data)
     roadDataCache.set(projectId, { roadFeatures, lineFeatures })
     currentRoadProjectId = String(projectId)
@@ -1424,6 +1432,9 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
 })
 
 async function onMapReady() {
+  // ✅ 边界数据守卫：先确保省界和市界就绪
+  await Promise.allSettled([loadShaanxiBoundary(), loadCityGeoJSON()])
+
   mapReady.value = true
   if (showCreateProject.value) nextTick(() => startCreateDrawing())
   const map = mapRef.value.getMap()
@@ -1440,7 +1451,12 @@ async function onMapReady() {
   } catch (err) { console.warn('[whln] 图层控制挂载失败:', err) }
 }
 
-onMounted(() => { fetchStageList(); fetchProjectList(); fetchMapProjects(); fetchOverviewStats(); fetchCityStats() })
+onMounted(() => {
+  // 提前预取边界数据，和业务请求并行
+  void loadShaanxiBoundary()
+  void loadCityGeoJSON()
+  fetchStageList(); fetchProjectList(); fetchMapProjects(); fetchOverviewStats(); fetchCityStats()
+})
 onUnmounted(() => {
   removeRoadLineLayers()
   whlnPlugin?.destroy?.(); whlnPlugin = null
@@ -1596,7 +1612,6 @@ onUnmounted(() => {
 :deep(.maplibregl-ctrl-bottom-right) { display: none; }
 :deep(.maplibregl-ctrl-top-right) { display: none; }
 
-/* ---------- 道路 / 线路 hover 气泡 ---------- */
 .map-line-tip {
   position: absolute;
   z-index: 20;
@@ -1613,7 +1628,6 @@ onUnmounted(() => {
 }
 .map-view > .map-line-tip { pointer-events: none; }
 
-/* ---------- 图层图例（传入 LayerChipPanel 的 #legend） ---------- */
 .layer-legend {
   display: flex;
   gap: 14px;
