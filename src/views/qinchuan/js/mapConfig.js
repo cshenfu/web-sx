@@ -82,6 +82,6 @@ export const satelliteStyle = emptyBaseStyle
 export { shaanxiBoundary }
 
 export const AREA_SELECT_LAYER_KEY = 'avoidance-polygon'
-export const AREA_ZOOM_THRESHOLD = 8
+export const AREA_ZOOM_THRESHOLD = 7
 export const PROVINCE_EXTRUSION_ID = 'shaanxi-extrusion'
 export const UPDATED_BY = 'admin'

@@ -2094,20 +2094,36 @@ function normalizeCityName(name) {
 }
 
 async function fetchStageCityCapacity(stageCode) {
-  if (stageCityCapacityCache.value[stageCode]) return stageCityCapacityCache.value[stageCode]
+  // ★ 用 !== undefined 判断，避免空 {} 被当成"未缓存"反复请求
+  if (stageCityCapacityCache.value[stageCode] !== undefined) {
+    return stageCityCapacityCache.value[stageCode]
+  }
   try {
     const res = await configApi.provinceViewData({
       provinceCode: '610000',
       projectStage: stageCode,
     })
-    const list = res?.data ?? []
+    // ★ 关键日志：看清这个阶段到底返回了什么
+    console.log(`[overview] provinceViewData(${stageCode}) raw:`, res)
+
+    // ★ 兼容 data 是数组 / data.list / data.records
+    const list = Array.isArray(res?.data)
+      ? res.data
+      : (res?.data?.list || res?.data?.records || [])
+
     const map = {}
     for (const item of list) {
-      const rawName = item.regionName || item.cityName || item.region || ''
+      // ★ 兼容多种字段名
+      const rawName = item.regionName || item.cityName || item.areaName
+                    || item.name || item.region || ''
+      const v = Number(
+        item.totalCapacity ?? item.capacity ?? item.total_capacity ?? 0
+      )
       if (!rawName) continue
       const key = normalizeCityName(rawName)
-      map[key] = (map[key] || 0) + (Number(item.totalCapacity) || 0)
+      map[key] = (map[key] || 0) + v
     }
+    console.log(`[overview] stage ${stageCode} 处理后 map:`, map)
     stageCityCapacityCache.value[stageCode] = map
     return map
   } catch (err) {
@@ -2190,7 +2206,7 @@ async function renderSelectedProject(row) {
   if (!mapRef.value) return
   const version = ++provinceRenderVersion
 
-  // ---------- 未选中：默认色挤出 + 无副标签 ----------
+  // ---------- 未选中：默认色 ----------
   if (!row) {
     mapRef.value.addExtrusion({
       ...PROVINCE_MAP_STYLE,
@@ -2215,36 +2231,49 @@ async function renderSelectedProject(row) {
   }
 
   // ---------- 决定要拉哪些阶段的城市数据 ----------
-  const isAggregated = row.key === 'AGGREGATION' && (!row.dropdownKey || row.dropdownKey === 'AGGREGATION')
-  const stageCodes = isAggregated
-    ? ['PROJECT_INITIATION', 'FEASIBILITY_REVIEW', 'INVESTMENT_DECISION']
-    : [row.dropdownKey || row.key]
+  // ★ 推进中本身没有数据：dropdownKey === 'AGGREGATION' 时直接空，不发请求
+  let mergedRaw = {}
+  const isAggregationSelf = row.key === 'AGGREGATION'
+    && (!row.dropdownKey || row.dropdownKey === 'AGGREGATION')
 
-  const cityMaps = await Promise.all(stageCodes.map(fetchStageCityCapacity))
-  if (version !== provinceRenderVersion) return
+  if (!isAggregationSelf) {
+    const stageCode = row.dropdownKey || row.key
+    const cityMap = await fetchStageCityCapacity(stageCode)
+    if (version !== provinceRenderVersion) return
+    Object.assign(mergedRaw, cityMap)
+  }
 
-  // 合并（同城相加）
-  const mergedCityData = {}
-  for (const m of cityMaps) {
-    for (const [name, v] of Object.entries(m)) {
-      mergedCityData[name] = (mergedCityData[name] || 0) + v
+  // ---------- 纯数字 key（如 "610800"）→ 中文城市名（如 "榆林"）----------
+  const REGION_CODE_TO_CITY = {
+    '610100': '西安', '610200': '铜川', '610300': '宝鸡', '610400': '咸阳',
+    '610500': '渭南', '610600': '延安', '610700': '汉中', '610800': '榆林',
+    '610900': '安康', '611000': '商洛',
+  }
+  const cityData = {}
+  for (const [k, v] of Object.entries(mergedRaw)) {
+    let key
+    if (/^\d+$/.test(k)) {
+      key = REGION_CODE_TO_CITY[k] || k
+    } else {
+      key = normalizeCityName(k)
     }
+    if (!key) continue
+    cityData[key] = (cityData[key] || 0) + v
   }
 
   // ---------- 生成色阶 ----------
   const baseHex = row.baseColor || row.color || PROVINCE_MAP_STYLE.defaultColor
-  const colorMap = buildCityColorMapForBoundary(shaanxiBoundary, mergedCityData, baseHex)
+  const colorMap = buildCityColorMapForBoundary(shaanxiBoundary, cityData, baseHex)
 
-  // 调试（跑通后可删）
   console.log('[overview] renderSelectedProject', {
     row,
-    stageCodes,
-    mergedCityData,
+    isAggregationSelf,
+    mergedRaw,
+    cityData,
     colorMap,
-    boundaryNames: (shaanxiBoundary?.features || []).map(f => f.properties?.name),
   })
 
-  // ---------- 渲染挤出层（★ ...PROVINCE_MAP_STYLE 必须在最前面） ----------
+  // ---------- 渲染挤出层 ----------
   mapRef.value.addExtrusion({
     ...PROVINCE_MAP_STYLE,
     id: PROVINCE_EXTRUSION_ID,
@@ -2253,8 +2282,8 @@ async function renderSelectedProject(row) {
     enableHover: true,
   })
 
-  // ---------- label 显示每市容量 ----------
-  const labelsGeo = injectCityLabels(shaanxiBoundary, mergedCityData)
+  // ---------- label ----------
+  const labelsGeo = injectCityLabels(shaanxiBoundary, cityData)
   mapRef.value.addCentroidLabels({
     id: 'shaanxi-labels',
     geojson: labelsGeo,
