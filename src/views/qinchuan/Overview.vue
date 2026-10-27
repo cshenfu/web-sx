@@ -34,7 +34,6 @@
       </template>
     </LayerChipPanel>
 
-    <!-- 道路 / 线路 hover 气泡 -->
     <div
       v-if="lineTip.visible"
       class="map-line-tip"
@@ -130,9 +129,12 @@
               class="panel-below"
               :project="activeProjectDetail"
               :is-fullscreen="isDetailFullscreen"
+              :stage="activeProjectDetail?.projectStage || activeProjectDetail?.stage || ''"
+              :initial-tab="detailPanelTab"
               @toggle-fullscreen="isDetailFullscreen = !isDetailFullscreen"
               @back="handleBackToList"
               @generate-report="reportModalVisible = true"
+              @action="onDetailPanelAction"
             />
           </template>
         </div>
@@ -359,14 +361,16 @@
       @close="showVerifyPanel = false"
       @saved="onVerifySaved"
     />
-    <SiteMapProjectDetailPanel
-      :visible="showSiteMapDetailPanel"
-      :project="actionProject"
-      :stage="actionProject?.projectStage || ''"
-      :initial-tab="detailPanelTab"
-      @close="showSiteMapDetailPanel = false"
-      @action="onSiteMapDetailAction"
-    />
+    <!-- Dashboard-area-editor.vue 里 -->
+<SiteMapProjectDetailPanel
+  :visible="showSiteMapDetailPanel"
+  :project="actionProject"
+  :stage="actionProject?.projectStage || ''"
+  :initial-tab="detailPanelTab"
+  @close="showSiteMapDetailPanel = false"
+  @action="onSiteMapDetailAction"
+  @generate-report="(proj) => { if(proj) activeProjectDetail = proj; reportModalVisible = true }"
+/>
     <SiteMapGenerateReportPanel
       :visible="showGeneratePanel"
       :project="generatePanelProject"
@@ -423,7 +427,6 @@ import {
 import { cloneValue } from './js/geoUtils'
 import { useZoomThresholdSwitch } from './js/useZoomThresholdSwitch'
 
-// ✅ WFS 边界加载（替代本地 610000.json / 610000_full.json）
 import { loadShaanxiProvince, loadShaanxiCities } from '@/utils/shaanxiBoundary'
 
 import fjIcon from '@/assets/img/mapIcon/fj-icon.png'
@@ -438,7 +441,6 @@ import {
   buildIconSizeExpression,
 } from '@/components/site-map/areaCenterIcon'
 
-// ==================== 常量 ====================
 const CITY_OPTIONS = [
   { label: '西安市', value: '610100' }, { label: '铜川市', value: '610200' },
   { label: '宝鸡市', value: '610300' }, { label: '咸阳市', value: '610400' },
@@ -455,7 +457,6 @@ const ICON_AREA_GF = 'icon-area-gf-overview'
 const AREA_CENTER_LAYER_ID = 'overview-project-area-center-icons'
 let areaCenterIconRequestVersion = 0
 
-// —— 场区道路 / 线路图层 ——
 const ROAD_LAYER_ID = 'overview-project-road-layer'
 const LINE_LAYER_ID = 'overview-project-35kv-line-layer'
 let overviewRoadRequestVersion = 0
@@ -529,35 +530,36 @@ function getAreaStyleByStage(projectStage) {
     const desc = opt?.desc || ''
     if (desc.includes('遴选')) group = 'selection'
     else if (desc.includes('储备')) group = 'reserved'
-    else if (desc.includes('立项') || desc.includes('可研') || desc.includes('投资决策')) group = 'planning'
+    else if (desc.includes('立项') || desc.includes('可研') || desc.includes('投决')) group = 'planning'
     else if (desc.includes('施工')) group = 'construction'
     else if (desc.includes('运营') || desc.includes('投产')) group = 'operating'
   }
   return GROUP_AREA_STYLE[group || 'unknown']
 }
 
+// ★ 更新 5 个阶段的操作配置
 const STAGE_ACTIONS = {
   PRELIMINARY_SELECTION: ['assign', 'verify', 'reserve', 'edit', 'delete'],
-  PROJECT_RESERVE: ['material', 'edit', 'assign', 'delete'],
-  PROJECT_INITIATION: ['establishMeeting', 'researchMaterial', 'edit', 'assign', 'delete'],
-  FEASIBILITY_REVIEW: ['researchReview', 'investMaterial', 'edit', 'assign', 'delete'],
-  INVESTMENT_DECISION: ['investMeeting', 'edit', 'assign', 'delete'],
+  PROJECT_RESERVE:       ['material', 'edit', 'assign', 'delete'],
+  PROJECT_INITIATION:    ['establishMeeting', 'edit', 'assign', 'delete'],
+  FEASIBILITY_REVIEW:    ['researchMaterial', 'researchReview', 'investMaterial', 'edit', 'assign', 'delete'],
+  INVESTMENT_DECISION:   ['investMeeting', 'edit', 'assign', 'delete'],
 }
-const ACTION_LABELS = {
-  material: '立项材料',
-  researchMaterial: '可研材料',
-  investMaterial: '投决材料',
-  establishMeeting: '立项上会',
-  researchReview: '可研审查',
-  investMeeting: '投决上会',
-  assign: '分配',
-  verify: '核查',
-  reserve: '储备',
-  edit: '编辑',
-  delete: '删除',
+// ★ 更新文字标签
+const ACTION_LABELS = { 
+  material: '立项准备', 
+  researchMaterial: '可研材料', 
+  investMaterial: '投决准备', 
+  establishMeeting: '立项上会', 
+  researchReview: '可研审查', 
+  investMeeting: '投决上会', 
+  assign: '分配', 
+  verify: '核查', 
+  reserve: '储备', 
+  edit: '编辑', 
+  delete: '删除' 
 }
 
-// ==================== 基础状态 ====================
 const mapRef = ref(null)
 const selectedStage = ref(null)
 const activeProject = ref(null)
@@ -576,13 +578,15 @@ const activeAreaId = ref(null)
 const activeProjectDetail = ref(projectDetailMockData)
 const reportModalVisible = ref(false)
 const detailLoading = ref(false)
+const detailPanelTab = ref('main')
 
 const popoverProject = ref(null)
 const selectedProject = ref(null)
 
 const popoverActions = computed(() => {
   const actions = STAGE_ACTIONS[popoverProject.value?.projectStage] || STAGE_ACTIONS.PRELIMINARY_SELECTION
-  const displayOrder = ['edit', 'reserve', 'verify', 'assign']
+  // ★ 修改：把新增动作提权展示
+  const displayOrder = ['material', 'establishMeeting', 'researchMaterial', 'researchReview', 'investMaterial', 'investMeeting', 'edit', 'reserve', 'verify', 'assign']
   const otherActions = actions.filter((action) => !displayOrder.includes(action) && action !== 'delete')
   const result = [
     ...displayOrder.filter((action) => actions.includes(action)),
@@ -621,7 +625,6 @@ const showGeneratePanel = ref(false)
 const generatePanelProject = ref(null)
 const generatePanelActionKey = ref('')
 const generatePanelSubCode = ref('')
-const detailPanelTab = ref('main')
 const showAssignDialog = ref(false)
 const showReserveDialog = ref(false)
 const showEditProject = ref(false)
@@ -702,7 +705,6 @@ function formatRegion(row) {
   return names.length ? names.join('/') : (row.address || '未知区域')
 }
 
-// ==================== 场区坐标工具 ====================
 function getProjectCoords(project) {
   return (project?.coordinate || [])
     .map((c) => [Number(c.longitude), Number(c.latitude)])
@@ -736,7 +738,6 @@ function getProjectBounds(project) {
   return [[minLng, minLat], [maxLng, maxLat]]
 }
 
-// ==================== 核心点击事件 ====================
 function handleProjectSelect(item) {
   const popoverId = popoverProject.value?.id
   const selectedId = selectedProject.value?.id
@@ -791,6 +792,7 @@ function openSiteMapDetailPanel(project, tab = 'main') {
   showSiteMapDetailPanel.value = true
 }
 
+// ★ 修改点击分发逻辑：包含新增的 可研材料、立项准备等
 function executeProjectAction(action, project) {
   if (!project) return
   const item = resolveMapProject(project)
@@ -933,7 +935,6 @@ function onReportGenerated() {
   ElMessage.success('报告生成完成')
 }
 
-// ==================== 地图场区/点位编辑 ====================
 function startGeometryEdit(project, mode = 'area') {
   const item = resolveMapProject(project)
   if (!item) return
@@ -1327,7 +1328,6 @@ function cancelEdit() {
   exitEditMode()
 }
 
-// ==================== 数据请求 ====================
 async function fetchStageList() {
   try {
     const res = await newApi.getStageList()
@@ -1373,7 +1373,6 @@ function handleTableSortChange({ prop, order }) {
 watch(() => filters.stage, () => { pagination.page = 1; fetchProjectList() })
 watch(viewMode, (val) => { if (val === 'list' && showLayerPanel.value) showLayerPanel.value = false })
 
-// ==================== 图层显隐 ====================
 function setProjectIconVisible(chipId, visible) {
   const layerIds = PROJECT_ICON_LAYER_MAP[chipId]
   if (!layerIds) return
@@ -1398,7 +1397,6 @@ function toggleCustomLayer(id, visible) {
 
 function handleAddProject() { ElMessage.info('添加项目功能已停用') }
 
-// ==================== 3D 地形 ====================
 function toggleTerrain(shouldEnable) {
   const map = mapRef.value?.getMap?.()
   if (!map) return
@@ -1432,7 +1430,6 @@ function toggleTerrain(shouldEnable) {
   }
 }
 
-// ==================== 详情数据映射 ====================
 function buildDetailFromListItem(item) {
   const base = cloneValue(projectDetailMockData)
   base.id = item.id
@@ -1483,7 +1480,6 @@ async function loadAiProjectDetail(aiProjectId) {
   finally { detailLoading.value = false }
 }
 
-// ==================== 地图项目 ====================
 const mapProjects = ref([])
 const renderedMapLayerIds = new Set()
 
@@ -1534,6 +1530,7 @@ function buildRoadLineFeatures(data) {
   const roadFeatures = []
   const lineFeatures = []
 
+  // ---- 道路（保持不变）----
   const roadMap = data?.roadMap ?? data?.data?.roadMap ?? {}
   for (const type of ['CNKJ', 'CNXJ', 'JZXJ']) {
     pushOverviewLineFeatures(
@@ -1543,9 +1540,88 @@ function buildRoadLineFeatures(data) {
     )
   }
 
-  const line35Kv = data?.line35Kv ?? data?.data?.line35Kv
+  // ---- 35kV 线路：优先使用 mapGeoJson ----
+  const line35Kv =
+    data?.line35Kv ??
+    data?.line35KV ??
+    data?.data?.line35Kv ??
+    data?.data?.line35KV ??
+    null
+
+  const mapGeoJson =
+    line35Kv?.mapGeoJson ??
+    line35Kv?.mapGeojson ??
+    line35Kv?.mapGeoJSON ??
+    data?.mapGeoJson ??
+    null
+
+  // 保留 loops 的元数据，用于补充 fanCount / 回路总长度
   const loops = line35Kv?.line?.loops ?? data?.line?.loops ?? []
+  const loopMeta = new Map()
   if (Array.isArray(loops)) {
+    loops.forEach((loop, index) => {
+      const name = loop?.loopname || String(index + 1)
+      loopMeta.set(String(name), {
+        fanCount: Number(loop?.fan) || (loop?.fanidarr?.length ?? 0),
+        loopLength: loop?.looplength || '',
+      })
+    })
+  }
+
+  if (mapGeoJson?.features?.length) {
+    // 按 edge_index 排序，保证绘制顺序与数据顺序一致
+    const sorted = [...mapGeoJson.features].sort((a, b) => {
+      const ai = Number(a?.properties?.edge_index)
+      const bi = Number(b?.properties?.edge_index)
+      if (Number.isFinite(ai) && Number.isFinite(bi)) return ai - bi
+      return 0
+    })
+
+    sorted.forEach((feature) => {
+      const geom = feature?.geometry
+      if (!geom) return
+      const props = feature?.properties || {}
+      const loopName = props.loopname || ''
+      const meta = loopMeta.get(String(loopName)) || {}
+      const lengthM = Number(props.length_m) || 0
+      const lengthKm = lengthM > 0
+        ? (lengthM / 1000).toFixed(2)
+        : (meta.loopLength || '')
+      const typeText =
+        props.type === 'underground' ? '地埋'
+          : props.type === 'trunk' ? '主干'
+            : props.type === 'branch' ? '分支'
+              : ''
+
+      const coordsList =
+        geom.type === 'LineString'
+          ? [geom.coordinates]
+          : geom.type === 'MultiLineString'
+            ? (geom.coordinates || [])
+            : []
+
+      coordsList.forEach((coords) => {
+        const points = (coords || []).map(toOverviewMapCoordinate).filter(Boolean)
+        if (points.length < 2) return
+        lineFeatures.push({
+          type: 'Feature',
+          properties: {
+            category: 'line',
+            loopIndex: props.edge_index ?? null,
+            loopName,
+            lineType: props.type || '',
+            lineTypeText: typeText,
+            segmentName: props.name || '',
+            loopLength: lengthKm,
+            fanCount: meta.fanCount || 0,
+            label: loopName ? `35kV 线路 ${loopName}` : `35kV 线路 ${props.name || ''}`,
+          },
+          geometry: { type: 'LineString', coordinates: points },
+        })
+      })
+    })
+  } else if (Array.isArray(loops)) {
+    // 兜底：旧 loops 结构（mapGeoJson 缺失时）
     loops.forEach((loop, loopIndex) => {
       const loopName = loop?.loopname || String(loopIndex + 1)
       pushOverviewLineFeatures(
@@ -1644,6 +1720,7 @@ function onLineHoverMove(e) {
   if (props.category === 'line') {
     const parts = ['35kV 线路']
     if (props.loopName) parts.push(`回路 ${props.loopName}`)
+    if (props.lineTypeText) parts.push(props.lineTypeText)
     if (props.loopLength && props.loopLength !== '0') parts.push(`${props.loopLength} km`)
     if (props.fanCount) parts.push(`${props.fanCount} 台风机`)
     lineTip.text = parts.join(' · ')
@@ -1761,7 +1838,6 @@ function addProjectArea(project, highlighted = false) {
   const layerId = `overview-project-area-${project.id}`
   const base = getAreaStyleByStage(project.projectStage)
 
-  // ✅ 与 SiteMapPage 一致：选中时透明只留描边，未选中时填充
   const style = highlighted
     ? {
         color: 'transparent',
@@ -2006,7 +2082,6 @@ function handleMapBlankClick(e) {
   }
 }
 
-// ==================== 阶段选择 ====================
 function renderSelectedProject(row) {
   if (!mapRef.value) return
   const colorMap = row
@@ -2041,7 +2116,6 @@ function onProjectStageSelect(row) {
   if (mapReady.value && !isAreaView.value) renderSelectedProject(row || null)
 }
 
-// ==================== 遮罩与阈值 ====================
 const MASK_LAYER_ID = 'shaanxi-mask'
 const MASK_PATTERN = 'shaanxi-starfield-mask'
 const MASK_COLOR = '#000000'
@@ -2086,7 +2160,6 @@ function syncMaskVisibility(force = false) {
   mapRef.value.setMaskOpacity(MASK_LAYER_ID, target)
 }
 
-// ==================== 边界数据加载（WFS） ====================
 let cityGeoJSONCache = null
 let shaanxiBoundaryCache = null
 let boundaryLoadingPromise = null
@@ -2141,20 +2214,17 @@ async function ensureShaanxiMask() {
       opacity: 0,
       fadeDuration: MASK_FADE_DURATION,
     })    
-lastMaskOpacity = -1; syncMaskVisibility(true)
+    lastMaskOpacity = -1; syncMaskVisibility(true)
   } catch (err) { console.error('[mask] 陕西省遮罩加载失败:', err) }
 }
 
-// ============================================================
-// 陕西省市界线图层（替代无效的矢量切片，确保 Overview 和电网一致）
-// ============================================================
 const CITY_BOUNDARY_LAYER_ID = 'sx-city-boundary-line'
 const CITY_BOUNDARY_SOURCE_ID = 'sx-city-boundary-src'
 
 async function ensureCityBoundaryLine() {
   const map = mapRef.value?.getMap?.()
   if (!map) return
-  if (map.getLayer(CITY_BOUNDARY_LAYER_ID)) return // 幂等
+  if (map.getLayer(CITY_BOUNDARY_LAYER_ID)) return 
 
   const cities = await loadCityGeoJSON()
   if (!cities) return
@@ -2211,7 +2281,7 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
   onAboveThreshold: () => { const map = mapRef.value?.getMap?.(); if (map?.getLayer(PROVINCE_EXTRUSION_ID)) mapRef.value.removeLayer(PROVINCE_EXTRUSION_ID) },
   onEnter: () => {
     ensureShaanxiMask()
-    ensureCityBoundaryLine() // ✅ 切换视图时重新确保市界线存在
+    ensureCityBoundaryLine() 
     rightPanelMode.value = 'list'
     listExpanded.value = false
     activeEditTool.value = ''
@@ -2247,7 +2317,6 @@ const layerPanelOffset = computed(() => {
 })
 const layerPanelZIndex = computed(() => (isAreaView.value ? 26 : 21))
 
-// ==================== 城市点击 ====================
 function focusCity(cityName) {
   if (!cityName || !mapRef.value) return
   const map = mapRef.value.getMap(); if (!map) return
@@ -2272,7 +2341,6 @@ function resolveCityCenter(feature) {
   return n ? [sx / n, sy / n] : null
 }
 
-// ==================== 其他回调 ====================
 function handleReportConfirm(payload) {
   const option = payload?.option || payload
   const project = payload?.project || activeProjectDetail.value
@@ -2286,7 +2354,6 @@ function handleReportConfirm(payload) {
 function handleWizardSaveDraft(payload) {}
 function handleWizardSubmit(payload) { wizardVisible.value = false }
 
-// ==================== 生命周期 ====================
 const SHAANXI_BOUNDS = [[105.4, 31.6], [111.3, 39.6]]
 
 function fitGlobeZoom(map, fill = 0.7) {
@@ -2299,7 +2366,6 @@ function fitGlobeZoom(map, fill = 0.7) {
 }
 
 async function onMapReady() {
-  // ✅ 边界数据守卫：先确保省界和市界就绪
   await Promise.allSettled([loadShaanxiBoundary(), loadCityGeoJSON()])
 
   mapReady.value = true
@@ -2309,8 +2375,6 @@ async function onMapReady() {
 
   try {
     map.setMinZoom(0)
-
-    // ✅ 修复：再次兜底确保 globe 投影（防止被外部插件/style 重载覆盖）
     try { map.setProjection({ type: 'globe' }) } catch (e) { try { map.setProjection('globe') } catch (e2) {} }
 
     const zoom = fitGlobeZoom(map, 0.8)
@@ -2349,7 +2413,7 @@ async function onMapReady() {
   map.on('move', syncMaskVisibility)
   map.on('style.load', ensureShaanxiMask)
   await ensureShaanxiMask()
-  await ensureCityBoundaryLine() // ✅ 初次挂载时加载市界线
+  await ensureCityBoundaryLine()
   nextTick(() => { syncByZoom() })
 
   try {
@@ -2369,14 +2433,13 @@ async function onMapReady() {
 }
 
 onMounted(async () => {
-  // 提前预取边界，和业务请求并行
   void loadShaanxiBoundary()
   void loadCityGeoJSON()
   await Promise.all([fetchStageList(), fetchProjectList(), fetchMapProjects()])
 })
 
 onUnmounted(() => {
-  try { mapRef.value?.stopAutoRotate?.() } catch (e) { /* 忽略 */ }
+  try { mapRef.value?.stopAutoRotate?.() } catch (e) { }
   unbindZoomListener()
   removeRoadLineLayers()
   whlnPlugin?.destroy?.()

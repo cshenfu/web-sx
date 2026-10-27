@@ -1,3 +1,4 @@
+<!-- SiteMapPage.vue -->
 <template>
   <div class="site-map-page">
     <section v-if="showConfigPage && showConfig" class="config-fullpage">
@@ -14,7 +15,6 @@
     </section>
 
     <div class="map-layer">
-      <!-- ✅ 修复：关闭 flyToOnLoad，让本页自己控制相机；避免飞向 zoom6/pitch0 的"平面"视角 -->
       <MapGL
         ref="mapRef"
         :style="satelliteStyle"
@@ -223,10 +223,44 @@
       @saved="onVerifySaved"
     />
     <ProjectDrawer :visible="showProjectDrawer" :list="projectList" :total="pagination.total" :page="pagination.page" :page-size="pagination.pageSize" :selected-id="selectedProject?.id ?? null" :loading="listLoading" :row-actions="rowActions" @close="showProjectDrawer = false" @select="focusProject" @action="handleDrawerAction" @page-change="handlePageChange" @size-change="handleSizeChange" @sort-change="handleDrawerSortChange" />
-    <ProjectDetailPanel :visible="showDetailPanel" :project="selectedProject" :stage="stage" :initial-tab="detailPanelTab" @close="showDetailPanel = false" @action="onDetailPanelAction" />
+    
+    <!-- ★ 公用面板，新增 @generate-report 监听 -->
+    <ProjectDetailPanel 
+      :visible="showDetailPanel" 
+      :project="selectedProject" 
+      :stage="props.stage || selectedProject?.projectStage || ''" 
+      :initial-tab="detailPanelTab" 
+      @close="showDetailPanel = false" 
+      @action="onDetailPanelAction" 
+      @generate-report="(proj) => { if(proj) selectedProject = proj; showGenerateModal = true }"
+    />
+    
     <GenerateReportPanel :visible="showGeneratePanel" :project="generatePanelProject" :action-key="generatePanelActionKey" :sub-code="generatePanelSubCode" @close="showGeneratePanel = false" @generated="onReportGenerated" />
     <AssignDialog v-model="showAssignDialog" :project="assignTargetProject" @success="onAssignSuccess" />
     <ReserveApprovalDialog v-model="showReserveDialog" :project="selectedProject" @saved="onReserveSaved" />
+
+    <!-- ★ 新增：报告/函件生成弹窗 -->
+    <ReportGenerateModal
+      :visible="showGenerateModal"
+      :project="selectedProject"
+      @close="showGenerateModal = false"
+      @add-report="showGenerateModal = false"
+      @confirm="handleReportConfirm"
+      @generate-request="handleGenerateRequest"
+    />
+
+    <!-- ★ 新增：报告向导 (ReportWizard) -->
+        <!-- ★ 新增：报告向导 (ReportWizard) -->
+    <ReportWizard
+      v-if="wizardVisible"
+      class="wizard-overlay"
+      :create-project-mode="wizardMode"
+      :project-name="selectedProject?.name || selectedProject?.projectName || ''"
+      :project="selectedProject"
+      @close="closeWizard"
+      @save-draft="handleWizardSaveDraft"
+      @submit="handleWizardSubmit"
+    />
 
     <slot name="page-extra" />
   </div>
@@ -248,6 +282,11 @@ import ProjectDetailPanel from './ProjectDetailPanel.vue'
 import AssignDialog from './AssignDialog.vue'
 import GenerateReportPanel from './GenerateReportPanel.vue'
 import ReserveApprovalDialog from './ReserveApprovalDialog.vue'
+// ★ 新增：引入弹窗和向导
+import ReportGenerateModal from './area-panel/ReportGenerateModal.vue'
+import ReportWizard from './report-wizard/ReportWizard.vue' // 请确保路径正确
+import { PACKAGE_TYPE } from '../js/Reportwizardmockdata' // 注意：如果路径不对，根据你的项目结构调整
+
 import { satelliteStyle } from '../js/mapConfig'
 import { useZoomThresholdSwitch } from '../js/useZoomThresholdSwitch'
 import { searchPlaceName } from '../js/useTiandituGeocode'
@@ -270,10 +309,7 @@ import {
   buildIconSizeExpression,
 } from '@/components/site-map/areaCenterIcon'
 
-// ✅ WFS 边界加载（替代本地 610000.json / 610000_full.json）
 import { loadShaanxiProvince, loadShaanxiCities } from '@/utils/shaanxiBoundary'
-// ✅ 修复：移除 useFlatViewLock（该 hook 会把 globe 锁成平面，导致"所有 GIS 变二维"）
-
 
 const props = defineProps({
   stage: { type: String, default: '' },
@@ -322,11 +358,23 @@ const TERRAIN_EXAGGERATION = 1.5
 const STAGE_ACTIONS = {
   PRELIMINARY_SELECTION: ['assign', 'verify', 'reserve', 'edit', 'delete'],
   PROJECT_RESERVE:       ['material', 'edit', 'assign', 'delete'],
-  PROJECT_INITIATION:    ['establishMeeting', 'researchMaterial', 'edit', 'assign', 'delete'],
-  FEASIBILITY_REVIEW:    ['researchReview', 'investMaterial', 'edit', 'assign', 'delete'],
+  PROJECT_INITIATION:    ['establishMeeting', 'edit', 'assign', 'delete'],
+  FEASIBILITY_REVIEW:    ['researchMaterial', 'researchReview', 'investMaterial', 'edit', 'assign', 'delete'],
   INVESTMENT_DECISION:   ['investMeeting', 'edit', 'assign', 'delete'],
 }
-const ACTION_LABELS = { material: '立项材料', researchMaterial: '可研材料', investMaterial: '投决材料', establishMeeting: '立项上会', researchReview: '可研审查', investMeeting: '投决上会', assign: '分配', verify: '核查', reserve: '储备', edit: '编辑', delete: '删除' }
+const ACTION_LABELS = { 
+  material: '立项准备', 
+  researchMaterial: '可研材料', 
+  investMaterial: '投决准备', 
+  establishMeeting: '立项上会', 
+  researchReview: '可研审查', 
+  investMeeting: '投决上会', 
+  assign: '分配', 
+  verify: '核查', 
+  reserve: '储备', 
+  edit: '编辑', 
+  delete: '删除' 
+}
 const CITY_OPTIONS = [
   { label: '西安市', value: '610100' }, { label: '铜川市', value: '610200' }, { label: '宝鸡市', value: '610300' },
   { label: '咸阳市', value: '610400' }, { label: '渭南市', value: '610500' }, { label: '延安市', value: '610600' },
@@ -339,6 +387,16 @@ const STAGE_THEMES = {
   PROJECT_INITIATION: { cityFillStops: ['interpolate', ['linear'], ['get', 'totalCapacity'], 0, '#bbf7d0', 30, '#4ade80', 80, '#22c55e', 150, '#15803d'], cityOutline: '#86efac' },
   FEASIBILITY_REVIEW: { cityFillStops: ['interpolate', ['linear'], ['get', 'totalCapacity'], 0, '#fed7aa', 30, '#fb923c', 80, '#f97316', 150, '#c2410c'], cityOutline: '#fdba74' },
   INVESTMENT_DECISION: { cityFillStops: ['interpolate', ['linear'], ['get', 'totalCapacity'], 0, '#fecaca', 30, '#f87171', 80, '#ef4444', 150, '#b91c1c'], cityOutline: '#fca5a5' },
+}
+
+// ★ 新增：报告向导相关状态
+const showGenerateModal = ref(false)
+const wizardVisible = ref(false)
+const wizardMode = ref(PACKAGE_TYPE.default)
+const reportKeyToWizardMode = {
+  'feasibility-centralized': PACKAGE_TYPE.default,
+  'feasibility-distributed': PACKAGE_TYPE.distributedDefault,
+  'feasibility-base': PACKAGE_TYPE.baseDefault
 }
 
 const showDetailPanel = ref(false)
@@ -360,7 +418,6 @@ const AREA_STYLE = {
 
 const mapRef = ref(null)
 const mapReady = ref(false)
-// ✅ 修复：删除 useFlatViewLock 调用（该 hook 会把 globe 投影改为 mercator，导致 GIS 变平面）
 const route = useRoute()
 const viewMode = ref(route.query.view === 'list' ? 'list' : 'map')
 const showConfig = ref(false)
@@ -397,10 +454,8 @@ const customLayerState = reactive({})
 const overviewStats = reactive({ totalCapacity: 0, totalCount: 0, windCapacity: 0, windCount: 0, solarCapacity: 0, solarCount: 0 })
 const cityStats = ref([])
 
-// ✅ 边界数据缓存（由 WFS 填充；不再 import 本地 JSON）
 let cityGeoJSONCache = null
 let shaanxiBoundaryCache = null
-// 模块级 Promise 缓存，避免并发调用重复请求
 let boundaryLoadingPromise = null
 let citiesLoadingPromise = null
 
@@ -599,8 +654,15 @@ const deletingId = ref(null)
 function executeAction(action, project) {
   if (!project) return
   const mapProject = allMapProjects.value.find((p) => p.id === project.id) || project
-  if (['material', 'researchMaterial', 'investMaterial'].includes(action)) { openDetailPanel(mapProject, 'material'); return }
-  if (['establishMeeting', 'researchReview', 'investMeeting'].includes(action)) { openDetailPanel(mapProject, 'meeting'); return }
+  
+  if (['material', 'researchMaterial', 'investMaterial'].includes(action)) { 
+    openDetailPanel(mapProject, 'material'); 
+    return 
+  }
+  if (['establishMeeting', 'researchReview', 'investMeeting'].includes(action)) { 
+    openDetailPanel(mapProject, 'meeting'); 
+    return 
+  }
   if (action === 'assign') { assignTargetProject.value = mapProject; showAssignDialog.value = true; return }
 
   if (action === 'verify') {
@@ -678,9 +740,6 @@ async function fetchCityStats() {
   } catch (err) { console.error('[stats] provinceViewData 失败:', err) }
 }
 
-// ============================================================
-// 边界数据加载（WFS）
-// ============================================================
 async function loadShaanxiBoundary() {
   if (shaanxiBoundaryCache) return shaanxiBoundaryCache
   if (!boundaryLoadingPromise) {
@@ -768,7 +827,7 @@ async function ensureShaanxiMask() {
       opacity: props.maskMaxOpacity,
       fadeDuration: props.maskFadeDuration,
     })    
-lastMaskOpacity = -1; syncMaskVisibility(true)
+    lastMaskOpacity = -1; syncMaskVisibility(true)
   } catch (err) { console.warn('[mask] 陕西省遮罩加载失败:', err) }
 }
 function viewIntersectsShaanxi(map) {
@@ -969,7 +1028,6 @@ const altCount = computed(() => (selectedProject.value?.windTurbinePoints || [])
 
 async function onProjectClick(projectId) {
   if (showCreateProject.value || showEditProject.value) {
-    // ElMessage.warning('请关闭当前面板后再进行场区选择')
     return
   }
   if (String(selectedProject.value?.id ?? '') === String(projectId)) return
@@ -1019,18 +1077,9 @@ function pushLineFeatures(target, rows, baseProps) {
   if (!Array.isArray(rows) || rows.length === 0) return 0
   const groups = Array.isArray(rows[0]) ? rows : [rows]
   let count = 0
-  groups.forEach((group, groupIdx) => {
+  groups.forEach((group) => {
     if (!Array.isArray(group)) return
     const coords = group.map(toMapCoordinate).filter(Boolean)
-
-    console.groupCollapsed(
-      `[diag-line] ${baseProps.category === 'line' ? '线路' : '道路'} ${baseProps.loopName || baseProps.sourceType || ''} 组#${groupIdx} → ${coords.length} 点`
-    )
-    console.log('原始点数:', group.length, '有效点数:', coords.length)
-    console.log('坐标数组 [lng, lat]:', coords)
-    console.table(coords.map((c, i) => ({ '#': i, lng: c[0], lat: c[1] })))
-    console.groupEnd()
-
     if (coords.length < 2) return
     target.push({
       type: 'Feature',
@@ -1207,18 +1256,6 @@ async function fetchAndRenderRoadData(projectId) {
     if (requestVersion !== roadRequestVersion || String(selectedProject.value?.id ?? '') !== String(projectId)) return
 
     const data = unwrapApiPayload(res)
-    console.log('[diag-line] ① raw response:', res)
-    console.log('[diag-line] ① unwrapped data:', data)
-    console.log('[diag-line] ① data keys:', data && typeof data === 'object' ? Object.keys(data) : typeof data)
-    console.log('[diag-line] ① line35Kv 探测:', {
-      'data.line35Kv': !!data?.line35Kv,
-      'data.data.line35Kv': !!data?.data?.line35Kv,
-      'data.line': !!data?.line,
-      'data.loops.length': Array.isArray(data?.loops) ? data.loops.length : 'n/a',
-      'data.line35Kv.loops.length': Array.isArray(data?.line35Kv?.loops) ? data.line35Kv.loops.length : 'n/a',
-      'data.line35Kv.line.loops.length': Array.isArray(data?.line35Kv?.line?.loops) ? data.line35Kv.line.loops.length : 'n/a',
-      'data.line.loops.length': Array.isArray(data?.line?.loops) ? data.line.loops.length : 'n/a',
-    })
     const { roadFeatures, lineFeatures } = buildRoadLineFeatures(data)
     roadDataCache.set(projectId, { roadFeatures, lineFeatures })
     currentRoadProjectId = String(projectId)
@@ -1456,7 +1493,6 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
     clearSelectionLayers()
     renderProjectsByStage('overview')
     if (cityStats.value.length) renderCityStats()
-    // ✅ 修复：退出场区回到 Overview 时，再次确保 globe 投影
     const map = mapRef.value?.getMap?.()
     if (map) {
       try { map.setProjection({ type: 'globe' }) } catch (e) { try { map.setProjection('globe') } catch (e2) {} }
@@ -1465,19 +1501,13 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
 })
 
 async function onMapReady() {
-  // ✅ 边界数据守卫：先确保省界和市界就绪
   await Promise.allSettled([loadShaanxiBoundary(), loadCityGeoJSON()])
-
   mapReady.value = true
-  // ✅ 修复：删除 lockFlatView() 调用（该 hook 是本次"全部变平面"的直接元凶）
-
+  
   if (showCreateProject.value) nextTick(() => startCreateDrawing())
   const map = mapRef.value.getMap()
 
-  // ✅ 修复：主动设置 globe 投影（兜底防止插件 / style 重载覆盖）
   try { map.setProjection({ type: 'globe' }) } catch (e) { try { map.setProjection('globe') } catch (e2) {} }
-
- 
 
   map.on('move', updateDetailCardPosition); map.on('zoom', updateDetailCardPosition)
   map.on('click', handleMapBlankClick)
@@ -1493,7 +1523,6 @@ async function onMapReady() {
 }
 
 onMounted(() => {
-  // 提前预取边界数据，和业务请求并行
   void loadShaanxiBoundary()
   void loadCityGeoJSON()
   fetchStageList(); fetchProjectList(); fetchMapProjects(); fetchOverviewStats(); fetchCityStats()
@@ -1513,9 +1542,55 @@ onUnmounted(() => {
     map.off('style.load', ensureShaanxiMask)
   }
 })
+
+// ★ 新增：复刻 Overview 的弹窗确认与向导打开逻辑
+// ★ 修改：打开向导时，收起 ProjectDetailPanel
+function handleReportConfirm(payload) {
+  const option = payload?.option || payload
+  const project = payload?.project || selectedProject.value
+  if (project) selectedProject.value = { ...selectedProject.value, ...project }
+  showGenerateModal.value = false
+  
+  if (reportKeyToWizardMode[option?.key] !== undefined) {
+    wizardMode.value = reportKeyToWizardMode[option.key]
+    wizardVisible.value = true
+    // 关键点：打开向导时，将详情面板隐藏
+    showDetailPanel.value = false 
+  }
+}
+
+// ★ 新增：统一的关闭向导方法
+function closeWizard() {
+  wizardVisible.value = false
+  // 关键点：关闭向导时，重新把详情面板显示出来
+  showDetailPanel.value = true
+}
+
+function handleWizardSaveDraft(payload) {
+  console.log('保存草稿:', payload)
+  // 如果保存草稿后，向导组件内部触发并关闭，我们这里也恢复面板
+  // 若组件内部不自动关闭，就不调 closeWizard
+  // 根据常规交互，保存后应该返回：
+  closeWizard()
+}
+
+function handleWizardSubmit(payload) {
+  console.log('提交向导:', payload)
+  // 提交后关闭向导，恢复面板
+  closeWizard()
+}
+
+function handleGenerateRequest(payload) {
+  console.log('生成请示文件:', payload)
+  showGenerateModal.value = false
+  // 如果请示文件也需要隐藏面板并进向导，可以在这里加上：
+  // showDetailPanel.value = false
+  // wizardVisible.value = true
+}
 </script>
 
 <style scoped>
+/* 请保留你原有的全部样式 */
 .site-map-page { position: relative; width: 100%; height: 100%; overflow: hidden; background: #f5f7fa; }
 .map-layer { position: absolute; inset: 0; z-index: 1; overflow: hidden; }
 .config-fullpage {
@@ -1692,6 +1767,17 @@ onUnmounted(() => {
 }
 .layer-legend-line.road { background: #2563eb; }
 .layer-legend-line.line { background: #eab308; }
+
+/* ★ 新增：向导组件覆盖层样式 */
+.wizard-overlay {
+  position: fixed;
+  top: 65px; /* 根据你的系统顶栏高度调整，如果全屏就写0 */
+  /* left: 100px; */
+  right: 0;
+  bottom: 0;
+  z-index: 2000; /* 比 ProjectDetailPanel (200) 高，但比生成弹窗 (3000) 低 */
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
+}
 
 @media (max-width: 1100px) {
   .project-list-view { padding-right: 10px; padding-left: 10px; }

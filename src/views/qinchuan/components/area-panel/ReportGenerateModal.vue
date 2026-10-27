@@ -299,7 +299,7 @@ function handleStartGeneration() {
 <style scoped>
 .modal-mask {
   position: fixed;
-  z-index: 200;
+  z-index: 300;
   inset: 0;
   display: flex;
   align-items: center;
@@ -395,7 +395,7 @@ function handleStartGeneration() {
 .request-page {
   /* Overview 根节点是 position: relative，面板只覆盖 Overview，不盖住全局导航。 */
   position: absolute;
-  z-index: 220;
+  z-index: 320;
   inset: 0;
   display: flex;
   flex-direction: column;

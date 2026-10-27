@@ -1,3 +1,4 @@
+<!-- components/ProjectDetailPanel.vue -->
 <template>
   <transition name="detail-slide">
     <aside v-if="visible" class="detail-panel">
@@ -13,10 +14,16 @@
 
       <!-- 常规模式 -->
       <template v-else>
-        <div class="panel-header">
-          <span class="panel-title">{{ project?.projectName || '-' }}</span>
-          
-          <div class="header-actions">
+        <header class="panel-header">
+          <div class="panel-title">{{ project?.projectName || '-' }}</div>
+                    <div class="header-actions">
+            <!-- 报告/函件生成 按钮 -->
+            <button type="button" class="report-btn" @click="$emit('generate-report', props.project)">
+              <svg viewBox="0 0 16 16" class="report-icon"><rect x="3" y="2" width="10" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+              报告 / 函件生成
+            </button>
+            
+            <!-- 阶段推进按钮 -->
             <el-button
               v-if="advanceConfig"
               size="small"
@@ -27,14 +34,17 @@
             >
               {{ advanceConfig.label }}
             </el-button>
-            <!-- ★ 新增：关闭按钮 -->
-            <button class="close-btn" title="关闭" @click="handleClose">
-              <el-icon><Close /></el-icon>
+
+            <!-- ★ 新增：关闭叉号按钮 -->
+            <button type="button" class="close-panel-btn" title="关闭面板" @click="$emit('close')">
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+              </svg>
             </button>
           </div>
-        </div>
+        </header>
 
-        <div class="panel-tabs">
+        <nav class="panel-tabs">
           <button
             v-for="tab in tabs"
             :key="tab.key"
@@ -44,13 +54,14 @@
           >
             {{ tab.label }}
           </button>
-        </div>
+        </nav>
 
         <div class="panel-body">
-          <DetailMainTab
+          <MainInfoTab
             v-if="activeTab === 'main'"
-            :project="project"
+            :data="project?.mainInfo || project"
           />
+          
           <DetailMaterialTab
             v-else-if="activeTab === 'material'"
             ref="materialTabRef"
@@ -61,6 +72,7 @@
             @upload="handleUpload"
             @deleted="handleFileDeleted"
           />
+          
           <DetailMeetingTab
             v-else-if="activeTab === 'meeting'"
             ref="meetingTabRef"
@@ -70,10 +82,20 @@
             @action="handleMeetingAction"
             @deleted="handleMeetingFileDeleted"
           />
+
+          <!-- ★ 修改：增加 hideSubTabs 属性 -->
+          <ProjectReportTab
+            v-else-if="activeTabConfig.type === 'report'"
+            :key="activeTab"
+            :project="project"
+            :initial-sub-tab="activeTabConfig.subTab"
+            :hide-sub-tabs="true"
+            @row-action="handleReportRowAction"
+          />
         </div>
       </template>
 
-      <!-- 通用材料上传弹窗（FileUploadDialog） -->
+      <!-- 弹窗组件 -->
       <FileUploadDialog
         :visible="showUploadDialog"
         :tag-name="uploadTagName"
@@ -84,7 +106,6 @@
         @saved="handleUploadSaved"
       />
 
-      <!-- 会议纪要上传弹窗（MeetingMinutesUploadDialog） -->
       <MeetingMinutesUploadDialog
         :visible="showMeetingUpload"
         :tag-name="meetingUploadConfig.tagName"
@@ -103,10 +124,9 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
-// ★ 新增引入 Close 图标
-import { Close } from '@element-plus/icons-vue'
 
-import DetailMainTab from './DetailMainTab.vue'
+import MainInfoTab from './area-panel/tabs/MainInfoTab.vue' 
+import ProjectReportTab from './area-panel/tabs/ProjectReportTab.vue'
 import DetailMaterialTab from './DetailMaterialTab.vue'
 import DetailMeetingTab from './DetailMeetingTab.vue'
 import MaterialSettingPanel from './MaterialSettingPanel.vue'
@@ -122,26 +142,19 @@ const props = defineProps({
   initialTab: { type: String, default: 'main' },
 })
 
-const emit = defineEmits(['close', 'action'])
-
-// ★ 新增：触发关闭事件
-function handleClose() {
-  emit('close')
-}
-
+// ★ 修改：新增 generate-report 事件
+const emit = defineEmits(['close', 'action', 'generate-report'])
 const router = useRouter()
 
 const activeTab = ref('main')
 const showSettingPanel = ref(false)
 const settingType = ref('material')
 
-// ---- 通用材料上传弹窗 ----
 const materialTabRef = ref(null)
 const showUploadDialog = ref(false)
 const uploadTagName = ref('')
 const uploadRecord = ref(null)
 
-// ---- 会议纪要上传弹窗 ----
 const meetingTabRef = ref(null)
 const showMeetingUpload = ref(false)
 const meetingUploadConfig = ref({
@@ -150,23 +163,9 @@ const meetingUploadConfig = ref({
   record: null,
 })
 
-// ★ 走全屏生成面板的 action
-const GENERATE_REPORT_ACTIONS = new Set([
-  'gen-application',
-  'gen-letter',
-  'gen-report',
-])
+const GENERATE_REPORT_ACTIONS = new Set(['gen-application', 'gen-letter', 'gen-report'])
+const MEETING_UPLOAD_ACTIONS = new Set(['upload-minutes', 'upload-approval', 'replace'])
 
-// ★ 走上传弹窗的 action
-const MEETING_UPLOAD_ACTIONS = new Set([
-  'upload-minutes',
-  'upload-approval',
-  'replace',
-])
-
-// ========================================================
-// ★ 阶段推进配置（header 右上角按钮）
-// ========================================================
 const STAGE_ADVANCE = {
   PROJECT_RESERVE:    { label: '开始立项', next: 'PROJECT_INITIATION',  fileCode: 'PROJECT_INITIATION_MATERIALS' },
   PROJECT_INITIATION: { label: '开始审查', next: 'FEASIBILITY_REVIEW',  fileCode: 'PROJECT_INITIATION_MATERIALS' },
@@ -174,7 +173,6 @@ const STAGE_ADVANCE = {
 }
 const advanceConfig = computed(() => STAGE_ADVANCE[props.stage] || null)
 
-// ★ 阶段 → 路由 name 映射（与 router 中各阶段页面一致）
 const STAGE_ROUTE_NAME = {
   PRELIMINARY_SELECTION: 'SiteSelect',
   PROJECT_RESERVE:       'Reserve',
@@ -183,7 +181,6 @@ const STAGE_ROUTE_NAME = {
   INVESTMENT_DECISION:   'Decision',
 }
 
-// ★ 必要性文件是否全部上传完成
 const necessaryFilesDone = ref(false)
 const advancing = ref(false)
 
@@ -211,9 +208,7 @@ async function loadNecessaryFiles() {
     })
     const list = (res?.data || []).map(normalizeRecord)
     const required = list.filter(isRequired)
-
-    necessaryFilesDone.value =
-      required.length > 0 && required.every(f => f.fileUrlList.length > 0)
+    necessaryFilesDone.value = required.length > 0 && required.every(f => f.fileUrlList.length > 0)
   } catch (err) {
     console.error('[panel] 加载必要性文件失败:', err)
     necessaryFilesDone.value = false
@@ -240,11 +235,8 @@ async function handleHeaderAction() {
     await api.updateProjectStage({ id: props.project.id, newStage: next })
     ElMessage.success(`${label}成功`)
     emit('action', { type: 'stage-changed', project: props.project, newStage: next })
-
     const targetName = STAGE_ROUTE_NAME[next]
-    if (targetName) {
-      router.push({ name: targetName, query: { view: 'list' } })
-    }
+    if (targetName) router.push({ name: targetName, query: { view: 'list' } })
   } catch (err) {
     ElMessage.error(err?.message || `${label}失败`)
   } finally {
@@ -252,82 +244,45 @@ async function handleHeaderAction() {
   }
 }
 
-// ========================================================
-// 各阶段 Tabs 配置
-// ========================================================
 const STAGE_TABS_CONFIG = {
   PRELIMINARY_SELECTION: [
     { key: 'main', label: '主要信息' },
   ],
   PROJECT_RESERVE: [
     { key: 'main', label: '主要信息' },
-    {
-      key: 'material',
-      label: '立项材料',
-      stageCode: 'PROJECT_RESERVE',
-      fileCode: 'PROJECT_INITIATION_MATERIALS',
-    },
+    { key: 'project-proposal', label: '项目建议书', type: 'report', subTab: 'PROJECT_PROPOSAL' },
+    { key: 'request-file', label: '请示文件', type: 'report', subTab: 'PROJECT_INITIATION' },
+    { key: 'competitive-allocation', label: '竞配申请报告', type: 'report', subTab: 'COMPETITIVE_ALLOCATION' },
+    { key: 'material', label: '立项材料', stageCode: 'PROJECT_RESERVE', fileCode: 'PROJECT_INITIATION_MATERIALS' },
   ],
   PROJECT_INITIATION: [
     { key: 'main', label: '主要信息' },
-    {
-      key: 'material',
-      label: '立项材料',
-      stageCode: 'PROJECT_INITIATION',
-      fileCode: 'PROJECT_INITIATION_MATERIALS',
-    },
-    {
-      key: 'meeting',
-      label: '立项上会',
-      stageCode: 'PROJECT_INITIATION',
-      fileCode: 'PROJECT_INITIATION_MEETING_MATERIALS',
-    },
+    { key: 'request-file', label: '请示文件', type: 'report', subTab: 'PROJECT_INITIATION' },
+    { key: 'material', label: '立项材料', stageCode: 'PROJECT_INITIATION', fileCode: 'PROJECT_INITIATION_MATERIALS' },
+    { key: 'meeting', label: '立项上会', stageCode: 'PROJECT_INITIATION', fileCode: 'PROJECT_INITIATION_MEETING_MATERIALS' },
   ],
   FEASIBILITY_REVIEW: [
     { key: 'main', label: '主要信息' },
-    {
-      key: 'material',
-      label: '可研材料',
-      stageCode: 'FEASIBILITY_REVIEW',
-      fileCode: 'PROJECT_FEASIBILITY_MATERIALS',
-    },
-    {
-      key: 'meeting',
-      label: '可研审查',
-      stageCode: 'FEASIBILITY_REVIEW',
-      fileCode: 'FEASIBILITY_REVIEW_MATERIALS',
-    },
+    { key: 'request-file', label: '请示文件', type: 'report', subTab: 'PROJECT_INITIATION' },
+    { key: 'material', label: '可研材料', stageCode: 'FEASIBILITY_REVIEW', fileCode: 'PROJECT_FEASIBILITY_MATERIALS' },
+    { key: 'meeting', label: '可研审查', stageCode: 'FEASIBILITY_REVIEW', fileCode: 'FEASIBILITY_REVIEW_MATERIALS' },
   ],
   INVESTMENT_DECISION: [
     { key: 'main', label: '主要信息' },
-    {
-      key: 'material',
-      label: '投决材料',
-      stageCode: 'INVESTMENT_DECISION',
-      fileCode: 'INVESTMENT_DECISION_MATERIALS',
-    },
-    {
-      key: 'meeting',
-      label: '投决上会',
-      stageCode: 'INVESTMENT_DECISION',
-      fileCode: 'INVESTMENT_DECISION_MEETING_MATERIALS',
-    },
+    { key: 'request-file', label: '请示文件', type: 'report', subTab: 'PROJECT_INITIATION' },
+    { key: 'material', label: '投决材料', stageCode: 'INVESTMENT_DECISION', fileCode: 'INVESTMENT_DECISION_MATERIALS' },
+    { key: 'meeting', label: '投决上会', stageCode: 'INVESTMENT_DECISION', fileCode: 'INVESTMENT_DECISION_MEETING_MATERIALS' },
   ],
 }
 
-const tabs = computed(
-  () => STAGE_TABS_CONFIG[props.stage] || STAGE_TABS_CONFIG.PROJECT_RESERVE
-)
-
-const activeTabConfig = computed(
-  () => tabs.value.find(t => t.key === activeTab.value) || {}
-)
+const tabs = computed(() => STAGE_TABS_CONFIG[props.stage] || STAGE_TABS_CONFIG.PROJECT_RESERVE)
+const activeTabConfig = computed(() => tabs.value.find(t => t.key === activeTab.value) || {})
 
 watch(
-  () => props.visible,
-  (val) => {
-    if (val) {
-      activeTab.value = props.initialTab || 'main'
+  () => [props.visible, props.project?.id, props.initialTab],
+  ([visible, , tab]) => {
+    if (visible) {
+      activeTab.value = tab || 'main'
       showSettingPanel.value = false
       showUploadDialog.value = false
       showMeetingUpload.value = false
@@ -338,16 +293,10 @@ watch(
   { immediate: true }
 )
 
-watch(
-  () => props.initialTab,
-  (val) => {
-    if (props.visible && val) activeTab.value = val
-  }
-)
+function handleReportRowAction(row) {
+  emit('action', { type: 'report-row-action', row, project: props.project })
+}
 
-// ========================================================
-// 设置面板
-// ========================================================
 function openSetting(type) {
   settingType.value = type
   showSettingPanel.value = true
@@ -359,11 +308,7 @@ function handleSettingSave(data) {
   showSettingPanel.value = false
 }
 
-// ========================================================
-// 通用材料上传（DetailMaterialTab → FileUploadDialog）
-// ========================================================
 function handleUpload(item) {
-  console.log('[panel] 打开通用上传弹窗，item =', item)
   uploadRecord.value = item?.record || null
   uploadTagName.value = item?.label || ''
   showUploadDialog.value = true
@@ -379,39 +324,21 @@ function handleFileDeleted() {
   loadNecessaryFiles()
 }
 
-// ========================================================
-// 上会流程（DetailMeetingTab → MeetingMinutesUploadDialog）
-// ========================================================
 function handleMeetingAction(payload) {
-  console.log('[panel] meeting action =', payload)
-
   if (payload.key === 'set-owner') {
     ElMessage.info(`点击了「设置负责人」：${payload.step || ''}（弹窗待接）`)
     emit('action', { type: 'meeting', ...payload })
     return
   }
-
   if (GENERATE_REPORT_ACTIONS.has(payload.key)) {
-    emit('action', {
-      type: 'generate-report',
-      actionKey: payload.key,
-      subCode: payload.subCode,
-      step: payload.step,
-      project: props.project,
-    })
+    emit('action', { type: 'generate-report', actionKey: payload.key, subCode: payload.subCode, step: payload.step, project: props.project })
     return
   }
-
   if (MEETING_UPLOAD_ACTIONS.has(payload.key)) {
-    meetingUploadConfig.value = {
-      tagName: payload.label?.replace(/^(生成|上传)/, '') || '会议纪要',
-      subCode: payload.subCode || '',
-      record: payload.record || null,
-    }
+    meetingUploadConfig.value = { tagName: payload.label?.replace(/^(生成|上传)/, '') || '会议纪要', subCode: payload.subCode || '', record: payload.record || null }
     showMeetingUpload.value = true
     return
   }
-
   ElMessage.info(`点击了：${payload.label || ''}`)
   emit('action', { type: 'meeting', ...payload })
 }
@@ -428,29 +355,58 @@ function handleMeetingFileDeleted() {
 </script>
 
 <style scoped>
+/* ================= 完全同步 Overview 的毛玻璃外框 ================= */
 .detail-panel {
   position: fixed;
   top: 65px;
-  height:calc(100vh - 65px);
-  right: 0;
-  width: 520px;
+  right: 12px; /* 留出阴影和边框的距离 */
+  bottom: 20px;
+  height: calc(100vh - 85px); 
+  width: 779px;  /* 宽度与 Overview 对齐 */
+  max-width: calc(100vw - 24px);
   z-index: 200;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+  padding: 16px 0px 24px 0px;
+  gap: 16px;
+  
+  /* 长串渐变背景 */
+  background: linear-gradient(149.65deg, rgba(255, 255, 255, 0.2) 4.61%, rgba(255, 255, 255, 0.15) 29.07%, rgba(255, 255, 255, 0.3) 49.01%, rgba(255, 255, 255, 0.1) 61.4%, rgba(255, 255, 255, 0.2) 74.74%, rgba(255, 255, 255, 0.22) 97.19%);
+  
+  /* 毛玻璃与边框 */
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  border-radius: 10px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  
+  /* 设计稿指定的双层阴影 */
+  box-shadow: 5px 5px 0px rgba(207, 234, 255, 0.5), -10px 0px 30px rgba(0, 0, 0, 0.1);
+  color: #303133;
+  overflow: hidden;
 }
 
+/* ================= 头部 ================= */
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid #ebeef5;
+  padding: 0 25px;
+}
+.panel-title {
+  flex: 1;
+  overflow: hidden;
+  color: #111827;
+  font-size: 24px;  /* 同步 Overview 尺寸 */
+  font-weight: 700;
+  line-height: 28px;
+  letter-spacing: 0.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Inter', 'PingFang SC', sans-serif;
 }
 
-/* ★ 新增：右侧操作区 */
 .header-actions {
   display: flex;
   align-items: center;
@@ -458,75 +414,102 @@ function handleMeetingFileDeleted() {
   flex-shrink: 0;
 }
 
-/* ★ 新增：关闭按钮样式 */
-.close-btn {
+/* 报告生成按钮 - 完全照搬 Overview */
+.report-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  height: 36px;
+  border: 1px solid #2563EB;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #2563EB;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+.report-btn:hover { background: #eff6ff; }
+.report-icon { width: 14px; height: 14px; }
+
+/* ================= 主 Tab 栏 ================= */
+.panel-tabs {
+  display: flex;
+  justify-content: flex-start;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.5); /* Overview 样式 */
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 0 25px;
+  gap: 0;
+  overflow-x: auto;
+}
+.panel-tabs::-webkit-scrollbar { display: none; }
+
+.panel-tab {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  color: #909399;
-  font-size: 18px;
+  height: 100%;
+  padding: 0 20px;
+  color: #4B5563;
+  font-family: 'PingFang SC', 'Inter', sans-serif;
+  font-size: 16px; /* 同步 Overview */
   background: transparent;
   border: 0;
-  border-radius: 4px;
+  border-bottom: 3px solid transparent;
   cursor: pointer;
+  white-space: nowrap;
   transition: all 0.2s;
 }
-.close-btn:hover {
-  color: #303133;
-  background: #f0f2f5;
-}
-
-.panel-title {
-  flex: 1;
-  overflow: hidden;
-  color: #303133;
-  font-size: 16px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.panel-tabs {
-  display: flex;
-  gap: 24px;
-  padding: 0 20px;
-  border-bottom: 1px solid #ebeef5;
-}
-.panel-tab {
-  position: relative;
-  padding: 12px 0;
-  color: #606266;
-  font-size: 14px;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
+.panel-tab:hover { color: #1D4ED8; }
 .panel-tab.active {
-  color: #1677ff;
+  color: #1D4ED8;
   font-weight: 500;
-}
-.panel-tab.active::after {
-  content: '';
-  position: absolute;
-  right: 0; bottom: -1px; left: 0;
-  height: 2px;
-  background: #1677ff;
+  background: rgba(19, 55, 134, 0.05);
+  border-bottom-color: #2563EB;
 }
 
+/* ================= 内容区 ================= */
 .panel-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 16px 20px;
+  padding: 0 25px 16px 25px;
 }
+/* 美化滚动条 */
+.panel-body::-webkit-scrollbar { width: 6px; height: 6px; }
+.panel-body::-webkit-scrollbar-track { background: transparent; }
+.panel-body::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 3px; }
+.panel-body::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.3); }
 
 .detail-slide-enter-active,
-.detail-slide-leave-active {
-  transition: transform 0.25s ease;
-}
+.detail-slide-leave-active { transition: transform 0.25s ease; }
 .detail-slide-enter-from,
-.detail-slide-leave-to {
-  transform: translateX(100%);
+.detail-slide-leave-to { transform: translateX(100%); }
+
+
+/* ★ 新增：关闭按钮样式 */
+.close-panel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: #6b7280;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  margin-left: 4px;
 }
+.close-panel-btn:hover {
+  color: #111827;
+  background: rgba(0, 0, 0, 0.06);
+}
+.close-panel-btn svg { width: 16px; height: 16px; }
 </style>
