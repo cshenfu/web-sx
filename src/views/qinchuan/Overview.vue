@@ -172,7 +172,7 @@
             <div class="grid-item border-right">
               <div class="grid-label">推荐机型</div>
               <div class="grid-value">
-                <span class="bold">{{ popoverProject.recommendedModel || 'MySE5.0-200' }}</span>
+                <span class="bold">{{ popoverProject.deviceModel || 'MySE5.0-200' }}</span>
               </div>
             </div>
             <div class="grid-item">
@@ -411,8 +411,7 @@ import AssignDialog from './components/AssignDialog.vue'
 import ReserveApprovalDialog from './components/ReserveApprovalDialog.vue'
 import ReportWizard from './components/report-wizard/ReportWizard.vue'
 import { PACKAGE_TYPE } from './js/Reportwizardmockdata'
-import { projectOverviewRows, stageCityData } from './js/dashboardMcokData'
-import { buildStageColorMap } from './js/mapStageColor'
+import { projectOverviewRows } from './js/dashboardMcokData'
 import { projectDetailMockData } from './js/areaPanelMockData'
 import { buildMainInfoFromAi } from './js/aiProjectAdapter'
 import * as newApi from '@/api/modules/project'
@@ -2082,23 +2081,183 @@ function handleMapBlankClick(e) {
   }
 }
 
-function renderSelectedProject(row) {
-  if (!mapRef.value) return
-  const colorMap = row
-    ? buildStageColorMap(stageCityData[row.key] || {}, row.color)
-    : {}
+// ==================================================================
+// ★ 省级大屏：按城市容量渲染色阶 + 数值 label
+// ==================================================================
 
+// 城市级阶段容量缓存 { [stageCode]: { 规范化城市名: 容量 } }
+const stageCityCapacityCache = ref({})
+let provinceRenderVersion = 0
+
+function normalizeCityName(name) {
+  return String(name || '').replace(/(市|地区|自治州|盟)$/, '').trim()
+}
+
+async function fetchStageCityCapacity(stageCode) {
+  if (stageCityCapacityCache.value[stageCode]) return stageCityCapacityCache.value[stageCode]
+  try {
+    const res = await configApi.provinceViewData({
+      provinceCode: '610000',
+      projectStage: stageCode,
+    })
+    const list = res?.data ?? []
+    const map = {}
+    for (const item of list) {
+      const rawName = item.regionName || item.cityName || item.region || ''
+      if (!rawName) continue
+      const key = normalizeCityName(rawName)
+      map[key] = (map[key] || 0) + (Number(item.totalCapacity) || 0)
+    }
+    stageCityCapacityCache.value[stageCode] = map
+    return map
+  } catch (err) {
+    console.warn(`[overview] provinceViewData(${stageCode}) 失败:`, err)
+    return {}
+  }
+}
+
+// 色相不变的 HSL 工具
+function hexToHsl(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '')
+  if (!m) return { h: 210, s: 80, l: 55 }
+  const int = parseInt(m[1], 16)
+  const r = ((int >> 16) & 255) / 255
+  const g = ((int >> 8) & 255) / 255
+  const b = (int & 255) / 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  let h = 0, s = 0
+  if (max !== min) {
+    const d = max - min
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6
+    else if (max === g) h = ((b - r) / d + 2) / 6
+    else h = ((r - g) / d + 4) / 6
+  }
+  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) }
+}
+
+function hslToHex(h, s, l) {
+  h = ((h % 360) + 360) % 360
+  s = Math.max(0, Math.min(100, s)) / 100
+  l = Math.max(0, Math.min(100, l)) / 100
+  const c = (1 - Math.abs(2 * l - 1)) * s
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = l - c / 2
+  let r = 0, g = 0, b = 0
+  if (h < 60) [r, g, b] = [c, x, 0]
+  else if (h < 120) [r, g, b] = [x, c, 0]
+  else if (h < 180) [r, g, b] = [0, c, x]
+  else if (h < 240) [r, g, b] = [0, x, c]
+  else if (h < 300) [r, g, b] = [x, 0, c]
+  else [r, g, b] = [c, 0, x]
+  const toHex = (v) => Math.round((v + m) * 255).toString(16).padStart(2, '0')
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
+}
+
+// 直接按省界 feature 的 name 建色阶（避免 key 对不上）
+function buildCityColorMapForBoundary(boundary, cityData, baseHex) {
+  const values = Object.values(cityData || {})
+  const max = values.length ? Math.max(...values) : 0
+  const { h } = hexToHsl(baseHex)
+  const result = {}
+  for (const f of boundary?.features || []) {
+    const rawName = f.properties?.name || ''
+    if (!rawName) continue
+    const key = normalizeCityName(rawName)
+    const v = cityData[key] ?? 0
+    const ratio = max > 0 ? v / max : 0
+    // 饱和度 40% → 90%，明度 45% → 65%（容量越大越亮越饱和）
+    result[rawName] = hslToHex(h, 40 + 50 * ratio, 45 + 20 * ratio)
+  }
+  return result
+}
+
+// 给省界每个 feature 注入 value（label 用）
+function injectCityLabels(boundary, cityData) {
+  const clone = JSON.parse(JSON.stringify(boundary))
+  for (const f of clone.features || []) {
+    const rawName = f.properties?.name || ''
+    const key = normalizeCityName(rawName)
+    const v = cityData[key] ?? 0
+    f.properties = { ...(f.properties || {}), value: `${v} MW`, totalCapacity: v }
+  }
+  return clone
+}
+
+// ★ 核心替换：按市区容量渲染省级挤出层
+async function renderSelectedProject(row) {
+  if (!mapRef.value) return
+  const version = ++provinceRenderVersion
+
+  // ---------- 未选中：默认色挤出 + 无副标签 ----------
+  if (!row) {
+    mapRef.value.addExtrusion({
+      ...PROVINCE_MAP_STYLE,
+      id: PROVINCE_EXTRUSION_ID,
+      geojson: shaanxiBoundary,
+      colorMap: {},
+      enableHover: true,
+    })
+    mapRef.value.addCentroidLabels({
+      id: 'shaanxi-labels',
+      geojson: shaanxiBoundary,
+      labelField: 'name',
+      subLabelField: 'value',
+      textColor: '#FFFFFF',
+      textSize: 14,
+      subTextSize: 10,
+      textOffset: [0, 0],
+      height: PROVINCE_MAP_STYLE.defaultHeight,
+      followLayer: PROVINCE_EXTRUSION_ID,
+    })
+    return
+  }
+
+  // ---------- 决定要拉哪些阶段的城市数据 ----------
+  const isAggregated = row.key === 'AGGREGATION' && (!row.dropdownKey || row.dropdownKey === 'AGGREGATION')
+  const stageCodes = isAggregated
+    ? ['PROJECT_INITIATION', 'FEASIBILITY_REVIEW', 'INVESTMENT_DECISION']
+    : [row.dropdownKey || row.key]
+
+  const cityMaps = await Promise.all(stageCodes.map(fetchStageCityCapacity))
+  if (version !== provinceRenderVersion) return
+
+  // 合并（同城相加）
+  const mergedCityData = {}
+  for (const m of cityMaps) {
+    for (const [name, v] of Object.entries(m)) {
+      mergedCityData[name] = (mergedCityData[name] || 0) + v
+    }
+  }
+
+  // ---------- 生成色阶 ----------
+  const baseHex = row.baseColor || row.color || PROVINCE_MAP_STYLE.defaultColor
+  const colorMap = buildCityColorMapForBoundary(shaanxiBoundary, mergedCityData, baseHex)
+
+  // 调试（跑通后可删）
+  console.log('[overview] renderSelectedProject', {
+    row,
+    stageCodes,
+    mergedCityData,
+    colorMap,
+    boundaryNames: (shaanxiBoundary?.features || []).map(f => f.properties?.name),
+  })
+
+  // ---------- 渲染挤出层（★ ...PROVINCE_MAP_STYLE 必须在最前面） ----------
   mapRef.value.addExtrusion({
+    ...PROVINCE_MAP_STYLE,
     id: PROVINCE_EXTRUSION_ID,
     geojson: shaanxiBoundary,
     colorMap,
     enableHover: true,
-    ...PROVINCE_MAP_STYLE
   })
 
+  // ---------- label 显示每市容量 ----------
+  const labelsGeo = injectCityLabels(shaanxiBoundary, mergedCityData)
   mapRef.value.addCentroidLabels({
     id: 'shaanxi-labels',
-    geojson: shaanxiBoundary,
+    geojson: labelsGeo,
     labelField: 'name',
     subLabelField: 'value',
     textColor: '#FFFFFF',
@@ -2110,9 +2269,12 @@ function renderSelectedProject(row) {
   })
 }
 
+// ==================================================================
+// ★ 替换 onProjectStageSelect（payload 来自 ProjectOverview 的 emit）
+// ==================================================================
 function onProjectStageSelect(row) {
   activeProject.value = row || null
-  selectedStage.value = row ? (row.key || row.stage) : null
+  selectedStage.value = row ? (row.key || null) : null
   if (mapReady.value && !isAreaView.value) renderSelectedProject(row || null)
 }
 
@@ -2220,27 +2382,61 @@ async function ensureShaanxiMask() {
 
 const CITY_BOUNDARY_LAYER_ID = 'sx-city-boundary-line'
 const CITY_BOUNDARY_SOURCE_ID = 'sx-city-boundary-src'
+let cityBoundaryVisible = null
 
+function syncCityBoundaryVisibility() {
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+  if (!map.getLayer(CITY_BOUNDARY_LAYER_ID)) return
+
+  const zoom = map.getZoom?.() ?? 0
+  // 挤出图层存在且可见 = 省级视角
+  const extrusionVisible = !!map.getLayer(PROVINCE_EXTRUSION_ID) &&
+    map.getLayoutProperty(PROVINCE_EXTRUSION_ID, 'visibility') !== 'none'
+
+  // 只有到“市一级”（zoom ≥ 阈值）且没有省级挤出图层时才显示
+  const shouldShow = zoom >= AREA_ZOOM_THRESHOLD && !extrusionVisible
+  if (cityBoundaryVisible === shouldShow) return
+  cityBoundaryVisible = shouldShow
+
+  map.setLayoutProperty(
+    CITY_BOUNDARY_LAYER_ID,
+    'visibility',
+    shouldShow ? 'visible' : 'none'
+  )
+
+  if (shouldShow && mapRef.value?.hasMaskLayer?.(MASK_LAYER_ID)) {
+    mapRef.value.bringMaskToTop(MASK_LAYER_ID)
+  }
+}
+function setCityBoundaryVisible(visible) {
+  const map = mapRef.value?.getMap?.()
+  if (!map || !map.getLayer(CITY_BOUNDARY_LAYER_ID)) return
+  map.setLayoutProperty(CITY_BOUNDARY_LAYER_ID, 'visibility', visible ? 'visible' : 'none')
+  if (visible && mapRef.value?.hasMaskLayer?.(MASK_LAYER_ID)) {
+    mapRef.value.bringMaskToTop(MASK_LAYER_ID)
+  }
+}
 async function ensureCityBoundaryLine() {
   const map = mapRef.value?.getMap?.()
   if (!map) return
-  if (map.getLayer(CITY_BOUNDARY_LAYER_ID)) return 
+
+  if (map.getLayer(CITY_BOUNDARY_LAYER_ID)) {
+    return   // ★ 不再 setCityBoundaryVisible(true)，显隐交给调用方
+  }
 
   const cities = await loadCityGeoJSON()
   if (!cities) return
 
   if (!map.getSource(CITY_BOUNDARY_SOURCE_ID)) {
-    map.addSource(CITY_BOUNDARY_SOURCE_ID, {
-      type: 'geojson',
-      data: cities,
-    })
+    map.addSource(CITY_BOUNDARY_SOURCE_ID, { type: 'geojson', data: cities })
   }
   if (!map.getLayer(CITY_BOUNDARY_LAYER_ID)) {
     map.addLayer({
       id: CITY_BOUNDARY_LAYER_ID,
       type: 'line',
       source: CITY_BOUNDARY_SOURCE_ID,
-      layout: { visibility: 'visible' },
+      layout: { visibility: 'none' },   // ★ 保持默认隐藏
       paint: {
         'line-color': '#7dd3fc',
         'line-width': ['interpolate', ['linear'], ['zoom'], 4, 1, 10, 2],
@@ -2248,10 +2444,7 @@ async function ensureCityBoundaryLine() {
       },
     })
   }
-
-  if (mapRef.value?.hasMaskLayer?.(MASK_LAYER_ID)) {
-    mapRef.value.bringMaskToTop(MASK_LAYER_ID)
-  }
+  // ★ 末尾去掉 setCityBoundaryVisible(true)
 }
 
 function onLayerToggle(item) {
@@ -2278,22 +2471,29 @@ function onLayerToggle(item) {
 const provinceEventLayerId = `${PROVINCE_EXTRUSION_ID}-event`
 const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoomThresholdSwitch({
   mapRef, zoomThreshold: AREA_ZOOM_THRESHOLD,
-  onAboveThreshold: () => { const map = mapRef.value?.getMap?.(); if (map?.getLayer(PROVINCE_EXTRUSION_ID)) mapRef.value.removeLayer(PROVINCE_EXTRUSION_ID) },
-  onEnter: () => {
-    ensureShaanxiMask()
-    ensureCityBoundaryLine() 
+  onAboveThreshold: () => {
+    // 每次 zoom 都跑：只负责移除挤出图层（有 getLayer 守卫）
+    const map = mapRef.value?.getMap?.()
+    if (map?.getLayer(PROVINCE_EXTRUSION_ID)) mapRef.value.removeLayer(PROVINCE_EXTRUSION_ID)
+  },
+  onEnter: async () => {
+    await ensureShaanxiMask()
+    await ensureCityBoundaryLine() 
+    setCityBoundaryVisible(true)     // 首次加载 / 已存在 → 设 visible
     rightPanelMode.value = 'list'
     listExpanded.value = false
     activeEditTool.value = ''
     renderProjectsByStage('area')
   },
   onBelowThreshold: () => {
+    // 每次 zoom 都跑：只负责恢复挤出图层（有 getLayer 守卫）
     const map = mapRef.value?.getMap?.()
     if (map?.getLayer(PROVINCE_EXTRUSION_ID)) {
       map.setLayoutProperty(PROVINCE_EXTRUSION_ID, 'visibility', 'visible')
       if (map.getLayer(provinceEventLayerId)) map.setLayoutProperty(provinceEventLayerId, 'visibility', 'visible')
-    } else { renderSelectedProject(activeProject.value) }
-    renderSelectedProject(activeProject.value)
+    } else {
+      renderSelectedProject(activeProject.value)
+    }
   },
   onExit: () => {
     clearOverviewRoadLayer()
@@ -2305,6 +2505,7 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
     if (isEditing.value) exitEditMode()
     isDetailFullscreen.value = false
     renderProjectsByStage('overview')
+    setCityBoundaryVisible(false)       // ← 退出市一级 → 隐藏切片
   }
 })
 
@@ -2365,6 +2566,16 @@ function fitGlobeZoom(map, fill = 0.7) {
   return Math.log2(target / BASE_RATIO)
 }
 
+// style.load 后重绘必要图层（避免 style 重载后自定义图层消失）
+function handleStyleLoad() {
+  try {
+    syncMaskVisibility(true)
+    // 如果需要也可以在这里重建 whln / 道路 / 线路
+  } catch (err) {
+    console.warn('[style.load] 重绘失败:', err)
+  }
+}
+
 async function onMapReady() {
   await Promise.allSettled([loadShaanxiBoundary(), loadCityGeoJSON()])
 
@@ -2411,9 +2622,9 @@ async function onMapReady() {
 
   map.on('zoom', syncMaskVisibility)
   map.on('move', syncMaskVisibility)
-  map.on('style.load', ensureShaanxiMask)
+  map.on('style.load', handleStyleLoad)
   await ensureShaanxiMask()
-  await ensureCityBoundaryLine()
+  // await ensureCityBoundaryLine()
   nextTick(() => { syncByZoom() })
 
   try {
@@ -2449,7 +2660,7 @@ onUnmounted(() => {
     map.off('click', handleMapBlankClick)
     map.off('zoom', syncMaskVisibility)
     map.off('move', syncMaskVisibility)
-    map.off('style.load', ensureShaanxiMask)
+    map.off('style.load', handleStyleLoad)  // ★ 原来是 map.on，改成 off
   }
 })
 </script>

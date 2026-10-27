@@ -63,7 +63,7 @@
           />
           
           <DetailMaterialTab
-            v-else-if="activeTab === 'material'"
+             v-else-if="activeTab === 'material' || activeTab === 'invest-material'"
             ref="materialTabRef"
             :project="project"
             :file-code="activeTabConfig.fileCode"
@@ -261,11 +261,15 @@ const STAGE_TABS_CONFIG = {
     { key: 'material', label: '立项材料', stageCode: 'PROJECT_INITIATION', fileCode: 'PROJECT_INITIATION_MATERIALS' },
     { key: 'meeting', label: '立项上会', stageCode: 'PROJECT_INITIATION', fileCode: 'PROJECT_INITIATION_MEETING_MATERIALS' },
   ],
-  FEASIBILITY_REVIEW: [
+    FEASIBILITY_REVIEW: [
     { key: 'main', label: '主要信息' },
     { key: 'request-file', label: '请示文件', type: 'report', subTab: 'PROJECT_INITIATION' },
+    // 原有的可研材料
     { key: 'material', label: '可研材料', stageCode: 'FEASIBILITY_REVIEW', fileCode: 'PROJECT_FEASIBILITY_MATERIALS' },
-    { key: 'meeting', label: '可研审查', stageCode: 'FEASIBILITY_REVIEW', fileCode: 'FEASIBILITY_REVIEW_MATERIALS' },
+    // ★ 新增：投决准备 Tab
+   
+    { key: 'meeting', label: '可研审查', stageCode: 'FEASIBILITY_REVIEW', fileCode: 'FEASIBILITY_REVIEW' },
+     { key: 'invest-material', label: '投决准备', stageCode: 'FEASIBILITY_REVIEW', fileCode: 'INVESTMENT_DECISION_MATERIALS' },
   ],
   INVESTMENT_DECISION: [
     { key: 'main', label: '主要信息' },

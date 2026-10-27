@@ -117,7 +117,7 @@
           <div class="detail-title">{{ selectedProject.projectName }}</div>
           <div class="detail-row"><span class="detail-label">装机容量</span><span class="detail-value">{{ selectedProject.currentProjectCapacity ?? '-' }} MW</span></div>
           <div class="detail-row"><span class="detail-label">风机</span><span class="detail-value">{{ windCount }} 台 <span v-if="altCount > 0" class="detail-sub">（备选 {{ altCount }} 台）</span></span></div>
-          <div class="detail-row"><span class="detail-label">推荐机型</span><span class="detail-value">{{ selectedProject.recommendedModel || '-' }}</span></div>
+          <div class="detail-row"><span class="detail-label">推荐机型</span><span class="detail-value">{{ selectedProject.deviceModel || '-' }}</span></div>
           <div class="detail-row"><span class="detail-label">资本金 IRR</span><span class="detail-value">{{ selectedProject.capitalFinancialRate != null ? selectedProject.capitalFinancialRate + '%' : '-' }}</span></div>
           <slot name="detail-card-extra" :project="selectedProject" />
 

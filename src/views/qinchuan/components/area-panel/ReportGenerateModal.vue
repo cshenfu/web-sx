@@ -24,6 +24,7 @@
         <div class="section-title">请选择需生成的报告类型</div>
 
         <div class="option-grid">
+          <!-- 报告弹窗：仍然使用 reportTypeOptions（可研那套） -->
           <button
             v-for="option in options"
             :key="option.key"
@@ -80,8 +81,9 @@
           <section class="request-step">
             <h2 class="step-title"><span class="step-number">1</span>选择文件类型</h2>
             <div class="request-option-grid">
+              <!-- 请示文件页：改用独立的 requestTypeOptions -->
               <button
-                v-for="option in options"
+                v-for="option in requestTypeOptions"
                 :key="option.key"
                 type="button"
                 class="request-option"
@@ -108,11 +110,12 @@
             <h2 class="step-title"><span class="step-number">2</span>填写请示单位</h2>
             <div v-if="selectedOptions.length" class="unit-fields">
               <label v-for="option in selectedOptions" :key="option.key" class="unit-row">
-                <span class="unit-label">{{ option.label }}请示</span>
+                <!-- 与截图一致：压覆矿审查请示 / 水保审批请示 -->
+                <span class="unit-label">{{ option.label }}{{ option.sub || '请示' }}</span>
                 <input
                   v-model="requestUnits[option.key]"
                   type="text"
-                  :placeholder="`请输入${option.label}请示单位`"
+                  :placeholder="`请输入${option.label}${option.sub || '请示'}单位`"
                 />
               </label>
             </div>
@@ -180,7 +183,6 @@
     </main>
   </div>
 </template>
-
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -188,12 +190,32 @@ import { reportTypeOptions } from '../../js/areaPanelMockData'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
-  // 由首页传入当前项目。组件本身不读取项目字段，只在触发时一并传回。
   project: { type: Object, default: () => null },
 })
 
 const emit = defineEmits(['close', 'add-report', 'confirm', 'generate-request'])
+
+/* ---------------- 报告类型（可研那套，保持不变） ---------------- */
 const options = reportTypeOptions
+
+/* ---------------- 请示文件类型（全新一套，与报告类型无关） ---------------- */
+/**
+ * sub 用来区分「审查请示 / 审批请示」
+ * 如果以后还要扩展，可以在 mock 文件里 export requestTypeOptions 统一维护
+ */
+const requestTypeOptions = [
+  { key: 'request-yafukuang',  label: '压覆矿',        sub: '审查请示' },
+  { key: 'request-wenwu',      label: '文物保护',      sub: '审查请示' },
+  { key: 'request-shuibao',    label: '水保',          sub: '审批请示' },
+  { key: 'request-huanbao',    label: '环保',          sub: '审批请示' },
+  { key: 'request-anquan',     label: '安全',          sub: '审查请示' },
+  { key: 'request-linye',      label: '林业',          sub: '审查请示' },
+  { key: 'request-junshi',     label: '军事',          sub: '审查请示' },
+  { key: 'request-yongdi',     label: '用地',          sub: '审批请示' },
+  { key: 'request-qianqi',     label: '前期工作',      sub: '审查请示' },
+  { key: 'request-tudi',       label: '土地等自然资源', sub: '审批请示' },
+]
+
 const selectedKey = ref('')
 const requestFormVisible = ref(false)
 const selectedKeys = ref([])
@@ -202,9 +224,11 @@ const referenceProjectName = ref('')
 const contactName = ref('')
 const contactPhone = ref('')
 
+/* 请示文件已选项 —— 必须基于 requestTypeOptions */
 const selectedOptions = computed(() =>
-  options.filter((option) => selectedKeys.value.includes(option.key)),
+  requestTypeOptions.filter((option) => selectedKeys.value.includes(option.key)),
 )
+
 const projectName = computed(() =>
   props.project?.projectName || props.project?.name || '',
 )
@@ -260,8 +284,8 @@ function toggleRequestType(option) {
 }
 
 function selectAllRequestTypes() {
-  selectedKeys.value = options.map((option) => option.key)
-  for (const option of options) {
+  selectedKeys.value = requestTypeOptions.map((option) => option.key)
+  for (const option of requestTypeOptions) {
     if (requestUnits.value[option.key] === undefined) requestUnits.value[option.key] = ''
   }
 }
@@ -285,7 +309,7 @@ function handleStartGeneration() {
   }
 
   emit('generate-request', {
-    options: selectedOptions.value,
+    options: selectedOptions.value,          // 现在是 requestTypeOptions 的子集
     requestUnits: { ...requestUnits.value },
     referenceProjectName: referenceProjectName.value,
     contactName: contactName.value,
@@ -466,7 +490,7 @@ function handleStartGeneration() {
   gap: 7px;
   margin: 0 0 9px;
   color: #303c4b;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
 }
 .step-number {
@@ -501,7 +525,7 @@ function handleStartGeneration() {
 }
 .request-option:hover { border-color: #9cbef4; }
 .request-option.selected { color: #2e66c5; background: #fbfdff; border-color: #3979e8; box-shadow: 0 0 0 1px rgba(57, 121, 232, 0.13); }
-.request-option-label { display: -webkit-box; overflow: hidden; max-width: 100%; font-size: 10px; font-weight: 600; line-height: 1.3; text-overflow: ellipsis; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
+.request-option-label { display: -webkit-box; overflow: hidden; max-width: 100%; font-size: 14px; font-weight: 600; line-height: 1.3; text-overflow: ellipsis; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
 .request-option-sub { overflow: hidden; max-width: 100%; color: #a5aeb9; font-size: 9px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .request-check {
   position: absolute;

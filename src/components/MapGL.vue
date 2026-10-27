@@ -9,7 +9,7 @@ import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import MapboxDraw from '@mapbox/mapbox-gl-draw'
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
-
+import { GlobeHaloLayer } from '@/utils/globeHaloLayer'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { addGradientExtrusion } from '@/utils/gradientExtrusion'
 
@@ -194,7 +194,8 @@ onMounted(() => {
   map.on('load', () => {
     // ✅ load 后兜底确保 globe（防止任何 setStyle / 插件覆盖）
     applyGlobeProjection()
-
+    const halo = new GlobeHaloLayer()
+    map.addLayer(halo)
     // ---------------- 全局：背景透明处理 ----------------
     try {
       const styleLayers = map.getStyle()?.layers || []
