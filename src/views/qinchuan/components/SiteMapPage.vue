@@ -1879,12 +1879,22 @@ async function onMapReady() {
   }
 
   // ★ 首次进入：fitBounds 让陕西刚好铺满屏幕（替代 flyToShaanxi 的固定 zoom:6）
+ // ★ 首次进入：从地球初始视角动画 flyTo 到陕西（原 duration:0 会让动画消失）
+const shaanxiPadding = { top: 60, bottom: 60, left: 60, right: 60 }
+
+// 用 requestAnimationFrame 兜一下，保证 map 已经渲染过首帧，
+// 动画起点稳定在 MapGL 初始的 [0,20] / zoom 1.5 地球视角
+requestAnimationFrame(() => {
   map.fitBounds(SHAANXI_FIT_BOUNDS, {
-    padding: { top: 60, bottom: 60, left: 60, right: 60 },
+    padding: shaanxiPadding,
     pitch: 0,
     bearing: 0,
-    duration: 0,
+    duration: 3500,
+    essential: true,
+    curve: 1.42,     // 飞行弧线更明显
+    linear: false,   // 强制走 flyTo（弧线）而非 easeTo（直线缩放）
   })
+})
 
   // ★ pitch 兜底（防止子组件 flyTo 偷传 pitch）
   zeroPitchGuard = () => {
