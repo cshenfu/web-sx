@@ -251,7 +251,7 @@ export const projectDetailMockData = {
       { key: 'request', label: '请示文件', count: 2, active: true },
       { key: 'postEval', label: '后评价报告', count: 5 },
     ],
-    columns: ['文件ID', '计算类型', '文件类型', '请示单位', '装机容量/MW', '状态', '备注', '创建时间', '操作'],
+    columns: ['项目ID', '计算类型', '文件类型', '请示单位', '装机容量/MW', '状态', '备注', '创建时间', '操作'],
     rows: [
       { id: '00002', calcType: '人工', fileType: '压覆矿审查请示', unit: '西安市自然资源和规划厅', capacity: 50, status: '已完成', statusType: 'success', remark: '--', createdAt: '2025-09-21 09:00' },
       { id: '00002', calcType: '人工', fileType: '环评审查请示', unit: '临潼区环保局', capacity: 50, status: '计算中', statusType: 'info', remark: '--', createdAt: '2025-09-21 09:00' },

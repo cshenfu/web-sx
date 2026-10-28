@@ -4,8 +4,8 @@
     <MapGL
       ref="mapRef"
       :style="satelliteStyle"
-      :fly-to-on-load="false"   
-      :isDashboard="true"  
+      :fly-to-on-load="false"
+      :isDashboard="true"
       @ready="onMapReady"
       @city-click="onCityClick"
       @draw-update="onDrawChange"
@@ -53,6 +53,8 @@
         v-else
         class="left-layer wizard-layer"
         :create-project-mode="wizardMode"
+        :title="wizardTitleLabel"          
+        :max-step="wizardMaxStep"          
         :project-name="activeProjectDetail?.name || activeProjectDetail?.projectName || ''"
         :project="activeProjectDetail"
         @close="wizardVisible = false"
@@ -135,89 +137,32 @@
               @back="handleBackToList"
               @generate-report="reportModalVisible = true"
               @action="onDetailPanelAction"
+              @open-confirm="handleOpenConfirm"
+              @create-report="handleCreateReport" 
             />
           </template>
         </div>
 
-        <div
+        <!-- ★ 点击选中：右上角固定卡片 -->
+        <ProjectActionCard
           v-if="popoverProject && !isDetailFullscreen && !selectedProject && !isEditing && !isActionPanelOpen"
-          class="right-top-card"
-        >
-          <div class="tooltip-header">
-            <button class="tooltip-title title-link" type="button" @click.stop="handleOpenDetailPanel(popoverProject)">
-              {{ popoverProject.projectName || '-' }}
-            </button>
-            <div class="tooltip-status">
-              <span class="status-dot" :style="{ background: getHoverThemeColor(popoverProject.projectStage) }"></span>
-              <span class="status-text" :style="{ color: getHoverThemeColor(popoverProject.projectStage) }">
-                {{ stageMap[popoverProject.projectStage] || '项目' }}
-              </span>
-            </div>
-          </div>
+          :project="popoverProject"
+          :stage-map="stageMap"
+          :actions="popoverActions"
+          @open-detail="handleOpenDetailPanel"
+          @action="executeProjectAction"
+        />
 
-          <div class="tooltip-grid">
-            <div class="grid-item border-right border-bottom">
-              <div class="grid-label">装机容量</div>
-              <div class="grid-value">
-                {{ popoverProject.currentProjectCapacity ?? '-' }} <span class="unit">MW</span>
-              </div>
-            </div>
-            <div class="grid-item border-bottom">
-              <div class="grid-label">风机数量</div>
-              <div class="grid-value text-blue">
-                {{ popoverWindCount }} <span class="unit">台</span>
-                <span v-if="popoverAltCount > 0" class="sub-text">（备选{{ popoverAltCount }}台）</span>
-              </div>
-            </div>
-            <div class="grid-item border-right">
-              <div class="grid-label">推荐机型</div>
-              <div class="grid-value">
-                <span class="bold">{{ popoverProject.deviceModel || 'MySE5.0-200' }}</span>
-              </div>
-            </div>
-            <div class="grid-item">
-              <div class="grid-label">资本金IRR</div>
-              <div class="grid-value text-red">
-                {{ popoverProject.capitalFinancialRate != null ? popoverProject.capitalFinancialRate : '5.96' }} <span class="unit">%</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="tooltip-footer" @click.stop>
-            <button
-              v-for="action in visiblePopoverActions"
-              :key="action"
-              type="button"
-              class="footer-action"
-              :class="{ danger: action === 'delete' }"
-              @click.stop="executeProjectAction(action, popoverProject)"
-            >
-              {{ ACTION_LABELS[action] || action }}
-            </button>
-            <div v-if="overflowPopoverActions.length" class="action-menu-wrap">
-              <button
-                type="button"
-                class="action-menu-button"
-                aria-label="更多操作"
-                title="更多操作"
-                @click.stop="actionMenuOpen = !actionMenuOpen"
-              >
-                <el-icon><MoreFilled /></el-icon>
-              </button>
-              <div v-if="actionMenuOpen" class="action-menu">
-                <button
-                  v-for="action in overflowPopoverActions"
-                  :key="action"
-                  type="button"
-                  :class="{ danger: action === 'delete' }"
-                  @click.stop="executeProjectAction(action, popoverProject)"
-                >
-                  {{ ACTION_LABELS[action] || action }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- ★ hover：跟随鼠标的只读悬浮卡片 -->
+        <ProjectActionCard
+          v-if="hoveredProject && isAreaView && viewMode === 'map' && !popoverProject && !selectedProject && !isEditing && !isActionPanelOpen && !isDetailFullscreen"
+          :project="hoveredProject"
+          hover-mode
+          :position="hoveredPos"
+          :show-footer="false"
+          :stage-map="stageMap"
+          :actions="popoverActions"
+        />
 
         <div
           v-if="isAreaView && (isEditing || (popoverProject && !isDetailFullscreen && !selectedProject && !isActionPanelOpen))"
@@ -335,16 +280,15 @@
       </section>
     </template>
 
-        <ReportGenerateModal
+    <ReportGenerateModal
       :visible="reportModalVisible"
       :project="activeProjectDetail"
       @close="reportModalVisible = false"
       @confirm="handleReportConfirm"
       @add-report="reportModalVisible = false"
-      @open-add-report="handleOpenAddReport" 
+      @open-add-report="handleOpenAddReport"
     />
 
-    <!-- ★ 在 template 的最底部（根 main 内），加上抽屉组件 -->
     <AddReportPanel
       :visible="showAddReportPanel"
       :project="activeProjectDetail"
@@ -370,16 +314,18 @@
       @close="showVerifyPanel = false"
       @saved="onVerifySaved"
     />
-    <!-- Dashboard-area-editor.vue 里 -->
-<SiteMapProjectDetailPanel
-  :visible="showSiteMapDetailPanel"
-  :project="actionProject"
-  :stage="actionProject?.projectStage || ''"
-  :initial-tab="detailPanelTab"
-  @close="showSiteMapDetailPanel = false"
-  @action="onSiteMapDetailAction"
-  @generate-report="(proj) => { if(proj) activeProjectDetail = proj; reportModalVisible = true }"
-/>
+
+    <SiteMapProjectDetailPanel
+      :visible="showSiteMapDetailPanel"
+      :project="actionProject"
+      :stage="actionProject?.projectStage || ''"
+      :initial-tab="detailPanelTab"
+      @close="showSiteMapDetailPanel = false"
+      @action="onSiteMapDetailAction"
+      @generate-report="(proj) => { if(proj) activeProjectDetail = proj; reportModalVisible = true }"
+      @open-confirm="handleOpenConfirm"
+    />
+
     <SiteMapGenerateReportPanel
       :visible="showGeneratePanel"
       :project="generatePanelProject"
@@ -390,6 +336,13 @@
     />
     <AssignDialog v-model="showAssignDialog" :project="actionProject" @success="onAssignSuccess" />
     <ReserveApprovalDialog v-model="showReserveDialog" :project="actionProject" @saved="onReserveSaved" />
+
+    <ConfirmReportPanel
+      :visible="showConfirmPanel"
+      :report-id="confirmReportId"
+      @close="showConfirmPanel = false"
+      @success="handleConfirmSuccess"
+    />
   </main>
 </template>
 
@@ -448,25 +401,12 @@ import {
   calcIconSizeAtRef,
   buildIconSizeExpression,
 } from '@/components/site-map/areaCenterIcon'
-// 顶部 import 处引入组件
+
 import AddReportPanel from './components/area-panel/AddReportPanel.vue'
+import ConfirmReportPanel from './components/area-panel/ConfirmReportPanel.vue'
+// ★ 新增：共用的项目操作卡片
+import ProjectActionCard from './components/area-panel/ProjectActionCard.vue'
 
-// ... 原有代码 ...
-
-// ★ 新增状态
-const showAddReportPanel = ref(false)
-
-// ★ 新增方法
-function handleOpenAddReport() {
-  reportModalVisible.value = false 
-  showAddReportPanel.value = true
-}
-
-function handleReportPanelSuccess() {
-  fetchMapProjects() 
-  fetchProjectList() 
-  // 如果在详情面板里，可能需要通知详情面板刷新
-}
 const CITY_OPTIONS = [
   { label: '西安市', value: '610100' }, { label: '铜川市', value: '610200' },
   { label: '宝鸡市', value: '610300' }, { label: '咸阳市', value: '610400' },
@@ -563,7 +503,6 @@ function getAreaStyleByStage(projectStage) {
   return GROUP_AREA_STYLE[group || 'unknown']
 }
 
-// ★ 更新 5 个阶段的操作配置
 const STAGE_ACTIONS = {
   PRELIMINARY_SELECTION: ['assign', 'verify', 'reserve', 'edit', 'delete'],
   PROJECT_RESERVE:       ['material', 'edit', 'assign', 'delete'],
@@ -571,19 +510,18 @@ const STAGE_ACTIONS = {
   FEASIBILITY_REVIEW:    ['researchMaterial', 'researchReview', 'investMaterial', 'edit', 'assign', 'delete'],
   INVESTMENT_DECISION:   ['investMeeting', 'edit', 'assign', 'delete'],
 }
-// ★ 更新文字标签
-const ACTION_LABELS = { 
-  material: '立项准备', 
-  researchMaterial: '可研材料', 
-  investMaterial: '投决准备', 
-  establishMeeting: '立项上会', 
-  researchReview: '可研审查', 
-  investMeeting: '投决上会', 
-  assign: '分配', 
-  verify: '核查', 
-  reserve: '储备', 
-  edit: '编辑', 
-  delete: '删除' 
+const ACTION_LABELS = {
+  material: '立项准备',
+  researchMaterial: '可研材料',
+  investMaterial: '投决准备',
+  establishMeeting: '立项上会',
+  researchReview: '可研审查',
+  investMeeting: '投决上会',
+  assign: '分配',
+  verify: '核查',
+  reserve: '储备',
+  edit: '编辑',
+  delete: '删除'
 }
 
 const mapRef = ref(null)
@@ -609,9 +547,12 @@ const detailPanelTab = ref('main')
 const popoverProject = ref(null)
 const selectedProject = ref(null)
 
+// ★ hover 状态（跟随鼠标的只读卡片）
+const hoveredProject = ref(null)
+const hoveredPos = reactive({ x: 0, y: 0 })
+
 const popoverActions = computed(() => {
   const actions = STAGE_ACTIONS[popoverProject.value?.projectStage] || STAGE_ACTIONS.PRELIMINARY_SELECTION
-  // ★ 修改：把新增动作提权展示
   const displayOrder = ['material', 'establishMeeting', 'researchMaterial', 'researchReview', 'investMaterial', 'investMeeting', 'edit', 'reserve', 'verify', 'assign']
   const otherActions = actions.filter((action) => !displayOrder.includes(action) && action !== 'delete')
   const result = [
@@ -624,25 +565,6 @@ const popoverActions = computed(() => {
   return result
 })
 
-const visiblePopoverActions = computed(() => {
-  const all = popoverActions.value
-  if (all.length <= 5) return all
-
-  const withoutDelete = all.filter(a => a !== 'delete')
-  const hasDelete = all.includes('delete')
-
-  return hasDelete ? [...withoutDelete.slice(0, 4), 'delete'] : withoutDelete.slice(0, 5)
-})
-
-const overflowPopoverActions = computed(() => {
-  const all = popoverActions.value
-  if (all.length <= 5) return []
-
-  const withoutDelete = all.filter(a => a !== 'delete')
-  const hasDelete = all.includes('delete')
-
-  return hasDelete ? withoutDelete.slice(4) : withoutDelete.slice(5)
-})
 const actionMenuOpen = ref(false)
 const actionProject = ref(null)
 const showVerifyPanel = ref(false)
@@ -659,6 +581,11 @@ const editProjectFormRef = ref(null)
 const refreshingActionProject = ref(false)
 const deleteConfirmOpen = ref(false)
 const wizardVisible = ref(false)
+
+const showAddReportPanel = ref(false)
+const showConfirmPanel = ref(false)
+const confirmReportId = ref(null)
+
 const isActionPanelOpen = computed(() => (
   showEditProject.value ||
   showVerifyPanel.value ||
@@ -669,7 +596,9 @@ const isActionPanelOpen = computed(() => (
   reportModalVisible.value ||
   refreshingActionProject.value ||
   deleteConfirmOpen.value ||
-  wizardVisible.value
+  wizardVisible.value ||
+  showAddReportPanel.value ||
+  showConfirmPanel.value
 ))
 
 const geometryProject = ref(null)
@@ -691,10 +620,24 @@ const editTools = [
 ]
 
 const wizardMode = ref(PACKAGE_TYPE.default)
+const wizardTitleLabel = ref('')
+const wizardMaxStep = ref(2)
+const wizardReportSubTab = ref('')
 const reportKeyToWizardMode = {
   'feasibility-centralized': PACKAGE_TYPE.default,
   'feasibility-distributed': PACKAGE_TYPE.distributedDefault,
-  'feasibility-base': PACKAGE_TYPE.baseDefault
+}
+
+// ★ 新增
+const SUB_TAB_REPORT_CONFIG = {
+  PROJECT_PROPOSAL:       { packageType: PACKAGE_TYPE.default, maxStep: 1, title: '一键生成项目建议书' },
+  FEASIBILITY_STUDY:      { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成风电场可行性研究报告' },
+  COMPETITIVE_ALLOCATION: { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成竞配申报报告' },
+  PROJECT_INITIATION:     { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成请示文件' },
+  POST_EVALUATION:        { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成后评价报告' },
+}
+function getReportConfigBySubTab(subTab) {
+  return SUB_TAB_REPORT_CONFIG[subTab] || SUB_TAB_REPORT_CONFIG.FEASIBILITY_STUDY
 }
 
 const projectList = ref([])
@@ -715,6 +658,29 @@ const popoverAltCount = computed(() => {
   const pts = popoverProject.value?.windTurbinePoints || []
   return pts.filter((p) => Number(p.isReserve) === 1).length
 })
+
+function handleOpenAddReport() {
+  reportModalVisible.value = false
+  showAddReportPanel.value = true
+}
+
+function handleReportPanelSuccess() {
+  fetchMapProjects()
+  fetchProjectList()
+}
+
+function handleOpenConfirm(reportId) {
+  confirmReportId.value = reportId
+  showConfirmPanel.value = true
+}
+
+function handleConfirmSuccess() {
+  fetchMapProjects()
+  fetchProjectList()
+  if (activeProjectDetail.value?.id) {
+    loadAiProjectDetail(activeProjectDetail.value.id)
+  }
+}
 
 function getHoverThemeColor(projectStage) {
   const style = getAreaStyleByStage(projectStage)
@@ -775,6 +741,8 @@ function handleProjectSelect(item) {
   clearOverviewRoadLayer()
   popoverProject.value = item
   actionMenuOpen.value = false
+  // 点击选中时清掉 hover 卡片
+  hoveredProject.value = null
   void renderAreaCenterIcons()
 
   const map = mapRef.value?.getMap()
@@ -796,6 +764,7 @@ function handleProjectSelect(item) {
 
 async function handleOpenDetailPanel(item) {
   popoverProject.value = null
+  hoveredProject.value = null
   actionMenuOpen.value = false
   selectedProject.value = item
 
@@ -818,7 +787,6 @@ function openSiteMapDetailPanel(project, tab = 'main') {
   showSiteMapDetailPanel.value = true
 }
 
-// ★ 修改点击分发逻辑：包含新增的 可研材料、立项准备等
 function executeProjectAction(action, project) {
   if (!project) return
   const item = resolveMapProject(project)
@@ -903,6 +871,7 @@ async function handleDeleteProject(project) {
     ElMessage.success('删除成功')
     if (String(popoverProject.value?.id) === String(project.id)) popoverProject.value = null
     if (String(actionProject.value?.id) === String(project.id)) actionProject.value = null
+    if (String(hoveredProject.value?.id) === String(project.id)) hoveredProject.value = null
     await Promise.all([fetchMapProjects(), fetchProjectList()])
   } catch (error) {
     ElMessage.error(error?.message || '删除失败')
@@ -953,9 +922,36 @@ async function onSiteMapDetailAction(payload) {
     generatePanelActionKey.value = payload.actionKey || ''
     generatePanelSubCode.value = payload.subCode || ''
     showGeneratePanel.value = true
+    return
+  }
+  // ★ 新增
+  if (payload?.type === 'create-report') {
+    const config = getReportConfigBySubTab(payload.subTab)
+    wizardMode.value = config.packageType
+    wizardTitleLabel.value = config.title
+    wizardMaxStep.value = config.maxStep
+    wizardReportSubTab.value = payload.subTab
+    wizardVisible.value = true
+    showSiteMapDetailPanel.value = false
+    return
   }
 }
-
+function onDetailPanelAction(payload) {
+  // 原有 stage-changed / generate-report 保留
+  if (payload?.type === 'stage-changed') { /* ... */ }
+  if (payload?.type === 'generate-report') { /* ... */ }
+  // ★ 新增
+  if (payload?.type === 'create-report') {
+    const config = getReportConfigBySubTab(payload.subTab)
+    wizardMode.value = config.packageType
+    wizardTitleLabel.value = config.title
+    wizardMaxStep.value = config.maxStep
+    wizardReportSubTab.value = payload.subTab
+    wizardVisible.value = true
+    isDetailFullscreen.value = false
+    return
+  }
+}
 function onReportGenerated() {
   showGeneratePanel.value = false
   ElMessage.success('报告生成完成')
@@ -973,6 +969,7 @@ function startGeometryEdit(project, mode = 'area') {
   actionProject.value = item
   popoverProject.value = null
   selectedProject.value = null
+  hoveredProject.value = null
   actionMenuOpen.value = false
   rightPanelMode.value = 'list'
   isDetailFullscreen.value = false
@@ -1397,7 +1394,10 @@ function handleTableSortChange({ prop, order }) {
 }
 
 watch(() => filters.stage, () => { pagination.page = 1; fetchProjectList() })
-watch(viewMode, (val) => { if (val === 'list' && showLayerPanel.value) showLayerPanel.value = false })
+watch(viewMode, (val) => {
+  if (val === 'list' && showLayerPanel.value) showLayerPanel.value = false
+  if (val === 'list') hoveredProject.value = null
+})
 
 function setProjectIconVisible(chipId, visible) {
   const layerIds = PROJECT_ICON_LAYER_MAP[chipId]
@@ -1556,7 +1556,6 @@ function buildRoadLineFeatures(data) {
   const roadFeatures = []
   const lineFeatures = []
 
-  // ---- 道路（保持不变）----
   const roadMap = data?.roadMap ?? data?.data?.roadMap ?? {}
   for (const type of ['CNKJ', 'CNXJ', 'JZXJ']) {
     pushOverviewLineFeatures(
@@ -1566,7 +1565,6 @@ function buildRoadLineFeatures(data) {
     )
   }
 
-  // ---- 35kV 线路：优先使用 mapGeoJson ----
   const line35Kv =
     data?.line35Kv ??
     data?.line35KV ??
@@ -1581,7 +1579,6 @@ function buildRoadLineFeatures(data) {
     data?.mapGeoJson ??
     null
 
-  // 保留 loops 的元数据，用于补充 fanCount / 回路总长度
   const loops = line35Kv?.line?.loops ?? data?.line?.loops ?? []
   const loopMeta = new Map()
   if (Array.isArray(loops)) {
@@ -1595,7 +1592,6 @@ function buildRoadLineFeatures(data) {
   }
 
   if (mapGeoJson?.features?.length) {
-    // 按 edge_index 排序，保证绘制顺序与数据顺序一致
     const sorted = [...mapGeoJson.features].sort((a, b) => {
       const ai = Number(a?.properties?.edge_index)
       const bi = Number(b?.properties?.edge_index)
@@ -1647,7 +1643,6 @@ function buildRoadLineFeatures(data) {
       })
     })
   } else if (Array.isArray(loops)) {
-    // 兜底：旧 loops 结构（mapGeoJson 缺失时）
     loops.forEach((loop, loopIndex) => {
       const loopName = loop?.loopname || String(loopIndex + 1)
       pushOverviewLineFeatures(
@@ -1893,6 +1888,30 @@ function addProjectArea(project, highlighted = false) {
   mapRef.value.onClick(fillLayerId, () => {
     if (!isEditing.value && !isActionPanelOpen.value) handleProjectSelect(project)
   })
+
+  // ★ hover 绑定：跟随鼠标的只读卡片
+  mapRef.value.offHover?.(fillLayerId)
+  mapRef.value.onHover?.(fillLayerId, {
+    onEnter: (_, e) => {
+      if (isEditing.value || isActionPanelOpen.value) return
+      if (String(popoverProject.value?.id ?? '') === String(project.id)) return
+      if (String(selectedProject.value?.id ?? '') === String(project.id)) return
+      hoveredProject.value = project
+      hoveredPos.x = e.point.x
+      hoveredPos.y = e.point.y
+    },
+    onMove: (_, e) => {
+      if (!hoveredProject.value) return
+      if (String(hoveredProject.value.id) !== String(project.id)) return
+      hoveredPos.x = e.point.x
+      hoveredPos.y = e.point.y
+    },
+    onLeave: () => {
+      if (hoveredProject.value && String(hoveredProject.value.id) === String(project.id)) {
+        hoveredProject.value = null
+      }
+    },
+  })
 }
 
 async function safeAddIcon({ layerId, featureCollection, iconId, iconUrl, iconSize, iconAnchor = 'center', fallbackColor = '#3b82f6', fallbackRadius = 8 }) {
@@ -2065,6 +2084,7 @@ function clearSelection() {
   clearOverviewRoadLayer()
   popoverProject.value = null
   selectedProject.value = null
+  hoveredProject.value = null
   actionMenuOpen.value = false
   void renderAreaCenterIcons()
 
@@ -2112,7 +2132,6 @@ function handleMapBlankClick(e) {
 // ★ 省级大屏：按城市容量渲染色阶 + 数值 label
 // ==================================================================
 
-// 城市级阶段容量缓存 { [stageCode]: { 规范化城市名: 容量 } }
 const stageCityCapacityCache = ref({})
 let provinceRenderVersion = 0
 
@@ -2121,7 +2140,6 @@ function normalizeCityName(name) {
 }
 
 async function fetchStageCityCapacity(stageCode) {
-  // ★ 用 !== undefined 判断，避免空 {} 被当成"未缓存"反复请求
   if (stageCityCapacityCache.value[stageCode] !== undefined) {
     return stageCityCapacityCache.value[stageCode]
   }
@@ -2130,17 +2148,14 @@ async function fetchStageCityCapacity(stageCode) {
       provinceCode: '610000',
       projectStage: stageCode,
     })
-    // ★ 关键日志：看清这个阶段到底返回了什么
     console.log(`[overview] provinceViewData(${stageCode}) raw:`, res)
 
-    // ★ 兼容 data 是数组 / data.list / data.records
     const list = Array.isArray(res?.data)
       ? res.data
       : (res?.data?.list || res?.data?.records || [])
 
     const map = {}
     for (const item of list) {
-      // ★ 兼容多种字段名
       const rawName = item.regionName || item.cityName || item.areaName
                     || item.name || item.region || ''
       const v = Number(
@@ -2159,7 +2174,6 @@ async function fetchStageCityCapacity(stageCode) {
   }
 }
 
-// 色相不变的 HSL 工具
 function hexToHsl(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex || '')
   if (!m) return { h: 210, s: 80, l: 55 }
@@ -2198,7 +2212,6 @@ function hslToHex(h, s, l) {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`
 }
 
-// 直接按省界 feature 的 name 建色阶（避免 key 对不上）
 function buildCityColorMapForBoundary(boundary, cityData, baseHex) {
   const values = Object.values(cityData || {})
   const max = values.length ? Math.max(...values) : 0
@@ -2210,13 +2223,11 @@ function buildCityColorMapForBoundary(boundary, cityData, baseHex) {
     const key = normalizeCityName(rawName)
     const v = cityData[key] ?? 0
     const ratio = max > 0 ? v / max : 0
-    // 饱和度 40% → 90%，明度 45% → 65%（容量越大越亮越饱和）
     result[rawName] = hslToHex(h, 40 + 50 * ratio, 45 + 20 * ratio)
   }
   return result
 }
 
-// 给省界每个 feature 注入 value（label 用）
 function injectCityLabels(boundary, cityData) {
   const clone = JSON.parse(JSON.stringify(boundary))
   for (const f of clone.features || []) {
@@ -2228,12 +2239,10 @@ function injectCityLabels(boundary, cityData) {
   return clone
 }
 
-// ★ 核心替换：按市区容量渲染省级挤出层
 async function renderSelectedProject(row) {
   if (!mapRef.value) return
   const version = ++provinceRenderVersion
 
-  // ---------- 未选中：默认色 ----------
   if (!row) {
     mapRef.value.addExtrusion({
       ...PROVINCE_MAP_STYLE,
@@ -2257,8 +2266,6 @@ async function renderSelectedProject(row) {
     return
   }
 
-  // ---------- 决定要拉哪些阶段的城市数据 ----------
-  // ★ 推进中本身没有数据：dropdownKey === 'AGGREGATION' 时直接空，不发请求
   let mergedRaw = {}
   const isAggregationSelf = row.key === 'AGGREGATION'
     && (!row.dropdownKey || row.dropdownKey === 'AGGREGATION')
@@ -2270,7 +2277,6 @@ async function renderSelectedProject(row) {
     Object.assign(mergedRaw, cityMap)
   }
 
-  // ---------- 纯数字 key（如 "610800"）→ 中文城市名（如 "榆林"）----------
   const REGION_CODE_TO_CITY = {
     '610100': '西安', '610200': '铜川', '610300': '宝鸡', '610400': '咸阳',
     '610500': '渭南', '610600': '延安', '610700': '汉中', '610800': '榆林',
@@ -2288,7 +2294,6 @@ async function renderSelectedProject(row) {
     cityData[key] = (cityData[key] || 0) + v
   }
 
-  // ---------- 生成色阶 ----------
   const baseHex = row.baseColor || row.color || PROVINCE_MAP_STYLE.defaultColor
   const colorMap = buildCityColorMapForBoundary(shaanxiBoundary, cityData, baseHex)
 
@@ -2300,7 +2305,6 @@ async function renderSelectedProject(row) {
     colorMap,
   })
 
-  // ---------- 渲染挤出层 ----------
   mapRef.value.addExtrusion({
     ...PROVINCE_MAP_STYLE,
     id: PROVINCE_EXTRUSION_ID,
@@ -2309,7 +2313,6 @@ async function renderSelectedProject(row) {
     enableHover: true,
   })
 
-  // ---------- label ----------
   const labelsGeo = injectCityLabels(shaanxiBoundary, cityData)
   mapRef.value.addCentroidLabels({
     id: 'shaanxi-labels',
@@ -2325,9 +2328,6 @@ async function renderSelectedProject(row) {
   })
 }
 
-// ==================================================================
-// ★ 替换 onProjectStageSelect（payload 来自 ProjectOverview 的 emit）
-// ==================================================================
 function onProjectStageSelect(row) {
   activeProject.value = row || null
   selectedStage.value = row ? (row.key || null) : null
@@ -2431,7 +2431,7 @@ async function ensureShaanxiMask() {
       color: MASK_COLOR,
       opacity: 0,
       fadeDuration: MASK_FADE_DURATION,
-    })    
+    })
     lastMaskOpacity = -1; syncMaskVisibility(true)
   } catch (err) { console.error('[mask] 陕西省遮罩加载失败:', err) }
 }
@@ -2446,11 +2446,9 @@ function syncCityBoundaryVisibility() {
   if (!map.getLayer(CITY_BOUNDARY_LAYER_ID)) return
 
   const zoom = map.getZoom?.() ?? 0
-  // 挤出图层存在且可见 = 省级视角
   const extrusionVisible = !!map.getLayer(PROVINCE_EXTRUSION_ID) &&
     map.getLayoutProperty(PROVINCE_EXTRUSION_ID, 'visibility') !== 'none'
 
-  // 只有到“市一级”（zoom ≥ 阈值）且没有省级挤出图层时才显示
   const shouldShow = zoom >= AREA_ZOOM_THRESHOLD && !extrusionVisible
   if (cityBoundaryVisible === shouldShow) return
   cityBoundaryVisible = shouldShow
@@ -2478,7 +2476,7 @@ async function ensureCityBoundaryLine() {
   if (!map) return
 
   if (map.getLayer(CITY_BOUNDARY_LAYER_ID)) {
-    return   // ★ 不再 setCityBoundaryVisible(true)，显隐交给调用方
+    return
   }
 
   const cities = await loadCityGeoJSON()
@@ -2492,7 +2490,7 @@ async function ensureCityBoundaryLine() {
       id: CITY_BOUNDARY_LAYER_ID,
       type: 'line',
       source: CITY_BOUNDARY_SOURCE_ID,
-      layout: { visibility: 'none' },   // ★ 保持默认隐藏
+      layout: { visibility: 'none' },
       paint: {
         'line-color': '#7dd3fc',
         'line-width': ['interpolate', ['linear'], ['zoom'], 4, 1, 10, 2],
@@ -2500,7 +2498,6 @@ async function ensureCityBoundaryLine() {
       },
     })
   }
-  // ★ 末尾去掉 setCityBoundaryVisible(true)
 }
 
 function onLayerToggle(item) {
@@ -2528,21 +2525,28 @@ const provinceEventLayerId = `${PROVINCE_EXTRUSION_ID}-event`
 const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoomThresholdSwitch({
   mapRef, zoomThreshold: AREA_ZOOM_THRESHOLD,
   onAboveThreshold: () => {
-    // 每次 zoom 都跑：只负责移除挤出图层（有 getLayer 守卫）
     const map = mapRef.value?.getMap?.()
     if (map?.getLayer(PROVINCE_EXTRUSION_ID)) mapRef.value.removeLayer(PROVINCE_EXTRUSION_ID)
   },
   onEnter: async () => {
+    // ★ 进入市/区层级：锁死俯仰（右键、双指、代码都改不了 pitch）
+    const map = mapRef.value?.getMap?.()
+    if (map) {
+      map.dragRotate.disable()
+      map.touchPitch.disable()
+      map.setMaxPitch(0)
+      if (map.getPitch() !== 0) map.easeTo({ pitch: 0, duration: 300 })
+    }
+
     await ensureShaanxiMask()
-    await ensureCityBoundaryLine() 
-    setCityBoundaryVisible(true)     // 首次加载 / 已存在 → 设 visible
+    await ensureCityBoundaryLine()
+    setCityBoundaryVisible(true)
     rightPanelMode.value = 'list'
     listExpanded.value = false
     activeEditTool.value = ''
     renderProjectsByStage('area')
   },
   onBelowThreshold: () => {
-    // 每次 zoom 都跑：只负责恢复挤出图层（有 getLayer 守卫）
     const map = mapRef.value?.getMap?.()
     if (map?.getLayer(PROVINCE_EXTRUSION_ID)) {
       map.setLayoutProperty(PROVINCE_EXTRUSION_ID, 'visibility', 'visible')
@@ -2552,17 +2556,28 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
     }
   },
   onExit: () => {
+    // ★ 退出市/区层级（回到省级及以上）：恢复俯仰与旋转
+    const map = mapRef.value?.getMap?.()
+    if (map) {
+      map.dragRotate.enable()
+      map.touchPitch.enable()
+      map.setMaxPitch(60)
+      // 缩回省视图时把 pitch 拉回 45，保留大屏 3D 感
+      if (map.getPitch() !== 45) map.easeTo({ pitch: 45, bearing: 0, duration: 800 })
+    }
+
     clearOverviewRoadLayer()
     syncMaskVisibility(true)
     activeEditTool.value = ''
     rightPanelMode.value = 'list'
     popoverProject.value = null
     selectedProject.value = null
+    hoveredProject.value = null
     if (isEditing.value) exitEditMode()
     isDetailFullscreen.value = false
     renderProjectsByStage('overview')
-    setCityBoundaryVisible(false)       // ← 退出市一级 → 隐藏切片
-  }
+    setCityBoundaryVisible(false)
+  },
 })
 
 const layerPanelOffset = computed(() => {
@@ -2577,9 +2592,62 @@ const layerPanelZIndex = computed(() => (isAreaView.value ? 26 : 21))
 function focusCity(cityName) {
   if (!cityName || !mapRef.value) return
   const map = mapRef.value.getMap(); if (!map) return
-  const feature = shaanxiBoundary.features.find((item) => item.properties?.name === cityName); if (!feature) return
-  const center = resolveCityCenter(feature); if (!center) return
-  map.flyTo({ center, zoom: AREA_ZOOM_THRESHOLD + 0.5, pitch: 45, duration: 1500 })
+  const feature = shaanxiBoundary.features.find((item) => item.properties?.name === cityName)
+  if (!feature) return
+
+  // ★ 进入市区层级前主动锁死俯仰（因为 onEnter 要等 zoom 事件触发才执行，
+  //   这里先锁能避免 flyTo/fitBounds 期间短暂显现 45° 俯仰角）
+  try {
+    if (!isAreaView.value) {
+      map.dragRotate.disable()
+      map.touchPitch.disable()
+      map.setMaxPitch(0)
+    }
+  } catch (e) { /* 忽略 */ }
+
+  // ★ 优先用 bbox fitBounds（自适应范围 + pitch:0 正俯视），避免固定 zoom 造成超出屏幕
+  const bounds = getFeatureBounds(feature)
+  if (bounds) {
+    map.fitBounds(bounds, {
+      padding: { top: 80, bottom: 80, left: 340, right: 340 }, // 左右留出侧边面板空间
+      pitch: 0,
+      bearing: 0,
+      maxZoom: AREA_ZOOM_THRESHOLD + 4,
+      duration: 1500,
+    })
+    return
+  }
+
+  // 兜底：用 centroid
+  const center = resolveCityCenter(feature)
+  if (!center) return
+  map.flyTo({ center, zoom: AREA_ZOOM_THRESHOLD + 0.5, pitch: 0, bearing: 0, duration: 1500 })
+}
+
+// ★ 从 Polygon/MultiPolygon 提取 bbox
+function getFeatureBounds(feature) {
+  const geom = feature?.geometry
+  if (!geom) return null
+  const polys = geom.type === 'Polygon'
+    ? [geom.coordinates]
+    : geom.type === 'MultiPolygon'
+      ? geom.coordinates
+      : []
+  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity
+  for (const poly of polys) {
+    for (const ring of poly) {
+      for (const pt of ring) {
+        const lng = Number(pt?.[0]), lat = Number(pt?.[1])
+        if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue
+        if (lng < minLng) minLng = lng
+        if (lng > maxLng) maxLng = lng
+        if (lat < minLat) minLat = lat
+        if (lat > maxLat) maxLat = lat
+      }
+    }
+  }
+  if (!Number.isFinite(minLng)) return null
+  return [[minLng, minLat], [maxLng, maxLat]]
 }
 
 function resolveCityCenter(feature) {
@@ -2608,9 +2676,20 @@ function handleReportConfirm(payload) {
     wizardVisible.value = true
   }
 }
-function handleWizardSaveDraft(payload) {}
-function handleWizardSubmit(payload) { wizardVisible.value = false }
+function handleWizardSaveDraft(payload) {
+  console.log('[overview][wizard] save-draft:', payload)
+}
 
+function handleWizardSubmit(payload) {
+  const subTab = wizardReportSubTab.value
+  const label = wizardTitleLabel.value || '报告'
+  console.log(`[overview][wizard] submit subTab=${subTab}`, payload)
+  ElMessage.success(`${label}提交成功（演示流程，接口待接）`)
+  wizardVisible.value = false
+  wizardTitleLabel.value = ''
+  wizardMaxStep.value = 2
+  wizardReportSubTab.value = ''
+}
 const SHAANXI_BOUNDS = [[105.4, 31.6], [111.3, 39.6]]
 
 function fitGlobeZoom(map, fill = 0.7) {
@@ -2622,11 +2701,9 @@ function fitGlobeZoom(map, fill = 0.7) {
   return Math.log2(target / BASE_RATIO)
 }
 
-// style.load 后重绘必要图层（避免 style 重载后自定义图层消失）
 function handleStyleLoad() {
   try {
     syncMaskVisibility(true)
-    // 如果需要也可以在这里重建 whln / 道路 / 线路
   } catch (err) {
     console.warn('[style.load] 重绘失败:', err)
   }
@@ -2659,11 +2736,11 @@ async function onMapReady() {
     mapRef.value.stopAutoRotate?.()
 
     map.fitBounds(SHAANXI_BOUNDS, {
-      padding: { top: 90, bottom: 140, left: 380, right: 340 },
+      padding: { top: 20, bottom: 20, left: 250, right: 250 },
       pitch: 45,
       bearing: 0,
       maxZoom: AREA_ZOOM_THRESHOLD - 0.3,
-      duration: 3000,
+      duration: 2500,
       essential: true,
     })
 
@@ -2680,7 +2757,6 @@ async function onMapReady() {
   map.on('move', syncMaskVisibility)
   map.on('style.load', handleStyleLoad)
   await ensureShaanxiMask()
-  // await ensureCityBoundaryLine()
   nextTick(() => { syncByZoom() })
 
   try {
@@ -2716,7 +2792,7 @@ onUnmounted(() => {
     map.off('click', handleMapBlankClick)
     map.off('zoom', syncMaskVisibility)
     map.off('move', syncMaskVisibility)
-    map.off('style.load', handleStyleLoad)  // ★ 原来是 map.on，改成 off
+    map.off('style.load', handleStyleLoad)
   }
 })
 </script>
@@ -2725,7 +2801,7 @@ onUnmounted(() => {
 .dashboard-page {
   position: relative;
   width: 100%;
-  height: 100%;  
+  height: 100%;
   min-height: 0;
   overflow: hidden;
   background: #03162e;
@@ -2804,111 +2880,6 @@ onUnmounted(() => {
 .project-table :deep(.el-table__body tr:hover > td) { background: #f5f8ff; }
 .pagination-row { display: flex; justify-content: flex-end; padding-top: 12px; }
 
-.right-top-card {
-  position: absolute;
-  z-index: 25;
-  top: 60px;
-  right: 12px;
-  width: min(375px, calc(100vw - 24px));
-  height: 192px;
-  box-sizing: border-box;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(235, 247, 255, 0.7) 100%);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.right-top-card .tooltip-header {
-  display: flex;
-  flex: 0 0 66px;
-  box-sizing: border-box;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px 12px;
-  background: rgba(222, 225, 228, 0.72);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-}
-.right-top-card .tooltip-status { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; font-size: 12px; white-space: nowrap; }
-.right-top-card .status-dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 3px rgba(146, 84, 222, 0.14); }
-.right-top-card .tooltip-title {
-  display: block;
-  min-width: 0;
-  padding: 0;
-  color: #172033;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 22px;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-.right-top-card .tooltip-title:hover { color: #1677ff; }
-.right-top-card .tooltip-grid {
-  display: grid;
-  flex: 0 0 76px;
-  height: 76px;
-  grid-template-columns: 1fr 1fr;
-}
-.right-top-card .grid-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-sizing: border-box;
-  gap: 6px;
-  height: 38px;
-  min-height: 38px;
-  padding: 3px 12px;
-  background: rgba(255, 255, 255, 0.24);
-}
-.right-top-card .border-right { border-right: 1px solid rgba(255, 255, 255, 0.6); }
-.right-top-card .border-bottom { border-bottom: 1px solid rgba(255, 255, 255, 0.6); }
-.right-top-card .grid-label { flex: 0 0 auto; margin: 0; color: #6B7280; font-size: 12px; }
-.right-top-card .grid-value { min-width: 0; color: #111827; font-size: 14px; font-weight: 700; text-align: right; }
-.right-top-card .unit { font-size: 12px; font-weight: 400; color: #6B7280; margin-left: 2px; }
-.right-top-card .text-blue { color: #2563EB; }
-.right-top-card .text-red { color: #DC2626; }
-.right-top-card .bold { font-weight: 800; }
-.right-top-card .sub-text { font-size: 11px; color: #6B7280; font-weight: 400; margin-left: 2px; }
-.right-top-card .tooltip-footer {
-  display: flex;
-  flex: 0 0 48px;
-  box-sizing: border-box;
-  align-items: center;
-  gap: 4px;
-  min-height: 48px;
-  padding: 6px 12px;
-  transition: background 0.2s;
-}
-.right-top-card .footer-action {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 6px 4px;
-  color: #172033;
-  font-size: 12px;
-  white-space: nowrap;
-  background: transparent;
-  border: 0;
-  border-radius: 5px;
-  cursor: pointer;
-}
-.right-top-card .footer-action:hover { color: #1677ff; }
-.right-top-card .footer-action.danger {
-  flex: 0 0 auto;
-  padding: 6px 10px;
-  color: #e5484d;
-  background: transparent;
-  border: 0;
-}
-.right-top-card .footer-action.danger:hover {
-  color: #d9363e;
-  background: transparent;
-}
 .action-menu-wrap { position: relative; flex: 0 0 auto; margin-left: 4px; }
 .action-menu-button {
   display: grid;
@@ -3039,19 +3010,6 @@ onUnmounted(() => {
 .layer-legend-line.line { background: #eab308; }
 
 @media (max-width: 760px) {
-  .right-top-card {
-    top: 56px;
-    right: 8px;
-    width: min(375px, calc(100vw - 24px));
-  }
-  .right-top-card .tooltip-header { padding: 8px 10px; }
-  .right-top-card .tooltip-title { font-size: 14px; }
-  .right-top-card .tooltip-grid .grid-item { padding: 3px 8px; }
-  .right-top-card .grid-value { font-size: 13px; }
-  .right-top-card .tooltip-footer { gap: 2px; padding: 6px 8px; }
-  .right-top-card .footer-action { font-size: 11px; }
-  .right-top-card .footer-action.danger { padding: 6px 8px; }
-  .action-menu-button { width: 28px; height: 28px; }
   .geometry-edit-toolbar { top: 6px; right: 8px; left: auto; max-width: calc(100vw - 16px); gap: 4px; padding: 5px; }
   .edit-tool-button { gap: 3px; padding: 0 7px; font-size: 11px; }
 }

@@ -18,6 +18,7 @@
       <MapGL
         ref="mapRef"
         :style="satelliteStyle"
+        :fly-to-on-load="false"
         @ready="onMapReady"
         @draw-update="onDrawChange"
         @draw-create="onDrawChange"
@@ -37,13 +38,13 @@
           </button>
         </div>
         <slot name="toolbar-extra" />
-        <button v-if="showConfigPage && !isAreaView && !showProjectDrawer && !selectedProject" class="config-button" @click="showConfig = true">
+        <button v-if="showConfigPage && !isAreaView && !showProjectDrawer && !popoverProject" class="config-button" @click="showConfig = true">
           <el-icon><Setting /></el-icon>选址配置
         </button>
       </div>
 
       <section v-if="viewMode === 'map'" class="map-view">
-        <div v-if="!selectedProject" class="map-summary">
+        <div v-if="!popoverProject" class="map-summary">
           <div class="summary-title"><span>{{ summaryTitle }}</span><el-icon><Fold /></el-icon></div>
           <div class="summary-location">
             <el-icon><LocationFilled /></el-icon><span>陕西省</span>
@@ -57,7 +58,7 @@
           </div>
         </div>
 
-        <div v-if="!selectedProject && (isAreaView || showProjectDrawer) && !showVerifyPanel && !showDetailPanel" class="search-panel">
+        <div v-if="!popoverProject && (isAreaView || showProjectDrawer) && !showVerifyPanel && !showDetailPanel" class="search-panel">
           <el-select v-model="filters.itemType" placeholder="项目类型" size="small" clearable style="width: 110px" @change="handleSearch">
             <el-option label="风电" value="FD" /><el-option label="光伏" value="GF" />
           </el-select>
@@ -75,60 +76,75 @@
           </el-input>
         </div>
 
-        <div v-if="selectedProject && !showVerifyPanel && !showDetailPanel" class="edit-toolbar">
-          <template v-if="!isEditing"></template>
-          <template v-else>
-            <button v-for="item in editTools" :key="item.key" class="edit-tool-button" :class="{ active: editMode === item.key }" @click="enterEditMode(item.key)">
-              <el-icon><component :is="item.icon" /></el-icon>{{ item.label }}
-            </button>
+        <!-- ★ 编辑工具条：外层工具按钮始终显示（popoverProject 存在时），内层按钮/保存按 isEditing 分支 -->
+        <div v-if="popoverProject && !showVerifyPanel && !showDetailPanel" class="edit-toolbar">
+          <button
+            v-for="item in editTools"
+            :key="item.key"
+            class="edit-tool-button"
+            :class="{ active: editMode === item.key }"
+            @click="isEditing ? enterEditMode(item.key) : startGeometryEdit(popoverProject, item.key)"
+          >
+            <el-icon><component :is="item.icon" /></el-icon>{{ item.label }}
+          </button>
 
+          <template v-if="isEditing">
             <template v-if="editMode === 'wind' || editMode === 'booster'">
               <span class="edit-divider" />
               <template v-if="editMode === 'wind'">
                 <button class="edit-tool-button" :class="{ active: drawingNewPoint }" @click="startAddWindPoint">添加风机</button>
                 <button class="edit-tool-button" :class="{ active: isBoxSelecting }" @click="startBoxSelection">框选</button>
-                <button class="edit-tool-button" @click="deleteSelectedPoints">删除</button>
+                <button class="edit-tool-button danger" @click="deleteSelectedPoints">删除选中</button>
                 <button class="edit-tool-button" @click="markReserve(true)">标记备选</button>
                 <button class="edit-tool-button" @click="markReserve(false)">取消备选</button>
               </template>
               <template v-else>
                 <button class="edit-tool-button" :class="{ active: drawingNewPoint }" @click="toggleAddPoint">{{ drawingNewPoint ? '退出新增' : '新增点' }}</button>
+                <button class="edit-tool-button" :class="{ active: isBoxSelecting }" @click="startBoxSelection">框选</button>
                 <button class="edit-tool-button danger" @click="deleteSelectedPoints">删除选中</button>
               </template>
             </template>
 
             <template v-if="isDirty">
               <span class="edit-divider" />
-              <button class="edit-tool-button save" :disabled="saving" @click="saveEdit">{{ saving ? '保存中...' : '保存' }}</button>
-              <button class="edit-tool-button" :disabled="saving" @click="cancelEdit">取消</button>
+              <button class="edit-tool-button save" :disabled="saving" @click="saveEdit">{{ saving ? '保存中…' : '保存' }}</button>
+              <button class="edit-tool-button" :disabled="saving" @click="cancelEdit">取消修改</button>
             </template>
 
             <template v-if="hasSaved && !isDirty">
               <span class="edit-divider" />
-              <button class="edit-tool-button recalculate" :disabled="recalculating" @click="handleRecalculate">{{ recalculating ? '计算中...' : '重新计算' }}</button>
+              <button class="edit-tool-button recalculate" :disabled="recalculating" @click="handleRecalculate">{{ recalculating ? '计算中…' : '重新计算' }}</button>
+            </template>
+
+            <template v-if="!isDirty">
+              <span class="edit-divider" />
+              <button class="edit-tool-button" :disabled="saving" @click="exitEditMode">完成编辑</button>
             </template>
           </template>
         </div>
 
-        <div v-if="selectedProject && detailCardPos.visible && !cardClosed" class="detail-card" :style="{ left: detailCardPos.x + 'px', top: detailCardPos.y + 'px' }">
-          <button class="detail-close" title="关闭" @click.stop="closeDetailCard">
-            <el-icon><Close /></el-icon>
-          </button>
-          <div class="detail-title">{{ selectedProject.projectName }}</div>
-          <div class="detail-row"><span class="detail-label">装机容量</span><span class="detail-value">{{ selectedProject.currentProjectCapacity ?? '-' }} MW</span></div>
-          <div class="detail-row"><span class="detail-label">风机</span><span class="detail-value">{{ windCount }} 台 <span v-if="altCount > 0" class="detail-sub">（备选 {{ altCount }} 台）</span></span></div>
-          <div class="detail-row"><span class="detail-label">推荐机型</span><span class="detail-value">{{ selectedProject.deviceModel || '-' }}</span></div>
-          <div class="detail-row"><span class="detail-label">资本金 IRR</span><span class="detail-value">{{ selectedProject.capitalFinancialRate != null ? selectedProject.capitalFinancialRate + '%' : '-' }}</span></div>
-          <slot name="detail-card-extra" :project="selectedProject" />
+        <!-- ★ 点击选中：右上角固定卡片 -->
+        <ProjectActionCard
+          v-if="popoverProject && !isEditing && !showVerifyPanel && !showDetailPanel && !showCreateProject && !showEditProject"
+          :project="popoverProject"
+          :stage-map="stageMap"
+          :actions="cardActions"
+          @open-detail="(p) => openDetailPanel(p, 'main')"
+          @action="executeAction"
+        />
 
-          <div class="detail-actions">
-            <button v-for="action in cardActions" :key="action" class="detail-action" :class="{ danger: action === 'delete' }" @click="executeAction(action, selectedProject)">
-              {{ ACTION_LABELS[action] || action }}
-            </button>
-          </div>
-        </div>
+        <!-- ★ hover：跟随鼠标的只读悬浮卡片 -->
+        <ProjectActionCard
+          v-if="hoveredProject && isAreaView && viewMode === 'map' && !popoverProject && !isEditing && !showVerifyPanel && !showDetailPanel && !showCreateProject && !showEditProject"
+          :project="hoveredProject"
+          hover-mode
+          :position="hoveredPos"
+          :show-footer="false"
+          :stage-map="stageMap"
+          :actions="cardActions"
+        />
 
-        <slot name="map-overlay" :projects="projectList" :selected="selectedProject" />
+        <slot name="map-overlay" :projects="projectList" :selected="popoverProject" />
 
         <button v-if="!showVerifyPanel && !showDetailPanel" class="expand-button" :style="expandButtonStyle" :title="showProjectDrawer ? '收起项目列表' : '打开项目列表'" @click="showProjectDrawer = !showProjectDrawer">
           <el-icon><ArrowLeft v-if="showProjectDrawer" /><ArrowRight v-else /></el-icon>
@@ -222,50 +238,53 @@
       @close="showVerifyPanel = false"
       @saved="onVerifySaved"
     />
-    <ProjectDrawer :visible="showProjectDrawer" :list="projectList" :total="pagination.total" :page="pagination.page" :page-size="pagination.pageSize" :selected-id="selectedProject?.id ?? null" :loading="listLoading" :row-actions="rowActions" @close="showProjectDrawer = false" @select="focusProject" @action="handleDrawerAction" @page-change="handlePageChange" @size-change="handleSizeChange" @sort-change="handleDrawerSortChange" />
-    
-    <!-- ★ 公用面板，新增 @generate-report 监听 -->
-    <ProjectDetailPanel 
-      :visible="showDetailPanel" 
-      :project="selectedProject" 
-      :stage="props.stage || selectedProject?.projectStage || ''" 
-      :initial-tab="detailPanelTab" 
-      @close="showDetailPanel = false" 
-      @action="onDetailPanelAction" 
+    <ProjectDrawer :visible="showProjectDrawer" :list="projectList" :total="pagination.total" :page="pagination.page" :page-size="pagination.pageSize" :selected-id="popoverProject?.id ?? null" :loading="listLoading" :row-actions="rowActions" @close="showProjectDrawer = false" @select="focusProject" @action="handleDrawerAction" @page-change="handlePageChange" @size-change="handleSizeChange" @sort-change="handleDrawerSortChange" />
+
+    <ProjectDetailPanel
+      :visible="showDetailPanel"
+      :project="selectedProject"
+      :stage="props.stage || selectedProject?.projectStage || ''"
+      :initial-tab="detailPanelTab"
+      @close="showDetailPanel = false"
+      @action="onDetailPanelAction"
       @generate-report="(proj) => { if(proj) selectedProject = proj; showGenerateModal = true }"
+      @open-confirm="handleOpenConfirm"
     />
-    
+
     <GenerateReportPanel :visible="showGeneratePanel" :project="generatePanelProject" :action-key="generatePanelActionKey" :sub-code="generatePanelSubCode" @close="showGeneratePanel = false" @generated="onReportGenerated" />
     <AssignDialog v-model="showAssignDialog" :project="assignTargetProject" @success="onAssignSuccess" />
     <ReserveApprovalDialog v-model="showReserveDialog" :project="selectedProject" @saved="onReserveSaved" />
 
-    <!-- ★ 新增：报告/函件生成弹窗 -->
-    <!-- 在 template 中 -->
-<!-- 1. 监听弹窗发出的事件 -->
-<ReportGenerateModal
-  :visible="showGenerateModal"
-  :project="selectedProject"
-  @close="showGenerateModal = false"
-  @add-report="showGenerateModal = false"
-  @confirm="handleReportConfirm"
-  @generate-request="handleGenerateRequest"
-  @open-add-report="handleOpenAddReport" 
-/>
+    <ReportGenerateModal
+      :visible="showGenerateModal"
+      :project="selectedProject"
+      @close="showGenerateModal = false"
+      @add-report="showGenerateModal = false"
+      @confirm="handleReportConfirm"
+      @generate-request="handleGenerateRequest"
+      @open-add-report="handleOpenAddReport"
+    />
 
-<!-- 2. 在页面根节点最下面加上抽屉面板 -->
-<AddReportPanel
-  :visible="showAddReportPanel"
-  :project="selectedProject"
-  @close="showAddReportPanel = false"
-  @success="handleReportPanelSuccess"
-/>
+    <AddReportPanel
+      :visible="showAddReportPanel"
+      :project="selectedProject"
+      @close="showAddReportPanel = false"
+      @success="handleReportPanelSuccess"
+    />
 
-    <!-- ★ 新增：报告向导 (ReportWizard) -->
-        <!-- ★ 新增：报告向导 (ReportWizard) -->
+    <ConfirmReportPanel
+      :visible="showConfirmPanel"
+      :report-id="confirmReportId"
+      @close="showConfirmPanel = false"
+      @success="handleConfirmSuccess"
+    />
+
     <ReportWizard
       v-if="wizardVisible"
       class="wizard-overlay"
       :create-project-mode="wizardMode"
+      :title="wizardTitleLabel"       
+      :max-step="wizardMaxStep"          
       :project-name="selectedProject?.name || selectedProject?.projectName || ''"
       :project="selectedProject"
       @close="closeWizard"
@@ -281,7 +300,7 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, ArrowRight, CircleCheck, Close, Edit, Files, Fold, InfoFilled, List, Location, LocationFilled, MapLocation, Plus, Search, Setting } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, CircleCheck, Edit, Files, Fold, InfoFilled, List, Location, LocationFilled, MapLocation, Plus, Search, Setting } from '@element-plus/icons-vue'
 import MapGL from '@/components/MapGL.vue'
 import SearchBar from '@/components/common/SearchBar.vue'
 import CreateProjectForm from './Createprojectform.vue'
@@ -293,10 +312,9 @@ import ProjectDetailPanel from './ProjectDetailPanel.vue'
 import AssignDialog from './AssignDialog.vue'
 import GenerateReportPanel from './GenerateReportPanel.vue'
 import ReserveApprovalDialog from './ReserveApprovalDialog.vue'
-// ★ 新增：引入弹窗和向导
 import ReportGenerateModal from './area-panel/ReportGenerateModal.vue'
-import ReportWizard from './report-wizard/ReportWizard.vue' // 请确保路径正确
-import { PACKAGE_TYPE } from '../js/Reportwizardmockdata' // 注意：如果路径不对，根据你的项目结构调整
+import ReportWizard from './report-wizard/ReportWizard.vue'
+import { PACKAGE_TYPE } from '../js/Reportwizardmockdata'
 
 import { satelliteStyle } from '../js/mapConfig'
 import { useZoomThresholdSwitch } from '../js/useZoomThresholdSwitch'
@@ -321,23 +339,12 @@ import {
 } from '@/components/site-map/areaCenterIcon'
 
 import { loadShaanxiProvince, loadShaanxiCities } from '@/utils/shaanxiBoundary'
-// 在 script setup 中
-import AddReportPanel from './area-panel/AddReportPanel.vue' // ★ 引入组件
+import { buildMainInfoFromAi } from '../js/aiProjectAdapter'
+import AddReportPanel from './area-panel/AddReportPanel.vue'
+import ConfirmReportPanel from './area-panel/ConfirmReportPanel.vue'
+// ★ 新增：共用的项目操作卡片
+import ProjectActionCard from './area-panel/ProjectActionCard.vue'
 
-const showAddReportPanel = ref(false)
-
-// 接收弹窗事件：关掉小弹窗，打开大抽屉
-function handleOpenAddReport() {
-  showGenerateModal.value = false 
-  showAddReportPanel.value = true
-}
-
-// 抽屉上传保存成功后的回调
-function handleReportPanelSuccess() {
-  fetchMapProjects() // 刷新地图数据
-  fetchProjectList() // 刷新列表数据
-  // 如果此时详情面板(ProjectDetailPanel)是打开的，你可能也需要触发它的刷新
-}
 const props = defineProps({
   stage: { type: String, default: '' },
   summaryTitle: { type: String, default: '项目通道概况' },
@@ -363,6 +370,12 @@ const ICON_AREA_GF = 'icon-area-gf'
 const AREA_CENTER_LAYER_ID = 'project-area-center-icons'
 let areaCenterIconRequestVersion = 0
 const CITY_LAYER_ID = 'site-city-stats'
+const PROVINCE_BOUNDARY_LAYER_ID = 'site-province-boundary-line'
+const PROVINCE_BOUNDARY_SOURCE_ID = 'site-province-boundary-src'
+const CITY_BOUNDARY_LAYER_ID = 'site-city-boundary-line'
+const CITY_BOUNDARY_SOURCE_ID = 'site-city-boundary-src'
+// 陕西外接矩形（和 overview 一致）
+const SHAANXI_FIT_BOUNDS = [[105.4, 31.7], [111.2, 39.6]]
 const PROVINCE_CODE = '610000'
 
 const PROJECT_ICON_LAYER_MAP = { 'wind-gh': ['project-wind-all', 'project-wind-bx-all'], booster: ['project-booster-all'] }
@@ -389,18 +402,18 @@ const STAGE_ACTIONS = {
   FEASIBILITY_REVIEW:    ['researchMaterial', 'researchReview', 'investMaterial', 'edit', 'assign', 'delete'],
   INVESTMENT_DECISION:   ['investMeeting', 'edit', 'assign', 'delete'],
 }
-const ACTION_LABELS = { 
-  material: '立项准备', 
-  researchMaterial: '可研材料', 
-  investMaterial: '投决准备', 
-  establishMeeting: '立项上会', 
-  researchReview: '可研审查', 
-  investMeeting: '投决上会', 
-  assign: '分配', 
-  verify: '核查', 
-  reserve: '储备', 
-  edit: '编辑', 
-  delete: '删除' 
+const ACTION_LABELS = {
+  material: '立项准备',
+  researchMaterial: '可研材料',
+  investMaterial: '投决准备',
+  establishMeeting: '立项上会',
+  researchReview: '可研审查',
+  investMeeting: '投决上会',
+  assign: '分配',
+  verify: '核查',
+  reserve: '储备',
+  edit: '编辑',
+  delete: '删除'
 }
 const CITY_OPTIONS = [
   { label: '西安市', value: '610100' }, { label: '铜川市', value: '610200' }, { label: '宝鸡市', value: '610300' },
@@ -416,22 +429,68 @@ const STAGE_THEMES = {
   INVESTMENT_DECISION: { cityFillStops: ['interpolate', ['linear'], ['get', 'totalCapacity'], 0, '#fecaca', 30, '#f87171', 80, '#ef4444', 150, '#b91c1c'], cityOutline: '#fca5a5' },
 }
 
-// ★ 新增：报告向导相关状态
+// 报告与面板状态
 const showGenerateModal = ref(false)
 const wizardVisible = ref(false)
 const wizardMode = ref(PACKAGE_TYPE.default)
+const wizardTitleLabel = ref('')
+const wizardMaxStep = ref(2)
+const wizardReportSubTab = ref('')   // 记录是哪个 subTab 触发的，提交时用于分流
 const reportKeyToWizardMode = {
   'feasibility-centralized': PACKAGE_TYPE.default,
   'feasibility-distributed': PACKAGE_TYPE.distributedDefault,
-  'feasibility-base': PACKAGE_TYPE.baseDefault
 }
 
+// ★ 每个 subTab → wizard 配置（packageType 暂时全用集中式）
+const SUB_TAB_REPORT_CONFIG = {
+  PROJECT_PROPOSAL:       { packageType: PACKAGE_TYPE.default, maxStep: 1, title: '一键生成项目建议书' },
+  FEASIBILITY_STUDY:      { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成风电场可行性研究报告' },
+  COMPETITIVE_ALLOCATION: { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成竞配申报报告' },
+  PROJECT_INITIATION:     { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成请示文件' },
+  POST_EVALUATION:        { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成后评价报告' },
+}
+function getReportConfigBySubTab(subTab) {
+  return SUB_TAB_REPORT_CONFIG[subTab] || SUB_TAB_REPORT_CONFIG.FEASIBILITY_STUDY
+}
 const showDetailPanel = ref(false)
 const detailPanelTab = ref('main')
 const showGeneratePanel = ref(false)
 const generatePanelProject = ref(null)
 const generatePanelActionKey = ref('')
 const generatePanelSubCode = ref('')
+
+const showAddReportPanel = ref(false)
+const showConfirmPanel = ref(false)
+const confirmReportId = ref(null)
+
+function handleOpenAddReport() {
+  showGenerateModal.value = false
+  showAddReportPanel.value = true
+}
+
+function handleReportPanelSuccess() {
+  fetchMapProjects()
+  fetchProjectList()
+}
+
+function handleOpenConfirm(id) {
+  confirmReportId.value = id
+  showConfirmPanel.value = true
+}
+
+function handleConfirmSuccess() {
+  fetchMapProjects()
+  fetchProjectList()
+  if (selectedProject.value?.id) {
+    const fresh = allMapProjects.value.find(p => p.id === selectedProject.value.id)
+    if (fresh) {
+      selectedProject.value = fresh
+      if (popoverProject.value && String(popoverProject.value.id) === String(fresh.id)) {
+        popoverProject.value = fresh
+      }
+    }
+  }
+}
 
 const theme = computed(() => STAGE_THEMES[props.stage] || STAGE_THEMES.DEFAULT)
 const currentActions = computed(() => STAGE_ACTIONS[props.stage] || STAGE_ACTIONS['PRELIMINARY_SELECTION'])
@@ -454,10 +513,14 @@ const showAssignDialog = ref(false)
 const assignTargetProject = ref(null)
 const renderedLayerIds = new Set()
 const allMapProjects = ref([])
+// ★ 卡片/编辑对象（点击场区时设置）
+const popoverProject = ref(null)
+// ★ hover 跟随鼠标卡片
+const hoveredProject = ref(null)
+const hoveredPos = reactive({ x: 0, y: 0 })
+// ★ 详情面板 / 各类弹窗使用的项目（与 popoverProject 同步设置）
 const selectedProject = ref(null)
-const detailCardPos = reactive({ x: 0, y: 0, visible: false })
 
-const cardClosed = ref(false)
 const editMode = ref(null)
 const drawingNewPoint = ref(false)
 const saving = ref(false)
@@ -474,6 +537,7 @@ const showReserveDialog = ref(false)
 
 const drawerSort = reactive({ key: '', dir: 'desc' })
 let whlnPlugin = null
+let zeroPitchGuard = null   // ★ 新增
 const layerVisibleIds = ref([...DEFAULT_VISIBLE])
 const layerInputs = reactive({ noise: 700 })
 const customLayerState = reactive({})
@@ -604,25 +668,31 @@ async function handlePlaceSearch() {
 }
 
 function openEditProjectForm() {
-  if (!selectedProject.value) return
+  if (!popoverProject.value) return
   if (isDirty.value) { ElMessage.warning('请先保存或取消地图上的修改'); return }
   clearSelectedProjectIcons()
-  editProjectTarget.value = selectedProject.value
+  editProjectTarget.value = popoverProject.value
   showEditProject.value = true
 }
 async function onProjectUpdated() {
   showEditProject.value = false
   editProjectTarget.value = null
   await Promise.all([fetchMapProjects(), fetchProjectList(), fetchOverviewStats(), fetchCityStats()])
-  const fresh = allMapProjects.value.find((p) => p.id === selectedProject.value?.id)
+  const fresh = allMapProjects.value.find((p) => p.id === popoverProject.value?.id)
   if (fresh) {
-    selectedProject.value = fresh
+    popoverProject.value = fresh
+    if (selectedProject.value && String(selectedProject.value.id) === String(fresh.id)) {
+      selectedProject.value = fresh
+    }
     initEditBuffer(fresh)
     await renderProjectsByStage('area')
-    updateDetailCardPosition()
   }
 }
-function onEditProjectCancel() { showEditProject.value = false; editProjectTarget.value = null; if (selectedProject.value) renderSelectedProjectIcons(selectedProject.value) }
+function onEditProjectCancel() {
+  showEditProject.value = false
+  editProjectTarget.value = null
+  if (popoverProject.value) renderSelectedProjectIcons(popoverProject.value)
+}
 function onReserveSaved() { fetchMapProjects(); fetchProjectList() }
 
 const filters = reactive({ province: '610000', city: '', district: '', itemType: '', projectStage: '', approvalStatus: '', managerCompany: '', managerName: '', createTimeStart: '', createTimeEnd: '', projectCode: '', projectName: '', isVerified: '' })
@@ -681,14 +751,14 @@ const deletingId = ref(null)
 function executeAction(action, project) {
   if (!project) return
   const mapProject = allMapProjects.value.find((p) => p.id === project.id) || project
-  
-  if (['material', 'researchMaterial', 'investMaterial'].includes(action)) { 
-    openDetailPanel(mapProject, 'material'); 
-    return 
+
+  if (['material', 'researchMaterial', 'investMaterial'].includes(action)) {
+    openDetailPanel(mapProject, 'material');
+    return
   }
-  if (['establishMeeting', 'researchReview', 'investMeeting'].includes(action)) { 
-    openDetailPanel(mapProject, 'meeting'); 
-    return 
+  if (['establishMeeting', 'researchReview', 'investMeeting'].includes(action)) {
+    openDetailPanel(mapProject, 'meeting');
+    return
   }
   if (action === 'assign') { assignTargetProject.value = mapProject; showAssignDialog.value = true; return }
 
@@ -701,7 +771,7 @@ function executeAction(action, project) {
   if (action === 'reserve') {
     showProjectDrawer.value = false; showDetailPanel.value = false; viewMode.value = 'map'
     setTimeout(async () => {
-      if (selectedProject.value?.id !== mapProject.id) await onProjectClick(mapProject.id)
+      if (String(popoverProject.value?.id ?? '') !== String(mapProject.id)) await onProjectClick(mapProject.id)
       showReserveDialog.value = true
     }, 100)
     return
@@ -710,7 +780,7 @@ function executeAction(action, project) {
   if (action === 'edit') {
     showProjectDrawer.value = false; showDetailPanel.value = false; viewMode.value = 'map'
     setTimeout(async () => {
-      if (selectedProject.value?.id !== mapProject.id) await onProjectClick(mapProject.id)
+      if (String(popoverProject.value?.id ?? '') !== String(mapProject.id)) await onProjectClick(mapProject.id)
       openEditProjectForm()
     }, 100)
     return
@@ -730,23 +800,74 @@ async function handleDeleteProject(project) {
     ElMessage.success('删除成功')
     showProjectDrawer.value = false; showDetailPanel.value = false
     await fetchMapProjects()
-    if (selectedProject.value?.id === id) clearSelectionLayers()
+    if (String(popoverProject.value?.id ?? '') === String(id)) clearPopover()
+    if (String(hoveredProject.value?.id ?? '') === String(id)) hoveredProject.value = null
     if (projectList.value.length === 1 && pagination.page > 1) pagination.page -= 1
     await Promise.all([fetchProjectList(), fetchOverviewStats(), fetchCityStats()])
   } catch (err) { ElMessage.error(err?.message || '删除失败') }
   finally { deletingId.value = null }
 }
 
-function openDetailPanel(project, tab) {
+async function openDetailPanel(project, tab) {
   const p = allMapProjects.value.find(item => item.id === project.id)
   if (!p) { ElMessage.warning('地图上未找到该项目'); return }
-  showProjectDrawer.value = false; viewMode.value = 'map'
-  setTimeout(() => { onProjectClick(p.id); detailPanelTab.value = tab; showDetailPanel.value = true }, 100)
+  showProjectDrawer.value = false
+  viewMode.value = 'map'
+
+  // 先执行地图选中（设置 popoverProject / selectedProject、flyTo、渲染图标等）
+  await onProjectClick(p.id)
+
+  // ★ 拉 AI 详情，填充 mainInfo（解决 MainInfoTab 数据不完整的问题）
+  try {
+    const res = await api.getAiProjectData(p.id)
+    if (res?.code === 200 && res.data) {
+      const ai = res.data
+      // 保持 id 不变（ProjectDetailPanel 内部多个 tab 用 props.project.id 作为 aiProjectId 请求文件列表）
+      selectedProject.value = {
+        ...selectedProject.value,
+        relationId: ai.relationId,
+        reportProjectId: ai.reportProjectId,
+        mainInfo: buildMainInfoFromAi(ai),
+        stageTimeList: ai.stageTimeList || [],
+        rawAiData: ai,
+      }
+      // 卡片那边同步一下（标题、状态等不受影响，只是让对象引用保持一致）
+      if (popoverProject.value && String(popoverProject.value.id) === String(p.id)) {
+        popoverProject.value = { ...popoverProject.value, ...selectedProject.value }
+      }
+    }
+  } catch (err) {
+    console.warn('[site-map] AI 详情加载失败:', err)
+  }
+
+  detailPanelTab.value = tab
+  showDetailPanel.value = true
 }
 function onAssignSuccess() { fetchProjectList(); fetchMapProjects() }
 function onDetailPanelAction(payload) {
-  if (payload?.type === 'stage-changed') { showDetailPanel.value = false; fetchMapProjects(); fetchProjectList(); fetchOverviewStats(); fetchCityStats(); return }
-  if (payload?.type === 'generate-report') { generatePanelProject.value = payload.project; generatePanelActionKey.value = payload.actionKey; generatePanelSubCode.value = payload.subCode; showGeneratePanel.value = true; return }
+  if (payload?.type === 'stage-changed') {
+    showDetailPanel.value = false
+    fetchMapProjects(); fetchProjectList(); fetchOverviewStats(); fetchCityStats()
+    return
+  }
+  if (payload?.type === 'generate-report') {
+    generatePanelProject.value = payload.project
+    generatePanelActionKey.value = payload.actionKey
+    generatePanelSubCode.value = payload.subCode
+    showGeneratePanel.value = true
+    return
+  }
+  // ★ 新增：空状态创建报告
+  if (payload?.type === 'create-report') {
+    const config = getReportConfigBySubTab(payload.subTab)
+    wizardMode.value = config.packageType
+    wizardTitleLabel.value = config.title
+    wizardMaxStep.value = config.maxStep
+    wizardReportSubTab.value = payload.subTab
+    wizardVisible.value = true
+    showDetailPanel.value = false
+    return
+  }
 }
 function onReportGenerated() { console.log('[site-map] 报告已生成') }
 
@@ -853,7 +974,7 @@ async function ensureShaanxiMask() {
       color: props.maskColor,
       opacity: props.maskMaxOpacity,
       fadeDuration: props.maskFadeDuration,
-    })    
+    })
     lastMaskOpacity = -1; syncMaskVisibility(true)
   } catch (err) { console.warn('[mask] 陕西省遮罩加载失败:', err) }
 }
@@ -866,10 +987,10 @@ function viewIntersectsShaanxi(map) {
   return !(e < sw || w > ne || n < ss || s > nn)
 }
 function smoothstep(e0, e1, x) { if (e1 <= e0) return x >= e1 ? 1 : 0; const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t) }
- function computeMaskOpacity() {
-   if (!props.enableShaanxiMask) return 0
-   return props.maskMaxOpacity
- }
+function computeMaskOpacity() {
+  if (!props.enableShaanxiMask) return 0
+  return props.maskMaxOpacity
+}
 function syncMaskVisibility(force = false) {
   if (!props.enableShaanxiMask) return
   const map = mapRef.value?.getMap?.(); if (!map || !map.getLayer(MASK_LAYER_ID)) return
@@ -895,9 +1016,14 @@ function getProjectCentroid(project) {
 }
 
 function buildAreaCenterFC(projects = allMapProjects.value, naturalWidthMap = {}) {
-  const selectedId = selectedProject.value?.id
+  // 排除当前 popoverProject / selectedProject 的场区中心图标
+  const hiddenIds = new Set(
+    [popoverProject.value?.id, selectedProject.value?.id]
+      .filter((id) => id != null)
+      .map(String)
+  )
   const features = projects
-    .filter((project) => selectedId == null || String(project.id) !== String(selectedId))
+    .filter((project) => !hiddenIds.has(String(project.id)))
     .map((project) => {
       const center = getProjectCentroid(project)
       if (!center) return null
@@ -1021,6 +1147,29 @@ function addProjectArea(project, highlighted = false) {
   const fillLayerId = `${layerId}-fill`
   mapRef.value.offClick(fillLayerId)
   mapRef.value.onClick(fillLayerId, () => onProjectClick(project.id))
+
+  // ★ hover 绑定：跟随鼠标的只读卡片
+  mapRef.value.offHover?.(fillLayerId)
+  mapRef.value.onHover?.(fillLayerId, {
+    onEnter: (_, e) => {
+      if (isEditing.value || showCreateProject.value || showEditProject.value || showVerifyPanel.value || showDetailPanel.value) return
+      if (String(popoverProject.value?.id ?? '') === String(project.id)) return
+      hoveredProject.value = project
+      hoveredPos.x = e.point.x
+      hoveredPos.y = e.point.y
+    },
+    onMove: (_, e) => {
+      if (!hoveredProject.value) return
+      if (String(hoveredProject.value.id) !== String(project.id)) return
+      hoveredPos.x = e.point.x
+      hoveredPos.y = e.point.y
+    },
+    onLeave: () => {
+      if (hoveredProject.value && String(hoveredProject.value.id) === String(project.id)) {
+        hoveredProject.value = null
+      }
+    },
+  })
 }
 function clearSelectedProjectIcons() { if (!mapRef.value) return; for (const layerId of SELECTED_ICON_LAYER_IDS) { if (renderedLayerIds.has(layerId)) { mapRef.value.removeLayer(layerId); renderedLayerIds.delete(layerId) } } }
 async function renderSelectedProjectIcons(project) {
@@ -1036,9 +1185,15 @@ async function renderProjectsByStage(stage) {
   if (!mapReady.value || !mapRef.value) return
   clearProjectLayers()
   if (!allMapProjects.value.length || stage === 'overview') return
-  for (const p of allMapProjects.value) addProjectArea(p, p.id === selectedProject.value?.id)
+  const highlightIds = new Set(
+    [popoverProject.value?.id, selectedProject.value?.id]
+      .filter((id) => id != null)
+      .map(String)
+  )
+  for (const p of allMapProjects.value) addProjectArea(p, highlightIds.has(String(p.id)))
   await renderAreaCenterIcons()
-  if (selectedProject.value) await renderSelectedProjectIcons(selectedProject.value)
+  const focus = popoverProject.value || selectedProject.value
+  if (focus) await renderSelectedProjectIcons(focus)
   syncAllProjectIcons(); syncMaskVisibility()
 }
 async function fetchMapProjects() {
@@ -1050,28 +1205,33 @@ async function fetchMapProjects() {
   } catch (err) { ElMessage.error(err?.message || '地图项目数据加载失败') }
 }
 
-const windCount = computed(() => selectedProject.value?.windTurbinePoints?.length || 0)
-const altCount = computed(() => (selectedProject.value?.windTurbinePoints || []).filter((p) => Number(p.isReserve) === 1).length)
+const windCount = computed(() => popoverProject.value?.windTurbinePoints?.length || 0)
+const altCount = computed(() => (popoverProject.value?.windTurbinePoints || []).filter((p) => Number(p.isReserve) === 1).length)
 
 async function onProjectClick(projectId) {
-  if (showCreateProject.value || showEditProject.value) {
+  if (showCreateProject.value || showEditProject.value) return
+  if (isEditing.value && isDirty.value) {
+    ElMessage.warning('当前有未保存的地图修改，请先保存或取消')
     return
   }
-  if (String(selectedProject.value?.id ?? '') === String(projectId)) return
-  clearSelectionLayers({ restoreAreaCenter: false })
+  if (String(popoverProject.value?.id ?? '') === String(projectId)) return
+
+  // 保留"清掉场区相关图层但恢复场区中心图标"，但不清选中（避免重复 flyTo）
+  clearPopoverLayersOnly()
+
   const project = allMapProjects.value.find((p) => String(p.id) === String(projectId)); if (!project) return
   flyToProjectBounds(project)
+  popoverProject.value = project
   selectedProject.value = project
-  cardClosed.value = false
+  hoveredProject.value = null
   hasSaved.value = false
-  isEditing.value = true
+  isEditing.value = false
   isDirty.value = false
   editMode.value = null
   initEditBuffer(project)
   addProjectArea(project, true)
   await renderAreaCenterIcons()
   await renderSelectedProjectIcons(project)
-  updateDetailCardPosition()
   fetchAndRenderRoadData(project.id)
 }
 
@@ -1190,7 +1350,7 @@ function syncRoadLineVisibility() {
   if (!map) return
   const roadOn = layerVisibleIds.value.includes('road')
   const lineOn = layerVisibleIds.value.includes('line')
-  const pid = selectedProject.value?.id
+  const pid = popoverProject.value?.id ?? selectedProject.value?.id
   const cached = pid != null ? roadDataCache.get(pid) : null
 
   if (roadOn && cached?.roadFeatures?.length) {
@@ -1259,7 +1419,7 @@ function onLineHoverLeave() {
 }
 
 async function fetchAndRenderRoadData(projectId) {
-  if (String(selectedProject.value?.id ?? '') !== String(projectId)) return
+  if (String(popoverProject.value?.id ?? '') !== String(projectId)) return
 
   const cached = roadDataCache.get(projectId)
   if (cached) {
@@ -1280,7 +1440,7 @@ async function fetchAndRenderRoadData(projectId) {
   try {
     const res = await api.getRoadData(projectId)
 
-    if (requestVersion !== roadRequestVersion || String(selectedProject.value?.id ?? '') !== String(projectId)) return
+    if (requestVersion !== roadRequestVersion || String(popoverProject.value?.id ?? '') !== String(projectId)) return
 
     const data = unwrapApiPayload(res)
     const { roadFeatures, lineFeatures } = buildRoadLineFeatures(data)
@@ -1299,33 +1459,39 @@ async function fetchAndRenderRoadData(projectId) {
   }
 }
 
-function clearSelectionLayers({ restoreAreaCenter = true } = {}) {
-  if (!selectedProject.value) return
-  if (!restoreAreaCenter) areaCenterIconRequestVersion += 1
-  const pid = selectedProject.value.id
+// ★ 仅清掉场区相关图层/编辑态，不动选中，供 onProjectClick 切换时使用
+function clearPopoverLayersOnly() {
+  const pid = popoverProject.value?.id
+  if (pid == null) {
+    // 无选中时也走一遍清编辑资源
+    mapRef.value?.clearEditableAreas(); mapRef.value?.stopBoxSelect?.()
+    editBuffer.value = null; drawingNewPoint.value = false; isBoxSelecting.value = false; isEditing.value = false; isDirty.value = false; hasSaved.value = false
+    editMode.value = null
+    return
+  }
   clearRoadLayer()
-  showVerifyPanel.value = false; showDetailPanel.value = false
   mapRef.value?.clearEditableAreas(); mapRef.value?.stopBoxSelect?.()
   editBuffer.value = null; drawingNewPoint.value = false; isBoxSelecting.value = false; isEditing.value = false; isDirty.value = false; hasSaved.value = false
   editMode.value = null
   const project = allMapProjects.value.find((p) => p.id === pid)
   if (project && isAreaView.value) addProjectArea(project, false)
   clearSelectedProjectIcons()
+}
+
+// ★ 完全清空选中（点击空白处、切 zoom level、删除后）
+function clearPopover() {
+  clearPopoverLayersOnly()
+  popoverProject.value = null
   selectedProject.value = null
-  if (restoreAreaCenter) renderAreaCenterIcons()
-  detailCardPos.visible = false
-  cardClosed.value = false
+  hoveredProject.value = null
+  showVerifyPanel.value = false
+  showDetailPanel.value = false
+  renderAreaCenterIcons()
 }
-function updateDetailCardPosition() {
-  if (!selectedProject.value || !mapRef.value) { detailCardPos.visible = false; return }
-  const centroid = getProjectCentroid(selectedProject.value); if (!centroid) { detailCardPos.visible = false; return }
-  const map = mapRef.value.getMap(); if (!map) return
-  const pt = map.project(centroid); detailCardPos.x = pt.x; detailCardPos.y = pt.y; detailCardPos.visible = true
-}
-function closeDetailCard() { cardClosed.value = true }
 
 function handleMapBlankClick(e) {
-  if (!isAreaView.value || !selectedProject.value || showEditProject.value) return
+  if (!isAreaView.value || !popoverProject.value) return
+  if (showEditProject.value || showDetailPanel.value || showVerifyPanel.value || showCreateProject.value) return
   const map = mapRef.value?.getMap?.()
   if (!map) return
 
@@ -1337,7 +1503,7 @@ function handleMapBlankClick(e) {
       if (isBoxSelecting.value) { mapRef.value?.stopBoxSelect?.(); isBoxSelecting.value = false }
       return
     }
-    clearSelectionLayers()
+    clearPopover()
   } catch (err) {
     console.warn('[site-map] handleMapBlankClick 查询失败:', err)
   }
@@ -1352,6 +1518,83 @@ function getCityCenterFromFeature(feature) {
   const lng = Number(center[0]); const lat = Number(center[1])
   return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null
 }
+// ★ 从 Polygon/MultiPolygon 计算 bbox，用于 fitBounds
+function getFeatureBounds(feature) {
+  const geom = feature?.geometry
+  if (!geom) return null
+  const polys = geom.type === 'Polygon'
+    ? [geom.coordinates]
+    : geom.type === 'MultiPolygon'
+      ? geom.coordinates
+      : []
+  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity
+  for (const poly of polys) {
+    for (const ring of poly) {
+      for (const pt of ring) {
+        const lng = Number(pt?.[0]), lat = Number(pt?.[1])
+        if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue
+        if (lng < minLng) minLng = lng
+        if (lng > maxLng) maxLng = lng
+        if (lat < minLat) minLat = lat
+        if (lat > maxLat) maxLat = lat
+      }
+    }
+  }
+  if (!Number.isFinite(minLng)) return null
+  return [[minLng, minLat], [maxLng, maxLat]]
+}
+
+// ★ 省界（黄色亮线，始终显示）
+async function ensureProvinceBoundaryLine() {
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+  if (map.getLayer(PROVINCE_BOUNDARY_LAYER_ID)) return
+  const province = await loadShaanxiBoundary()
+  if (!province) return
+
+  if (!map.getSource(PROVINCE_BOUNDARY_SOURCE_ID)) {
+    map.addSource(PROVINCE_BOUNDARY_SOURCE_ID, { type: 'geojson', data: province })
+  }
+  if (!map.getLayer(PROVINCE_BOUNDARY_LAYER_ID)) {
+    map.addLayer({
+      id: PROVINCE_BOUNDARY_LAYER_ID,
+      type: 'line',
+      source: PROVINCE_BOUNDARY_SOURCE_ID,
+      layout: { visibility: 'visible' },
+      paint: {
+        'line-color': '#facc15',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 4, 1.5, 8, 3, 12, 4],
+        'line-opacity': 0.95,
+      },
+    })
+  }
+}
+
+// ★ 市界（青蓝细线，始终显示）
+async function ensureCityBoundaryLine() {
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+  if (map.getLayer(CITY_BOUNDARY_LAYER_ID)) return
+  const cities = await loadCityGeoJSON()
+  if (!cities) return
+
+  if (!map.getSource(CITY_BOUNDARY_SOURCE_ID)) {
+    map.addSource(CITY_BOUNDARY_SOURCE_ID, { type: 'geojson', data: cities })
+  }
+  if (!map.getLayer(CITY_BOUNDARY_LAYER_ID)) {
+    map.addLayer({
+      id: CITY_BOUNDARY_LAYER_ID,
+      type: 'line',
+      source: CITY_BOUNDARY_SOURCE_ID,
+      layout: { visibility: 'visible' },
+      paint: {
+        'line-color': '#7dd3fc',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 4, 1, 10, 2],
+        'line-opacity': 0.9,
+      },
+    })
+  }
+}
 function handleCityFillClick(e) {
   if (isAreaView.value) return
   if (showCreateProject.value || showEditProject.value) return
@@ -1360,16 +1603,36 @@ function handleCityFillClick(e) {
   if (!map.getLayer(fillLayerId)) return
   const features = map.queryRenderedFeatures(e.point, { layers: [fillLayerId] })
   if (!features.length) return
+
+  // ★ 用该市区的 bbox fitBounds，自适应范围 + 正俯视
+  const bounds = getFeatureBounds(features[0])
+  if (bounds) {
+    map.fitBounds(bounds, {
+      padding: { top: 80, bottom: 80, left: 60, right: 60 },
+      pitch: 0,
+      bearing: 0,
+      duration: 1500,
+    })
+    return
+  }
+
+  // 兜底：走 center + 固定 zoom
   const center = getCityCenterFromFeature(features[0])
   if (!center) return
-  map.flyTo({ center, zoom: CITY_CLICK_ZOOM_TARGET, duration: 1500 })
+  map.flyTo({ center, zoom: CITY_CLICK_ZOOM_TARGET, pitch: 0, bearing: 0, duration: 1500 })
 }
 
 async function onVerifySaved() {
   showVerifyPanel.value = false
   await fetchMapProjects()
-  const fresh = allMapProjects.value.find(p => p.id === selectedProject.value?.id)
-  if (fresh) { selectedProject.value = fresh; initEditBuffer(fresh); updateDetailCardPosition() }
+  const fresh = allMapProjects.value.find(p => p.id === popoverProject.value?.id)
+  if (fresh) {
+    popoverProject.value = fresh
+    if (selectedProject.value && String(selectedProject.value.id) === String(fresh.id)) {
+      selectedProject.value = fresh
+    }
+    initEditBuffer(fresh)
+  }
   fetchProjectList()
   fetchOverviewStats()
   fetchCityStats()
@@ -1382,13 +1645,17 @@ async function focusProject(project) {
 function handleDrawerAction({ type, project }) { executeAction(type, allMapProjects.value.find((item) => item.id === project.id) || project) }
 function handleDrawerSortChange({ key, dir }) { drawerSort.key = key; drawerSort.dir = dir; pagination.page = 1; fetchProjectList() }
 
-watch(viewMode, (val) => { if (val === 'list' && showProjectDrawer.value) showProjectDrawer.value = false })
+watch(viewMode, (val) => {
+  if (val === 'list' && showProjectDrawer.value) showProjectDrawer.value = false
+  if (val === 'list') hoveredProject.value = null
+})
 watch(showProjectDrawer, (val) => { if (val) { pagination.page = 1; fetchProjectList() } })
 
 const editBuffer = ref(null)
 let suppressDrawSync = false
 
 function initEditBuffer(project) {
+  if (!project) { editBuffer.value = null; return }
   const area = getProjectCoords(project)
   const wind = (project.windTurbinePoints || []).map(p => { const lng = Number(p.longitude), lat = Number(p.latitude); return Number.isFinite(lng) && Number.isFinite(lat) ? { lng, lat, isReserve: Number(p.isReserve) === 1 ? 1 : 0 } : null }).filter(Boolean)
   const booster = (project.boosterStationLocations || []).map(p => { const lng = Number(p.lng), lat = Number(p.lat); return Number.isFinite(lng) && Number.isFinite(lat) ? { lng, lat, isBest: Number(p.isBest) === 1 ? 1 : 0 } : null }).filter(Boolean)
@@ -1405,17 +1672,53 @@ function syncDrawToBuffer() {
   else if (currentMode === 'unavailable') { editBuffer.value.unavailable = all.features.filter(f => f.properties?.kind === 'unavailable') }
   refreshAllPointsLayers()
 }
-function onDrawChange() { if (suppressDrawSync) return; syncDrawToBuffer(); if (isEditing.value) isDirty.value = true }
-function startEdit() { if (!selectedProject.value) return; isEditing.value = true; isDirty.value = false; editMode.value = null; initEditBuffer(selectedProject.value); enterEditMode('area') }
+function onDrawChange(event) {
+  if (suppressDrawSync || !isEditing.value) return
+  const draw = mapRef.value?.getDraw?.()
+  if (event?.features?.length && draw && ['wind', 'booster', 'unavailable'].includes(editMode.value)) {
+    const kind = editMode.value
+    event.features.forEach((feature) => {
+      if (!feature?.id || feature.geometry?.type !== (kind === 'unavailable' ? 'Polygon' : 'Point')) return
+      if (feature.properties?.kind) return
+      draw.setFeatureProperty(feature.id, 'kind', kind)
+      if (kind === 'wind') draw.setFeatureProperty(feature.id, 'isReserve', 0)
+      if (kind === 'booster') draw.setFeatureProperty(feature.id, 'isBest', 0)
+    })
+  }
+  syncDrawToBuffer()
+  isDirty.value = true
+}
+
+// ★ 进入编辑态：与 overview 一致
+function startGeometryEdit(project, mode = 'area') {
+  if (!project) return
+  if (isDirty.value) {
+    ElMessage.warning('当前地图修改尚未保存，请先保存或取消')
+    return
+  }
+  const p = allMapProjects.value.find((item) => String(item.id) === String(project.id)) || project
+  popoverProject.value = p
+  selectedProject.value = p
+  hoveredProject.value = null
+  isEditing.value = true
+  isDirty.value = false
+  hasSaved.value = false
+  initEditBuffer(p)
+  enterEditMode(mode)
+}
+
+function startEdit() { if (!popoverProject.value) return; isEditing.value = true; isDirty.value = false; editMode.value = null; initEditBuffer(popoverProject.value); enterEditMode('area') }
 function exitEditMode() {
   if (!isEditing.value) return
+  suppressDrawSync = true
   mapRef.value?.clearEditableAreas(); mapRef.value?.stopBoxSelect?.()
-  editBuffer.value = null; drawingNewPoint.value = false; isBoxSelecting.value = false; isEditing.value = false; isDirty.value = false
+  nextTick(() => { suppressDrawSync = false })
+  editBuffer.value = null; drawingNewPoint.value = false; isBoxSelecting.value = false; isEditing.value = false; isDirty.value = false; hasSaved.value = false
   editMode.value = null
-  if (selectedProject.value) renderSelectedProjectIcons(selectedProject.value)
+  if (popoverProject.value) renderSelectedProjectIcons(popoverProject.value)
 }
 function enterEditMode(mode) {
-  if (!selectedProject.value || !editBuffer.value) return
+  if (!popoverProject.value || !editBuffer.value) return
   const draw = mapRef.value?.getDraw?.(); if (!draw) return
   const currentFeatures = draw.getAll().features
   if (!suppressDrawSync && currentFeatures.length > 0) syncDrawToBuffer()
@@ -1428,12 +1731,17 @@ function enterEditMode(mode) {
   else if (mode === 'wind') { buf.wind.forEach((p, i) => features.push({ type: 'Feature', id: `edit-wind-${i}`, properties: { kind: 'wind', index: i, isReserve: p.isReserve }, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } })) }
   else if (mode === 'booster') { buf.booster.forEach((p, i) => features.push({ type: 'Feature', id: `edit-booster-${i}`, properties: { kind: 'booster', index: i, isBest: p.isBest }, geometry: { type: 'Point', coordinates: [p.lng, p.lat] } })) }
   else if (mode === 'unavailable') { buf.unavailable.forEach(f => features.push(f)) }
-  if (features.length) draw.add({ type: 'FeatureCollection', features })
-  if (mode === 'area') { const areaFeat = features.find(f => f.properties.kind === 'area'); if (areaFeat) draw.changeMode('vertex_only_direct_select', { featureId: areaFeat.id }); else draw.changeMode('simple_select') }
-  else if (mode === 'unavailable') draw.changeMode('draw_polygon')
-  else draw.changeMode('simple_select')
-  nextTick(() => mapRef.value?.bringDrawPointsToTop?.())
-  suppressDrawSync = false
+  try {
+    if (features.length) draw.add({ type: 'FeatureCollection', features })
+    if (mode === 'area') { const areaFeat = features.find(f => f.properties.kind === 'area'); if (areaFeat) draw.changeMode('vertex_only_direct_select', { featureId: areaFeat.id }); else draw.changeMode('simple_select') }
+    else if (mode === 'unavailable') draw.changeMode('draw_polygon')
+    else draw.changeMode('simple_select')
+  } finally {
+    nextTick(() => {
+      mapRef.value?.bringDrawPointsToTop?.()
+      suppressDrawSync = false
+    })
+  }
 }
 function startAddWindPoint() { const draw = mapRef.value?.getDraw?.(); if (!draw) return; draw.changeMode('draw_point'); drawingNewPoint.value = true; ElMessage.info('点击地图添加风机，点击"标记备选"可切换备选状态') }
 function toggleAddPoint() {
@@ -1445,27 +1753,36 @@ function startBoxSelection() {
   if (editMode.value !== 'wind' && editMode.value !== 'booster') { ElMessage.warning('仅支持在编辑风机/升压站时框选'); return }
   isBoxSelecting.value = true; mapRef.value.startBoxSelect?.(); ElMessage.info('请在地图上拖拽进行框选')
 }
-function handleBoxSelect(featureIds) { if (!featureIds.length) return; const draw = mapRef.value?.getDraw?.(); if (draw) { draw.changeMode('simple_select', { featureIds }); isBoxSelecting.value = false } }
+function handleBoxSelect(featureIds) { if (!featureIds?.length) return; const draw = mapRef.value?.getDraw?.(); if (draw) { draw.changeMode('simple_select', { featureIds }); isBoxSelecting.value = false } }
 function markReserve(isReserve) {
   const draw = mapRef.value?.getDraw?.(); if (!draw) return
   const ids = draw.getSelectedIds(); if (!ids.length) { ElMessage.warning('请先选中风机点位'); return }
   let count = 0
-  ids.forEach(id => { draw.setFeatureProperty(id, 'isReserve', isReserve ? 1 : 0); const feat = draw.get(id); if (feat && feat.properties?.kind === 'wind') count++ })
+  ids.forEach(id => {
+    const feat = draw.get(id)
+    if (!feat || feat.properties?.kind !== 'wind') return
+    draw.setFeatureProperty(id, 'isReserve', isReserve ? 1 : 0)
+    count++
+  })
   if (count === 0) return
-  syncDrawToBuffer(); enterEditMode('wind'); ElMessage.success(`已${isReserve ? '标记' : '取消'}备选 ${count} 个风机`)
+  syncDrawToBuffer()
+  enterEditMode('wind')
+  isDirty.value = true
+  ElMessage.success(`已${isReserve ? '标记' : '取消'}备选 ${count} 个风机`)
 }
 function deleteSelectedPoints() {
   const draw = mapRef.value?.getDraw?.(); if (!draw) return
   const ids = draw.getSelectedIds(); if (!ids.length) { ElMessage.warning('请先选中要删除的点'); return }
-  draw.delete(ids); syncDrawToBuffer(); enterEditMode(editMode.value); ElMessage.success(`已删除 ${ids.length} 个点`)
+  draw.delete(ids); syncDrawToBuffer(); enterEditMode(editMode.value); isDirty.value = true
+  ElMessage.success(`已删除 ${ids.length} 个点`)
 }
 function refreshAllPointsLayers() {
-  if (!mapRef.value || !editBuffer.value || !selectedProject.value) return
+  if (!mapRef.value || !editBuffer.value || !popoverProject.value) return
   const map = mapRef.value.getMap?.(); if (!map) return
-  const pid = selectedProject.value.id
+  const pid = popoverProject.value.id
   if (editBuffer.value.area && editBuffer.value.area.length >= 3) {
-    const areaFeature = { type: 'Feature', properties: { projectId: pid, projectCode: selectedProject.value.projectCode, projectName: selectedProject.value.projectName, itemType: selectedProject.value.itemType }, geometry: { type: 'Polygon', coordinates: [closeRing(editBuffer.value.area)] } }
-    const layerId = `project-area-${pid}`; const style = AREA_STYLE[selectedProject.value.itemType] || AREA_STYLE.FD
+    const areaFeature = { type: 'Feature', properties: { projectId: pid, projectCode: popoverProject.value.projectCode, projectName: popoverProject.value.projectName, itemType: popoverProject.value.itemType }, geometry: { type: 'Polygon', coordinates: [closeRing(editBuffer.value.area)] } }
+    const layerId = `project-area-${pid}`; const style = AREA_STYLE[popoverProject.value.itemType] || AREA_STYLE.FD
     mapRef.value.addPolygon({ id: layerId, geojson: areaFeature, color: style.highlight.color, opacity: style.highlight.opacity, outlineColor: style.highlight.outlineColor, outlineWidth: style.highlight.outlineWidth })
   }
   const windNormal = [], windReserve = []
@@ -1480,8 +1797,9 @@ function refreshAllPointsLayers() {
   if (map.getSource('project-booster-all')) map.getSource('project-booster-all').setData({ type: 'FeatureCollection', features: boosterFeatures })
 }
 async function saveEdit() {
-  if (!editBuffer.value || !selectedProject.value || saving.value) return
-  syncDrawToBuffer(); const project = selectedProject.value; const pid = project.id
+  if (!editBuffer.value || !popoverProject.value || saving.value) return
+  syncDrawToBuffer(); const project = popoverProject.value; const pid = project.id
+  if (editBuffer.value.area.length < 3) { ElMessage.warning('场区至少需要 3 个有效坐标点'); return }
   const fallbackRegionCode = project.coordinate?.[0]?.regionCode ?? null
   const coordinate = editBuffer.value.area.map(([lng, lat]) => ({ regionCode: fallbackRegionCode, longitude: String(lng), latitude: String(lat) }))
   const windTurbinePoints = editBuffer.value.wind.map(p => ({ longitude: p.lng, latitude: p.lat, isReserve: p.isReserve }))
@@ -1494,30 +1812,42 @@ async function saveEdit() {
       ElMessage.success('保存成功'); hasSaved.value = true; isDirty.value = false
       const target = allMapProjects.value.find(p => p.id === pid)
       if (target) { target.coordinate = coordinate; target.windTurbinePoints = windTurbinePoints; target.boosterStationLocations = boosterStationLocations }
-      await renderProjectsByStage('area'); updateDetailCardPosition()
-      if (target) { initEditBuffer(target); editMode.value = null }
+      if (popoverProject.value) Object.assign(popoverProject.value, { coordinate, windTurbinePoints, boosterStationLocations })
+      if (selectedProject.value && String(selectedProject.value.id) === String(pid)) {
+        Object.assign(selectedProject.value, { coordinate, windTurbinePoints, boosterStationLocations })
+      }
+      await renderProjectsByStage('area')
+      if (target) { popoverProject.value = target; if (selectedProject.value && String(selectedProject.value.id) === String(pid)) selectedProject.value = target; initEditBuffer(target); editMode.value = null }
       fetchOverviewStats(); fetchCityStats()
     } else ElMessage.error(res?.msg || '保存失败')
   } catch (err) { ElMessage.error(err?.message || '保存失败') }
   finally { saving.value = false }
 }
 async function handleRecalculate() {
-  if (!selectedProject.value || !hasSaved.value) return
+  if (!popoverProject.value || !hasSaved.value) return
   try {
     recalculating.value = true
-    const res = await configApi.updateCalculateStatus(selectedProject.value.id, { isReturnProject: 1 })
+    const res = await configApi.updateCalculateStatus(popoverProject.value.id, { isReturnProject: 1 })
     if (res?.code === 200) { ElMessage.success('重新计算发起成功'); hasSaved.value = false; fetchMapProjects(); fetchProjectList() }
     else ElMessage.error(res?.msg || '重新计算失败')
   } catch (err) { ElMessage.error(err?.message || '重新计算请求异常') }
   finally { recalculating.value = false }
 }
-function cancelEdit() { exitEditMode() }
+function cancelEdit() {
+  if (isDirty.value) {
+    ElMessageBox.confirm('放弃当前未保存的地图修改吗？', '确认取消', { type: 'warning' })
+      .then(() => exitEditMode())
+      .catch(() => {})
+    return
+  }
+  exitEditMode()
+}
 
 const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoomThresholdSwitch({
   mapRef,
   onEnter: () => { hideCityStats(); renderProjectsByStage('area') },
   onExit: () => {
-    clearSelectionLayers()
+    clearPopover()
     renderProjectsByStage('overview')
     if (cityStats.value.length) renderCityStats()
     const map = mapRef.value?.getMap?.()
@@ -1530,18 +1860,51 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
 async function onMapReady() {
   await Promise.allSettled([loadShaanxiBoundary(), loadCityGeoJSON()])
   mapReady.value = true
-  
+
   if (showCreateProject.value) nextTick(() => startCreateDrawing())
   const map = mapRef.value.getMap()
 
   try { map.setProjection({ type: 'globe' }) } catch (e) { try { map.setProjection('globe') } catch (e2) {} }
 
-  map.on('move', updateDetailCardPosition); map.on('zoom', updateDetailCardPosition)
+  // ★ site-map 全站锁死正俯视
+  try {
+    map.dragRotate.disable()
+    map.touchPitch.disable()
+    map.setMaxPitch(0)
+    if (map.getPitch() !== 0 || map.getBearing() !== 0) {
+      map.jumpTo({ pitch: 0, bearing: 0 })
+    }
+  } catch (e) {
+    console.warn('[site-map] 锁定正俯视失败:', e)
+  }
+
+  // ★ 首次进入：fitBounds 让陕西刚好铺满屏幕（替代 flyToShaanxi 的固定 zoom:6）
+  map.fitBounds(SHAANXI_FIT_BOUNDS, {
+    padding: { top: 60, bottom: 60, left: 60, right: 60 },
+    pitch: 0,
+    bearing: 0,
+    duration: 0,
+  })
+
+  // ★ pitch 兜底（防止子组件 flyTo 偷传 pitch）
+  zeroPitchGuard = () => {
+    if (!map) return
+    if (Math.abs(map.getPitch()) > 0.01) {
+      map.easeTo({ pitch: 0, duration: 150 })
+    }
+  }
+  map.on('pitch', zeroPitchGuard)
+
   map.on('click', handleMapBlankClick)
   map.on('click', handleCityFillClick)
   if (isAreaView.value) { hideCityStats(); renderProjectsByStage('area') } else await renderCityStats()
   map.on('zoom', syncMaskVisibility); map.on('move', syncMaskVisibility); map.on('style.load', ensureShaanxiMask)
   await ensureShaanxiMask()
+
+  // ★ 省市行政区域边线
+  await ensureProvinceBoundaryLine()
+  await ensureCityBoundaryLine()
+
   bindZoomListener()
   try {
     whlnPlugin = attachSxLayers(map, { initialVisibleIds: layerVisibleIds.value.filter((id) => WHLN_LAYER_IDS.includes(id)) })
@@ -1560,64 +1923,61 @@ onUnmounted(() => {
   unbindZoomListener()
   const map = mapRef.value?.getMap?.()
   if (map) {
-    map.off('move', updateDetailCardPosition)
-    map.off('zoom', updateDetailCardPosition)
     map.off('click', handleMapBlankClick)
     map.off('click', handleCityFillClick)
     map.off('zoom', syncMaskVisibility)
     map.off('move', syncMaskVisibility)
     map.off('style.load', ensureShaanxiMask)
+    if (zeroPitchGuard) { map.off('pitch', zeroPitchGuard); zeroPitchGuard = null }  // ★ 新增
   }
 })
 
-// ★ 新增：复刻 Overview 的弹窗确认与向导打开逻辑
-// ★ 修改：打开向导时，收起 ProjectDetailPanel
 function handleReportConfirm(payload) {
   const option = payload?.option || payload
   const project = payload?.project || selectedProject.value
   if (project) selectedProject.value = { ...selectedProject.value, ...project }
   showGenerateModal.value = false
-  
+
   if (reportKeyToWizardMode[option?.key] !== undefined) {
     wizardMode.value = reportKeyToWizardMode[option.key]
     wizardVisible.value = true
-    // 关键点：打开向导时，将详情面板隐藏
-    showDetailPanel.value = false 
+    showDetailPanel.value = false
   }
 }
 
-// ★ 新增：统一的关闭向导方法
 function closeWizard() {
   wizardVisible.value = false
-  // 关键点：关闭向导时，重新把详情面板显示出来
+  wizardTitleLabel.value = ''
+  wizardMaxStep.value = 2
+  wizardReportSubTab.value = ''
   showDetailPanel.value = true
 }
 
 function handleWizardSaveDraft(payload) {
-  console.log('保存草稿:', payload)
-  // 如果保存草稿后，向导组件内部触发并关闭，我们这里也恢复面板
-  // 若组件内部不自动关闭，就不调 closeWizard
-  // 根据常规交互，保存后应该返回：
-  closeWizard()
+  console.log('[site-map][wizard] save-draft:', payload)
+  // 演示阶段不做真实保存
 }
 
 function handleWizardSubmit(payload) {
-  console.log('提交向导:', payload)
-  // 提交后关闭向导，恢复面板
-  closeWizard()
+  // ★ 假提示，未来接真实接口时在这里按 wizardReportSubTab 分流
+  const subTab = wizardReportSubTab.value
+  const label = wizardTitleLabel.value || '报告'
+  console.log(`[site-map][wizard] submit subTab=${subTab}`, payload)
+  ElMessage.success(`${label}提交成功（演示流程，接口待接）`)
+  wizardVisible.value = false
+  wizardTitleLabel.value = ''
+  wizardMaxStep.value = 2
+  wizardReportSubTab.value = ''
+  // 刷新一下列表，模拟"生成后能看见"
+  // fetchMapProjects(); fetchProjectList();
 }
 
 function handleGenerateRequest(payload) {
-  console.log('生成请示文件:', payload)
   showGenerateModal.value = false
-  // 如果请示文件也需要隐藏面板并进向导，可以在这里加上：
-  // showDetailPanel.value = false
-  // wizardVisible.value = true
 }
 </script>
 
 <style scoped>
-/* 请保留你原有的全部样式 */
 .site-map-page { position: relative; width: 100%; height: 100%; overflow: hidden; background: #f5f7fa; }
 .map-layer { position: absolute; inset: 0; z-index: 1; overflow: hidden; }
 .config-fullpage {
@@ -1694,37 +2054,11 @@ function handleGenerateRequest(payload) {
 .edit-tool-button:hover { color: #1677ff; background: #f0f7ff; }
 .edit-tool-button.active { color: #1677ff; background: #e6f2ff; }
 .edit-tool-button.save { color: #1677ff; font-weight: 500; }
+.edit-tool-button.recalculate { color: #087443; border: 1px solid #6ce9a6; background: #ecfdf3; }
 .edit-tool-button.danger { color: #f56c6c; }
 .edit-tool-button.danger:hover { color: #f56c6c; background: #fef0f0; }
 .edit-tool-button:disabled { opacity: 0.6; cursor: not-allowed; }
 .edit-divider { width: 1px; height: 18px; margin: 0 4px; background: #e5e7eb; }
-
-.detail-card {
-  position: absolute; z-index: 5; width: 320px; padding: 16px;
-  color: #303133; background: rgba(255,255,255,0.98); border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.18);
-  transform: translate(calc(-100% - 16px), 12px); pointer-events: auto;
-}
-.detail-close {
-  position: absolute; top: 12px; right: 12px; z-index: 10;
-  display: flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; padding: 0; color: #909399;
-  background: transparent; border: 0; border-radius: 4px;
-  cursor: pointer; transition: background 0.15s, color 0.15s;
-}
-.detail-close:hover { color: #303133; background: #f0f2f5; }
-.detail-title {
-  padding-right: 28px; padding-bottom: 10px; margin-bottom: 10px;
-  color: #1f2d3d; font-size: 15px; font-weight: 600; border-bottom: 1px solid #eee;
-}
-.detail-row { display: flex; align-items: center; min-height: 24px; font-size: 13px; }
-.detail-label { width: 75px; color: #909399; }
-.detail-value { flex: 1; color: #303133; }
-.detail-sub { color: #a0a5ad; font-size: 12px; }
-.detail-actions { display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 1px solid #eee; }
-.detail-action { padding: 2px 4px; color: #1677ff; font-size: 13px; background: transparent; border: 0; cursor: pointer; }
-.detail-action:hover { text-decoration: underline; }
-.detail-action.danger { color: #f56c6c; }
 
 .expand-button { position: absolute; top: 50%; right: 0; z-index: 3; width: 25px; height: 54px; color: #fff; background: rgba(30,30,30,0.4); border: 0; border-radius: 5px 0 0 5px; cursor: pointer; transition: right 0.25s ease, background 0.15s ease; }
 .expand-button:hover { background: rgba(30, 30, 30, 0.65); }
@@ -1795,14 +2129,12 @@ function handleGenerateRequest(payload) {
 .layer-legend-line.road { background: #2563eb; }
 .layer-legend-line.line { background: #eab308; }
 
-/* ★ 新增：向导组件覆盖层样式 */
 .wizard-overlay {
   position: fixed;
-  top: 65px; /* 根据你的系统顶栏高度调整，如果全屏就写0 */
-  /* left: 100px; */
+  top: 65px;
   right: 0;
   bottom: 0;
-  z-index: 2000; /* 比 ProjectDetailPanel (200) 高，但比生成弹窗 (3000) 低 */
+  z-index: 2000;
   box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
 }
 

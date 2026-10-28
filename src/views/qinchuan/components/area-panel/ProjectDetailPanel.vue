@@ -58,11 +58,13 @@
         @file-action="(...args) => $emit('support-file-action', ...args)"
       />
       
-      <ProjectReportTab
-        v-else-if="activeTab === 'report'"
-        :project="project"
-        @row-action="(row) => $emit('report-row-action', row)"
-      />
+<ProjectReportTab
+  v-else-if="activeTab === 'report'"
+  :project="project"
+  @row-action="(row) => $emit('report-row-action', row)"
+  @open-confirm="(id) => $emit('open-confirm', id)"
+  @create="(payload) => $emit('create-report', payload)"
+/>
       
       <ReviewInfoTab v-else-if="activeTab === 'review'" :data="project.reviewInfo" />
     </div>
@@ -108,7 +110,8 @@ defineEmits([
   'back', 'generate-report', 'toggle-fullscreen',
   'survey-add-data', 'survey-file-action',
   'support-add-data', 'support-file-action',
-  'report-row-action',
+  'report-row-action', 'open-confirm',
+  'create-report',
 ])
 
 const router = useRouter()

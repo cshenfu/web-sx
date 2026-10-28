@@ -91,6 +91,7 @@
             :initial-sub-tab="activeTabConfig.subTab"
             :hide-sub-tabs="true"
             @row-action="handleReportRowAction"
+            @create="handleReportCreate"
           />
         </div>
       </template>
@@ -296,6 +297,14 @@ watch(
   },
   { immediate: true }
 )
+function handleReportCreate(payload) {
+  emit('action', {
+    type: 'create-report',
+    subTab: payload.subTab,
+    tabLabel: payload.tabLabel,
+    project: props.project,
+  })
+}
 
 function handleReportRowAction(row) {
   emit('action', { type: 'report-row-action', row, project: props.project })

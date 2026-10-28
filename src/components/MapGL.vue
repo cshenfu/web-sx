@@ -48,6 +48,9 @@ const clickHandlers = new Map()
 const imageCache = new Map()
 const glowLineGeoJSONCache = new Map()
 
+// ★ 通用 hover 封装（与省份 hoverHandlers 分开，互不影响）
+const hoverLayerHandlers = new Map()
+
 // ✅ 修复：声明 activeProjection，避免 style.load 回调抛 ReferenceError
 let activeProjection = 'globe'
 
@@ -305,6 +308,14 @@ onUnmounted(() => {
     for (const h of list) map?.off('click', layerId, h)
   }
   clickHandlers.clear()
+
+  // ★ 通用 hover 清理
+  for (const [layerId, h] of hoverLayerHandlers) {
+    map?.off('mousemove', layerId, h.onMouseMove)
+    map?.off('mouseleave', layerId, h.onMouseLeave)
+  }
+  hoverLayerHandlers.clear()
+
   imageCache.clear()
   glowLineGeoJSONCache.clear()
 
@@ -1234,8 +1245,52 @@ function offClick(layerId) {
   clickHandlers.delete(layerId)
 }
 
+// ★ 通用 hover 封装（与省份 hoverHandlers 分开，互不影响）
+function onHover(layerId, { onEnter, onMove, onLeave } = {}) {
+  if (!map) return
+  offHover(layerId)
+  let inside = false
+
+  const onMouseMove = (e) => {
+    const features = e.features || []
+    if (!features.length) {
+      if (inside) {
+        inside = false
+        if (map) map.getCanvas().style.cursor = ''
+        onLeave?.()
+      }
+      return
+    }
+    if (!inside) {
+      inside = true
+      if (map) map.getCanvas().style.cursor = 'pointer'
+      onEnter?.(features[0], e)
+    }
+    onMove?.(features[0], e)
+  }
+
+  const onMouseLeave = () => {
+    if (!inside) return
+    inside = false
+    if (map) map.getCanvas().style.cursor = ''
+    onLeave?.()
+  }
+
+  map.on('mousemove', layerId, onMouseMove)
+  map.on('mouseleave', layerId, onMouseLeave)
+  hoverLayerHandlers.set(layerId, { onMouseMove, onMouseLeave })
+}
+
+function offHover(layerId) {
+  const h = hoverLayerHandlers.get(layerId)
+  if (!h || !map) return
+  map.off('mousemove', layerId, h.onMouseMove)
+  map.off('mouseleave', layerId, h.onMouseLeave)
+  hoverLayerHandlers.delete(layerId)
+}
+
 defineExpose({
-  flyToShaanxi, addPolygon, addFillLayer, addSymbolLayer, addExtrusion, addCentroidLabels, addLine, addPoints, addLabels, addImagePoints, ensureImage, removeLayer, onClick, offClick, loadEditableAreas, clearEditableAreas, getEditableAreas, addMaskLayer, setMaskOpacity, bringMaskToTop, hasMaskLayer, removeMaskLayer, getMap: () => map, getDraw: () => draw, startBoxSelect, stopBoxSelect, bringDrawPointsToTop,addGlowLine, startAutoRotate, stopAutoRotate,setCentroidLabelsVisible,
+  flyToShaanxi, addPolygon, addFillLayer, addSymbolLayer, addExtrusion, addCentroidLabels, addLine, addPoints, addLabels, addImagePoints, ensureImage, removeLayer, onClick, offClick, onHover, offHover, loadEditableAreas, clearEditableAreas, getEditableAreas, addMaskLayer, setMaskOpacity, bringMaskToTop, hasMaskLayer, removeMaskLayer, getMap: () => map, getDraw: () => draw, startBoxSelect, stopBoxSelect, bringDrawPointsToTop,addGlowLine, startAutoRotate, stopAutoRotate,setCentroidLabelsVisible,
   findCityAtLngLat: (lngLat) => findCityAtLngLat(lngLat),
 })
 </script>
