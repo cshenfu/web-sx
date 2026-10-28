@@ -143,3 +143,22 @@ export async function listFileGenerateTaskByProjectFile(projectFileId) {
     `/api/fileGenerateTask/list-by-project-file?projectFileId=${projectFileId}`
   );
 }
+
+
+
+
+// 解析后待确认
+export async function userMakeSure(id) {
+  return await publicService4.get(
+    `/ai/ai-project/report/{id}/confirm-parse?id=${id}`
+  );
+}
+
+
+
+// 解析后待确认
+export async function getParamsData(id) {
+  return await publicService4.get(
+    `/ai/ai-project/report/${id}/params`
+  );
+}

@@ -240,14 +240,25 @@
     <ReserveApprovalDialog v-model="showReserveDialog" :project="selectedProject" @saved="onReserveSaved" />
 
     <!-- ★ 新增：报告/函件生成弹窗 -->
-    <ReportGenerateModal
-      :visible="showGenerateModal"
-      :project="selectedProject"
-      @close="showGenerateModal = false"
-      @add-report="showGenerateModal = false"
-      @confirm="handleReportConfirm"
-      @generate-request="handleGenerateRequest"
-    />
+    <!-- 在 template 中 -->
+<!-- 1. 监听弹窗发出的事件 -->
+<ReportGenerateModal
+  :visible="showGenerateModal"
+  :project="selectedProject"
+  @close="showGenerateModal = false"
+  @add-report="showGenerateModal = false"
+  @confirm="handleReportConfirm"
+  @generate-request="handleGenerateRequest"
+  @open-add-report="handleOpenAddReport" 
+/>
+
+<!-- 2. 在页面根节点最下面加上抽屉面板 -->
+<AddReportPanel
+  :visible="showAddReportPanel"
+  :project="selectedProject"
+  @close="showAddReportPanel = false"
+  @success="handleReportPanelSuccess"
+/>
 
     <!-- ★ 新增：报告向导 (ReportWizard) -->
         <!-- ★ 新增：报告向导 (ReportWizard) -->
@@ -310,7 +321,23 @@ import {
 } from '@/components/site-map/areaCenterIcon'
 
 import { loadShaanxiProvince, loadShaanxiCities } from '@/utils/shaanxiBoundary'
+// 在 script setup 中
+import AddReportPanel from './area-panel/AddReportPanel.vue' // ★ 引入组件
 
+const showAddReportPanel = ref(false)
+
+// 接收弹窗事件：关掉小弹窗，打开大抽屉
+function handleOpenAddReport() {
+  showGenerateModal.value = false 
+  showAddReportPanel.value = true
+}
+
+// 抽屉上传保存成功后的回调
+function handleReportPanelSuccess() {
+  fetchMapProjects() // 刷新地图数据
+  fetchProjectList() // 刷新列表数据
+  // 如果此时详情面板(ProjectDetailPanel)是打开的，你可能也需要触发它的刷新
+}
 const props = defineProps({
   stage: { type: String, default: '' },
   summaryTitle: { type: String, default: '项目通道概况' },

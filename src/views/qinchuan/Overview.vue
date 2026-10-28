@@ -335,12 +335,21 @@
       </section>
     </template>
 
-    <ReportGenerateModal
+        <ReportGenerateModal
       :visible="reportModalVisible"
       :project="activeProjectDetail"
       @close="reportModalVisible = false"
       @confirm="handleReportConfirm"
       @add-report="reportModalVisible = false"
+      @open-add-report="handleOpenAddReport" 
+    />
+
+    <!-- ★ 在 template 的最底部（根 main 内），加上抽屉组件 -->
+    <AddReportPanel
+      :visible="showAddReportPanel"
+      :project="activeProjectDetail"
+      @close="showAddReportPanel = false"
+      @success="handleReportPanelSuccess"
     />
 
     <section v-if="showEditProject" class="create-project-fullpage">
@@ -439,7 +448,25 @@ import {
   calcIconSizeAtRef,
   buildIconSizeExpression,
 } from '@/components/site-map/areaCenterIcon'
+// 顶部 import 处引入组件
+import AddReportPanel from './components/area-panel/AddReportPanel.vue'
 
+// ... 原有代码 ...
+
+// ★ 新增状态
+const showAddReportPanel = ref(false)
+
+// ★ 新增方法
+function handleOpenAddReport() {
+  reportModalVisible.value = false 
+  showAddReportPanel.value = true
+}
+
+function handleReportPanelSuccess() {
+  fetchMapProjects() 
+  fetchProjectList() 
+  // 如果在详情面板里，可能需要通知详情面板刷新
+}
 const CITY_OPTIONS = [
   { label: '西安市', value: '610100' }, { label: '铜川市', value: '610200' },
   { label: '宝鸡市', value: '610300' }, { label: '咸阳市', value: '610400' },

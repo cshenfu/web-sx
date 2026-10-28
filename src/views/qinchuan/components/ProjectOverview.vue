@@ -505,7 +505,7 @@ defineExpose({ refresh: loadStageOverview, loading })
   font-size: 13px;
   font-weight: 600;
 }
-.val-wind { color: #20DAED; }
+.val-wind { color: #20DAED; } 
 .val-solar { color: #42A3FC; }
 .val-total { color: #42A3FC; }
 .val-count {

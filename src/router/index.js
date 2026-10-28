@@ -249,18 +249,127 @@ const router = createRouter({
 })
 
 // 全局路由守卫
+// ─────────────────────────────────────────────
+// 登录鉴权工具
+// ─────────────────────────────────────────────
+
+const LOGIN_PATH = '/login'
+
+function clearAuth() {
+  sessionStorage.removeItem('accessToken')
+  // 如果你还有这些缓存，也一并清理，按你项目实际情况保留
+  sessionStorage.removeItem('refreshToken')
+  sessionStorage.removeItem('accessTokenExpiresAt')
+  // sessionStorage.removeItem('userInfo')
+}
+
+/**
+ * 解析 JWT payload
+ * 如果 accessToken 不是 JWT，会返回 null
+ */
+function parseJwtPayload(token) {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = base64.padEnd(
+      base64.length + (4 - (base64.length % 4)) % 4,
+      '='
+    )
+
+    const binary = atob(padded)
+    const json = decodeURIComponent(
+      binary
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    )
+
+    return JSON.parse(json)
+  } catch (e) {
+    return null
+  }
+}
+
+/**
+ * 判断 token 是否过期
+ * 优先使用 sessionStorage 中的 accessTokenExpiresAt
+ * 其次解析 JWT 的 exp
+ * 如果无法解析，则返回 false，交给后端 401 兜底
+ */
+function isTokenExpired(token, skewMs = 5000) {
+  if (!token) return true
+
+  // 方案1：登录时保存了绝对过期时间
+  const expiresAt = Number(sessionStorage.getItem('accessTokenExpiresAt'))
+  if (Number.isFinite(expiresAt) && expiresAt > 0) {
+    return Date.now() >= expiresAt - skewMs
+  }
+
+  // 方案2：accessToken 是 JWT，解析 exp
+  const payload = parseJwtPayload(token)
+  if (!payload || !payload.exp) {
+    return false
+  }
+
+  return Date.now() >= payload.exp * 1000 - skewMs
+}
+
+function redirectToLogin(to) {
+  return {
+    path: LOGIN_PATH,
+    query: {
+      redirect: to.fullPath
+    },
+    replace: true
+  }
+}
+
+// 全局路由守卫
 router.beforeEach((to) => {
-  document.title = to.meta.title ? `${to.meta.title} - 新能源项目前期工作AI平台` : '新能源项目前期工作AI平台'
+  document.title = to.meta.title
+    ? `${to.meta.title} - 新能源项目前期工作AI平台`
+    : '新能源项目前期工作AI平台'
+
   const token = sessionStorage.getItem('accessToken')
-  if (to.name === 'Login' && token) {
-    const redirect = to.query.redirect
-    const safeRedirect = typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/overview'
-    return safeRedirect
+  const expired = isTokenExpired(token)
+
+  // token 已过期，先清理本地登录态
+  if (token && expired) {
+    clearAuth()
   }
-  if (to.meta.public) return true
-  if (!token) {
-    return { path: '/login', query: { redirect: to.fullPath } }
+
+  const hasValidToken = !!token && !expired
+
+  // 已登录且 token 有效，访问登录页则跳回目标页
+  if (to.name === 'Login') {
+    if (hasValidToken) {
+      const redirect = to.query.redirect
+      const safeRedirect =
+        typeof redirect === 'string' &&
+        redirect.startsWith('/') &&
+        !redirect.startsWith('//')
+          ? redirect
+          : '/overview'
+
+      return safeRedirect
+    }
+
+    // 未登录或 token 过期，允许进入登录页
+    return true
   }
+
+  // public 页面放行，比如登录页、404
+  if (to.meta.public) {
+    return true
+  }
+
+  // 没有 token 或 token 过期，跳登录页
+  if (!hasValidToken) {
+    return redirectToLogin(to)
+  }
+
   return true
 })
 

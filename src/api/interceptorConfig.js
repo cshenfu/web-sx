@@ -1,16 +1,52 @@
 import { ElMessage } from 'element-plus'
-import { requestConfig } from './base';
 import { refreshToken, isRefreshRequest } from './modules/refreshToken';
 import router from '@/router/index.js';
-// import { logger } from '@/utils/logger/logger';
-// import { userStore } from '@/utils/store/module/userStore';
 
+// ─────────────────────────────────────────────
+// 登录态处理工具
+// ─────────────────────────────────────────────
+let isRedirectingToLogin = false;
+
+function isLoginApi(url = '') {
+    return url.includes('/system/auth/login') || url.includes('/user/login');
+}
+
+function clearAuthStorage() {
+    sessionStorage.removeItem('accessToken');
+    sessionStorage.removeItem('refreshToken');
+    sessionStorage.removeItem('accessTokenExpiresAt');
+    sessionStorage.removeItem('userId');
+    sessionStorage.removeItem('userName');
+    sessionStorage.removeItem('ossCredentials');
+}
+
+async function toLogin() {
+    if (isRedirectingToLogin) return;
+    const current = router.currentRoute.value;
+    if (current.path === '/login') return;
+
+    isRedirectingToLogin = true;
+    clearAuthStorage();
+    ElMessage.error('登录过期，请重新登录');   // ← 只在这里弹
+
+    try {
+        await router.replace({
+            path: '/login',
+            query: { redirect: current.fullPath },
+        });
+    } finally {
+        isRedirectingToLogin = false;
+    }
+}
+
+// ─────────────────────────────────────────────
+// 请求拦截器
+// ─────────────────────────────────────────────
 export async function requestInterceptor(config) {
     config.headers = config.headers || {};
     config.headers['Authorization'] = sessionStorage.getItem('accessToken') || '';
 
     if (config.data instanceof FormData) {
-        // 清除所有层级的 Content-Type，让浏览器自动添加带 boundary 的值
         delete config.headers['Content-Type'];
         delete config.headers['content-type'];
         if (config.headers.common) delete config.headers.common['Content-Type'];
@@ -23,62 +59,72 @@ export async function requestInterceptor(config) {
 
     return config;
 }
+
+// ─────────────────────────────────────────────
+// 响应拦截器（仅 HTTP 2xx 会进来）
+// ─────────────────────────────────────────────
 export async function responseInterceptor(response, val) {
-    const url = response.config.baseURL + response.config.url;
-    if (response.status === 200) {
-        if (response.data.code === 401 && !isRefreshRequest(response.config)) {
-            const isSuccess = await refreshToken();
-            if (isSuccess) {
-                
-                response.config.headers['Authorization'] =
-                    sessionStorage.getItem('accessToken') || '';
-                const resp = val.request(response.config);
-                return resp;
-            } else {
-                removeLoading();
-                // console.log('没有登录，跳转到登录页');
-                // 确实是没有登录
-                router.push('/login');
-            }
-            return false;
-        }
-        if(response.data.code === 400 || response.data.code === 100300002 || response.data.code === 1002000002 || response.data.code === 1002000001 ) {
-            return response.data;
-        }
-        if (!(response.data.code === 200 || response.data.code === 1 || response.data.code === 0)) {
-            removeLoading();
-            ElMessage.error(response.data.message || response.data.msg)
-        }
-        if (response.data.code == 401) {
-            removeLoading();
-            ElMessage.error('登录过期，请重新登录');
-            setTimeout(() => {
-                window.close();
-            }, 2000);
-        }
+    const config = response.config || {};
+    const url = config.url || '';
+    const code = Number(response.data?.code);
+
+    // 登录接口本身不做刷新/跳转，交给 Login.vue 处理
+    if (isLoginApi(url)) {
         return response.data;
-    } else {
-        removeLoading();
-        if (response.status === 500) {
-            ElMessage.error('服务异常');
-        }
-        if (response.status === 401) {
-            return Promise.reject(new Error('Login Invalid'));
-        } else {
-            return Promise.reject(new Error('Network Error'));
+    }
+
+    // 业务码 401：先尝试刷新，失败再跳登录
+   if (code === 401) {
+    if (!isRefreshRequest(config)) {
+        const isSuccess = await refreshToken();
+        if (isSuccess) {
+            config.headers['Authorization'] =
+                sessionStorage.getItem('accessToken') || '';
+            return val.request(config);
         }
     }
+    await toLogin();
+    return Promise.reject(new Error('Login Expired'));
 }
 
-// 处理接口报错loading效果不消失情况
+    // 业务自定义错误码，原样返回，由业务处理
+    if (
+        code === 400 ||
+        code === 100300002 ||
+        code === 1002000002 ||
+        code === 1002000001
+    ) {
+        return response.data;
+    }
+
+    if (!(code === 200 || code === 1 || code === 0)) {
+        removeLoading();
+        ElMessage.error(response.data.message || response.data.msg);
+    }
+
+    return response.data;
+}
+
+// 处理接口报错 loading 不消失
 const removeLoading = () => {
     const loading = document.querySelector('#__LOADING_PARENT__');
     if (!loading) return;
-    loading.remove()
-}
+    loading.remove();
+};
 
+// ─────────────────────────────────────────────
+// 响应失败拦截器（HTTP 非 2xx 会进来）
+// ─────────────────────────────────────────────
 export function responseInterceptorRejected(err) {
     removeLoading();
-    console.log('请求错误', err.config.__isRefreshToken);
+
+    const status = err.response?.status;
+    const url = err.response?.config?.url || err.config?.url || '';
+
+    // HTTP 401 且不是登录接口，清登录态并跳登录
+    if (status === 401 && !isLoginApi(url)) {
+        toLogin();   // 不 await，避免阻塞 reject
+    }
+
     return Promise.reject(err);
 }

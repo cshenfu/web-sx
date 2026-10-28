@@ -1,0 +1,250 @@
+<template>
+  <div v-if="visible" class="add-report-drawer">
+    <header class="drawer-header">
+      <h1>添加报告</h1>
+      <div class="drawer-actions">
+        <button type="button" class="btn-cancel" @click="$emit('close')">取消</button>
+        <button type="button" class="btn-save" :disabled="saving" @click="handleSave">
+          {{ saving ? '保存中...' : '保存' }}
+        </button>
+      </div>
+    </header>
+
+    <main class="drawer-body">
+      <!-- 报告类型 Tabs -->
+      <div class="report-tabs">
+        <button
+          v-for="tab in reportTypeOptions"
+          :key="tab.key"
+          type="button"
+          class="report-tab"
+          :class="{ active: activeReportTab === tab.key }"
+          @click="handleSwitchTab(tab.key)"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+
+      <div class="upload-section">
+        <div class="upload-hint">
+          支持 docx 格式数据导入，每次只能选择一种类型并导入最多1个文件（系统会自动解析文档，请确认解析的内容）
+        </div>
+        
+        <div class="upload-action">
+          <button type="button" class="btn-upload" :disabled="saving" @click="triggerFileInput">上传数据</button>
+          <input
+            ref="fileInputRef"
+            type="file"
+            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            style="display: none"
+            @change="handleFileChange"
+          />
+        </div>
+
+        <!-- 已上传文件展示 -->
+        <div v-if="currentFile" class="uploaded-file">
+          <span class="file-name">{{ currentFile.name }}</span>
+        </div>
+      </div>
+      
+      <!-- 备注输入框 -->
+      <div class="remark-section">
+        <div class="remark-label">备注</div>
+        <el-input
+          v-model="remark"
+          type="textarea"
+          :rows="3"
+          placeholder="请输入备注信息（选填）"
+          maxlength="200"
+          show-word-limit
+          :disabled="saving"
+        />
+      </div>
+    </main>
+  </div>
+</template>
+
+<script setup>
+import { ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import * as aiProjectApi from '@/api/modules/aiProject' 
+import { useOssUpload } from '@/components/ossClient/index' 
+
+const props = defineProps({
+  visible: { type: Boolean, default: false },
+  project: { type: Object, default: () => null }
+})
+
+const emit = defineEmits(['close', 'success'])
+
+// 1. 顶层调用 Hook
+const ossUpload = useOssUpload() 
+
+const reportTypeOptions = [
+  { key: 'FEASIBILITY_STUDY', label: '可研报告' },
+  { key: 'PROJECT_PROPOSAL', label: '项目建议书' },
+  { key: 'WIND_RESOURCE_ASSESSMENT', label: '风资源评估' },
+  { key: 'COMPETITIVE_ALLOCATION', label: '竞配申请报告' },
+  { key: 'POST_EVALUATION', label: '后评价报告' },
+  { key: 'PROJECT_INITIATION', label: '请示文件' },
+]
+
+const activeReportTab = ref('FEASIBILITY_STUDY')
+const fileInputRef = ref(null)
+const currentFile = ref(null)
+const remark = ref('')
+const saving = ref(false)
+
+watch(() => props.visible, (val) => {
+  if (val) {
+    console.log('【AddReportPanel】组件已显示，当前 project:', props.project)
+    activeReportTab.value = 'FEASIBILITY_STUDY'
+    currentFile.value = null
+    remark.value = ''
+    saving.value = false
+  }
+})
+
+function handleSwitchTab(key) {
+  if (activeReportTab.value === key) return
+  activeReportTab.value = key
+  currentFile.value = null
+}
+
+function triggerFileInput() {
+  fileInputRef.value?.click()
+}
+
+function handleFileChange(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  console.log('【AddReportPanel】选择文件:', file.name)
+  currentFile.value = file
+  e.target.value = ''
+}
+
+// ★ 核心排错方法
+async function handleSave() {
+  // 使用 alert 确保绝对能看到！
+  alert('1. 成功触发了 handleSave 点击事件！');
+  
+  if (!currentFile.value) {
+    alert('2. 拦截：你还没选择文件呢！currentFile 为空');
+    return;
+  }
+
+  const projectId = props.project?.aiProjectId || props.project?.id;
+  if (!projectId) {
+    alert('3. 拦截：当前 project 数据里没有 id 或 aiProjectId');
+    console.error('【AddReportPanel】project 数据:', props.project);
+    return;
+  }
+
+  const file = currentFile.value;
+  alert(`4. 准备开始上传，文件: ${file.name}，项目ID: ${projectId}`);
+
+  try {
+    saving.value = true;
+    
+    // 检查 OSS 实例
+    if (!ossUpload || typeof ossUpload.uploadFile !== 'function') {
+      alert('5. 报错：ossUpload.uploadFile 不是一个函数！请检查 OSS 封装');
+      console.error('ossUpload 的值:', ossUpload);
+      throw new Error('OSS 上传组件未正确初始化');
+    }
+
+    alert('6. 正在调用 OSS 接口，请打开 F12 网络面板查看请求...');
+    const uploadRes = await ossUpload.uploadFile(file);
+    console.log('【AddReportPanel】OSS 返回结果:', uploadRes);
+
+    const fileUrl = uploadRes?.obsPath || uploadRes?.url || '';
+    if (!fileUrl) {
+      alert('7. 报错：OSS 上传成功，但返回的数据里没有 obsPath 或 url');
+      throw new Error('未能获取文件URL');
+    }
+
+    alert(`8. OSS 上传成功！URL: ${fileUrl}，准备调用后端保存接口...`);
+
+    const payload = {
+      aiProjectId: projectId, 
+      fileName: file.name,
+      fileSize: file.size,
+      fileSuffix: file.name.split('.').pop().toLowerCase(),
+      fileUrl: fileUrl,
+      remark: remark.value,
+      reportType: activeReportTab.value 
+    };
+
+    console.log('【AddReportPanel】准备提交的参数:', payload);
+
+    // 检查接口实例
+    if (typeof aiProjectApi.uploadReport !== 'function') {
+      alert('9. 报错：aiProjectApi.uploadReport 不是一个函数！请检查 import 路径或接口名');
+      throw new Error('找不到 uploadReport 接口');
+    }
+
+    const res = await aiProjectApi.uploadReport(payload);
+    console.log('【AddReportPanel】后端返回结果:', res);
+
+    if (res?.code === 200 || res?.code === '200' || res?.success) {
+      alert('10. 全部成功！报告添加成功');
+      ElMessage.success('报告添加成功');
+      emit('success');
+      emit('close');
+    } else {
+      alert('11. 后端返回失败：' + (res?.msg || '未知错误'));
+    }
+  } catch (err) {
+    alert('12. 代码抛出异常：' + err.message);
+    console.error('【AddReportPanel】异常详情:', err);
+  } finally {
+    saving.value = false;
+  }
+}
+</script>
+
+<style scoped>
+.add-report-drawer {
+  position: fixed; top: 65px; right: 0; bottom: 0;
+  width: 50vw; min-width: 500px; z-index: 310;
+  background: #f5f7fa; box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
+  display: flex; flex-direction: column;
+}
+.drawer-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px; background: #fff; border-bottom: 1px solid #eef0f4;
+}
+.drawer-header h1 { margin: 0; font-size: 18px; font-weight: 600; color: #1f2937; }
+.drawer-actions { display: flex; gap: 12px; }
+.drawer-actions button {
+  padding: 6px 16px; font-size: 14px; border-radius: 4px; cursor: pointer;
+  border: 1px solid transparent; transition: all 0.2s;
+}
+.btn-cancel { color: #606266; background: #f4f4f5; border-color: #dcdfe6; }
+.btn-cancel:hover { background: #e9e9eb; color: #1677ff; border-color: #c6e2ff; }
+.btn-save { color: #fff; background: #1677ff; }
+.btn-save:hover { background: #4096ff; }
+.btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+.drawer-body { flex: 1; padding: 24px; overflow-y: auto; }
+.report-tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+.report-tab {
+  padding: 8px 16px; font-size: 14px; color: #606266; background: #fff;
+  border: 1px solid #e4e7ed; border-radius: 4px; cursor: pointer; transition: all 0.2s;
+}
+.report-tab:hover { color: #1677ff; }
+.report-tab.active {
+  color: #1677ff; background: #e6f2ff; border-color: #1677ff; font-weight: 500;
+}
+.upload-section { background: #fff; padding: 24px; border-radius: 8px; border: 1px solid #eef0f4; }
+.upload-hint { color: #909399; font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+.btn-upload {
+  padding: 8px 24px; color: #1677ff; background: #e6f2ff; border: 1px solid #1677ff;
+  border-radius: 4px; cursor: pointer; font-size: 14px; transition: all 0.2s;
+}
+.btn-upload:hover { background: #bae0ff; }
+.btn-upload:disabled { opacity: 0.6; cursor: not-allowed; }
+.uploaded-file { margin-top: 16px; }
+.file-name { color: #1677ff; font-size: 14px; text-decoration: underline; cursor: default; }
+.remark-section { margin-top: 24px; }
+.remark-label { margin-bottom: 8px; color: #606266; font-size: 14px; }
+</style>

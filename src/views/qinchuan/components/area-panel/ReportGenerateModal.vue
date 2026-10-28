@@ -193,7 +193,7 @@ const props = defineProps({
   project: { type: Object, default: () => null },
 })
 
-const emit = defineEmits(['close', 'add-report', 'confirm', 'generate-request'])
+const emit = defineEmits(['close', 'add-report', 'confirm', 'generate-request', 'open-add-report'])
 
 /* ---------------- 报告类型（可研那套，保持不变） ---------------- */
 const options = reportTypeOptions
@@ -259,7 +259,8 @@ function handleSelect(option) {
 }
 
 function handleAddReport() {
-  window.alert('添加项目报告：功能开发中')
+  // ★ 通知父页面：“用户想添加报告了”
+  emit('open-add-report')
 }
 
 function openRequestForm() {

@@ -1,6 +1,7 @@
 <!-- components/area-panel/tabs/ProjectReportTab.vue -->
 <template>
   <div class="project-report-tab">
+    <!-- 子 Tab 保持原样 -->
     <div class="sub-tabs" v-if="!hideSubTabs">
       <button
         v-for="tab in tabs"
@@ -39,7 +40,7 @@
             <td>{{ row.currentCapacityMw ?? '-' }}</td>
             <td>
               <span class="status-tag" :style="{ color: getStatusColor(row.status, row.statusDesc) }">
-                {{ row.statusDesc || '-' }}
+                {{ row.displayStatusDesc || row.statusDesc || '-' }}
               </span>
             </td>
             <td class="ellipsis" :title="row.remark">{{ row.remark || '--' }}</td>
@@ -47,6 +48,13 @@
             
             <td class="sticky-col" style="width: 140px; min-width: 140px;">
               <div class="action-cell">
+                <!-- ★ 新增：待确认按钮 -->
+                <button 
+                  v-if="row.displayStatus === 'PENDING_CONFIRM'" 
+                  class="action-btn warning" 
+                  @click="handleOpenConfirm(row)"
+                >待确认</button>
+
                 <button 
                   v-if="row.fileUrl" 
                   class="action-btn primary" 
@@ -87,18 +95,61 @@
         @size-change="handleSizeChange"
       />
     </div>
+
+    <!-- ★ 新增：数据确认弹窗/面板 -->
+    <el-dialog
+      v-model="confirmDialogVisible"
+      title="数据解析确认"
+      width="600px"
+      :close-on-click-modal="false"
+      class="confirm-dialog"
+    >
+      <div v-loading="paramsLoading" class="confirm-content">
+        <template v-if="confirmData">
+          <p class="confirm-tip">请核对系统解析出的以下数据，确认无误后点击下方"确认"按钮。</p>
+          
+          <!-- 临时展示：如果你希望后续换成标准的表单，只需在这里替换掉下面这段 v-for -->
+          <div class="data-preview">
+            <div class="data-row" v-for="(val, key) in filterDisplayData(confirmData)" :key="key">
+              <span class="data-label">{{ key }}</span>
+              <span class="data-value">{{ val ?? '-' }}</span>
+            </div>
+          </div>
+        </template>
+        <div v-else class="empty-tip">暂无解析数据</div>
+      </div>
+
+      <template #footer>
+        <el-button @click="confirmDialogVisible = false">取消</el-button>
+        <el-button 
+          type="primary" 
+          :loading="confirming" 
+          :disabled="paramsLoading || !confirmData"
+          @click="handleMakeSure"
+        >
+          确认无误
+        </el-button>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { pageReport, terminateCalculation } from '@/api/modules/aiProject'
+// ★ 引入需要的接口
+import { 
+  pageReport, 
+  terminateCalculation, 
+  getParamsData, // 假设接口名叫这个，请根据实际导出调整
+  userMakeSure   // 假设接口名叫这个，请根据实际导出调整
+} from '@/api/modules/aiProject'
 
 const props = defineProps({
   project: { type: Object, required: true },
-  initialSubTab: { type: String, default: '' }, // ★ 新增：允许父组件指定初始子Tab
-  hideSubTabs: { type: Boolean, default: false } // ★ 新增
+  initialSubTab: { type: String, default: '' }, 
+  hideSubTabs: { type: Boolean, default: false } 
 })
 const emit = defineEmits(['row-action'])
 
@@ -116,6 +167,13 @@ const list = ref([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(10)
+
+// ★ 新增：确认弹窗相关状态
+const confirmDialogVisible = ref(false)
+const paramsLoading = ref(false)
+const confirming = ref(false)
+const confirmData = ref(null)
+const currentRowId = ref(null)
 
 // 监听外部传入的初始子 Tab
 watch(() => props.initialSubTab, (val) => {
@@ -208,6 +266,61 @@ function handleTerminate(row) {
   }).catch(() => {})
 }
 
+// ★ 新增：打开待确认弹窗并请求数据
+async function handleOpenConfirm(row) {
+  currentRowId.value = row.id
+  confirmDialogVisible.value = true
+  paramsLoading.value = true
+  confirmData.value = null
+
+  try {
+    // 替换为你实际定义的接口名，假设返回格式为 res.data
+    const res = await getParamsData(row.id)
+    if (res?.code === 0 || res?.code === 200) {
+      confirmData.value = res.data || {}
+    } else {
+      ElMessage.error(res?.msg || '获取解析数据失败')
+    }
+  } catch (err) {
+    console.error('获取解析数据失败:', err)
+    ElMessage.error('获取解析数据异常')
+  } finally {
+    paramsLoading.value = false
+  }
+}
+
+// ★ 新增：提交确认
+async function handleMakeSure() {
+  if (!currentRowId.value) return
+  confirming.value = true
+  try {
+    // 替换为你实际定义的接口名
+    const res = await userMakeSure(currentRowId.value)
+    if (res?.code === 0 || res?.code === 200) {
+      ElMessage.success('确认成功')
+      confirmDialogVisible.value = false
+      fetchList() // 刷新当前列表
+      fetchAllTabCounts() // 刷新各 Tab 数量
+    } else {
+      ElMessage.error(res?.msg || '确认失败')
+    }
+  } catch (err) {
+    console.error('确认失败:', err)
+    ElMessage.error('确认请求异常')
+  } finally {
+    confirming.value = false
+  }
+}
+
+// ★ 新增：过滤要展示的数据（比如你不需要展示 createTime 时间戳）
+function filterDisplayData(data) {
+  if (!data) return {}
+  // 暂时全量展示，后续你可以根据实际字段删减，如：
+  // const { createTime, id, ...rest } = data
+  // return rest
+  return data
+}
+
 function formatDateTime(val) {
   if (!val) return '-'
   if (typeof val === 'number' || /^\d+$/.test(String(val))) {
@@ -228,7 +341,7 @@ function getStatusColor(status, desc) {
   const d = desc || ''
   if (d.includes('完成') || d.includes('成功') || s === 'COMPLETED') return '#00AE0F'
   if (d.includes('计算') || d.includes('解析') || d.includes('生成') || s === 'GENERATING' || s === 'PARSING') return '#2664EB'
-  if (d.includes('排队') || d.includes('等待') || d.includes('待') || s === 'PENDING' || s === 'QUEUING') return '#EF9600'
+  if (d.includes('排队') || d.includes('等待') || d.includes('待') || s === 'PENDING' || s === 'QUEUING' || s === 'PENDING_CONFIRM') return '#EF9600'
   if (d.includes('失败') || s === 'FAILED') return '#D81D1D'
   if (d.includes('终止') || s === 'TERMINATED') return '#8D8D8D'
   return '#303133'
@@ -280,6 +393,29 @@ watch(() => props.project?.id, async (newId) => {
 .action-btn.primary { color: #1D4ED8; }
 .action-btn.danger { color: #D81D1D; }
 .action-btn.more { color: #333333; font-weight: bold; font-size: 14px; }
+/* ★ 新增：警告/待确认按钮样式 */
+.action-btn.warning { color: #EF9600; font-weight: 500; }
 .empty-state { padding: 32px 0; color: #9CA3AF; text-align: center; font-size: 12px; }
 .pagination-wrap { display: flex; justify-content: flex-end; padding-top: 12px; margin-top: 8px; }
+
+/* ★ 新增：确认弹窗内部样式 */
+.confirm-content { min-height: 100px; }
+.confirm-tip { margin-top: 0; margin-bottom: 16px; color: #606266; font-size: 13px; }
+.data-preview {
+  background: #f8f9fa;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.data-row {
+  display: flex;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.data-row:last-child { margin-bottom: 0; }
+.data-label { flex: 0 0 120px; color: #909399; text-align: right; padding-right: 12px; }
+.data-value { flex: 1; color: #303133; word-break: break-all; }
+.empty-tip { text-align: center; color: #909399; padding: 20px 0; font-size: 13px; }
 </style>
