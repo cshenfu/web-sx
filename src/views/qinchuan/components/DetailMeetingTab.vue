@@ -114,8 +114,11 @@ const emit = defineEmits(['action', 'deleted'])
 const loading = ref(false)
 const steps = ref([])
 
-// 1. 原有的 step 按钮配置
+// ========================================================
+// 操作按钮配置 (已按效果图更新 IDM)
+// ========================================================
 const STEP_ACTIONS_MAP = {
+  // --- 立项阶段 ---
   PIM_TO_NEW_ENERGY_COMPANY: [
     { key: 'gen-application', label: '生成立项申请报告' },
     { key: 'upload-minutes', label: '上传会议纪要' },
@@ -128,32 +131,38 @@ const STEP_ACTIONS_MAP = {
     { key: 'upload-minutes', label: '上传会议纪要' },
     { key: 'upload-approval', label: '上传立项批复文件' },
   ],
+
+  // --- 可研阶段 ---
   FER_TO_NEW_ENERGY_COMPANY: [
     { key: 'gen-report', label: '生成可研审查报告' },
     { key: 'upload-minutes', label: '上传会议纪要' },
   ],
+
+  // --- 投决阶段（按截图更新）---
   IDM_TO_NEW_ENERGY_COMPANY: [
-    { key: 'gen-application', label: '生成投决申请报告' },
-    { key: 'upload-minutes', label: '上传会议纪要' },
+    { key: 'gen-invest-apply', label: '生成投资决策申请报告' },
+    { key: 'gen-invest-letter', label: '生成投资决策请示函' },
   ],
   IDM_TO_SHAANXI_COMPANY: [
-    { key: 'gen-application', label: '生成投决申请报告' },
-    { key: 'gen-letter', label: '生成投决请示函' },
+    { key: 'upload-party-minutes', label: '上传党委会纪要' },
+    { key: 'gen-invest-apply', label: '生成投资决策申请报告' },
+    { key: 'gen-invest-commitment', label: '生成投资项目责任承诺书' },
+    { key: 'gen-invest-letter', label: '生成投资决策请示函' },
   ],
   IDM_SHAANXI_COMPANY: [
-    { key: 'upload-minutes', label: '上传会议纪要' },
-    { key: 'upload-approval', label: '上传投决批复文件' },
+    { key: 'gen-audit-notice', label: '生成投审会通知文件' },
+    { key: 'gen-audit-topic', label: '生成投审议题材料' },
   ],
   IDM_TO_GROUP: [
-    { key: 'upload-minutes', label: '上传会议纪要' },
-    { key: 'upload-approval', label: '上传集团批复文件' },
+    { key: 'upload-party-minutes', label: '上传党委会纪要' },
+    { key: 'gen-filing-report', label: '生成投资决策备案报告' },
   ],
   IDM_APPROVAL_TO_NEW_ENERGY_COMPANY: [
-    { key: 'upload-approval', label: '上传投资决策批复文件' },
+    { key: 'gen-approval-doc', label: '生成批复文件' },
   ],
 }
 
-// 2. ★ 新增：按 fileCode 兜底的操作映射（应对后端不传 subCode）
+// 1. 如果是后端完全没给，前端强行兜底的结构
 const DEFAULT_ACTIONS_BY_FILE_CODE = {
   'FEASIBILITY_REVIEW': [
     { key: 'intelligent-review', label: '智能审查' },
@@ -161,19 +170,32 @@ const DEFAULT_ACTIONS_BY_FILE_CODE = {
   ]
 }
 
-// 3. ★ 修改：按钮 key 对应的文件类型标签
+// 2. 操作完成判断标签（需和文件标签双向匹配）
 const ACTION_TO_FILE_TAG = {
   'gen-application': '立项申请',
   'gen-letter': '立项请示函',
   'gen-report': '可研审查报告',
   'upload-minutes': '会议纪要',
   'upload-approval': '批复文件',
-  'upload-manual-review': '人工审查报告', // 新增
+  'upload-manual-review': '人工审查报告',
+  // 投决新增
+  'gen-invest-apply': '投资决策申请报告',
+  'gen-invest-letter': '投资决策请示函',
+  'upload-party-minutes': '党委会纪要',
+  'gen-invest-commitment': '投资项目责任承诺书',
+  'gen-audit-notice': '投审会通知文件',
+  'gen-audit-topic': '投审议题材料',
+  'gen-filing-report': '投资决策备案报告',
+  'gen-approval-doc': '批复文件',
 }
 
+// 3. 设置负责人的步骤（添加了投决的后面 4 步）
 const NEED_SET_OWNER_STEPS = new Set([
   'PIM_TO_SHAANXI_COMPANY',
   'IDM_TO_SHAANXI_COMPANY',
+  'IDM_SHAANXI_COMPANY',
+  'IDM_TO_GROUP',
+  'IDM_APPROVAL_TO_NEW_ENERGY_COMPANY',
 ])
 
 function hasSetOwner(step) {
@@ -233,8 +255,14 @@ function getPendingActions(actions, fileGroups) {
   return actions.filter(a => !isActionCompleted(a, fileGroups))
 }
 
+// ========================================================
+// ★ 核心修改：全部操作都完成才判定为 done
+// ========================================================
 function isStepDone(step) {
-  return step.files.length > 0
+  // 如果没有操作（或只有一个兜底上传），退回到有文件就算完成
+  if (step.actions.length === 0) return step.files.length > 0
+  // 只要还有 pendingActions，就不算完成
+  return step.pendingActions.length === 0
 }
 
 // ========================================================
@@ -251,13 +279,10 @@ async function loadMeeting() {
     const stage = (enumRes?.data || []).find(s => s.stageCode === props.stageCode)
     const firstBiz = (stage?.firstBusinessTitle || []).find(f => f.fileCode === props.fileCode)
     
-    // ★ 核心兜底：如果后端没返回 subList，我们强行注入一个
+    // 兜底：如果可研审查没给，硬塞一个
     let subList = firstBiz?.secondaryBusinessTitle || []
     if (props.fileCode === 'FEASIBILITY_REVIEW' && subList.length === 0) {
-      subList = [{
-        subCode: '', 
-        subDesc: 'to新能源公司',
-      }]
+      subList = [{ subCode: '', subDesc: 'to新能源公司' }]
     }
 
     const fileRes = await fileApi.getFileListByProjectid({
@@ -267,12 +292,11 @@ async function loadMeeting() {
     const fileList = normalizeFileList(fileRes?.data)
 
     const rawSteps = subList.map((sub, index) => {
-      // ★ 按 subCode 匹配，若匹配不到则根据 fileCode 兜底
       const actions = STEP_ACTIONS_MAP[sub.subCode] 
         || DEFAULT_ACTIONS_BY_FILE_CODE[props.fileCode] 
         || [{ key: 'upload', label: '上传文件' }]
 
-      // ★ 兼容后端可能返回空字符串 '' 或 null 的问题
+      // 兼容空 subCode 匹配
       const records = fileList.filter(
         f => (f.secondaryBusinessTitle || '') === (sub.subCode || '')
       )
@@ -280,12 +304,11 @@ async function loadMeeting() {
       const files = records.flatMap(r => r.fileUrlList || [])
       const fileGroups = records.flatMap(r => buildFileGroups(r, actions))
       const lastRecord = records.length ? records[records.length - 1] : null
-
       const pendingActions = getPendingActions(actions, fileGroups)
 
       return {
         subCode: sub.subCode || '',
-        uniqueKey: `STEP_${sub.subCode || index}`, // ★ 避免 key 冲突
+        uniqueKey: `STEP_${sub.subCode || index}`,
         subDesc: sub.subDesc || `上会流程 ${index + 1}`,
         files,
         fileGroups,

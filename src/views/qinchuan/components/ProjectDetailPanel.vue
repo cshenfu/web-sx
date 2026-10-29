@@ -162,9 +162,21 @@ const meetingUploadConfig = ref({
   record: null,
 })
 
-const GENERATE_REPORT_ACTIONS = new Set(['gen-application', 'gen-letter', 'gen-report'])
-// ★ 新增 upload-manual-review 到上传动作
-const MEETING_UPLOAD_ACTIONS = new Set(['upload-minutes', 'upload-approval', 'replace', 'upload-manual-review'])
+// ★ 新增了投决阶段所有生成的动作
+const GENERATE_REPORT_ACTIONS = new Set([
+  'gen-application', 
+  'gen-letter', 
+  'gen-report',
+  'gen-invest-apply',
+  'gen-invest-letter',
+  'gen-invest-commitment',
+  'gen-audit-notice',
+  'gen-audit-topic',
+  'gen-filing-report',
+  'gen-approval-doc'
+])
+
+const MEETING_UPLOAD_ACTIONS = new Set(['upload-minutes', 'upload-approval', 'replace', 'upload-manual-review', 'upload-party-minutes'])
 
 const STAGE_ADVANCE = {
   PROJECT_RESERVE:    { label: '开始立项', next: 'PROJECT_INITIATION',  fileCode: 'PROJECT_INITIATION_MATERIALS' },
@@ -335,7 +347,7 @@ function handleFileDeleted() {
 }
 
 function handleMeetingAction(payload) {
-  // ★ 拦截智能审查
+  // 拦截智能审查
   if (payload.key === 'intelligent-review') {
     emit('action', { 
       type: 'intelligent-review', 
@@ -352,15 +364,16 @@ function handleMeetingAction(payload) {
     return
   }
 
+  // 拦截所有生成操作
   if (GENERATE_REPORT_ACTIONS.has(payload.key)) {
     emit('action', { type: 'generate-report', actionKey: payload.key, subCode: payload.subCode, step: payload.step, project: props.project })
     return
   }
 
-  // ★ 拦截上传操作（包含 upload-manual-review）
+  // 拦截所有上传操作
   if (MEETING_UPLOAD_ACTIONS.has(payload.key)) {
     meetingUploadConfig.value = { 
-      tagName: payload.label?.replace(/^(生成|上传)/, '') || '会议纪要', 
+      tagName: payload.label?.replace(/^(生成|上传)/, '') || '文件', 
       subCode: payload.subCode || '', 
       record: payload.record || null 
     }
