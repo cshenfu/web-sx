@@ -1,6 +1,8 @@
 <!-- MapGL.vue -->
 <template>
   <div ref="mapContainer" class="map-container" />
+  <!-- ★ 首帧遮罩：与最终背景同色，等 load + idle 后淡出 -->
+  <div class="map-initial-mask" :class="{ 'is-hidden': maskHidden }" />
 </template>
 
 <script setup>
@@ -39,6 +41,8 @@ const props = defineProps({
 })
 
 const mapContainer = ref(null)
+// ★ 遮罩状态：load + idle 之后置为 true
+const maskHidden = ref(false)
 let map = null
 let draw = null
 const hoverHandlers = new Map()
@@ -150,15 +154,68 @@ function applyGlobeProjection() {
   }
 }
 
+// ============================================================
+// ★ 计算初始 globe zoom（让第一帧就是正确大小，避免跳变）
+//   fill 0.32 ≈ zoom 0 时球体占容器短边的比例（经验值）
+//   想要更大就把 fill 调大到 0.88 / 0.92
+// ============================================================
+function computeInitialGlobeZoom(el, fill = 0.5) {
+  if (!el) return 2
+  const short = Math.min(el.clientWidth, el.clientHeight)
+  if (!short) return 2
+  const BASE_RATIO = 0.32
+  const target = Math.max(0.4, Math.min(1.2, fill))
+  return Math.log2(target / BASE_RATIO)
+}
+
+// ============================================================
+// ★ 大气 / 光照（幂等；style.load 与 load 都会调用，保证第一帧就带大气）
+// ============================================================
+function applyAtmosphereAndLight() {
+  if (!map) return
+
+  try {
+    map.setSky({
+      'sky-color': 'rgba(0, 0, 0, 0)',
+      'horizon-color': 'rgba(0, 0, 0, 0)',
+      'fog-color': 'rgba(0, 0, 0, 0)',
+      'sky-horizon-blend': 0.5,
+      'horizon-fog-blend': 0.5,
+      'fog-ground-blend': 0.5,
+      // 在大屏地球层级（zoom ≤ 3.5）显示光晕，3.5~5 之间逐渐消失
+      'atmosphere-blend': [
+        'interpolate', ['linear'], ['zoom'],
+        0, 1.0, 3.5, 1.0, 5, 0.0,
+      ],
+    })
+  } catch (e) { /* 忽略 */ }
+
+  try {
+    map.setLight(
+      props.isDashboard
+        ? { anchor: 'viewport', color: '#ffffff', intensity: 0.1, position: [1.15, 200, 45] }
+        : { anchor: 'viewport', color: '#ffffff', intensity: 0.4, position: [1.15, 200, 45] },
+    )
+  } catch (e) { /* 忽略 */ }
+}
+
 onMounted(() => {
+  // ★ 大屏模式：直接算好 zoom / center，构造时就进入最终视角
+  const initialZoom = props.isDashboard
+    ? computeInitialGlobeZoom(mapContainer.value, 2)
+    : props.zoom
+  const initialCenter = props.isDashboard ? [108.9, 35.2] : props.center
+console.log(initialZoom)
   map = new maplibregl.Map({
     container: mapContainer.value,
     style: props.style,
-    center: props.center,
-    zoom: props.zoom,
+    center: initialCenter,
+    zoom: initialZoom,
     projection: 'globe',
     // ★ 大屏允许倾斜，业务地图永远正俯视
     maxPitch: props.isDashboard ? 60 : 0,
+    // ★ 取消瓦片 / 图标淡入，避免"从暗到亮、轮廓渐显"
+    fadeDuration: 0,
   })
 
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
@@ -192,6 +249,8 @@ onMounted(() => {
   map.on('style.load', () => {
     activeProjection = 'globe'
     applyGlobeProjection()
+    // ★ style 解析完成即可应用大气 / 光照，让第一帧就有大气
+    applyAtmosphereAndLight()
   })
 
   map.on('load', () => {
@@ -221,66 +280,25 @@ onMounted(() => {
       console.warn('[MapGL] 星空插件加载失败', e)
     }
 
-    if (props.isDashboard) {
-      // =========================================================
-      // 主页（大屏）专属：大气光晕、夜半球（去除强光照明）
-      // =========================================================
-
-      // 1. 设置大气光晕（核心）
-      try {
-        map.setSky({
-          'sky-color': 'rgba(0, 0, 0, 0)',
-          'horizon-color': 'rgba(0, 0, 0, 0)',
-          'fog-color': 'rgba(0, 0, 0, 0)',
-          'sky-horizon-blend': 0.5,
-          'horizon-fog-blend': 0.5,
-          'fog-ground-blend': 0.5,
-          // 在大屏地球层级（zoom ≤ 3.5）显示光晕，3.5~5 之间逐渐消失
-          'atmosphere-blend': [
-            'interpolate', ['linear'], ['zoom'],
-            0, 1.0, 3.5, 1.0, 5, 0.0,
-          ],
-        })
-      } catch (e) { /* 忽略 */ }
-
-      // 2. 取消强烈的方向光照明，改为极弱的全局均光，增强立体感但不产生明显的阴影
-      try {
-        map.setLight({
-          anchor: 'viewport',
-          color: '#ffffff',
-          intensity: 0.1, // 很低的强度，避免左亮右暗
-          position: [1.15, 200, 45],
-        })
-      } catch (e) { /* 忽略 */ }
-
-      // 3. 夜半球（如果不需要昼夜交替的黑暗面，可以将这里注释掉）
-      // import('crepuscule')
-      //   .then(({ CrepusculeLive }) => {
-      //     try {
-      //       nightOverlay = new CrepusculeLive(map, { color: [0, 12, 55] })
-      //     } catch (e) {}
-      //   })
-      //   .catch(() => {})
-
-    } else {
-      // =========================================================
-      // 普通业务模式：默认透明天空和基础光照（星空已在上面加载）
-      // =========================================================
-      try {
-        map.setSky({
-          'sky-color': 'rgba(0, 0, 0, 0)', 'horizon-color': 'rgba(0, 0, 0, 0)',
-          'fog-color': 'rgba(0, 0, 0, 0)', 'sky-horizon-blend': 0.5,
-          'horizon-fog-blend': 0.5, 'fog-ground-blend': 0.5,
-        })
-      } catch (e) { /* 忽略 */ }
-
-      try {
-        map.setLight({ anchor: 'viewport', color: '#ffffff', intensity: 0.4, position: [1.15, 200, 45] })
-      } catch (e) { /* 忽略 */ }
-    }
+    // ★ load 里再调用一次兜底（style.load 若被跳过也不至于没大气）
+    applyAtmosphereAndLight()
 
     if (props.flyToOnLoad) flyToShaanxi()
     emit('ready')
+
+    // ★ 遮罩淡出：优先等 map idle（瓦片全部就绪），并给 3s 硬兜底
+    const hideMaskOnce = () => {
+      if (maskHidden.value) return
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // 再给一点点余量让 style.load 的 sky/light 生效
+          setTimeout(() => { maskHidden.value = true }, 60)
+        })
+      })
+      map.off('idle', hideMaskOnce)
+    }
+    map.once('idle', hideMaskOnce)
+    setTimeout(hideMaskOnce, 3000)
   })
 })
 
@@ -1303,6 +1321,20 @@ defineExpose({
   height: 100%;
   /* ✅ 深色兜底：星空插件加载失败或球体外围无星空时，也不会露出浅色底 */
   background-color: #030817;
+}
+/* ★ 首帧遮罩：与最终背景同色，load + idle 后平滑淡出 */
+.map-initial-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: #030817;
+  opacity: 1;
+  transition: opacity 420ms ease;
+  will-change: opacity;
+}
+.map-initial-mask.is-hidden {
+  opacity: 0;
 }
 :deep(.maplibregl-ctrl-top-right) { display: none; }
 :deep(.maplibregl-ctrl-bottom-right) { display: none; }

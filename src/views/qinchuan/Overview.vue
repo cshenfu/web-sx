@@ -2691,14 +2691,7 @@ function handleWizardSubmit(payload) {
 }
 const SHAANXI_BOUNDS = [[105.4, 31.6], [111.3, 39.6]]
 
-function fitGlobeZoom(map, fill = 0.7) {
-  const el = map.getContainer()
-  const short = Math.min(el.clientWidth, el.clientHeight)
-  if (!short) return 1.8
-  const BASE_RATIO = 0.32
-  const target = Math.max(0.4, Math.min(0.9, fill))
-  return Math.log2(target / BASE_RATIO)
-}
+
 
 function handleStyleLoad() {
   try {
@@ -2717,17 +2710,16 @@ async function onMapReady() {
   const map = mapRef.value.getMap()
 
   try {
+    // ★ 初始视角 / center / zoom 已在 MapGL 构造时按容器尺寸算好，
+    //   这里不再 jumpTo，避免首帧"地球先小后大"的跳变。
     map.setMinZoom(0)
-    try { map.setProjection({ type: 'globe' }) } catch (e) { try { map.setProjection('globe') } catch (e2) {} }
-
-    const zoom = fitGlobeZoom(map, 0.8)
-    map.jumpTo({ center: [108.9, 35.2], zoom: 2, pitch: 0, bearing: 0 })
     mapRef.value.startAutoRotate(3)
     mapRef.value.setCentroidLabelsVisible?.(false)
   } catch (err) {
     console.warn('[map] 初始化地球视角失败:', err)
   }
 
+  // ↓↓↓ 以下整段完全保留原样 ↓↓↓
   const handleEnterMap = () => {
     if (hasEntered) return
     hasEntered = true
