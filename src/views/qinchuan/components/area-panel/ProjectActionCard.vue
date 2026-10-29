@@ -9,7 +9,7 @@
     <div class="tooltip-header">
       <button
         class="tooltip-title"
-        :class="{ 'title-link': !hoverMode }"
+        :class="{ 'title-link': titleClickable }"
         type="button"
         @click.stop="onTitleClick"
       >{{ project.projectName || '-' }}</button>
@@ -143,7 +143,11 @@ const statusLabel = computed(() => props.stageMap[props.project.projectStage] ||
 
 const windCount = computed(() => (props.project.windTurbinePoints || []).filter((p) => Number(p.isReserve) !== 1).length)
 const altCount  = computed(() => (props.project.windTurbinePoints || []).filter((p) => Number(p.isReserve) === 1).length)
-
+// ★ 标题是否可点击：hover 模式 / 初步遴选（selection 分组）均不可点
+const titleClickable = computed(() => {
+  if (props.hoverMode) return false
+  return getGroupKey(props.project?.projectStage) !== 'selection'
+})
 const allActions = computed(() => {
   if (props.actions && props.actions.length) return props.actions
   return STAGE_ACTIONS[props.project.projectStage] || STAGE_ACTIONS.PRELIMINARY_SELECTION
@@ -178,10 +182,10 @@ const cardStyle = computed(() => {
 
 watch(() => props.project?.id, () => { actionMenuOpen.value = false })
 
-function onTitleClick() {
-  if (props.hoverMode) return
-  emit('open-detail', props.project)
-}
+ function onTitleClick() {
+   if (!titleClickable.value) return
+   emit('open-detail', props.project)
+ }
 function emitAction(action) {
   actionMenuOpen.value = false
   emit('action', action, props.project)

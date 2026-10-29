@@ -51,7 +51,7 @@
         </div>
 
         <div v-else class="file-actions">
-          <el-button link type="primary" size="small" @click="onUploadClick(item)">设置任务</el-button>
+          <el-button link type="primary" size="small" @click="setTask(item)">设置任务</el-button>
           <el-button link type="primary" size="small" @click="onUploadClick(item)">上传</el-button>
         </div>
       </div>
@@ -198,6 +198,10 @@ watch(
 function onUploadClick(item) {
   console.log('[material] 点击上传，item =', item)
   emit('upload', item)
+}
+
+function setTask(item){
+  console.log("设置任务")
 }
 
 // ★ 下载：调 ossClient.getFileUrl 拿签名 URL，再触发浏览器下载

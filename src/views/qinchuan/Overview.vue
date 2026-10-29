@@ -107,8 +107,7 @@
           @submit="handleWizardSubmit"
         />
 
-        <div class="area-view-layer" v-show="!popoverProject && !isEditing">
-          <template v-if="!selectedProject">
+        <div class="area-view-layer" v-show="!popoverProject && !isEditing && !isActionPanelOpen">          <template v-if="!selectedProject">
             <ProjectListPanel
               class="panel-below"
               v-model:model-value-expanded="listExpanded"

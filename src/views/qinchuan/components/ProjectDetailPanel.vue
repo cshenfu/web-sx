@@ -16,7 +16,7 @@
       <template v-else>
         <header class="panel-header">
           <div class="panel-title">{{ project?.projectName || '-' }}</div>
-                    <div class="header-actions">
+          <div class="header-actions">
             <!-- 报告/函件生成 按钮 -->
             <button type="button" class="report-btn" @click="$emit('generate-report', props.project)">
               <svg viewBox="0 0 16 16" class="report-icon"><rect x="3" y="2" width="10" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
@@ -35,7 +35,7 @@
               {{ advanceConfig.label }}
             </el-button>
 
-            <!-- ★ 新增：关闭叉号按钮 -->
+            <!-- 关闭叉号按钮 -->
             <button type="button" class="close-panel-btn" title="关闭面板" @click="$emit('close')">
               <svg viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
@@ -63,7 +63,7 @@
           />
           
           <DetailMaterialTab
-             v-else-if="activeTab === 'material' || activeTab === 'invest-material'"
+            v-else-if="activeTab === 'material' || activeTab === 'invest-material'"
             ref="materialTabRef"
             :project="project"
             :file-code="activeTabConfig.fileCode"
@@ -83,7 +83,6 @@
             @deleted="handleMeetingFileDeleted"
           />
 
-          <!-- ★ 修改：增加 hideSubTabs 属性 -->
           <ProjectReportTab
             v-else-if="activeTabConfig.type === 'report'"
             :key="activeTab"
@@ -143,7 +142,6 @@ const props = defineProps({
   initialTab: { type: String, default: 'main' },
 })
 
-// ★ 修改：新增 generate-report 事件
 const emit = defineEmits(['close', 'action', 'generate-report'])
 const router = useRouter()
 
@@ -165,7 +163,8 @@ const meetingUploadConfig = ref({
 })
 
 const GENERATE_REPORT_ACTIONS = new Set(['gen-application', 'gen-letter', 'gen-report'])
-const MEETING_UPLOAD_ACTIONS = new Set(['upload-minutes', 'upload-approval', 'replace'])
+// ★ 新增 upload-manual-review 到上传动作
+const MEETING_UPLOAD_ACTIONS = new Set(['upload-minutes', 'upload-approval', 'replace', 'upload-manual-review'])
 
 const STAGE_ADVANCE = {
   PROJECT_RESERVE:    { label: '开始立项', next: 'PROJECT_INITIATION',  fileCode: 'PROJECT_INITIATION_MATERIALS' },
@@ -262,15 +261,12 @@ const STAGE_TABS_CONFIG = {
     { key: 'material', label: '立项材料', stageCode: 'PROJECT_INITIATION', fileCode: 'PROJECT_INITIATION_MATERIALS' },
     { key: 'meeting', label: '立项上会', stageCode: 'PROJECT_INITIATION', fileCode: 'PROJECT_INITIATION_MEETING_MATERIALS' },
   ],
-    FEASIBILITY_REVIEW: [
+  FEASIBILITY_REVIEW: [
     { key: 'main', label: '主要信息' },
     { key: 'request-file', label: '请示文件', type: 'report', subTab: 'PROJECT_INITIATION' },
-    // 原有的可研材料
     { key: 'material', label: '可研材料', stageCode: 'FEASIBILITY_REVIEW', fileCode: 'PROJECT_FEASIBILITY_MATERIALS' },
-    // ★ 新增：投决准备 Tab
-   
     { key: 'meeting', label: '可研审查', stageCode: 'FEASIBILITY_REVIEW', fileCode: 'FEASIBILITY_REVIEW' },
-     { key: 'invest-material', label: '投决准备', stageCode: 'FEASIBILITY_REVIEW', fileCode: 'INVESTMENT_DECISION_MATERIALS' },
+    { key: 'invest-material', label: '投决准备', stageCode: 'FEASIBILITY_REVIEW', fileCode: 'INVESTMENT_DECISION_MATERIALS' },
   ],
   INVESTMENT_DECISION: [
     { key: 'main', label: '主要信息' },
@@ -297,6 +293,7 @@ watch(
   },
   { immediate: true }
 )
+
 function handleReportCreate(payload) {
   emit('action', {
     type: 'create-report',
@@ -338,20 +335,39 @@ function handleFileDeleted() {
 }
 
 function handleMeetingAction(payload) {
+  // ★ 拦截智能审查
+  if (payload.key === 'intelligent-review') {
+    emit('action', { 
+      type: 'intelligent-review', 
+      subCode: payload.subCode, 
+      step: payload.step, 
+      project: props.project 
+    })
+    return
+  }
+
   if (payload.key === 'set-owner') {
     ElMessage.info(`点击了「设置负责人」：${payload.step || ''}（弹窗待接）`)
     emit('action', { type: 'meeting', ...payload })
     return
   }
+
   if (GENERATE_REPORT_ACTIONS.has(payload.key)) {
     emit('action', { type: 'generate-report', actionKey: payload.key, subCode: payload.subCode, step: payload.step, project: props.project })
     return
   }
+
+  // ★ 拦截上传操作（包含 upload-manual-review）
   if (MEETING_UPLOAD_ACTIONS.has(payload.key)) {
-    meetingUploadConfig.value = { tagName: payload.label?.replace(/^(生成|上传)/, '') || '会议纪要', subCode: payload.subCode || '', record: payload.record || null }
+    meetingUploadConfig.value = { 
+      tagName: payload.label?.replace(/^(生成|上传)/, '') || '会议纪要', 
+      subCode: payload.subCode || '', 
+      record: payload.record || null 
+    }
     showMeetingUpload.value = true
     return
   }
+
   ElMessage.info(`点击了：${payload.label || ''}`)
   emit('action', { type: 'meeting', ...payload })
 }
@@ -372,10 +388,10 @@ function handleMeetingFileDeleted() {
 .detail-panel {
   position: fixed;
   top: 65px;
-  right: 12px; /* 留出阴影和边框的距离 */
+  right: 12px;
   bottom: 20px;
   height: calc(100vh - 85px); 
-  width: 779px;  /* 宽度与 Overview 对齐 */
+  width: 779px;
   max-width: calc(100vw - 24px);
   z-index: 200;
   display: flex;
@@ -383,17 +399,11 @@ function handleMeetingFileDeleted() {
   box-sizing: border-box;
   padding: 16px 0px 24px 0px;
   gap: 16px;
-  
-  /* 长串渐变背景 */
   background: linear-gradient(149.65deg, rgba(255, 255, 255, 0.2) 4.61%, rgba(255, 255, 255, 0.15) 29.07%, rgba(255, 255, 255, 0.3) 49.01%, rgba(255, 255, 255, 0.1) 61.4%, rgba(255, 255, 255, 0.2) 74.74%, rgba(255, 255, 255, 0.22) 97.19%);
-  
-  /* 毛玻璃与边框 */
   border: 3px solid rgba(255, 255, 255, 0.4);
   border-radius: 10px;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  
-  /* 设计稿指定的双层阴影 */
   box-shadow: 5px 5px 0px rgba(207, 234, 255, 0.5), -10px 0px 30px rgba(0, 0, 0, 0.1);
   color: #303133;
   overflow: hidden;
@@ -411,7 +421,7 @@ function handleMeetingFileDeleted() {
   flex: 1;
   overflow: hidden;
   color: #111827;
-  font-size: 24px;  /* 同步 Overview 尺寸 */
+  font-size: 24px;
   font-weight: 700;
   line-height: 28px;
   letter-spacing: 0.5px;
@@ -427,7 +437,6 @@ function handleMeetingFileDeleted() {
   flex-shrink: 0;
 }
 
-/* 报告生成按钮 - 完全照搬 Overview */
 .report-btn {
   display: inline-flex;
   align-items: center;
@@ -452,7 +461,7 @@ function handleMeetingFileDeleted() {
   display: flex;
   justify-content: flex-start;
   height: 44px;
-  background: rgba(255, 255, 255, 0.5); /* Overview 样式 */
+  background: rgba(255, 255, 255, 0.5);
   border-top: 1px solid rgba(255, 255, 255, 0.4);
   border-bottom: 1px solid rgba(255, 255, 255, 0.4);
   padding: 0 25px;
@@ -469,7 +478,7 @@ function handleMeetingFileDeleted() {
   padding: 0 20px;
   color: #4B5563;
   font-family: 'PingFang SC', 'Inter', sans-serif;
-  font-size: 16px; /* 同步 Overview */
+  font-size: 16px;
   background: transparent;
   border: 0;
   border-bottom: 3px solid transparent;
@@ -492,7 +501,6 @@ function handleMeetingFileDeleted() {
   overflow-y: auto;
   padding: 0 25px 16px 25px;
 }
-/* 美化滚动条 */
 .panel-body::-webkit-scrollbar { width: 6px; height: 6px; }
 .panel-body::-webkit-scrollbar-track { background: transparent; }
 .panel-body::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 3px; }
@@ -503,8 +511,6 @@ function handleMeetingFileDeleted() {
 .detail-slide-enter-from,
 .detail-slide-leave-to { transform: translateX(100%); }
 
-
-/* ★ 新增：关闭按钮样式 */
 .close-panel-btn {
   display: flex;
   align-items: center;

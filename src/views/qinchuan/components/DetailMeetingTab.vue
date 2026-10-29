@@ -6,7 +6,7 @@
 
     <div
       v-for="step in steps"
-      :key="step.subCode"
+      :key="step.uniqueKey"
       class="step-card"
       :class="{ locked: !step.unlocked }"
     >
@@ -114,7 +114,7 @@ const emit = defineEmits(['action', 'deleted'])
 const loading = ref(false)
 const steps = ref([])
 
-// 操作按钮配置
+// 1. 原有的 step 按钮配置
 const STEP_ACTIONS_MAP = {
   PIM_TO_NEW_ENERGY_COMPANY: [
     { key: 'gen-application', label: '生成立项申请报告' },
@@ -153,16 +153,24 @@ const STEP_ACTIONS_MAP = {
   ],
 }
 
-// ★ action.key → 该操作对应的文件类型标签（用于判定"是否已完成"）
+// 2. ★ 新增：按 fileCode 兜底的操作映射（应对后端不传 subCode）
+const DEFAULT_ACTIONS_BY_FILE_CODE = {
+  'FEASIBILITY_REVIEW': [
+    { key: 'intelligent-review', label: '智能审查' },
+    { key: 'upload-manual-review', label: '上传人工审查报告' },
+  ]
+}
+
+// 3. ★ 修改：按钮 key 对应的文件类型标签
 const ACTION_TO_FILE_TAG = {
   'gen-application': '立项申请',
   'gen-letter': '立项请示函',
   'gen-report': '可研审查报告',
   'upload-minutes': '会议纪要',
   'upload-approval': '批复文件',
+  'upload-manual-review': '人工审查报告', // 新增
 }
 
-// 需要"设置负责人"的步骤
 const NEED_SET_OWNER_STEPS = new Set([
   'PIM_TO_SHAANXI_COMPANY',
   'IDM_TO_SHAANXI_COMPANY',
@@ -212,7 +220,6 @@ function buildFileGroups(record, actions) {
   }))
 }
 
-// ★ 判断某个 action 是否已完成（该步骤下已有对应标签的文件）
 function isActionCompleted(action, fileGroups) {
   const tag = ACTION_TO_FILE_TAG[action.key]
   if (!tag) return false
@@ -222,7 +229,6 @@ function isActionCompleted(action, fileGroups) {
   })
 }
 
-// ★ 计算"还没完成的操作"
 function getPendingActions(actions, fileGroups) {
   return actions.filter(a => !isActionCompleted(a, fileGroups))
 }
@@ -232,7 +238,7 @@ function isStepDone(step) {
 }
 
 // ========================================================
-// loadMeeting
+// 核心加载逻辑
 // ========================================================
 async function loadMeeting() {
   if (!props.project?.id || !props.fileCode) {
@@ -243,9 +249,16 @@ async function loadMeeting() {
   try {
     const enumRes = await fileApi.getFileType()
     const stage = (enumRes?.data || []).find(s => s.stageCode === props.stageCode)
-    const firstBiz = (stage?.firstBusinessTitle || [])
-      .find(f => f.fileCode === props.fileCode)
-    const subList = firstBiz?.secondaryBusinessTitle || []
+    const firstBiz = (stage?.firstBusinessTitle || []).find(f => f.fileCode === props.fileCode)
+    
+    // ★ 核心兜底：如果后端没返回 subList，我们强行注入一个
+    let subList = firstBiz?.secondaryBusinessTitle || []
+    if (props.fileCode === 'FEASIBILITY_REVIEW' && subList.length === 0) {
+      subList = [{
+        subCode: '', 
+        subDesc: 'to新能源公司',
+      }]
+    }
 
     const fileRes = await fileApi.getFileListByProjectid({
       aiProjectId: props.project.id,
@@ -253,35 +266,32 @@ async function loadMeeting() {
     })
     const fileList = normalizeFileList(fileRes?.data)
 
-    const rawSteps = subList.map(sub => {
-      const actions = STEP_ACTIONS_MAP[sub.subCode] || [
-        { key: 'upload', label: '上传文件' },
-      ]
+    const rawSteps = subList.map((sub, index) => {
+      // ★ 按 subCode 匹配，若匹配不到则根据 fileCode 兜底
+      const actions = STEP_ACTIONS_MAP[sub.subCode] 
+        || DEFAULT_ACTIONS_BY_FILE_CODE[props.fileCode] 
+        || [{ key: 'upload', label: '上传文件' }]
 
+      // ★ 兼容后端可能返回空字符串 '' 或 null 的问题
       const records = fileList.filter(
-        f => f.secondaryBusinessTitle === sub.subCode
+        f => (f.secondaryBusinessTitle || '') === (sub.subCode || '')
       )
+      
       const files = records.flatMap(r => r.fileUrlList || [])
       const fileGroups = records.flatMap(r => buildFileGroups(r, actions))
       const lastRecord = records.length ? records[records.length - 1] : null
 
-      // ★ 计算未完成的操作
       const pendingActions = getPendingActions(actions, fileGroups)
 
       return {
-        subCode: sub.subCode,
-        subDesc: sub.subDesc,
+        subCode: sub.subCode || '',
+        uniqueKey: `STEP_${sub.subCode || index}`, // ★ 避免 key 冲突
+        subDesc: sub.subDesc || `上会流程 ${index + 1}`,
         files,
         fileGroups,
-        pendingActions,        // ★ 只包含未完成的操作
-        owner:
-          lastRecord?.assignedUploaderName ||
-          lastRecord?.uploaderName ||
-          '',
-        time:
-          lastRecord?.updateTime ||
-          lastRecord?.createTime ||
-          '',
+        pendingActions,
+        owner: lastRecord?.assignedUploaderName || lastRecord?.uploaderName || '',
+        time: lastRecord?.updateTime || lastRecord?.createTime || '',
         actions,
         lastRecord,
         records,
@@ -323,7 +333,6 @@ function handleDownload(group) {
   ElMessage.info(`下载：${group.fileName}`)
 }
 
-// ★ 删除：文件级 + 记录级 recognitionContent 一起清空（传空对象，不能传 null）
 async function handleRemoveFile(group, step) {
   const record = group?.record
   if (!record?.id) {
@@ -348,8 +357,8 @@ async function handleRemoveFile(group, step) {
       fileTypeTag: record.fileTypeTag,
       isRequiredUpload: normalizeBool(record.isRequiredUpload),
       notes: record.notes,
-      recognitionContent: {}, // ★ 清空记录级解析数据（空对象，不能 null）
-      fileUrlList: [],        // ★ 文件级随数组清空
+      recognitionContent: {},
+      fileUrlList: [],
     })
     ElMessage.success('删除成功')
     await loadMeeting()

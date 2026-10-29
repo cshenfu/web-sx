@@ -463,9 +463,12 @@ const showAddReportPanel = ref(false)
 const showConfirmPanel = ref(false)
 const confirmReportId = ref(null)
 
+
 function handleOpenAddReport() {
-  showGenerateModal.value = false
-  showAddReportPanel.value = true
+   showGenerateModal.value = false
+   showProjectDrawer.value = false
+   showDetailPanel.value = false   // ← 关键：避免和右侧面板叠在一起
+   showAddReportPanel.value = true
 }
 
 function handleReportPanelSuccess() {

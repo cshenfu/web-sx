@@ -125,45 +125,36 @@ function handleFileChange(e) {
 
 // ★ 核心排错方法
 async function handleSave() {
-  // 使用 alert 确保绝对能看到！
-  alert('1. 成功触发了 handleSave 点击事件！');
   
   if (!currentFile.value) {
-    alert('2. 拦截：你还没选择文件呢！currentFile 为空');
     return;
   }
 
   const projectId = props.project?.aiProjectId || props.project?.id;
   if (!projectId) {
-    alert('3. 拦截：当前 project 数据里没有 id 或 aiProjectId');
     console.error('【AddReportPanel】project 数据:', props.project);
     return;
   }
 
   const file = currentFile.value;
-  alert(`4. 准备开始上传，文件: ${file.name}，项目ID: ${projectId}`);
 
   try {
     saving.value = true;
     
     // 检查 OSS 实例
     if (!ossUpload || typeof ossUpload.uploadFile !== 'function') {
-      alert('5. 报错：ossUpload.uploadFile 不是一个函数！请检查 OSS 封装');
       console.error('ossUpload 的值:', ossUpload);
       throw new Error('OSS 上传组件未正确初始化');
     }
 
-    alert('6. 正在调用 OSS 接口，请打开 F12 网络面板查看请求...');
     const uploadRes = await ossUpload.uploadFile(file);
     console.log('【AddReportPanel】OSS 返回结果:', uploadRes);
 
     const fileUrl = uploadRes?.obsPath || uploadRes?.url || '';
     if (!fileUrl) {
-      alert('7. 报错：OSS 上传成功，但返回的数据里没有 obsPath 或 url');
       throw new Error('未能获取文件URL');
     }
 
-    alert(`8. OSS 上传成功！URL: ${fileUrl}，准备调用后端保存接口...`);
 
     const payload = {
       aiProjectId: projectId, 
@@ -179,7 +170,6 @@ async function handleSave() {
 
     // 检查接口实例
     if (typeof aiProjectApi.uploadReport !== 'function') {
-      alert('9. 报错：aiProjectApi.uploadReport 不是一个函数！请检查 import 路径或接口名');
       throw new Error('找不到 uploadReport 接口');
     }
 
@@ -187,15 +177,12 @@ async function handleSave() {
     console.log('【AddReportPanel】后端返回结果:', res);
 
     if (res?.code === 200 || res?.code === '200' || res?.success) {
-      alert('10. 全部成功！报告添加成功');
       ElMessage.success('报告添加成功');
       emit('success');
       emit('close');
     } else {
-      alert('11. 后端返回失败：' + (res?.msg || '未知错误'));
     }
   } catch (err) {
-    alert('12. 代码抛出异常：' + err.message);
     console.error('【AddReportPanel】异常详情:', err);
   } finally {
     saving.value = false;
