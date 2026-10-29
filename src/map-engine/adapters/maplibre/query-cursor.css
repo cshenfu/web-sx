@@ -1,0 +1,4 @@
+.eng-queryable .maplibregl-canvas-container.maplibregl-interactive,
+.eng-queryable .maplibregl-canvas-container.maplibregl-interactive:active {
+    cursor: crosshair;
+}

@@ -11,11 +11,11 @@ import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import MapboxDraw from '@mapbox/mapbox-gl-draw'
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
-import { GlobeHaloLayer } from '@/utils/globeHaloLayer'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { addGradientExtrusion } from '@/utils/gradientExtrusion'
 
-import { MaplibreStarfieldLayer } from '@geoql/maplibre-gl-starfield'
+// ★ 大气光圈 + 星空（和 whMap 同款）
+import { GlobeHalo } from '@/map-engine/adapters/maplibre/globeHalo.js'
 
 if (typeof maplibregl.setWorkerUrl === 'function') {
   maplibregl.setWorkerUrl(workerUrl)
@@ -73,8 +73,8 @@ let cityLabels = []
 let cityLabelMoveHandler = null
 
 // 大屏模式专属变量
-let starfieldLayer = null
-let nightOverlay = null
+// ★ GlobeHalo 自带星空 + 光晕，替代原 MaplibreStarfieldLayer
+let globeHalo = null
 
 const drawStyles = [
   {
@@ -169,33 +169,25 @@ function computeInitialGlobeZoom(el, fill = 0.5) {
 }
 
 // ============================================================
-// ★ 大气 / 光照（幂等；style.load 与 load 都会调用，保证第一帧就带大气）
+// ★ 大气：只保留很弱的 sky 贴边（和 whMap 的 globeSky() 一致）
+//   外层明显的光晕由 GlobeHalo 画在球外
+//   不再 setLight，光照使用 MapLibre 默认
 // ============================================================
-function applyAtmosphereAndLight() {
+function applyGlobeSky() {
   if (!map) return
-
   try {
     map.setSky({
-      'sky-color': 'rgba(0, 0, 0, 0)',
-      'horizon-color': 'rgba(0, 0, 0, 0)',
-      'fog-color': 'rgba(0, 0, 0, 0)',
+      'sky-color': '#0c1b33',
+      'horizon-color': '#4d9fe6',
+      'fog-color': '#0c1b33',
       'sky-horizon-blend': 0.5,
-      'horizon-fog-blend': 0.5,
-      'fog-ground-blend': 0.5,
-      // 在大屏地球层级（zoom ≤ 3.5）显示光晕，3.5~5 之间逐渐消失
+      'horizon-fog-blend': 0.4,
+      'fog-ground-blend': 0.08,
       'atmosphere-blend': [
         'interpolate', ['linear'], ['zoom'],
-        0, 1.0, 3.5, 1.0, 5, 0.0,
+        0, 0.25, 6, 0.15, 9, 0,
       ],
     })
-  } catch (e) { /* 忽略 */ }
-
-  try {
-    map.setLight(
-      props.isDashboard
-        ? { anchor: 'viewport', color: '#ffffff', intensity: 0.1, position: [1.15, 200, 45] }
-        : { anchor: 'viewport', color: '#ffffff', intensity: 0.4, position: [1.15, 200, 45] },
-    )
   } catch (e) { /* 忽略 */ }
 }
 
@@ -205,7 +197,7 @@ onMounted(() => {
     ? computeInitialGlobeZoom(mapContainer.value, 2)
     : props.zoom
   const initialCenter = props.isDashboard ? [108.9, 35.2] : props.center
-console.log(initialZoom)
+
   map = new maplibregl.Map({
     container: mapContainer.value,
     style: props.style,
@@ -249,15 +241,14 @@ console.log(initialZoom)
   map.on('style.load', () => {
     activeProjection = 'globe'
     applyGlobeProjection()
-    // ★ style 解析完成即可应用大气 / 光照，让第一帧就有大气
-    applyAtmosphereAndLight()
+    // ★ style 解析完成即可应用弱 sky，让第一帧就有贴边
+    applyGlobeSky()
   })
 
   map.on('load', () => {
     // ✅ load 后兜底确保 globe（防止任何 setStyle / 插件覆盖）
     applyGlobeProjection()
-    const halo = new GlobeHaloLayer()
-    map.addLayer(halo)
+
     // ---------------- 全局：背景透明处理 ----------------
     try {
       const styleLayers = map.getStyle()?.layers || []
@@ -266,22 +257,18 @@ console.log(initialZoom)
       })
     } catch (e) { /* 忽略 */ }
 
+    // ★ load 里再调用一次兜底（style.load 若被跳过也不至于没 sky）
+    applyGlobeSky()
+
     // =========================================================
-    // ✅ 通用：星空层（所有模式都有）
-    // 加在 style 最底层（background 之下），只在球体外围可见
+    // ★ 大气光圈 + 星空（和 whMap 同款，由 GlobeHalo 画在球外）
+    //   自带星空，替代原 MaplibreStarfieldLayer
     // =========================================================
     try {
-      starfieldLayer = new MaplibreStarfieldLayer({
-        starCount: 40000,
-        starSize: 3.0,
-      })
-      map.addLayer(starfieldLayer, map.getStyle().layers[0]?.id)
+      globeHalo = new GlobeHalo(map)
     } catch (e) {
-      console.warn('[MapGL] 星空插件加载失败', e)
+      console.warn('[MapGL] GlobeHalo 初始化失败', e)
     }
-
-    // ★ load 里再调用一次兜底（style.load 若被跳过也不至于没大气）
-    applyAtmosphereAndLight()
 
     if (props.flyToOnLoad) flyToShaanxi()
     emit('ready')
@@ -291,7 +278,7 @@ console.log(initialZoom)
       if (maskHidden.value) return
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          // 再给一点点余量让 style.load 的 sky/light 生效
+          // 再给一点点余量让 style.load 的 sky 生效
           setTimeout(() => { maskHidden.value = true }, 60)
         })
       })
@@ -305,16 +292,10 @@ console.log(initialZoom)
 onUnmounted(() => {
   stopAutoRotate()
 
-  // ✅ 星空 / 夜半球清理无条件化（各自判空）
-  if (map) {
-    if (nightOverlay) {
-      try { nightOverlay.destroy?.() } catch (e) {}
-      nightOverlay = null
-    }
-    if (starfieldLayer && map.getLayer(starfieldLayer.id)) {
-      try { map.removeLayer(starfieldLayer.id) } catch (e) {}
-      starfieldLayer = null
-    }
+  // ★ GlobeHalo 清理（含星空）
+  if (globeHalo) {
+    try { globeHalo.destroy?.() } catch (e) {}
+    globeHalo = null
   }
 
   for (const [layerId, handler] of hoverHandlers) {
@@ -1319,8 +1300,8 @@ defineExpose({
   inset: 0;
   width: 100%;
   height: 100%;
-  /* ✅ 深色兜底：星空插件加载失败或球体外围无星空时，也不会露出浅色底 */
-  background-color: #030817;
+  /* ★ 与 GlobeHalo 的 SPACE_COLOR 一致，避免遮罩淡出时颜色跳变 */
+  background-color: #0c1b33;
 }
 /* ★ 首帧遮罩：与最终背景同色，load + idle 后平滑淡出 */
 .map-initial-mask {
@@ -1328,7 +1309,7 @@ defineExpose({
   inset: 0;
   z-index: 5;
   pointer-events: none;
-  background: #030817;
+  background: #0c1b33;
   opacity: 1;
   transition: opacity 420ms ease;
   will-change: opacity;
@@ -1338,5 +1319,6 @@ defineExpose({
 }
 :deep(.maplibregl-ctrl-top-right) { display: none; }
 :deep(.maplibregl-ctrl-bottom-right) { display: none; }
+/* ★ 保持 canvas 透明，让 GlobeHalo 的星空/光晕透出 */
 :deep(.maplibregl-canvas) { background: transparent !important; }
 </style>
