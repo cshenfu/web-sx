@@ -293,6 +293,11 @@ class GlobeHalo {
      *
      * @returns {void}
      */
+        /**
+     * 按当前球体位置画星空和外层光晕。
+     *
+     * @returns {void}
+     */
     _paint() {
         this.rafId = 0;
         const ctx = this.ctx;
@@ -303,7 +308,16 @@ class GlobeHalo {
         if (!isGlobe(this.map)) {
             return;
         }
+        
+        // 1. 星空照常绘制（星空平移是没有问题的，极地也能看到星空）
         this._blitStars(ctx);
+
+        // ★ 2. 新增极点保护：纬度大于 80° 时，不画光晕，防止半径爆炸刷白全屏
+        const center = this.map.getCenter();
+        if (Math.abs(center.lat) > 80) {
+            return; 
+        }
+
         const disc = globeDisc(this.map);
         if (disc.radius >= 5) {
             this._fillHalo(ctx, disc);

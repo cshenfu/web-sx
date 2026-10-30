@@ -344,7 +344,6 @@ import AddReportPanel from './area-panel/AddReportPanel.vue'
 import ConfirmReportPanel from './area-panel/ConfirmReportPanel.vue'
 // ★ 新增：共用的项目操作卡片
 import ProjectActionCard from './area-panel/ProjectActionCard.vue'
-
 const props = defineProps({
   stage: { type: String, default: '' },
   summaryTitle: { type: String, default: '项目通道概况' },
@@ -1868,17 +1867,16 @@ async function onMapReady() {
   const map = mapRef.value.getMap()
 
   try { map.setProjection({ type: 'globe' }) } catch (e) { try { map.setProjection('globe') } catch (e2) {} }
-
-  // ★ site-map 全站锁死正俯视
+    // ★ 允许拖动俯仰角，初始仍以正俯视进入
   try {
-    map.dragRotate.disable()
-    map.touchPitch.disable()
-    map.setMaxPitch(0)
+    map.dragRotate.enable()
+    map.touchPitch.enable()
+    map.setMaxPitch(60)
     if (map.getPitch() !== 0 || map.getBearing() !== 0) {
       map.jumpTo({ pitch: 0, bearing: 0 })
     }
   } catch (e) {
-    console.warn('[site-map] 锁定正俯视失败:', e)
+    console.warn('[site-map] 初始化俯仰设置失败:', e)
   }
 
   // ★ 首次进入：fitBounds 让陕西刚好铺满屏幕（替代 flyToShaanxi 的固定 zoom:6）
@@ -1899,14 +1897,7 @@ requestAnimationFrame(() => {
   })
 })
 
-  // ★ pitch 兜底（防止子组件 flyTo 偷传 pitch）
-  zeroPitchGuard = () => {
-    if (!map) return
-    if (Math.abs(map.getPitch()) > 0.01) {
-      map.easeTo({ pitch: 0, duration: 150 })
-    }
-  }
-  map.on('pitch', zeroPitchGuard)
+ 
 
   map.on('click', handleMapBlankClick)
   map.on('click', handleCityFillClick)
@@ -1941,7 +1932,6 @@ onUnmounted(() => {
     map.off('zoom', syncMaskVisibility)
     map.off('move', syncMaskVisibility)
     map.off('style.load', ensureShaanxiMask)
-    if (zeroPitchGuard) { map.off('pitch', zeroPitchGuard); zeroPitchGuard = null }  // ★ 新增
   }
 })
 

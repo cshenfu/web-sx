@@ -33,7 +33,6 @@
         </div>
       </template>
     </LayerChipPanel>
-
     <div
       v-if="lineTip.visible"
       class="map-line-tip"
@@ -400,7 +399,6 @@ import {
   calcIconSizeAtRef,
   buildIconSizeExpression,
 } from '@/components/site-map/areaCenterIcon'
-
 import AddReportPanel from './components/area-panel/AddReportPanel.vue'
 import ConfirmReportPanel from './components/area-panel/ConfirmReportPanel.vue'
 // ★ 新增：共用的项目操作卡片
@@ -736,6 +734,12 @@ function handleProjectSelect(item) {
     (popoverId != null && String(popoverId) === String(item.id)) ||
     (selectedId != null && String(selectedId) === String(item.id))
   ) return
+
+  // ★ 恢复上一次选中的场区为普通样式，避免点 B 后 A 仍显示"取消颜色"
+  const prevProject = popoverProject.value
+  if (prevProject && String(prevProject.id) !== String(item.id) && isAreaView.value) {
+    addProjectArea(prevProject, false)
+  }
 
   clearOverviewRoadLayer()
   popoverProject.value = item
@@ -2531,9 +2535,9 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
     // ★ 进入市/区层级：锁死俯仰（右键、双指、代码都改不了 pitch）
     const map = mapRef.value?.getMap?.()
     if (map) {
-      map.dragRotate.disable()
-      map.touchPitch.disable()
-      map.setMaxPitch(0)
+      map.dragRotate.enable()
+      map.touchPitch.enable()
+      map.setMaxPitch(60)
       if (map.getPitch() !== 0) map.easeTo({ pitch: 0, duration: 300 })
     }
 
@@ -2594,15 +2598,7 @@ function focusCity(cityName) {
   const feature = shaanxiBoundary.features.find((item) => item.properties?.name === cityName)
   if (!feature) return
 
-  // ★ 进入市区层级前主动锁死俯仰（因为 onEnter 要等 zoom 事件触发才执行，
-  //   这里先锁能避免 flyTo/fitBounds 期间短暂显现 45° 俯仰角）
-  try {
-    if (!isAreaView.value) {
-      map.dragRotate.disable()
-      map.touchPitch.disable()
-      map.setMaxPitch(0)
-    }
-  } catch (e) { /* 忽略 */ }
+  
 
   // ★ 优先用 bbox fitBounds（自适应范围 + pitch:0 正俯视），避免固定 zoom 造成超出屏幕
   const bounds = getFeatureBounds(feature)

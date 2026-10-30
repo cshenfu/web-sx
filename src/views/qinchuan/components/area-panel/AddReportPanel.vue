@@ -27,7 +27,7 @@
 
       <div class="upload-section">
         <div class="upload-hint">
-          支持 docx 格式数据导入，每次只能选择一种类型并导入最多1个文件（系统会自动解析文档，请确认解析的内容）
+          支持 docx 支持 doc、docx、pdf 格式数据导入，每次只能选择一种类型并导入最多1个文件（系统会自动解析文档，请确认解析的内容）
         </div>
         
         <div class="upload-action">
@@ -35,8 +35,7 @@
           <input
             ref="fileInputRef"
             type="file"
-            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            style="display: none"
+            accept=".doc,.docx,.pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"            style="display: none"
             @change="handleFileChange"
           />
         </div>
@@ -118,11 +117,20 @@ function triggerFileInput() {
 function handleFileChange(e) {
   const file = e.target.files?.[0]
   if (!file) return
+
+  // ★ 新增：后缀白名单校验
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  const allowExts = ['doc', 'docx', 'pdf']
+  if (!allowExts.includes(ext)) {
+    ElMessage.warning('仅支持 doc、docx、pdf 格式的文件')
+    e.target.value = ''
+    return
+  }
+
   console.log('【AddReportPanel】选择文件:', file.name)
   currentFile.value = file
   e.target.value = ''
 }
-
 // ★ 核心排错方法
 async function handleSave() {
   

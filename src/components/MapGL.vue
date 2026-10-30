@@ -176,18 +176,18 @@ function computeInitialGlobeZoom(el, fill = 0.5) {
 function applyGlobeSky() {
   if (!map) return
   try {
-    map.setSky({
-      'sky-color': '#0c1b33',
-      'horizon-color': '#4d9fe6',
-      'fog-color': '#0c1b33',
-      'sky-horizon-blend': 0.5,
-      'horizon-fog-blend': 0.4,
-      'fog-ground-blend': 0.08,
-      'atmosphere-blend': [
-        'interpolate', ['linear'], ['zoom'],
-        0, 0.25, 6, 0.15, 9, 0,
-      ],
-    })
+    // map.setSky({
+    //   'sky-color': '#0c1b33',
+    //   'horizon-color': '#4d9fe6',
+    //   'fog-color': '#0c1b33',
+    //   'sky-horizon-blend': 0.5,
+    //   'horizon-fog-blend': 0.4,
+    //   'fog-ground-blend': 0.08,
+    //   'atmosphere-blend': [
+    //     'interpolate', ['linear'], ['zoom'],
+    //     0, 0.25, 6, 0.15, 9, 0,
+    //   ],
+    // })
   } catch (e) { /* 忽略 */ }
 }
 
@@ -266,6 +266,19 @@ onMounted(() => {
     // =========================================================
     try {
       globeHalo = new GlobeHalo(map)
+      // ★ GlobeHalo 在 |lat| > 80° 时 disc 会退化，screen 混合刷白整屏
+//   这里在极点附近淡出它的 canvas，不影响 whMap（whMap 不经过这段）
+const haloCanvas = map.getCanvasContainer().querySelector('.eng-globe-halo-canvas')
+if (haloCanvas) haloCanvas.style.transition = 'opacity 200ms'
+
+const syncHaloVisibility = () => {
+  if (!haloCanvas) return
+  const lat = Math.abs(map.getCenter().lat)
+  haloCanvas.style.opacity = lat <= 80 ? '1' : lat >= 85 ? '0' : String((85 - lat) / 5)
+}
+map.on('move', syncHaloVisibility)
+map.on('projectiontransition', syncHaloVisibility)
+syncHaloVisibility()
     } catch (e) {
       console.warn('[MapGL] GlobeHalo 初始化失败', e)
     }
