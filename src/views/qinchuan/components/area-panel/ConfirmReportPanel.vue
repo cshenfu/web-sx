@@ -207,7 +207,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'success'])
-
+// ★ 本地测试开关：true 时用 @/assets/js/data.json，不走接口
+//   联调/上线前改成 false
+const USE_LOCAL_MOCK = true
 const loading = ref(false)
 const confirming = ref(false)
 const rawData = ref({})
@@ -348,57 +350,90 @@ const cleanEmptyValues = (obj) => {
   }
 }
 
+
+
+// ==========================================
+// 本地测试开关（联调/上线前改成 false）
+// ==========================================
+
+// ==========================================
+// 数据加载
+// ==========================================
 watch(() => props.visible, async (val) => {
-  if (val && props.reportId) await loadData()
+  if (!val) return
+  if (USE_LOCAL_MOCK || props.reportId) await loadData()
 })
 
 async function loadData() {
   loading.value = true
   try {
-    const res = await getParamsData(props.reportId)
+    // ---------- 1. 取数：mock 或接口 ----------
+    let res
+    if (USE_LOCAL_MOCK) {
+      const mod = await import('@/assets/js/data.json')
+      // 深拷贝，防止 cleanEmptyValues / 双向绑定污染模块缓存
+      res = { code: 200, data: JSON.parse(JSON.stringify(mod.default)) }
+    } else {
+      res = await getParamsData(props.reportId)
+    }
+
     if (res?.code === 0 || res?.code === 200) {
       rawData.value = res.data || {}
       formData.value = JSON.parse(JSON.stringify(rawData.value))
-      
-      // 1. 清理输入空值
+
+      // ---------- 2. 清理输入空值 ----------
       cleanEmptyValues(formData.value)
 
-      // 2. 用地面积表格处理
+      // ---------- 3. 用地面积表格处理 ----------
       const landRaw = rawData.value['${wind_farm_engineering_land_area_table}']
       if (isTableData(landRaw)) {
         landTableRows.value = landRaw.data.map((row, index) => ({
-          category: row[0] || '', subItem: row[1] || '', area: row[2],
+          category: row[0] || '',
+          subItem: row[1] || '',
+          area: row[2],
           _isEmpty: row[2] === undefined || row[2] === null || row[2] === '',
-          _rowIndex: index
+          _rowIndex: index,
         }))
+      } else {
+        landTableRows.value = []
       }
 
-      // 3. 财务表格解析
+      // ---------- 4. 财务表格解析 ----------
       financialState.value = {}
-      Object.values(MODULE_CONFIG).forEach(subModules => {
-        subModules.forEach(sub => {
+      Object.values(MODULE_CONFIG).forEach((subModules) => {
+        subModules.forEach((sub) => {
           if (sub.type !== 'financial' || !sub.fieldKeys) return
           const key = sub.fieldKeys.join('|')
           let hasTotal = false
-          
-          const rows = sub.fieldKeys.map(fieldKey => {
-            const rawArr = formData.value[fieldKey]
-            if (!Array.isArray(rawArr) || rawArr.length < 2) return null
-            
-            const headers = rawArr[0]
-            const values = rawArr[1]
-            const isTotal = headers[0] === '合计'
-            if (isTotal) hasTotal = true
-            
-            const yearStart = isTotal ? 1 : 0
-            const years = Array.from({ length: 21 }, (_, i) => {
-              const v = values[yearStart + i]
-              return (v === null || v === undefined || typeof v === 'object') ? '' : v
+
+          const rows = sub.fieldKeys
+            .map((fieldKey) => {
+              const rawArr = formData.value[fieldKey]
+              if (!Array.isArray(rawArr) || rawArr.length < 2) return null
+
+              const headers = rawArr[0]
+              const values = rawArr[1]
+              const isTotal = headers[0] === '合计'
+              if (isTotal) hasTotal = true
+
+              const yearStart = isTotal ? 1 : 0
+              const years = Array.from({ length: 21 }, (_, i) => {
+                const v = values[yearStart + i]
+                return v === null || v === undefined || typeof v === 'object' ? '' : v
+              })
+
+              return {
+                key: fieldKey,
+                name: getFieldLabel(fieldKey),
+                unit: '万元',
+                total: isTotal ? (values[0] ?? '') : '',
+                years,
+                // ★ 顺手补上 hasTotal，避免保存时 row.hasTotal 取不到（见下方说明）
+                hasTotal: isTotal,
+              }
             })
-            
-            return { key: fieldKey, name: getFieldLabel(fieldKey), unit: '万元', total: isTotal ? (values[0] ?? '') : '', years }
-          }).filter(Boolean)
-          
+            .filter(Boolean)
+
           financialState.value[key] = { rows, hasTotal }
         })
       })
