@@ -1,0 +1,375 @@
+@use './variables' as *;
+
+// =========================================================
+// 骨架层
+// =========================================================
+
+// 页面根 —— 对应 ①②③④ 的 *.root
+@mixin page-root {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+// 页面背景 —— 对应 *.page-bg / *.page-bg 光晕容器
+@mixin page-bg {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: $bg-page-gradient;
+}
+
+// 顶部 Header
+@mixin page-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  height: $header-height;
+  padding: 0 16px;
+  box-sizing: border-box;
+  border-bottom: 1px solid $border-card;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+@mixin page-title {
+  font-family: $font-family;
+  font-size: $font-size-base;
+  font-weight: 600;
+  color: $text-primary;
+}
+
+// 主白卡
+@mixin main-card {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 10px 16px 14px;
+  background: $bg-card;
+  border: 1px solid $border-card;
+  border-radius: $radius-md;
+  box-shadow: $shadow-card;
+  overflow: hidden;
+}
+
+// 卡片内部 header（Tabs / 操作按钮区）
+@mixin card-header($h: $card-header-height) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  height: $h;
+  padding: 0 16px;
+  border-bottom: 1px solid $border-inner;
+}
+
+// 左右分栏容器
+@mixin content-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+}
+
+// 左侧固定导航
+@mixin aside-panel($w: $aside-width) {
+  width: $w;
+  flex-shrink: 0;
+  background: $bg-aside;
+  border-right: 1px solid $border-inner;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+// 右侧内容主区
+@mixin main-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+// 搜索栏容器
+@mixin filter-bar {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.72);
+  border-bottom: 1px solid $border-inner;
+}
+
+// 搜索栏行
+@mixin filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+// 表格滚动区
+@mixin table-area {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px 14px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+// =========================================================
+// 滚动条
+// =========================================================
+@mixin scrollbar-thin($w: 5px) {
+  &::-webkit-scrollbar { width: $w; height: $w; }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(150, 165, 180, 0.35);
+    border-radius: $w;
+  }
+  &::-webkit-scrollbar-track { background: transparent; }
+}
+
+// =========================================================
+// 导航选中态（竖条 + 浅底）—— 组件3、4 共用
+// =========================================================
+@mixin nav-active-indicator($bar-h: 14px) {
+  color: $color-primary;
+  font-weight: 500;
+  background: $color-primary-soft;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: $bar-h;
+    border-radius: 0 2px 2px 0;
+    background: $color-primary;
+  }
+}
+
+// =========================================================
+// 左导航项（组件3、4）
+// =========================================================
+@mixin nav-item {
+  padding: 8px 14px;
+  margin-bottom: 3px;
+  border-radius: $radius-md;
+  font-size: $font-size-base;
+  color: $text-secondary;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: $bg-hover;
+    color: $text-primary;
+  }
+
+  &.active {
+    @include nav-active-indicator;
+  }
+}
+
+// =========================================================
+// Tabs 基础样式（组件3、4）
+// =========================================================
+@mixin tabs-base($h: 48px) {
+  flex-shrink: 0;
+  margin-bottom: 0;
+
+  :deep(.el-tabs__header) { margin: 0; }
+  :deep(.el-tabs__nav-wrap::after) { display: none; }
+  :deep(.el-tabs__item) {
+    height: $h;
+    line-height: $h;
+    padding: 0 16px;
+    font-size: $font-size-base;
+    color: $text-secondary;
+
+    &.is-active {
+      color: $color-primary;
+      font-weight: 500;
+    }
+  }
+  :deep(.el-tabs__active-bar) {
+    background-color: $color-primary;
+    height: 2px;
+  }
+}
+
+// =========================================================
+// 按钮：重置 / 搜索 / 添加 / ghost
+// =========================================================
+@mixin btn-base($h: $btn-height) {
+  height: $h;
+  padding: 0 14px;
+  border-radius: $radius-md;
+  font-size: $font-size-base;
+  font-weight: 400;
+  line-height: $h;
+}
+
+@mixin btn-ghost {
+  @include btn-base;
+  color: #657487;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid $border-input;
+
+  &:hover {
+    color: $color-primary;
+    border-color: #b9d4ed;
+    background: #fff;
+  }
+}
+
+@mixin btn-primary {
+  @include btn-base;
+  color: $text-inverse !important;
+  background: $color-primary !important;
+  border-color: $color-primary !important;
+  box-shadow: $shadow-btn-primary;
+
+  &:hover {
+    background: $color-primary-hover !important;
+    border-color: $color-primary-hover !important;
+  }
+}
+
+@mixin btn-add {
+  @include btn-base($btn-add-height);
+  padding: 0 13px;
+  border: none !important;
+  background: $color-primary !important;
+  color: $text-inverse !important;
+  box-shadow: 0 4px 10px rgba(2, 120, 231, 0.18);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  &:hover {
+    background: $color-primary-active !important;
+  }
+}
+
+// =========================================================
+// 操作列链接按钮
+// =========================================================
+@mixin operation-btn {
+  margin: 0 !important;
+  padding: 0 !important;
+  height: auto;
+  font-size: $font-size-base;
+  color: #718092 !important;
+
+  &:hover { color: #187ed9 !important; }
+
+  &.is-danger { color: $color-danger !important; }
+  &.is-danger:hover { color: $color-danger-hover !important; }
+}
+
+// =========================================================
+// 弹窗
+// =========================================================
+@mixin dialog-base {
+  :deep(.el-dialog) {
+    border-radius: $radius-xl;
+    overflow: hidden;
+    box-shadow: $shadow-dialog;
+  }
+  :deep(.el-dialog__header) {
+    height: 54px;
+    margin-right: 0;
+    padding: 0 22px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #e7ecf2;
+  }
+  :deep(.el-dialog__title) {
+    color: #172536;
+    font-size: $font-size-base;
+    font-weight: 600;
+  }
+  :deep(.el-dialog__headerbtn) {
+    top: 0;
+    right: 15px;
+    height: 54px;
+  }
+  :deep(.el-dialog__body) { padding: 22px; }
+  :deep(.el-dialog__footer) {
+    padding: 13px 22px;
+    border-top: 1px solid #e7ecf2;
+  }
+}
+
+// =========================================================
+// 小标题（蓝竖条 + 文字）—— 组件4 引入
+// =========================================================
+@mixin section-title {
+  display: flex;
+  align-items: center;
+  font-size: $font-size-lg;
+  font-weight: 600;
+  color: #0b1c2c;
+
+  &::before {
+    content: '';
+    width: 3px;
+    height: 14px;
+    background-color: $color-primary;
+    margin-right: 8px;
+    border-radius: 2px;
+  }
+}
+
+// =========================================================
+// 只读输入框（去边框、浅底）
+// =========================================================
+@mixin readonly-input {
+  :deep(.el-input__wrapper),
+  :deep(.el-textarea__inner) {
+    background-color: $bg-readonly !important;
+    box-shadow: none !important;
+    border-radius: $radius-md;
+    color: #0b1c2c;
+    font-size: $font-size-base;
+  }
+  :deep(.el-input__wrapper) { padding: 4px 12px; }
+  :deep(.el-textarea__inner) { padding: 8px 12px; line-height: 1.6; }
+}
+
+// =========================================================
+// 带单位输入框
+// =========================================================
+@mixin input-with-unit {
+  display: flex;
+  align-items: center;
+
+  .unit {
+    margin-left: 12px;
+    font-size: $font-size-base;
+    color: $text-secondary;
+    white-space: nowrap;
+  }
+}

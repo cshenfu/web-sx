@@ -19,6 +19,9 @@
         ref="mapRef"
         :style="satelliteStyle"
         :fly-to-on-load="false"
+        :fast-reveal="true"
+        :center="[30, 22]"
+        :zoom="1.2"
         @ready="onMapReady"
         @draw-update="onDrawChange"
         @draw-create="onDrawChange"
@@ -1492,19 +1495,33 @@ function clearPopover() {
 }
 
 function handleMapBlankClick(e) {
-  if (!isAreaView.value || !popoverProject.value) return
-  if (showEditProject.value || showDetailPanel.value || showVerifyPanel.value || showCreateProject.value) return
+  // 表单类全屏覆盖时，点地图空白不处理
+  if (showCreateProject.value || showEditProject.value) return
+  // 没选中项目、也没打开详情面板 → 无事可做
+  if (!popoverProject.value && !showDetailPanel.value) return
+
   const map = mapRef.value?.getMap?.()
   if (!map) return
 
   try {
     const hits = map.queryRenderedFeatures(e.point)
+    // 点到任意带 projectId 的图层（场区、风机、升压站…）→ 视为"点在场区上"，不关
     if (hits.some((f) => f.properties?.projectId != null)) return
+
+    // 编辑态：只收掉临时绘制/框选状态，不关闭详情面板
     if (editMode.value !== null) {
-      if (drawingNewPoint.value) { mapRef.value?.getDraw?.()?.changeMode('simple_select'); drawingNewPoint.value = false }
-      if (isBoxSelecting.value) { mapRef.value?.stopBoxSelect?.(); isBoxSelecting.value = false }
+      if (drawingNewPoint.value) {
+        mapRef.value?.getDraw?.()?.changeMode('simple_select')
+        drawingNewPoint.value = false
+      }
+      if (isBoxSelecting.value) {
+        mapRef.value?.stopBoxSelect?.()
+        isBoxSelecting.value = false
+      }
       return
     }
+
+    // ★ 走到这里 = 点击空白 / 无 projectId 区域 → 取消场区选中 + 关闭详情面板
     clearPopover()
   } catch (err) {
     console.warn('[site-map] handleMapBlankClick 查询失败:', err)
@@ -1879,25 +1896,31 @@ async function onMapReady() {
     console.warn('[site-map] 初始化俯仰设置失败:', e)
   }
 
-  // ★ 首次进入：fitBounds 让陕西刚好铺满屏幕（替代 flyToShaanxi 的固定 zoom:6）
- // ★ 首次进入：从地球初始视角动画 flyTo 到陕西（原 duration:0 会让动画消失）
-const shaanxiPadding = { top: 60, bottom: 60, left: 60, right: 60 }
+  // ============================================================
+  // ★ 首次进入：先展示「地球 + 星空」一小会儿，再弧线飞向陕西
+  //   - 900ms ≈ MapGL 遮罩淡出 (约 600ms) 后再留 300ms 给首帧
+  //   - curve: 1.7 + duration: 4000 让弧线更明显、过渡更从容
+  //   - 用户若在延迟期间已经手动操作相机，则跳过自动飞行
+  // ============================================================
+  const FLY_DELAY = 900
+  const shaanxiPadding = { top: 60, bottom: 60, left: 60, right: 60 }
+  let userInteracted = false
+  const markUserInteracted = () => { userInteracted = true }
+  map.once('dragstart', markUserInteracted)
+  map.once('zoomstart', markUserInteracted)
+  map.once('rotatestart', markUserInteracted)
 
-// 用 requestAnimationFrame 兜一下，保证 map 已经渲染过首帧，
-// 动画起点稳定在 MapGL 初始的 [0,20] / zoom 1.5 地球视角
-requestAnimationFrame(() => {
-  map.fitBounds(SHAANXI_FIT_BOUNDS, {
-    padding: shaanxiPadding,
-    pitch: 0,
-    bearing: 0,
-    duration: 3500,
-    essential: true,
-    curve: 1.42,     // 飞行弧线更明显
-    linear: false,   // 强制走 flyTo（弧线）而非 easeTo（直线缩放）
-  })
-})
-
- 
+  setTimeout(() => {
+    if (!map || userInteracted) return
+    map.fitBounds(SHAANXI_FIT_BOUNDS, {
+      padding: shaanxiPadding,
+      pitch: 0,
+      bearing: 0,
+      duration: 4000,
+      curve: 1.7,
+      essential: true,
+    })
+  }, FLY_DELAY)
 
   map.on('click', handleMapBlankClick)
   map.on('click', handleCityFillClick)
@@ -2140,7 +2163,13 @@ function handleGenerateRequest(payload) {
   z-index: 2000;
   box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
 }
-
+/* ★ 视图控件：左下角，抬到 LayerChipPanel 上方 */
+:deep(.maplibregl-ctrl-bottom-left) {
+  display: block;
+  left: 12px;
+  bottom: 70px;   /* LayerChipPanel 高度 + 间距，实际可按需调 */
+  z-index: 22;     /* 高于 view-toolbar(5) / map-summary(2)，不影响 Drawer */
+}
 @media (max-width: 1100px) {
   .project-list-view { padding-right: 10px; padding-left: 10px; }
   .create-project-fullpage { flex-direction: column; }

@@ -24,7 +24,6 @@
         <div class="section-title">请选择需生成的报告类型</div>
 
         <div class="option-grid">
-          <!-- 报告弹窗：仍然使用 reportTypeOptions（可研那套） -->
           <button
             v-for="option in options"
             :key="option.key"
@@ -78,10 +77,12 @@
     <main class="request-layout">
       <section class="request-left-card">
         <div class="request-form-scroll">
+          <!-- Step 1: 文件类型 -->
           <section class="request-step">
-            <h2 class="step-title"><span class="step-number">1</span>选择文件类型</h2>
+            <div class="step-header">
+              <h2 class="step-title">文件类型</h2>
+            </div>
             <div class="request-option-grid">
-              <!-- 请示文件页：改用独立的 requestTypeOptions -->
               <button
                 v-for="option in requestTypeOptions"
                 :key="option.key"
@@ -106,11 +107,13 @@
             </div>
           </section>
 
+          <!-- Step 2: 请示单位 -->
           <section class="request-step">
-            <h2 class="step-title"><span class="step-number">2</span>填写请示单位</h2>
+            <div class="step-header">
+              <h2 class="step-title">请示单位</h2>
+            </div>
             <div v-if="selectedOptions.length" class="unit-fields">
               <label v-for="option in selectedOptions" :key="option.key" class="unit-row">
-                <!-- 与截图一致：压覆矿审查请示 / 水保审批请示 -->
                 <span class="unit-label">{{ option.label }}{{ option.sub || '请示' }}</span>
                 <input
                   v-model="requestUnits[option.key]"
@@ -122,21 +125,111 @@
             <p v-else class="form-hint">请先选择文件类型，系统会为每种类型添加对应的请示单位。</p>
           </section>
 
+          <!-- Step 3: 引用与联系人 -->
           <section class="request-step contact-step">
-            <h2 class="step-title"><span class="step-number">3</span>补充引用与联系人</h2>
-            <label class="reference-row">
+            <div class="step-header">
+              <h2 class="step-title">引用项目与联系人</h2>
+            </div>
+            <div class="reference-row">
               <span class="field-label">引用项目报告</span>
               <span class="reference-tag">可研报告</span>
-              <select v-model="referenceProjectName" aria-label="引用项目">
-                <option value="" disabled>请选择项目名称</option>
-                <option v-if="projectName" :value="projectName">{{ projectName }}</option>
-                <option v-else value="当前项目">当前项目</option>
-              </select>
-            </label>
+              <!-- 改为 el-select 支持远程搜索和加载 -->
+              <el-select
+                v-model="selectedReportId"
+                class="report-select"
+                filterable
+                remote
+                :remote-method="fetchReportList"
+                :loading="reportLoading"
+                placeholder="请选择项目名称"
+                @visible-change="handleDropdownVisibleChange"
+              >
+                <el-option
+                  v-for="item in reportOptions"
+                  :key="item.id"
+                  :label="item.reportProjectName || item.fileName"
+                  :value="item.id"
+                />
+              </el-select>
+            </div>
             <div class="contact-row">
               <span class="field-label">联系人</span>
               <input v-model="contactName" type="text" placeholder="请输入联系人姓名" aria-label="联系人姓名" />
               <input v-model="contactPhone" type="tel" placeholder="请输入联系电话" aria-label="联系电话" />
+            </div>
+          </section>
+
+          <!-- Step 4: 项目信息 -->
+          <section class="request-step project-info-step">
+            <div v-show="!isCollapsed" class="project-info-content">
+              <div class="form-row">
+                <span class="form-label">装机容量</span>
+                <div class="input-with-suffix">
+                  <input v-model="formData.projectCapacity" type="number" placeholder="请输入装机容量" />
+                  <span class="suffix">万千瓦</span>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <span class="form-label">总投资</span>
+                <div class="input-with-suffix">
+                  <input v-model="formData.totalInvestment" type="number" placeholder="请输入总投资" />
+                  <span class="suffix">亿元</span>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <span class="form-label">建设单位</span>
+                <input v-model="formData.investor" type="text" placeholder="请输入建设单位" class="full-width-input" />
+              </div>
+
+              <div class="form-row">
+                <span class="form-label">项目选址</span>
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" value="简写" v-model="formData.siteSelectionType" />
+                    <span>简写</span>
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" value="详细" v-model="formData.siteSelectionType" />
+                    <span>详细</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="form-row mt-2" v-if="formData.siteSelectionType">
+                <span class="form-label"></span>
+                <input v-model="formData.siteSelectionContent" type="text" placeholder="请输入选址内容" class="full-width-input" />
+              </div>
+
+              <div class="form-row">
+                <span class="form-label">申报保障性并网项目年份</span>
+                <div class="input-with-icon">
+                  <input v-model="formData.gridYear" type="number" placeholder="如：2026" />
+                  <svg class="icon-date" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
+                    <rect x="3" y="4" width="10" height="9" rx="1" />
+                    <path d="M3 7h10M6 2v3M10 2v3" stroke-linecap="round" />
+                  </svg>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <span class="form-label">落款日期</span>
+                <div class="input-with-icon">
+                  <input v-model="formData.signDate" type="date" />
+                  <svg class="icon-date" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
+                    <rect x="3" y="4" width="10" height="9" rx="1" />
+                    <path d="M3 7h10M6 2v3M10 2v3" stroke-linecap="round" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="collapse-toggle" @click="isCollapsed = !isCollapsed">
+              <span>{{ isCollapsed ? '展开' : '收起' }}</span>
+              <svg :class="{ rotated: isCollapsed }" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 10l4-4 4 4" />
+              </svg>
             </div>
           </section>
         </div>
@@ -150,10 +243,10 @@
             <button
               type="button"
               class="footer-btn primary"
-              :disabled="!selectedOptions.length"
+              :disabled="!selectedOptions.length || loading"
               @click="handleStartGeneration"
             >
-              开始生成
+              {{ loading ? '生成中...' : '开始生成' }}
             </button>
           </div>
         </footer>
@@ -168,8 +261,11 @@
           </span>
           文件预览
         </h2>
+        <div class="preview-tabs" v-if="generatedTabs.length">
+          <span v-for="tab in generatedTabs" :key="tab" class="preview-tab active">{{ tab }}</span>
+        </div>
         <div class="preview-canvas">
-          <div class="preview-empty">
+          <div class="preview-empty" v-if="!generatedTabs.length">
             <svg viewBox="0 0 32 32" aria-hidden="true">
               <path d="M9 4.5h9l6 6v16H9zM18 4.5v6h6M13 16h7M13 19.5h7M13 23h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
               <circle cx="23" cy="23" r="5" fill="#f4f7fb" stroke="currentColor" stroke-width="1.4" />
@@ -178,15 +274,24 @@
             <strong>尚未生成文件</strong>
             <p>请在左侧完成文件类型选择与信息填写，点击“开始生成”后，生成的请示文件将在此预览。</p>
           </div>
+          <div class="preview-content" v-else>
+            <div class="mock-doc">
+              <h3>关于{{ projectName }}项目请示的函</h3>
+              <p>...生成成功，此处可展示接口返回的文档内容...</p>
+            </div>
+          </div>
         </div>
       </section>
     </main>
   </div>
 </template>
+
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { reportTypeOptions } from '../../js/areaPanelMockData'
+import { createQXReport } from '@/api/modules/report'
+import { pageReport } from '@/api/modules/aiProject' // 引入接口
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -195,14 +300,10 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'add-report', 'confirm', 'generate-request', 'open-add-report'])
 
-/* ---------------- 报告类型（可研那套，保持不变） ---------------- */
+/* ---------------- 报告类型（保持原样） ---------------- */
 const options = reportTypeOptions
 
-/* ---------------- 请示文件类型（全新一套，与报告类型无关） ---------------- */
-/**
- * sub 用来区分「审查请示 / 审批请示」
- * 如果以后还要扩展，可以在 mock 文件里 export requestTypeOptions 统一维护
- */
+/* ---------------- 请示文件类型 ---------------- */
 const requestTypeOptions = [
   { key: 'request-yafukuang',  label: '压覆矿',        sub: '审查请示' },
   { key: 'request-wenwu',      label: '文物保护',      sub: '审查请示' },
@@ -220,11 +321,29 @@ const selectedKey = ref('')
 const requestFormVisible = ref(false)
 const selectedKeys = ref([])
 const requestUnits = ref({})
-const referenceProjectName = ref('')
 const contactName = ref('')
 const contactPhone = ref('')
 
-/* 请示文件已选项 —— 必须基于 requestTypeOptions */
+// --- 引用项目报告下拉框状态 ---
+const selectedReportId = ref('')
+const reportOptions = ref([])
+const reportLoading = ref(false)
+
+// --- 项目信息表单数据 ---
+const isCollapsed = ref(false)
+const loading = ref(false)
+const generatedTabs = ref([])
+
+const formData = ref({
+  projectCapacity: '',
+  totalInvestment: '',
+  investor: '陕西华电新能源发电有限公司',
+  siteSelectionType: '简写',
+  siteSelectionContent: '',
+  gridYear: new Date().getFullYear().toString(),
+  signDate: new Date().toISOString().split('T')[0],
+})
+
 const selectedOptions = computed(() =>
   requestTypeOptions.filter((option) => selectedKeys.value.includes(option.key)),
 )
@@ -232,6 +351,9 @@ const selectedOptions = computed(() =>
 const projectName = computed(() =>
   props.project?.projectName || props.project?.name || '',
 )
+
+// 获取项目 ID（考虑到你组件可能传入的字段结构，做兼容处理）
+const aiProjectId = computed(() => props.project?.id || props.project?.projectId || 1001)
 
 watch(
   () => props.visible,
@@ -241,25 +363,67 @@ watch(
       requestFormVisible.value = false
       selectedKeys.value = []
       requestUnits.value = {}
-      referenceProjectName.value = projectName.value
       contactName.value = props.project?.contactName || props.project?.managerName || ''
       contactPhone.value = props.project?.contactPhone || props.project?.managerPhone || ''
+      generatedTabs.value = []
+      
+      // 重置下拉报告
+      selectedReportId.value = ''
+      reportOptions.value = []
+      
+      formData.value = {
+        projectCapacity: props.project?.projectCapacity || '',
+        totalInvestment: props.project?.totalInvestment ? (props.project.totalInvestment / 100000000).toString() : '',
+        investor: props.project?.investor || '陕西华电新能源发电有限公司',
+        siteSelectionType: '简写',
+        siteSelectionContent: '',
+        gridYear: new Date().getFullYear().toString(),
+        signDate: new Date().toISOString().split('T')[0],
+      }
     } else {
       requestFormVisible.value = false
     }
   },
 )
 
+/* ---------------- 可研报告下拉框接口逻辑 ---------------- */
+async function fetchReportList(keyword = '') {
+  if (!aiProjectId.value) return
+  
+  reportLoading.value = true
+  try {
+    const res = await pageReport({
+      aiProjectId: aiProjectId.value,
+      pageNo: 1,
+      pageSize: 20, // 后续数据多，使用远程搜索每次拉取20条
+      status: 'COMPLETED', // 写死已完成
+      reportType: 'FEASIBILITY_STUDY', // 可研报告
+      fileName: keyword // 远程搜索参数
+    })
+    
+    // 兼容不同的返回结构，假设标准返回为 { code: 200, data: { list: [...] } }
+    reportOptions.value = res.data?.list || res.list || []
+  } catch (error) {
+    console.error('获取可研报告列表失败:', error)
+    ElMessage.error('获取可研报告列表失败')
+  } finally {
+    reportLoading.value = false
+  }
+}
+
+function handleDropdownVisibleChange(visible) {
+  // 首次展开时加载初始数据
+  if (visible && reportOptions.value.length === 0) {
+    fetchReportList()
+  }
+}
+
 function handleSelect(option) {
   selectedKey.value = option.key
-  emit('confirm', {
-    option,
-    project: props.project,
-  })
+  emit('confirm', { option, project: props.project })
 }
 
 function handleAddReport() {
-  // ★ 通知父页面：“用户想添加报告了”
   emit('open-add-report')
 }
 
@@ -295,7 +459,8 @@ function clearRequestTypes() {
   selectedKeys.value = []
 }
 
-function handleStartGeneration() {
+/* ---------------- 核心生成逻辑 ---------------- */
+async function handleStartGeneration() {
   if (!selectedOptions.value.length) {
     ElMessage.warning('请先选择文件类型')
     return
@@ -309,288 +474,178 @@ function handleStartGeneration() {
     return
   }
 
-  emit('generate-request', {
-    options: selectedOptions.value,          // 现在是 requestTypeOptions 的子集
-    requestUnits: { ...requestUnits.value },
-    referenceProjectName: referenceProjectName.value,
-    contactName: contactName.value,
-    contactPhone: contactPhone.value,
-    project: props.project,
-  })
-  ElMessage.info('文件生成流程待接入，当前已完成表单样式与信息收集')
+  if (!selectedReportId.value) {
+    ElMessage.warning('请选择引用的项目报告')
+    return
+  }
+
+  loading.value = true
+
+  try {
+    const firstUnitKey = selectedOptions.value[0]?.key
+    const dockingDepartment = requestUnits.value[firstUnitKey] || ''
+
+    const submitData = {
+      aiProjectId: aiProjectId.value,
+      // ★ 使用下拉框选中的可研报告ID
+      aiProjectReportId: selectedReportId.value,
+      contactName: contactName.value,
+      contactPhone: contactPhone.value,
+      dockingDepartment: dockingDepartment,
+      gridYear: Number(formData.value.gridYear) || undefined,
+      investor: formData.value.investor,
+      projectCapacity: Number(formData.value.projectCapacity) || undefined,
+      totalInvestment: formData.value.totalInvestment ? Number(formData.value.totalInvestment) * 100000000 : undefined,
+      siteSelectionType: formData.value.siteSelectionType,
+      siteSelectionContent: formData.value.siteSelectionContent,
+      signDate: formData.value.signDate,
+      requestDocTypes: selectedOptions.value.map(option => ({
+        type: `${option.label}${option.sub || '请示'}`,
+        content: ''
+      }))
+    }
+
+    await createQXReport(submitData)
+    ElMessage.success('请示文件生成成功')
+    
+    generatedTabs.value = submitData.requestDocTypes.map(item => item.type)
+    
+    emit('generate-request', {
+      options: selectedOptions.value,
+      requestUnits: { ...requestUnits.value },
+      selectedReportId: selectedReportId.value,
+      contactName: contactName.value,
+      contactPhone: contactPhone.value,
+      project: props.project,
+      formData: formData.value
+    })
+  } catch (error) {
+    console.error('生成请示文件失败:', error)
+    ElMessage.error(error.message || '生成失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
 <style scoped>
+/* --- 原有样式保留，此处省略未改动部分以节省版面 --- */
 .modal-mask {
-  position: fixed;
-  z-index: 300;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 8, 20, 0.5);
+  position: fixed; z-index: 300; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 8, 20, 0.5);
 }
-.modal-box {
-  width: min(600px, calc(100vw - 40px));
-  overflow: hidden;
-  border-radius: 8px;
-  background: #eef1f4;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
-}
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  background: #e4e8ec;
-}
-.modal-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #1f2937;
-  font-size: 14px;
-  font-weight: 600;
-}
+.modal-box { width: min(600px, calc(100vw - 40px)); overflow: hidden; border-radius: 8px; background: #eef1f4; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid rgba(0, 0, 0, 0.08); background: #e4e8ec; }
+.modal-title { display: inline-flex; align-items: center; gap: 6px; color: #1f2937; font-size: 14px; font-weight: 600; }
 .title-icon, .close-btn svg { width: 14px; height: 14px; }
-.close-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  color: #6b7280;
-  background: none;
-}
+.close-btn { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: none; border-radius: 4px; cursor: pointer; color: #6b7280; background: none; }
 .close-btn:hover { background: rgba(0, 0, 0, 0.06); }
 .modal-body { padding: 20px 24px; }
 .section-title { color: #374151; font-size: 13px; text-align: center; }
 .option-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
-.option-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 16px 10px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
-  cursor: pointer;
-  background: #fff;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
+.option-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 10px; border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 8px; cursor: pointer; background: #fff; transition: border-color 0.15s, box-shadow 0.15s; }
 .option-card:hover { border-color: #93c5fd; }
 .option-card.selected { border-color: #2f8dff; box-shadow: 0 0 0 1px #2f8dff; }
-.selected-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #2f8dff;
-}
+.selected-badge { position: absolute; top: -6px; right: -6px; display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #2f8dff; }
 .selected-badge svg { width: 11px; height: 11px; }
 .option-icon { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; }
 .option-icon svg { width: 18px; height: 18px; }
 .option-label { color: #1f2937; font-size: 12.5px; line-height: 1.4; text-align: center; }
 .option-sub { color: #9ca3af; font-size: 11px; }
 .modal-footer { display: flex; justify-content: center; gap: 10px; padding: 14px 24px 22px; }
-.footer-btn {
-  min-width: 94px;
-  padding: 8px 18px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 5px;
-  cursor: pointer;
-  color: #374151;
-  background: #fff;
-  font-size: 13px;
-}
+.footer-btn { min-width: 94px; padding: 8px 18px; border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 5px; cursor: pointer; color: #374151; background: #fff; font-size: 13px; }
 .footer-btn.primary { border-color: #2f8dff; color: #fff; background: #2f8dff; }
 .footer-btn.primary:disabled { cursor: not-allowed; opacity: 0.5; }
 
-.request-page {
-  /* Overview 根节点是 position: relative，面板只覆盖 Overview，不盖住全局导航。 */
-  position: absolute;
-  z-index: 320;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-   background:
-    radial-gradient(ellipse at 10% 0%, rgba(255, 220, 232, 0.42), transparent 42%),
-    radial-gradient(ellipse at 96% 100%, rgba(176, 210, 250, 0.48), transparent 43%),
-    linear-gradient(122deg, #f1f4f9 0%, #e8f0fa 100%);
-  /* border-radius: 24px 0 0 0; */
-}
-.request-header {
-  display: flex;
-  flex: 0 0 44px;
-  align-items: center;
-  gap: 10px;
-  padding: 0 14px;
-  color: #273443;
-}
+.request-page { position: absolute; z-index: 320; inset: 0; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: radial-gradient(ellipse at 10% 0%, rgba(255, 220, 232, 0.42), transparent 42%), radial-gradient(ellipse at 96% 100%, rgba(176, 210, 250, 0.48), transparent 43%), linear-gradient(122deg, #f1f4f9 0%, #e8f0fa 100%); }
+.request-header { display: flex; flex: 0 0 44px; align-items: center; gap: 10px; padding: 0 14px; color: #273443; }
 .request-header h1 { margin: 0; font-size: 13px; font-weight: 600; }
-.back-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  color: #586575;
-  background: #fff;
-  border: 1px solid #dce4ed;
-  border-radius: 50%;
-  cursor: pointer;
-}
+.back-button { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; color: #586575; background: #fff; border: 1px solid #dce4ed; border-radius: 50%; cursor: pointer; }
 .back-button svg { width: 17px; height: 17px; }
 .request-header-actions { display: flex; gap: 8px; margin-left: auto; }
-.request-header-actions button {
-  padding: 5px 11px;
-  color: #aab5c2;
-  background: #f4f7fb;
-  border: 1px solid #e7edf4;
-  border-radius: 5px;
-  font-size: 11px;
-}
-.request-layout {
-  display: grid;
-  flex: 1 1 auto;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
-  min-height: 0;
-  padding: 20px;
-}
-.request-left-card, .preview-card {
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  background: #fff;
-  border: 1px solid #e2eaf3;
-  border-radius: 8px;
-  box-shadow: 0 1px 5px rgba(35, 69, 107, 0.04);
-}
+.request-header-actions button { padding: 5px 11px; color: #aab5c2; background: #f4f7fb; border: 1px solid #e7edf4; border-radius: 5px; font-size: 11px; }
+.request-layout { display: grid; flex: 1 1 auto; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; min-height: 0; padding: 20px; }
+.request-left-card, .preview-card { min-width: 0; min-height: 0; overflow: hidden; background: #fff; border: 1px solid #e2eaf3; border-radius: 8px; box-shadow: 0 1px 5px rgba(35, 69, 107, 0.04); }
 .request-left-card { display: flex; flex-direction: column; }
-.request-form-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 10px 14px 8px; }
-.request-step { padding: 3px 0 11px; border-bottom: 1px solid #f0f3f7; }
-.step-title {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0 0 9px;
-  color: #303c4b;
-  font-size: 14px;
-  font-weight: 600;
-}
-.step-number {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 17px;
-  height: 17px;
-  color: #fff;
-  background: #347cf0;
-  border-radius: 50%;
-  font-size: 10px;
-}
-.request-option-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-.request-option {
-  position: relative;
-  display: flex;
-  min-width: 0;
-  min-height: 66px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 6px 13px 5px 6px;
-  color: #465364;
-  background: #fff;
-  border: 1px solid #e4e9ef;
-  border-radius: 6px;
-  cursor: pointer;
-  text-align: center;
-  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
-}
+.request-form-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 16px 20px 8px; }
+.request-step { padding: 0 0 16px; margin-bottom: 16px; border-bottom: 1px dashed #e2e8f0; }
+.request-step:last-child { border-bottom: 0; }
+.step-header { display: flex; align-items: center; margin-bottom: 12px; }
+.step-title { margin: 0; color: #303c4b; font-size: 13px; font-weight: 600; }
+.request-option-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.request-option { position: relative; display: flex; min-width: 0; min-height: 64px; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px; color: #465364; background: #fff; border: 1px solid #e4e9ef; border-radius: 6px; cursor: pointer; text-align: center; transition: all 0.15s; }
 .request-option:hover { border-color: #9cbef4; }
-.request-option.selected { color: #2e66c5; background: #fbfdff; border-color: #3979e8; box-shadow: 0 0 0 1px rgba(57, 121, 232, 0.13); }
-.request-option-label { display: -webkit-box; overflow: hidden; max-width: 100%; font-size: 14px; font-weight: 600; line-height: 1.3; text-overflow: ellipsis; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
-.request-option-sub { overflow: hidden; max-width: 100%; color: #a5aeb9; font-size: 9px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-.request-check {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 11px;
-  height: 11px;
-  color: #cbd2db;
-  border: 1px solid #dbe1e8;
-  border-radius: 50%;
-}
+.request-option.selected { color: #2e66c5; background: #f0f7ff; border-color: #3979e8; }
+.request-option-label { font-size: 13px; font-weight: 600; }
+.request-option-sub { color: #a5aeb9; font-size: 10px; }
+.request-check { position: absolute; top: 4px; right: 4px; display: flex; align-items: center; justify-content: center; width: 12px; height: 12px; color: #cbd2db; border: 1px solid #dbe1e8; border-radius: 50%; }
 .request-check svg { width: 8px; height: 8px; }
 .request-option.selected .request-check { background: #3979e8; border-color: #3979e8; }
-.selection-tools { display: flex; gap: 10px; margin-top: 6px; }
-.selection-tools button { padding: 0; color: #4385e8; background: none; border: 0; cursor: pointer; font-size: 10px; }
+.selection-tools { display: flex; gap: 12px; margin-top: 8px; }
+.selection-tools button { padding: 0; color: #4385e8; background: none; border: 0; cursor: pointer; font-size: 12px; }
 .selection-tools button + button { color: #8a96a5; }
-.unit-fields { display: flex; flex-direction: column; gap: 6px; }
-.unit-row, .reference-row, .contact-row { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.unit-label, .field-label { flex: 0 0 74px; overflow: hidden; color: #718091; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.unit-row input, .contact-row input, .reference-row select {
-  box-sizing: border-box;
-  min-width: 0;
-  height: 27px;
-  padding: 0 8px;
-  color: #354254;
-  background: #fff;
+.unit-fields { display: flex; flex-direction: column; gap: 8px; }
+.unit-row, .reference-row, .contact-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.unit-label, .field-label { flex: 0 0 100px; color: #4b5563; font-size: 12px; text-align: right; }
+.unit-row input, .contact-row input, .form-row input { box-sizing: border-box; min-width: 0; height: 32px; padding: 0 10px; color: #354254; background: #fff; border: 1px solid #e2e8ef; border-radius: 4px; outline: none; font: inherit; font-size: 12px; flex: 1; }
+.unit-row input:focus, .contact-row input:focus, .form-row input:focus { border-color: #72a5f5; box-shadow: 0 0 0 2px rgba(114, 165, 245, 0.2); }
+.form-hint { margin: 0; color: #9aa5b2; font-size: 12px; }
+.reference-row { margin-bottom: 10px; }
+.reference-tag { flex: 0 0 auto; padding: 3px 7px; color: #8290a0; background: #f2f5f8; border-radius: 4px; font-size: 11px; }
+
+/* --- 覆盖 el-select 样式使其与原生 input 统一 --- */
+.report-select { flex: 1; width: 100%; }
+:deep(.report-select .el-input__wrapper) {
+  box-shadow: none !important;
   border: 1px solid #e2e8ef;
-  border-radius: 5px;
-  outline: none;
-  font: inherit;
-  font-size: 10px;
+  border-radius: 4px;
+  height: 32px;
+  background-color: #fff;
+  padding: 0 10px;
 }
-.unit-row input { flex: 1; }
-.unit-row input:focus, .contact-row input:focus, .reference-row select:focus { border-color: #72a5f5; }
-.form-hint { margin: 0; padding: 4px 0 6px 81px; color: #9aa5b2; font-size: 10px; }
-.contact-step { border-bottom: 0; }
-.reference-row { margin-bottom: 7px; }
-.reference-tag { flex: 0 0 auto; padding: 3px 7px; color: #8290a0; background: #f2f5f8; border-radius: 3px; font-size: 9px; }
-.reference-row select { flex: 1; }
-.contact-row input { flex: 1; }
-.request-footer {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 12px;
-  border-top: 1px solid #f0f3f7;
+:deep(.report-select .el-input__wrapper.is-focus) {
+  border-color: #72a5f5;
+  box-shadow: 0 0 0 2px rgba(114, 165, 245, 0.2) !important;
 }
-.request-count { color: #8693a1; font-size: 10px; }
-.request-footer-actions { display: flex; gap: 7px; }
-.request-footer-actions .footer-btn { min-width: 90px; padding-top: 7px; padding-bottom: 7px; font-size: 11px; }
-.preview-card { display: flex; flex-direction: column; padding: 10px 12px 12px; }
-.preview-title { display: flex; flex: 0 0 auto; align-items: center; gap: 7px; margin: 0 0 9px; color: #303c4b; font-size: 11px; font-weight: 600; }
-.preview-title-icon { display: inline-flex; width: 17px; height: 17px; align-items: center; justify-content: center; color: #3979e8; background: #edf5ff; border-radius: 4px; }
-.preview-title-icon svg { width: 13px; height: 13px; }
-.preview-canvas { display: flex; flex: 1 1 auto; min-height: 0; align-items: center; justify-content: center; overflow: auto; background: #f3f6fc; border-radius: 5px; }
-.preview-empty { display: flex; max-width: 300px; flex-direction: column; align-items: center; padding: 20px; color: #96a3b1; text-align: center; }
-.preview-empty svg { width: 31px; height: 31px; margin-bottom: 10px; color: #8c9aaa; }
-.preview-empty strong { margin-bottom: 6px; color: #566475; font-size: 11px; font-weight: 600; }
-.preview-empty p { margin: 0; color: #98a4b1; font-size: 9px; line-height: 1.7; }
+:deep(.report-select .el-input__inner) {
+  font-size: 12px;
+  color: #354254;
+}
+
+.project-info-content { display: flex; flex-direction: column; gap: 12px; }
+.form-row { display: flex; align-items: center; gap: 10px; }
+.form-label { flex: 0 0 140px; color: #4b5563; font-size: 12px; text-align: right; }
+.input-with-suffix { position: relative; display: flex; flex: 1; align-items: center; }
+.input-with-suffix input { padding-right: 60px; width: 100%; }
+.input-with-suffix .suffix { position: absolute; right: 10px; color: #6b7280; font-size: 12px; pointer-events: none; }
+.full-width-input { width: 100%; }
+.radio-group { display: flex; gap: 16px; flex: 1; }
+.radio-label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #354254; cursor: pointer; }
+.input-with-icon { position: relative; display: flex; flex: 1; align-items: center; }
+.input-with-icon input { padding-right: 30px; width: 100%; }
+.icon-date { position: absolute; right: 10px; width: 14px; height: 14px; color: #9ca3af; pointer-events: none; }
+.mt-2 { margin-top: -4px; }
+.collapse-toggle { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 14px; color: #3b82f6; font-size: 12px; cursor: pointer; }
+.collapse-toggle svg { width: 14px; height: 14px; transition: transform 0.2s; }
+.collapse-toggle svg.rotated { transform: rotate(180deg); }
+
+.request-footer { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 20px; border-top: 1px solid #f0f3f7; }
+.request-count { color: #8693a1; font-size: 12px; }
+.request-footer-actions { display: flex; gap: 10px; }
+.request-footer-actions .footer-btn { min-width: 100px; padding: 8px 16px; font-size: 13px; }
+
+.preview-card { display: flex; flex-direction: column; padding: 16px; }
+.preview-title { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; margin: 0 0 12px; color: #303c4b; font-size: 13px; font-weight: 600; }
+.preview-title-icon { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; color: #3979e8; background: #edf5ff; border-radius: 4px; }
+.preview-tabs { display: flex; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; overflow-x: auto; }
+.preview-tab { font-size: 13px; color: #3b82f6; padding: 2px 8px; border-radius: 4px; background: #eff6ff; white-space: nowrap; }
+.preview-canvas { display: flex; flex: 1 1 auto; min-height: 0; align-items: center; justify-content: center; overflow: auto; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; padding: 20px; }
+.preview-empty { display: flex; max-width: 320px; flex-direction: column; align-items: center; color: #94a3b8; text-align: center; }
+.preview-empty svg { width: 40px; height: 40px; margin-bottom: 12px; color: #cbd5e1; }
+.preview-empty strong { margin-bottom: 8px; color: #475569; font-size: 14px; font-weight: 600; }
+.preview-empty p { margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.6; }
+.preview-content { width: 100%; height: 100%; display: flex; justify-content: center; }
+.mock-doc { background: #fff; padding: 40px; width: 100%; max-width: 600px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; min-height: 100%; font-size: 14px; line-height: 2; }
+.mock-doc h3 { text-align: center; font-size: 18px; margin-bottom: 20px; }
 
 @media (max-width: 760px) {
   .request-page { overflow: auto; }
@@ -598,7 +653,8 @@ function handleStartGeneration() {
   .request-option-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .request-footer { align-items: flex-start; flex-direction: column; }
   .request-footer-actions { align-self: flex-end; }
-  .unit-row, .contact-row { flex-wrap: wrap; }
-  .unit-label, .field-label { flex-basis: 70px; }
+  .unit-row, .contact-row, .form-row { flex-wrap: wrap; }
+  .unit-label, .field-label, .form-label { flex-basis: 100%; text-align: left; margin-bottom: 4px; }
+  .mt-2 { margin-top: 0; }
 }
 </style>

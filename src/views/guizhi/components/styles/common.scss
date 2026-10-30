@@ -1,0 +1,18 @@
+// ========== 字体规范 ==========
+$font-size-base: 14px;   // 普通字体
+$font-size-tip: 12px;    // 提示字体（placeholder / tooltip / 空状态 / 分页文字）
+
+// ========== 颜色规范（沿用组件1） ==========
+$color-text-primary: #304153;
+$color-text-secondary: #637285;
+$color-text-tip: #8190a2;
+$color-primary: #087fe5;
+$color-primary-hover: #0675d4;
+$color-danger: #f15e64;
+$color-border: #dfe6ee;
+$color-border-light: #e8edf3;
+$color-bg-header: #f2f5f9;
+$color-bg-hover: #f8fbff;
+
+@mixin font-base { font-size: $font-size-base; }
+@mixin font-tip  { font-size: $font-size-tip; }

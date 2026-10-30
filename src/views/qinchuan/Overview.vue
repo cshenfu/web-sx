@@ -2117,17 +2117,36 @@ function handleBackToList() {
 }
 
 function handleMapBlankClick(e) {
-  if (!isAreaView.value) return
-  if (isEditing.value || isActionPanelOpen.value) return
+  // 表单类全屏覆盖时，点地图空白不处理
+  if (showCreateProject.value || showEditProject.value) return
+  // 没选中项目、也没打开详情面板 → 无事可做
+  if (!popoverProject.value && !showDetailPanel.value) return
+
   const map = mapRef.value?.getMap?.()
   if (!map) return
 
   try {
     const hits = map.queryRenderedFeatures(e.point)
+    // 点到任意带 projectId 的图层（场区、风机、升压站…）→ 视为"点在场区上"，不关
     if (hits.some((f) => f.properties?.projectId != null)) return
-    clearSelection()
+
+    // 编辑态：只收掉临时绘制/框选状态，不关闭详情面板
+    if (editMode.value !== null) {
+      if (drawingNewPoint.value) {
+        mapRef.value?.getDraw?.()?.changeMode('simple_select')
+        drawingNewPoint.value = false
+      }
+      if (isBoxSelecting.value) {
+        mapRef.value?.stopBoxSelect?.()
+        isBoxSelecting.value = false
+      }
+      return
+    }
+
+    // ★ 走到这里 = 点击空白 / 无 projectId 区域 → 取消场区选中 + 关闭详情面板
+    clearPopover()
   } catch (err) {
-    console.warn('[overview] handleMapBlankClick 查询失败:', err)
+    console.warn('[site-map] handleMapBlankClick 查询失败:', err)
   }
 }
 
@@ -2761,7 +2780,13 @@ async function onMapReady() {
     console.warn('[whln] 图层控制挂载失败:', err)
   }
 }
-
+watch(isAreaView, (val) => {
+  const el = document.querySelector('.maplibregl-ctrl-bottom-left')
+  if (!el) return
+  el.style.left = val
+    ? '16px'
+    : 'calc(clamp(12px, 1.35vw, 26px) + clamp(240px, 23vw, 410px) + 16px)'
+}, { immediate: true })
 onMounted(async () => {
   void loadShaanxiBoundary()
   void loadCityGeoJSON()
@@ -2995,7 +3020,18 @@ onUnmounted(() => {
 }
 .layer-legend-line.road { background: #2563eb; }
 .layer-legend-line.line { background: #eab308; }
+/* 非 area view：对齐 LayerChipPanel 的 left */
+.dashboard-page :deep(.maplibregl-ctrl-bottom-left) {
+  display: block;
+  left: calc(clamp(12px, 1.35vw, 26px) + clamp(240px, 23vw, 410px) + 16px);
+  bottom: 70px;
+  z-index: 22;
+}
 
+/* area view：LayerChipPanel 在 16px */
+.dashboard-page.is-area-view :deep(.maplibregl-ctrl-bottom-left) {
+  left: 16px;
+}
 @media (max-width: 760px) {
   .geometry-edit-toolbar { top: 6px; right: 8px; left: auto; max-width: calc(100vw - 16px); gap: 4px; padding: 5px; }
   .edit-tool-button { gap: 3px; padding: 0 7px; font-size: 11px; }

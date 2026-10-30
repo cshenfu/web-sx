@@ -1,0 +1,53 @@
+@use './variables' as *;
+
+// ---------- 搜索栏统一 26px ----------
+.filter-row {
+  :deep(.el-input__wrapper),
+  :deep(.el-select__wrapper) {
+    min-height: $control-height;
+    height: $control-height;
+    padding: 0 9px;
+    box-sizing: border-box;
+    background: $bg-input;
+    border-radius: $radius-md;
+    box-shadow: 0 0 0 1px $border-input inset;
+    transition: box-shadow 0.15s ease;
+  }
+  :deep(.el-input__wrapper:hover),
+  :deep(.el-select__wrapper:hover) {
+    box-shadow: 0 0 0 1px $border-input-hover inset;
+  }
+  :deep(.el-input__wrapper.is-focus),
+  :deep(.el-select__wrapper.is-focused) {
+    box-shadow: 0 0 0 1px $border-input-focus inset;
+  }
+  :deep(.el-input__inner),
+  :deep(.el-select__placeholder),
+  :deep(.el-select__selected-item) {
+    font-size: $font-size-base;
+    color: $text-regular;
+  }
+  :deep(.el-input__inner::placeholder) {
+    font-size: $font-size-xs;
+    color: $text-placeholder;
+  }
+}
+
+// ---------- 树节点统一 ----------
+.el-tree {
+  background: transparent;
+  font-size: $font-size-base;
+  color: #425466;
+}
+.el-tree-node__content {
+  height: 30px;
+  border-radius: $radius-md;
+}
+.el-tree-node__content:hover {
+  background: #f0f6fc;
+}
+
+// ---------- MessageBox ----------
+.custom-message-box {
+  border-radius: $radius-lg;
+}

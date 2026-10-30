@@ -26,24 +26,31 @@
               value-format="YYYY-MM-DD"
               class="filter-date"
             />
-            
-            <el-select v-model="searchForm.dept" placeholder="组织/部门" clearable class="filter-select">
+
+            <el-select
+              v-model="searchForm.dept"
+              placeholder="组织/部门"
+              clearable
+              class="filter-select"
+            >
               <el-option label="企业名称" value="企业名称" />
               <el-option label="技术部" value="技术部" />
+              <el-option label="财务部" value="财务部" />
+              <el-option label="运营部" value="运营部" />
             </el-select>
 
-            <el-input 
-              v-model="searchForm.logName" 
-              placeholder="日志名称" 
-              clearable 
+            <el-input
+              v-model="searchForm.logName"
+              placeholder="日志名称"
+              clearable
               class="filter-input"
               @keyup.enter="handleSearch"
             />
 
-            <el-input 
-              v-model="searchForm.account" 
-              placeholder="用户账号" 
-              clearable 
+            <el-input
+              v-model="searchForm.account"
+              placeholder="用户账号"
+              clearable
               class="filter-input"
               @keyup.enter="handleSearch"
             />
@@ -55,43 +62,28 @@
           </div>
         </div>
 
-        <!-- 表格展示区 -->
-        <div class="table-wrapper">
-          <el-table 
-            :data="tableData" 
-            style="width: 100%; height: 100%" 
-            header-cell-class-name="table-header"
-          >
-            <el-table-column prop="time" label="时间" min-width="160" />
-            <el-table-column prop="logType" label="日志类型" min-width="120" />
-            <el-table-column prop="account" label="用户账号" min-width="150" />
-            <el-table-column prop="dept" label="所属组织/部门" min-width="150" />
-            <el-table-column prop="logName" label="日志名称" min-width="180" />
-            <el-table-column prop="status" label="状态" min-width="100">
-              <template #default="{ row }">
-                <el-tag 
-                  :type="row.status === '成功' ? 'success' : 'danger'" 
-                  effect="light"
-                  class="status-tag"
-                >
-                  {{ row.status }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="content" label="操作内容" min-width="250" show-overflow-tooltip />
-          </el-table>
-        </div>
-
-        <!-- 分页 -->
-        <div class="pagination-wrap">
-          <el-pagination
+        <!-- 表格 + 分页 -->
+        <div class="table-area">
+          <CommonTable
+            :data="pagedTableData"
+            :columns="columns"
+            :total="filteredData.length"
             v-model:current-page="currentPage"
             v-model:page-size="pageSize"
-            :total="total"
-            layout="total, sizes, prev, pager, next, jumper"
-            :page-sizes="[10, 20, 50, 100]"
-            background
-          />
+            :show-page-sizes="true"
+            :show-jumper="true"
+          >
+            <!-- 状态 -->
+            <template #status="{ row }">
+              <el-tag
+                :type="row.status === '成功' ? 'success' : 'danger'"
+                effect="light"
+                class="status-tag"
+              >
+                {{ row.status }}
+              </el-tag>
+            </template>
+          </CommonTable>
         </div>
       </div>
     </div>
@@ -99,15 +91,15 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import CommonTable from './components/CommonTable.vue'
 
-// 分页相关
+// ================= 分页 =================
 const currentPage = ref(1)
 const pageSize = ref(10)
-const total = ref(30)
 
-// 搜索表单
+// ================= 搜索表单 =================
 const searchForm = reactive({
   dateRange: [],
   dept: '',
@@ -115,43 +107,77 @@ const searchForm = reactive({
   account: ''
 })
 
-// 表格假数据
-const tableData = ref([
-  {
-    id: 1,
-    time: '2024-09-01 09:00:00',
-    logType: '登录/注销',
-    account: 'zhangsan001',
-    dept: '企业名称',
-    logName: '登录',
-    status: '成功',
-    content: ''
-  },
-  {
-    id: 2,
-    time: '2024-09-01 09:00:00',
-    logType: '项目相关',
-    account: 'zhangsan001',
-    dept: '企业名称',
-    logName: '创建项目',
-    status: '失败',
-    content: ''
-  },
-  {
-    id: 3,
-    time: '2024-09-01 09:00:00',
-    logType: '项目相关',
-    account: 'zhangsan001',
-    dept: '企业名称',
-    logName: '项目结果推送手机号',
-    status: '成功',
-    content: ''
-  }
-])
+// ================= 生成假数据（30 条，便于演示分页） =================
+const logTypes = ['登录/注销', '项目相关', '数据操作', '系统设置', '权限管理']
+const accounts = ['zhangsan001', 'lisi002', 'wangwu003', 'zhaoliu004', 'sunqi005']
+const depts = ['企业名称', '技术部', '财务部', '运营部']
+const logNames = ['登录', '注销', '创建项目', '项目结果推送手机号', '导出数据', '修改配置', '新增角色', '删除用户']
+const statuses = ['成功', '失败']
 
-// 搜索与重置
+const generateLogs = (n) => {
+  const list = []
+  for (let i = 0; i < n; i++) {
+    const day = String((i % 28) + 1).padStart(2, '0')
+    const hour = String(8 + (i % 10)).padStart(2, '0')
+    const minute = String((i * 7) % 60).padStart(2, '0')
+    list.push({
+      id: i + 1,
+      time: `2024-09-${day} ${hour}:${minute}:00`,
+      logType: logTypes[i % logTypes.length],
+      account: accounts[i % accounts.length],
+      dept: depts[i % depts.length],
+      logName: logNames[i % logNames.length],
+      status: statuses[i % statuses.length],
+      content: ''
+    })
+  }
+  return list
+}
+
+const tableData = ref(generateLogs(30))
+
+// ================= 表格列配置 =================
+const columns = [
+  { prop: 'time',    label: '时间',          minWidth: 160 },
+  { prop: 'logType', label: '日志类型',      minWidth: 120 },
+  { prop: 'account', label: '用户账号',      minWidth: 150 },
+  { prop: 'dept',    label: '所属组织/部门', minWidth: 150 },
+  { prop: 'logName', label: '日志名称',      minWidth: 180 },
+  { prop: 'status',  label: '状态',          minWidth: 100, slot: 'status' },
+  { prop: 'content', label: '操作内容',      minWidth: 250, showOverflowTooltip: true }
+]
+
+// ================= 筛选 =================
+const filteredData = computed(() => {
+  const [start, end] = searchForm.dateRange || []
+  const logName = (searchForm.logName || '').trim().toLowerCase()
+  const account = (searchForm.account || '').trim().toLowerCase()
+
+  return tableData.value.filter((row) => {
+    if (searchForm.dept && row.dept !== searchForm.dept) return false
+    if (logName && !row.logName.toLowerCase().includes(logName)) return false
+    if (account && !row.account.toLowerCase().includes(account)) return false
+
+    if (start || end) {
+      const rowDate = row.time.slice(0, 10)
+      if (start && rowDate < start) return false
+      if (end && rowDate > end) return false
+    }
+
+    return true
+  })
+})
+
+// ================= 分页切片 =================
+const pagedTableData = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return filteredData.value.slice(start, start + pageSize.value)
+})
+
+// ================= 搜索 / 重置 =================
 const handleSearch = () => {
-  ElMessage.success('触发搜索')
+  currentPage.value = 1
+  ElMessage.success(`搜索完成，共 ${filteredData.value.length} 条`)
 }
 
 const handleReset = () => {
@@ -159,10 +185,9 @@ const handleReset = () => {
   searchForm.dept = ''
   searchForm.logName = ''
   searchForm.account = ''
-  handleSearch()
+  currentPage.value = 1
 }
 </script>
-
 
 <style scoped lang="scss">
 /* ========== 页面基础布局 ========== */
@@ -185,12 +210,7 @@ const handleReset = () => {
   min-height: 0;
   box-sizing: border-box;
   overflow: hidden;
-  background: linear-gradient(
-    122deg,
-    #eef3fa 0%,
-    #f7f8fc 48%,
-    #eaf2fb 100%
-  );
+  background: linear-gradient(122deg, #eef3fa 0%, #f7f8fc 48%, #eaf2fb 100%);
 }
 
 /* ========== 背景光晕 ========== */
@@ -247,7 +267,7 @@ const handleReset = () => {
 
 .page-title {
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.5;
   color: #152536;
@@ -291,41 +311,35 @@ const handleReset = () => {
   box-sizing: border-box;
 }
 
-/* 日期范围选择器：固定桌面端尺寸 */
+/* 日期范围选择器 */
 .filter-date {
-  display: inline-flex;
   flex: 0 0 250px;
   width: 250px !important;
-  height: 26px !important;
-  min-height: 26px !important;
-  box-sizing: border-box;
 }
 
-/* Element Plus 日期选择器外框 */
 .filter-row :deep(.el-date-editor.filter-date),
 .filter-row :deep(.el-date-editor--daterange.el-input__wrapper) {
   flex: 0 0 250px;
   width: 250px !important;
   height: 26px !important;
   min-height: 26px !important;
-  padding: 0 6px !important;
+  padding: 0 8px !important;
   box-sizing: border-box;
-  border-radius: 4px;
+  border-radius: 6px;
   background: #fff;
   box-shadow: 0 0 0 1px #dfe6ee inset;
 }
 
-/* 日期选择器悬停、聚焦状态 */
 .filter-row :deep(.el-date-editor.filter-date:hover) {
-  box-shadow: 0 0 0 1px #b9c9dc inset;
+  box-shadow: 0 0 0 1px #cbd7e5 inset;
 }
 
 .filter-row :deep(.el-date-editor.filter-date.is-active),
 .filter-row :deep(.el-date-editor.filter-date:focus-within) {
-  box-shadow: 0 0 0 1px #087fe5 inset;
+  box-shadow: 0 0 0 1px #1686e9 inset;
 }
 
-/* 开始和结束日期输入区域 */
+/* 日期输入文字 */
 .filter-row :deep(.el-date-editor .el-range-input) {
   flex: 1 1 0;
   width: 0;
@@ -333,25 +347,24 @@ const handleReset = () => {
   height: 24px;
   padding: 0;
   line-height: 24px;
-  font-size: 10px !important;
+  font-size: 14px !important;
   color: #536274;
   background: transparent;
 }
 
-/* 日期占位文字 */
 .filter-row :deep(.el-date-editor .el-range-input::placeholder) {
-  font-size: 10px;
-  color: #98a5b5;
+  font-size: 12px;
+  color: #8190a2;
 }
 
-/* 日期之间的分隔符 */
+/* 日期分隔符 */
 .filter-row :deep(.el-date-editor .el-range-separator) {
   flex: 0 0 16px;
   width: 16px;
   height: 24px;
   padding: 0;
   line-height: 24px;
-  font-size: 10px;
+  font-size: 12px;
   text-align: center;
   color: #8795a6;
 }
@@ -363,7 +376,7 @@ const handleReset = () => {
   width: 14px;
   height: 24px;
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 24px;
 }
 
@@ -375,8 +388,8 @@ const handleReset = () => {
 
 /* 普通搜索输入框 */
 .filter-input {
-  flex: 0 0 150px;
-  width: 150px;
+  flex: 0 0 160px;
+  width: 160px;
 }
 
 /* 所有搜索控件统一高度 */
@@ -390,43 +403,43 @@ const handleReset = () => {
 .filter-row :deep(.el-select__wrapper) {
   min-height: 26px;
   height: 26px;
-  padding: 0 8px;
+  padding: 0 9px;
   box-sizing: border-box;
   background: #fff;
-  border-radius: 4px;
+  border-radius: 6px;
   box-shadow: 0 0 0 1px #dfe6ee inset;
   transition: box-shadow 0.15s ease;
 }
 
 .filter-row :deep(.el-input__wrapper:hover),
 .filter-row :deep(.el-select__wrapper:hover) {
-  box-shadow: 0 0 0 1px #b9c9dc inset;
+  box-shadow: 0 0 0 1px #cbd7e5 inset;
 }
 
 .filter-row :deep(.el-input__wrapper.is-focus),
 .filter-row :deep(.el-select__wrapper.is-focused) {
-  box-shadow: 0 0 0 1px #087fe5 inset;
+  box-shadow: 0 0 0 1px #1686e9 inset;
 }
 
-/* 输入文字、占位文字 */
+/* 输入文字 / 占位文字 */
 .filter-row :deep(.el-input__inner),
 .filter-row :deep(.el-select__placeholder),
 .filter-row :deep(.el-select__selected-item) {
   height: 24px;
   line-height: 24px;
-  font-size: 10px;
+  font-size: 14px;
   color: #536274;
 }
 
 .filter-row :deep(.el-input__inner::placeholder) {
-  font-size: 10px;
-  color: #98a5b5;
+  font-size: 12px;
+  color: #8190a2;
 }
 
 /* 清除、前缀、后缀图标 */
 .filter-row :deep(.el-input__suffix-inner),
 .filter-row :deep(.el-input__prefix-inner) {
-  font-size: 11px;
+  font-size: 14px;
 }
 
 /* 搜索按钮组 */
@@ -434,44 +447,45 @@ const handleReset = () => {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
 }
 
-/* 重置与搜索按钮 */
+/* 重置 / 搜索按钮 */
 .btn-reset,
 .btn-search {
   height: 26px;
-  padding: 0 12px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 500;
+  padding: 0 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 400;
 }
 
 .btn-reset {
-  color: #536274;
+  color: #657487;
   background: #fff;
   border: 1px solid #dfe6ee;
 }
 
 .btn-reset:hover {
-  color: #087fe5;
+  color: #167ddd;
   background: #f2f8ff;
-  border-color: #9bcaff;
+  border-color: #b9d4ed;
 }
 
 .btn-search {
   color: #fff !important;
   background: #087fe5 !important;
   border-color: #087fe5 !important;
+  box-shadow: 0 3px 8px rgba(8, 127, 229, 0.15);
 }
 
 .btn-search:hover {
-  background: #0672cf !important;
-  border-color: #0672cf !important;
+  background: #0874d0 !important;
+  border-color: #0874d0 !important;
 }
 
-/* ========== 表格区域 ========== */
-.table-wrapper {
+/* ========== 表格区域容器 ========== */
+.table-area {
   position: relative;
   z-index: 1;
   display: flex;
@@ -479,159 +493,32 @@ const handleReset = () => {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  padding: 0 14px;
+  padding: 10px 14px 14px;
   box-sizing: border-box;
   overflow: hidden;
 }
 
-.table-wrapper :deep(.el-table) {
-  width: 100% !important;
-  height: 100%;
-  flex: 1 1 0;
-  min-height: 0;
-  font-size: 10px;
-
-  --el-table-border-color: #e6ebf1;
-  --el-table-header-bg-color: #f5f8fc;
-  --el-table-row-hover-bg-color: #f0f6fc;
-  --el-table-current-row-bg-color: #f0f6fc;
-  --el-table-text-color: #536274;
-  --el-table-header-text-color: #46576a;
-  --el-fill-color-lighter: #f5f8fc;
-}
-
-.table-wrapper :deep(.el-table__inner-wrapper::before) {
-  height: 0;
-}
-
-.table-wrapper :deep(.el-table th.el-table__cell) {
-  height: 28px;
-  padding: 0;
-  background: #f5f8fc !important;
-  border-bottom: 1px solid #e2e9f1;
-  font-size: 10px;
-  font-weight: 600;
-  color: #46576a;
-}
-
-.table-wrapper :deep(.el-table td.el-table__cell) {
-  height: 40px;
-  padding: 0;
-  border-bottom: 1px solid #edf1f5;
-  font-size: 10px;
-  color: #536274;
-}
-
-.table-wrapper :deep(.el-table th .cell),
-.table-wrapper :deep(.el-table td .cell) {
-  padding: 0 10px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-.table-wrapper :deep(.el-table__body tr) {
-  transition: background-color 0.12s ease;
-}
-
-.table-wrapper :deep(.el-table__body tr:hover > td.el-table__cell) {
-  background-color: #f0f6fc !important;
-}
-
-.table-wrapper :deep(.el-table__empty-block) {
-  min-height: 100px;
-}
-
-.table-wrapper :deep(.el-table__empty-text) {
-  font-size: 11px;
-  color: #98a5b5;
-}
-
 /* ========== 状态标签 ========== */
-.table-wrapper :deep(.status-tag) {
-  height: 21px;
-  padding: 0 8px;
+.status-tag {
+  height: 22px;
+  padding: 0 9px;
   border: 1px solid transparent;
-  border-radius: 4px;
-  font-size: 10px;
+  border-radius: 10px;
+  font-size: 12px;
   font-weight: 500;
-  line-height: 19px;
+  line-height: 20px;
 }
 
-.table-wrapper :deep(.status-tag.el-tag--success) {
+:deep(.status-tag.el-tag--success) {
   color: #16834a;
   background: #edf8f1;
   border-color: #d3efdd;
 }
 
-.table-wrapper :deep(.status-tag.el-tag--danger) {
+:deep(.status-tag.el-tag--danger) {
   color: #d14343;
   background: #fff1f0;
   border-color: #ffddda;
-}
-
-/* ========== 分页区域 ========== */
-.pagination-wrap {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex: 0 0 auto;
-  justify-content: flex-end;
-  align-items: center;
-  min-height: 48px;
-  padding: 8px 14px;
-  box-sizing: border-box;
-  background: rgba(255, 255, 255, 0.94);
-  border-top: 1px solid #e8edf3;
-}
-
-.pagination-wrap :deep(.el-pagination) {
-  font-size: 10px;
-  color: #637285;
-  --el-pagination-font-size: 10px;
-  --el-pagination-button-height: 24px;
-  --el-pagination-button-width: 24px;
-  --el-pagination-hover-color: #087fe5;
-}
-
-.pagination-wrap :deep(.el-pagination__total),
-.pagination-wrap :deep(.el-pagination__sizes),
-.pagination-wrap :deep(.el-pagination__jump) {
-  font-size: 10px;
-  color: #637285;
-}
-
-.pagination-wrap :deep(.el-pagination .el-input__wrapper) {
-  min-height: 24px;
-  height: 24px;
-  border-radius: 4px;
-  box-shadow: 0 0 0 1px #dfe6ee inset;
-}
-
-.pagination-wrap :deep(.el-pagination .el-input__inner) {
-  height: 22px;
-  font-size: 10px;
-}
-
-.pagination-wrap :deep(.el-pagination.is-background .el-pager li) {
-  min-width: 24px;
-  height: 24px;
-  margin: 0 2px;
-  border-radius: 4px;
-  font-size: 10px;
-  line-height: 24px;
-  background: #f2f5f9;
-  color: #536274;
-}
-
-.pagination-wrap :deep(.el-pagination.is-background .el-pager li.is-active) {
-  color: #fff;
-  background: #087fe5;
-}
-
-.pagination-wrap :deep(.el-pagination button) {
-  min-width: 24px;
-  height: 24px;
-  border-radius: 4px;
 }
 
 /* ========== 中等屏幕适配 ========== */
@@ -649,8 +536,8 @@ const handleReset = () => {
   }
 
   .filter-input {
-    flex-basis: 140px;
-    width: 140px;
+    flex-basis: 150px;
+    width: 150px;
   }
 }
 
@@ -689,13 +576,8 @@ const handleReset = () => {
     margin-left: auto;
   }
 
-  .table-wrapper {
-    padding: 0 8px;
-  }
-
-  .pagination-wrap {
+  .table-area {
     padding: 8px;
-    overflow-x: auto;
   }
 }
 </style>

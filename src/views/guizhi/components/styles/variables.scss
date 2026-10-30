@@ -1,0 +1,75 @@
+// =========================================================
+// 主题变量 —— 全站唯一来源
+// =========================================================
+
+// ---------- 品牌主色 ----------
+$color-primary:        #087fe5;
+$color-primary-hover:  #0874d0;
+$color-primary-active: #0675d4;
+$color-primary-soft:   #e6f2ff;   // 选中态浅底
+$color-primary-shadow: rgba(8, 127, 229, 0.15);
+
+// ---------- 语义色 ----------
+$color-danger:  #f15e64;
+$color-danger-hover: #e9474e;
+$color-success: #16834a;
+$color-warning: #e6a23c;
+$color-info:    #909399;
+
+// ---------- 文字 ----------
+$text-primary:  #152536;   // 标题
+$text-regular:  #536274;   // 正文
+$text-secondary:#667383;   // 次要
+$text-placeholder: #8190a2;
+$text-disabled: #b1bbc6;
+$text-inverse:  #ffffff;
+
+// ---------- 背景 ----------
+$bg-page-gradient: linear-gradient(122deg, #eef3fa 0%, #f7f8fc 48%, #eaf2fb 100%);
+$bg-card:          rgba(255, 255, 255, 0.96);
+$bg-card-solid:    #ffffff;
+$bg-aside:         #fafbfc;
+$bg-input:         rgba(255, 255, 255, 0.92);
+$bg-hover:         #f0f4f8;
+$bg-readonly:      #f8fafc;
+
+// ---------- 边框 ----------
+$border-card:     #e1e7ef;
+$border-inner:    #e8edf3;
+$border-input:    #dfe6ee;
+$border-input-hover: #cbd7e5;
+$border-input-focus: $color-primary;
+
+// ---------- 圆角 ----------
+$radius-sm:  4px;
+$radius-md:  6px;    // 主卡 / 输入框
+$radius-lg:  8px;    // 弹窗
+$radius-xl:  10px;
+$radius-pill: 10px;  // tag
+
+// ---------- 阴影 ----------
+$shadow-card:  0 3px 12px rgba(34, 57, 86, 0.035);
+$shadow-dialog: 0 12px 40px rgba(30, 55, 80, 0.16);
+$shadow-btn-primary: 0 3px 8px rgba(8, 127, 229, 0.15);
+
+// ---------- 尺寸 ----------
+$header-height:      48px;
+$card-header-height: 48px;
+$control-height:     26px;
+$btn-height:         26px;
+$btn-add-height:     28px;
+$dialog-btn-height:  34px;
+$aside-width:        200px;
+
+// ---------- 字体 ----------
+$font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+$font-size-xs: 12px;
+$font-size-sm: 13px;
+$font-size-base: 14px;
+$font-size-lg: 15px;
+$font-size-xl: 16px;
+
+// ---------- 光晕 ----------
+$glow-pink:   rgba(255, 205, 220, 0.45);
+$glow-blue:   rgba(184, 219, 255, 0.45);
+$glow-blue-2: rgba(172, 216, 255, 0.4);

@@ -1,0 +1,19 @@
+@use './variables' as *;
+
+.mr-1 { margin-right: 4px; }
+.mr-2 { margin-right: 8px; }
+
+.scrollbar-thin {
+  &::-webkit-scrollbar { width: 5px; }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(150, 165, 180, 0.35);
+    border-radius: 5px;
+  }
+}
+
+.empty-tip {
+  padding: 50px 20px;
+  color: #9aa7b5;
+  text-align: center;
+  font-size: 12px;
+}

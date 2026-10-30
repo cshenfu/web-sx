@@ -16,6 +16,8 @@ import { addGradientExtrusion } from '@/utils/gradientExtrusion'
 
 // ★ 大气光圈 + 星空（和 whMap 同款）
 import { GlobeHalo } from '@/map-engine/adapters/maplibre/globeHalo.js'
+// ★ 视图控件：恢复全景 / 恢复正北 / 2D·3D / 地球投影
+import { MapViewControls } from '@/map-engine/controls/view/index.js'
 
 if (typeof maplibregl.setWorkerUrl === 'function') {
   maplibregl.setWorkerUrl(workerUrl)
@@ -38,6 +40,10 @@ const props = defineProps({
   flyToOnLoad: { type: Boolean, default: true },
   // ★ 控制是否为主页模式（星空、大气光晕、夜半球、自转、可倾斜）
   isDashboard: { type: Boolean, default: false },
+    // ★ 新增：是否挂载视图控件
+  viewControls: { type: Boolean, default: true },
+  // ★ 新增：MapLibre 角位置
+  viewControlsPosition: { type: String, default: 'bottom-left' },
 })
 
 const mapContainer = ref(null)
@@ -45,6 +51,8 @@ const mapContainer = ref(null)
 const maskHidden = ref(false)
 let map = null
 let draw = null
+// ★ 视图控件实例
+let viewControls = null
 const hoverHandlers = new Map()
 const addedLayers = new Set()
 const lastHighlightBySource = new Map()
@@ -210,8 +218,64 @@ onMounted(() => {
     fadeDuration: 0,
   })
 
-  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
+  // map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
   map.on('dragstart', () => stopAutoRotate())
+
+  // ============================================================
+  // ★ 视图控件：恢复全景 / 恢复正北 / 2D·3D / 地球投影
+  //   业务页 maxPitch=0，3D 按钮无意义 → 挂载后隐藏
+  //   大屏点"恢复全景/正北"时先停自转，避免视角立刻飘走
+  // ============================================================
+  viewControls = new MapViewControls({
+    center: props.isDashboard ? [108.9, 35.2] : [108.9, 35],
+    zoom: props.isDashboard
+      ? computeInitialGlobeZoom(mapContainer.value, 2)
+      : 6,
+    compare: false,
+    quadCompare: false,
+    onWarn: (text) => console.warn('[MapGL]', text),
+  })
+  // map.addControl(viewControls, 'top-right')
+
+  // 业务页 maxPitch=0，3D 按钮点了无效果，直接隐藏
+  // if (!props.isDashboard) {
+  //   const dimBtn = map.getContainer().querySelector('.map-dimension-toggle')
+  //   if (dimBtn) dimBtn.style.display = 'none'
+  // }
+// ============================================================
+// ★ 视图控件（按 prop 控制）
+// ============================================================
+if (props.viewControls) {
+  viewControls = new MapViewControls({
+    center: props.isDashboard ? [108.9, 35.2] : [108.9, 35],
+    zoom: props.isDashboard
+      ? computeInitialGlobeZoom(mapContainer.value, 2)
+      : 6,
+    compare: false,
+    quadCompare: false,
+    onWarn: (text) => console.warn('[MapGL]', text),
+  })
+  map.addControl(viewControls, props.viewControlsPosition)
+
+  // 业务页 maxPitch=0，3D 按钮无意义 → 隐藏
+  // if (!props.isDashboard) {
+  //   const dimBtn = map.getContainer().querySelector('.map-dimension-toggle')
+  //   if (dimBtn) dimBtn.style.display = 'none'
+  // }
+
+  // 点"恢复全景/正北"时停自转
+  map.getContainer().addEventListener('click', (e) => {
+    if (e.target?.closest?.('.map-view-reset, .map-north-reset')) {
+      stopAutoRotate()
+    }
+  })
+}
+  // 点"恢复全景/正北"时停自转（easeTo 触发的是 movestart，不是 dragstart）
+  map.getContainer().addEventListener('click', (e) => {
+    if (e.target?.closest?.('.map-view-reset, .map-north-reset')) {
+      stopAutoRotate()
+    }
+  })
 
   draw = new MapboxDraw({
     displayControlsDefault: false,
@@ -309,6 +373,12 @@ onUnmounted(() => {
   if (globeHalo) {
     try { globeHalo.destroy?.() } catch (e) {}
     globeHalo = null
+  }
+
+  // ★ 视图控件清理：必须在 map.remove() 之前
+  if (viewControls && map) {
+    try { map.removeControl(viewControls) } catch (e) {}
+    viewControls = null
   }
 
   for (const [layerId, handler] of hoverHandlers) {
@@ -1330,7 +1400,12 @@ defineExpose({
 .map-initial-mask.is-hidden {
   opacity: 0;
 }
-:deep(.maplibregl-ctrl-top-right) { display: none; }
+/* ★ 保留 top-right 容器显示，让 MapViewControls 可见；
+      仅隐藏 NavigationControl（它的根元素没有 .map-view-controls 类） */
+:deep(.maplibregl-ctrl-top-right) { display: block; }
+:deep(.maplibregl-ctrl-top-right > .maplibregl-ctrl-group:not(.map-view-controls)) {
+  display: none;
+}
 :deep(.maplibregl-ctrl-bottom-right) { display: none; }
 /* ★ 保持 canvas 透明，让 GlobeHalo 的星空/光晕透出 */
 :deep(.maplibregl-canvas) { background: transparent !important; }

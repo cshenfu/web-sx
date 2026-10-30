@@ -28,13 +28,25 @@
             <div class="form-row">
               <span class="form-label required">引用项目报告</span>
               <div class="form-control report-ref-row">
-                <el-select v-model="form.reportType" class="report-type-select">
-                  <el-option :label="isFeasibility ? '可研报告' : '立项报告'" :value="isFeasibility ? 'feasibility' : 'initiation'" />
+                <el-select v-model="form.reportType" class="report-type-select" disabled>
+                  <el-option label="项目建议书" value="proposal" />
                 </el-select>
-                <el-select v-model="form.reportRef" placeholder="请选择" class="report-ref-select">
+                <!-- 远程搜索加载可研报告 -->
+                <el-select
+                  v-model="selectedReportId"
+                  class="report-ref-select"
+                  filterable
+                  remote
+                  :remote-method="fetchReportList"
+                  :loading="reportLoading"
+                  placeholder="请选择可研报告"
+                  @visible-change="handleDropdownVisibleChange"
+                >
                   <el-option
-                    label="陕西华电白水20万千瓦风力发电项目"
-                    value="report-1"
+                    v-for="item in reportOptions"
+                    :key="item.id"
+                    :label="item.reportProjectName || item.fileName"
+                    :value="item.id"
                   />
                 </el-select>
               </div>
@@ -42,17 +54,37 @@
 
             <!-- 申请公司 -->
             <div class="form-row">
-              <span class="form-label">申请公司</span>
-              <el-select v-model="form.applicantCompany" placeholder="请选择" class="form-control">
-                <el-option label="陕西华电永寿新能源有限公司" value="company-1" />
+              <span class="form-label required">申请公司</span>
+              <el-select 
+                v-model="form.applyCompany" 
+                placeholder="请选择" 
+                class="form-control"
+                value-key="id"
+              >
+                <el-option
+                  v-for="item in companyOptions"
+                  :key="item.id"
+                  :label="item.name"
+                  :value="item"
+                />
               </el-select>
             </div>
 
             <!-- 请示公司 -->
             <div class="form-row">
-              <span class="form-label">请示公司</span>
-              <el-select v-model="form.requestCompany" placeholder="请选择" class="form-control">
-                <el-option label="华电陕西能源有限公司" value="company-2" />
+              <span class="form-label required">请示公司</span>
+              <el-select 
+                v-model="form.requestCompany" 
+                placeholder="请选择" 
+                class="form-control"
+                value-key="id"
+              >
+                <el-option
+                  v-for="item in companyOptions"
+                  :key="item.id"
+                  :label="item.name"
+                  :value="item"
+                />
               </el-select>
             </div>
 
@@ -67,6 +99,7 @@
                   placeholder="选择日期"
                   value-format="YYYY-MM-DD"
                   class="form-control"
+                  style="width: 100%"
                 />
               </div>
               <div class="form-row">
@@ -77,6 +110,7 @@
                   placeholder="选择日期"
                   value-format="YYYY-MM-DD"
                   class="form-control"
+                  style="width: 100%"
                 />
               </div>
               <div class="form-row">
@@ -87,6 +121,7 @@
                   placeholder="选择日期"
                   value-format="YYYY-MM-DD"
                   class="form-control"
+                  style="width: 100%"
                 />
               </div>
 
@@ -94,14 +129,14 @@
               <div class="form-row">
                 <span class="form-label">拟申请前期费用</span>
                 <div class="form-control with-unit">
-                  <el-input v-model="form.applyFee" placeholder="请输入" />
+                  <el-input v-model="form.applyFee" placeholder="请输入" type="number" />
                   <span class="unit">万元</span>
                 </div>
               </div>
               <div class="form-row">
                 <span class="form-label">本年预计发送费用</span>
                 <div class="form-control with-unit">
-                  <el-input v-model="form.estimateFee" placeholder="请输入" />
+                  <el-input v-model="form.estimateFee" placeholder="请输入" type="number" />
                   <span class="unit">万元</span>
                 </div>
               </div>
@@ -137,28 +172,20 @@
           </div>
 
           <div class="gp-preview-body">
-            <!-- 未生成 & 未加载 -->
             <div v-if="!generating && !generated" class="preview-empty">
               点击「开始生成」后预览文件
             </div>
-
-            <!-- Loading 10s -->
             <div v-else-if="generating" class="preview-loading">
               <el-skeleton :rows="10" animated />
               <div class="loading-tip">正在生成文件，请稍候...</div>
             </div>
-
-            <!-- 加载完成区 -->
             <div v-else-if="generated" class="preview-content">
-              <!-- 如果是 PDF -->
               <iframe
                 v-if="previewType === 'pdf'"
                 class="preview-iframe"
                 :src="previewUrl"
                 frameborder="0"
               />
-
-              <!-- 如果是 Word -->
               <div v-else-if="previewType === 'word'" class="preview-word-wrap">
                 <div ref="wordContainer" class="docx-preview-container"></div>
               </div>
@@ -171,21 +198,23 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onBeforeUnmount, nextTick } from 'vue'
+import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { renderAsync } from 'docx-preview' // ★ 引入解析库
+import { renderAsync } from 'docx-preview'
+import { createLXReport } from '@/api/modules/report'
+import { pageReport } from '@/api/modules/aiProject'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
   project: { type: Object, default: null },
-  actionKey: { type: String, default: '' },  // gen-application / gen-letter / gen-report / gen-investment
+  actionKey: { type: String, default: '' },
   subCode: { type: String, default: '' },
+  toNode: { type: String, default: 'to陕西公司' }, // ★ 由父组件传入
 })
 
 const emit = defineEmits(['close', 'generated'])
 
-// ★ 标题映射 (增加了投决)
 const REPORT_TITLE_MAP = {
   'gen-application': '立项申请报告生成',
   'gen-letter': '立项请示函生成',
@@ -196,29 +225,69 @@ const REPORT_TITLE_MAP = {
 const title = computed(() => REPORT_TITLE_MAP[props.actionKey] || '报告生成')
 const isFeasibility = computed(() => props.actionKey === 'gen-report')
 
-// ★ 预览文件配置 (指向 public/doc 目录)
-// 立项类走 Word，可研类走 PDF，投决类走 Word
+// AI 项目ID
+const aiProjectId = computed(() => props.project?.id || props.project?.projectId || 1001)
+
+// ★ 预览文件配置
 const previewUrl = computed(() => {
   if (props.actionKey === 'gen-report') {
-    return '/doc/2.pdf'               // 可研审查报告 (PDF)
+    return '/doc/2.pdf'
   } else if (props.actionKey === 'gen-investment') {
-    return '/doc/投资决策.docx'        // 投决 (Word)
+    return '/doc/投资决策.docx'
   } else {
-    return '/doc/立项报告.docx'        // 立项 (Word)
+    return '/doc/立项报告.docx'
   }
 })
 
-// 自动判断文件类型
 const previewType = computed(() => {
   return previewUrl.value.endsWith('.docx') || previewUrl.value.endsWith('.doc') ? 'word' : 'pdf'
 })
 
-// 表单数据（全假数据）
+/* ---------------- 可研报告下拉逻辑 ---------------- */
+const selectedReportId = ref('')
+const reportOptions = ref([])
+const reportLoading = ref(false)
+
+async function fetchReportList(keyword = '') {
+  if (!aiProjectId.value) return
+  reportLoading.value = true
+  try {
+    const res = await pageReport({
+      aiProjectId: aiProjectId.value,
+      pageNo: 1,
+      pageSize: 20,
+      status: 'COMPLETED',
+      reportType: 'FEASIBILITY_STUDY',
+      fileName: keyword
+    })
+    reportOptions.value = res.data?.list || res.list || []
+  } catch (error) {
+    console.error('获取可研报告列表失败:', error)
+    ElMessage.error('获取可研报告列表失败')
+  } finally {
+    reportLoading.value = false
+  }
+}
+
+function handleDropdownVisibleChange(visible) {
+  if (visible && reportOptions.value.length === 0) {
+    fetchReportList()
+  }
+}
+
+/* ---------------- 公司下拉假数据 ---------------- */
+// 后期替换为接口请求的数据
+const companyOptions = ref([
+  { id: 2001, name: '陕西华电永寿新能源有限公司' },
+  { id: 2002, name: '华电陕西能源有限公司' },
+  { id: 2003, name: '陕西华电新能源发电有限公司' },
+])
+
+// 表单数据
 const form = reactive({
-  reportType: '',
-  reportRef: 'report-1',
-  applicantCompany: 'company-1',
-  requestCompany: 'company-2',
+  reportType: 'proposal',
+  applyCompany: { id: 2001, name: '陕西华电永寿新能源有限公司' }, // 默认选中第一个
+  requestCompany: { id: 2002, name: '华电陕西能源有限公司' },
   approvalDate: '',
   reviewDate: '',
   decisionDate: '',
@@ -230,8 +299,7 @@ const form = reactive({
 
 const generating = ref(false)
 const generated = ref(false)
-const wordContainer = ref(null) // ★ Word 挂载节点
-let timer = null
+const wordContainer = ref(null)
 
 watch(
   () => props.visible,
@@ -239,32 +307,24 @@ watch(
     if (val) {
       generated.value = false
       generating.value = false
-      clearTimer()
-      form.reportType = isFeasibility.value ? 'feasibility' : 'initiation'
+      selectedReportId.value = ''
+      reportOptions.value = []
+      // 重置假数据默认选项
+      form.applyCompany = companyOptions.value[0] || null
+      form.requestCompany = companyOptions.value[1] || null
     }
   }
 )
-
-function clearTimer() {
-  if (timer) {
-    clearTimeout(timer)
-    timer = null
-  }
-}
 
 // ★ 核心渲染 Word 逻辑
 async function renderWord() {
   if (!wordContainer.value) return
   try {
-    // 获取文件流
     const response = await fetch(previewUrl.value)
     if (!response.ok) throw new Error('文件获取失败')
     const blob = await response.blob()
 
-    // 清空之前的渲染
     wordContainer.value.innerHTML = ''
-
-    // 渲染 DOCX
     await renderAsync(blob, wordContainer.value, null, {
       className: 'docx-preview',
       inWrapper: true,
@@ -279,24 +339,73 @@ async function renderWord() {
   }
 }
 
+// 格式化时间为 YYYY年M月
+function formatToMonth(dateStr) {
+  if (!dateStr) return undefined
+  const date = new Date(dateStr)
+  if (isNaN(date.getTime())) return dateStr
+  return `${date.getFullYear()}年${date.getMonth() + 1}月`
+}
+
+/* ---------------- 核心生成逻辑 ---------------- */
 async function handleGenerate() {
   if (generating.value) return
+
+  if (!selectedReportId.value) {
+    ElMessage.warning('请选择引用的可研报告')
+    return
+  }
+  
+  if (!form.applyCompany || !form.requestCompany) {
+    ElMessage.warning('请选择申请公司和请示公司')
+    return
+  }
+
   generating.value = true
   generated.value = false
 
-  // 假 loading 10 秒
-  clearTimer()
-  timer = setTimeout(async () => {
+  try {
+    // 组装接口参数
+    const submitData = {
+      aiProjectId: aiProjectId.value,
+      reportProjectId: selectedReportId.value,
+      toNode: props.toNode, // ★ 从父组件带入
+      
+      applyCompanyId: form.applyCompany.id,
+      applyCompanyName: form.applyCompany.name,
+      requestCompanyId: form.requestCompany.id,
+      requestCompanyName: form.requestCompany.name,
+      
+      contactName: form.contactName,
+      contactPhone: form.contactPhone,
+    }
+
+    // 如果不是可研审查（立项、投决等），则带上计划与费用参数
+    if (!isFeasibility.value) {
+      submitData.applyEarlyCost = form.applyFee ? Number(form.applyFee) : undefined
+      submitData.thisYearEarlyCost = form.estimateFee ? Number(form.estimateFee) : undefined
+      
+      submitData.planApprovalTime = formatToMonth(form.approvalDate)
+      submitData.planFeasibilityTime = formatToMonth(form.reviewDate)
+      submitData.planInvestmentDecisionTime = formatToMonth(form.decisionDate)
+    }
+
+    // 真实调用接口
+    await createLXReport(submitData)
+    
     generating.value = false
     generated.value = true
     emit('generated', { actionKey: props.actionKey, subCode: props.subCode })
 
-    // 如果生成的类型是 Word，在 DOM 渲染后执行解析
     if (previewType.value === 'word') {
       await nextTick()
       await renderWord()
     }
-  }, 10000)
+  } catch (error) {
+    console.error('生成报告失败:', error)
+    ElMessage.error(error.message || '生成报告失败，请重试')
+    generating.value = false
+  }
 }
 
 function handlePrint() {
@@ -312,17 +421,14 @@ function handleClose() {
     ElMessage.warning('正在生成中，请稍候')
     return
   }
-  clearTimer()
   emit('close')
 }
-
-onBeforeUnmount(() => clearTimer())
 </script>
 
 <style scoped>
 .generate-panel {
   position: fixed;
-  top: 65px;       /* ★ 向下偏移 65px */
+  top: 65px;
   left: 0;
   right: 0;
   bottom: 0;
@@ -364,7 +470,7 @@ onBeforeUnmount(() => clearTimer())
 .gp-body {
   flex: 1;
   display: flex;
-  min-height: 0; /* ★ 关键：防止 body 被内部撑破 */
+  min-height: 0;
 }
 
 /* 左侧表单 */
@@ -379,7 +485,7 @@ onBeforeUnmount(() => clearTimer())
   padding: 24px 40px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 .form-row {
   display: flex;
@@ -387,7 +493,7 @@ onBeforeUnmount(() => clearTimer())
   gap: 16px;
 }
 .form-label {
-  width: 130px;
+  width: 140px;
   flex-shrink: 0;
   color: #606266;
   font-size: 13px;
@@ -419,7 +525,7 @@ onBeforeUnmount(() => clearTimer())
   gap: 8px;
 }
 .report-type-select {
-  width: 110px;
+  width: 120px;
   flex-shrink: 0;
 }
 .report-ref-select {
@@ -428,6 +534,7 @@ onBeforeUnmount(() => clearTimer())
 
 .form-section-title {
   margin-top: 8px;
+  margin-bottom: -4px;
   color: #303133;
   font-size: 13px;
   font-weight: 600;
@@ -445,12 +552,12 @@ onBeforeUnmount(() => clearTimer())
 .gp-form-actions {
   display: flex;
   justify-content: center;
-  margin-top: 32px;
+  margin-top: 40px;
 }
 .generate-btn {
-  width: 160px;
+  width: 200px;
   height: 40px;
-  border-radius: 20px;
+  border-radius: 4px; /* 根据原型图看起来是圆角矩形 */
   font-size: 14px;
 }
 
@@ -461,7 +568,7 @@ onBeforeUnmount(() => clearTimer())
   flex-direction: column;
   background: #f5f7fa;
   min-width: 0;
-  min-height: 0; /* ★ 关键：防止右侧被内部内容撑破 */
+  min-height: 0;
 }
 .gp-preview-header {
   height: 40px;
@@ -481,7 +588,7 @@ onBeforeUnmount(() => clearTimer())
   flex: 1;
   overflow: auto;
   padding: 20px;
-  min-height: 0;      /* ★ 关键 */
+  min-height: 0;
   box-sizing: border-box;
 }
 
@@ -517,7 +624,7 @@ onBeforeUnmount(() => clearTimer())
 /* PDF 和 Word 的统一外观 */
 .preview-iframe {
   width: 100%;
-  height: 100%;       /* ★ 撑满父容器 */
+  height: 100%;
   background: #fff;
   border: none;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
@@ -532,7 +639,6 @@ onBeforeUnmount(() => clearTimer())
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* 为了 Word 显示更像纸张 */
 .docx-preview-container {
   flex: 1;
   width: 100%;
@@ -540,10 +646,9 @@ onBeforeUnmount(() => clearTimer())
   flex-direction: column;
   align-items: center;
   background: #f5f7fa;
-  overflow-y: auto; /* ★ 允许在内部滚动 */
+  overflow-y: auto;
 }
 
-/* 第三方库 word 页面的样式修正 */
 :deep(.docx-wrapper) {
   background: #f5f7fa !important;
   padding: 20px 0 !important;
