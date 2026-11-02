@@ -170,14 +170,14 @@ const createObjectKey = (file, storePath, bucket) => {
 // usePublicBucket 默认 false，即所有旧调用不传该参数时行为完全不变（私有桶）
 const resolveBucket = (credentials, usePublicBucket = true) => {
     if (!usePublicBucket) {
-        return credentials.publicBucket;
+        return credentials.privateBucket;
     }
 
     if (!credentials.publicBucket) {
         throw new Error('后端未返回 publicBucket，无法使用公有桶');
     }
 
-    return credentials.publicBucket;
+    return credentials.privateBucket;
 };
 
 
@@ -243,7 +243,7 @@ export function useOssUpload() {
      * 创建阿里云 OSS 客户端
      * ★ usePublicBucket 默认 false，不传即为原来的私有桶逻辑
      */
-    const createAliOssClient = (credentials, usePublicBucket = true) => {
+    const createAliOssClient = (credentials, usePublicBucket = false) => {
         const {
             access,
             secret,
@@ -297,7 +297,7 @@ export function useOssUpload() {
      * 创建 RustFS S3 客户端
      * ★ usePublicBucket 默认 false，不传即为原来的私有桶逻辑
      */
-    const createRustfsClient = (credentials, usePublicBucket = true) => {
+    const createRustfsClient = (credentials, usePublicBucket = false) => {
         const {
             access,
             secret,

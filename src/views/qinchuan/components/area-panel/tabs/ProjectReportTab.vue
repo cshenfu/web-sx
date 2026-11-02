@@ -118,6 +118,29 @@
         <el-button @click="docxDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- ★ pdf 本地预览弹窗 -->
+    <el-dialog
+      v-model="pdfDialogVisible"
+      :title="pdfDialogTitle"
+      width="80%"
+      top="5vh"
+      append-to-body
+      destroy-on-close
+      class="pdf-preview-dialog"
+    >
+      <div v-loading="pdfLoading" class="pdf-body">
+        <iframe
+          v-if="pdfIframeSrc"
+          :src="pdfIframeSrc"
+          class="pdf-iframe"
+          frameborder="0"
+        />
+      </div>
+      <template #footer>
+        <el-button @click="pdfDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -238,12 +261,18 @@ function getFileExt(row) {
   return m ? m[1] : ''
 }
 
-/** 通过 getTempUrlSX(fileName) 拿临时地址，失败回退 row.fileUrl */
+/**
+ * 通过 getTempUrlSX 拿临时地址，失败回退 row.fileUrl
+ * ★ 改动：现在把 fileUrl 传给接口
+ */
 async function resolvePreviewUrl(row) {
-  const fileName = row.fileName || row.fileUrl || ''
-  if (fileName) {
+  const fileUrl = row.fileUrl
+  if (fileUrl) {
     try {
-      const res = await getTempUrlSX(fileName)
+      // ★ 方案 A：接口入参为对象 { fileUrl }（最常见）
+      const res = await getTempUrlSX(fileUrl)
+      // ★ 若你的 getTempUrlSX 签名是直接收字符串，把上面一行换成：
+      // const res = await getTempUrlSX(fileUrl)
       const url = pickTempUrl(res)
       if (url) return url
     } catch (e) {
@@ -285,17 +314,55 @@ async function openDocxPreview(url, title) {
     if (isCors) {
       ElMessage.warning('文件存储未配置跨域，已切换为在线预览（如仍打不开请下载查看）')
     } else {
-      ElMessage.warning('本地预览失败，已尝试在线预览')
+      ElMessage.warning('本地预览失败')
     }
-
-    try {
-      window.open(
-        `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`,
-        '_blank'
-      )
-    } catch {}
   } finally {
     docxLoading.value = false
+  }
+}
+
+// ============================================================
+// ★ PDF 预览
+// ============================================================
+const pdfDialogVisible = ref(false)
+const pdfDialogTitle = ref('PDF 预览')
+const pdfLoading = ref(false)
+const pdfIframeSrc = ref('')
+
+/** 关闭时回收 blob，避免内存泄漏 */
+watch(pdfDialogVisible, (visible) => {
+  if (!visible && pdfIframeSrc.value) {
+    URL.revokeObjectURL(pdfIframeSrc.value)
+    pdfIframeSrc.value = ''
+  }
+})
+
+async function openPdfPreview(url, title) {
+  pdfDialogTitle.value = title || 'PDF 预览'
+  pdfDialogVisible.value = true
+  pdfLoading.value = true
+  pdfIframeSrc.value = ''
+  try {
+    await nextTick()
+
+    const resp = await fetch(url, { mode: 'cors' })
+    if (!resp.ok) throw new Error(`文件下载失败 (${resp.status})`)
+    const rawBlob = await resp.blob()
+
+    // ★ 关键：强制 type=application/pdf，绕开 attachment 导致的下载
+    const pdfBlob = new Blob([rawBlob], { type: 'application/pdf' })
+    const blobUrl = URL.createObjectURL(pdfBlob)
+
+    // 旧 blob 先回收
+    if (pdfIframeSrc.value) URL.revokeObjectURL(pdfIframeSrc.value)
+    pdfIframeSrc.value = blobUrl
+  } catch (e) {
+    console.error('[ProjectReportTab] PDF 预览失败:', e)
+    ElMessage.warning('本地预览失败，已尝试新窗口打开（如仍下载请下载后查看）')
+    // 降级：直接新窗口打开原链接
+    window.open(url, '_blank')
+  } finally {
+    pdfLoading.value = false
   }
 }
 
@@ -310,9 +377,9 @@ async function handlePreview(row) {
     return
   }
 
-  // PDF → 新窗口
+  // PDF → 弹窗内嵌预览（blob 方式，避免被下载）
   if (ext === 'pdf') {
-    window.open(url, '_blank')
+    openPdfPreview(url, fileName || 'PDF 预览')
     return
   }
 
@@ -534,6 +601,24 @@ watch(() => props.project?.id, async (newId) => {
 .docx-container :deep(.docx-wrapper > section.docx) {
   margin-bottom: 16px;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
+  background: #fff;
+}
+
+/* ★ pdf 预览弹窗 */
+.pdf-preview-dialog :deep(.el-dialog__body) {
+  padding: 0;
+  background: #f5f6f8;
+}
+.pdf-body {
+  height: 75vh;
+  overflow: hidden;
+  padding: 8px;
+  box-sizing: border-box;
+}
+.pdf-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
   background: #fff;
 }
 </style>
