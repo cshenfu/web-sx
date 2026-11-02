@@ -804,16 +804,19 @@ function handleProjectSelect(item) {
 }
 
 async function handleOpenDetailPanel(item) {
-  popoverProject.value = null
-  clearHoverState()             // ★
+  if (!item) return
   actionMenuOpen.value = false
-  selectedProject.value = item
 
+  // ★ 先走"选中场区"流程：清 hover、flyTo、高亮场区、渲染风机/升压站图标、加载道路
+  handleProjectSelect(item)
+
+  // ★ 再打开全屏详情面板
+  selectedProject.value = item
   activeAreaId.value = item.id
   activeProjectDetail.value = buildDetailFromListItem(item)
-
   rightPanelMode.value = 'detail'
   isDetailFullscreen.value = true
+
   await loadAiProjectDetail(item.id)
 }
 

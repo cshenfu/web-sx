@@ -145,9 +145,8 @@ const statusLabel = computed(() => props.stageMap[props.project.projectStage] ||
 const windCount = computed(() => (props.project.windTurbinePoints || []).filter((p) => Number(p.isReserve) !== 1).length)
 const altCount  = computed(() => (props.project.windTurbinePoints || []).filter((p) => Number(p.isReserve) === 1).length)
 // ★ 标题是否可点击：仅初步遴选（selection 分组）不可点，hover 模式也允许点
-const titleClickable = computed(() => {
-  return getGroupKey(props.project?.projectStage) !== 'selection'
-})
+// ★ 标题始终可点击打开详情（含智能选址 / 项目遴选等所有阶段）
+const titleClickable = computed(() => true)
 const allActions = computed(() => {
   if (props.actions && props.actions.length) return props.actions
   return STAGE_ACTIONS[props.project.projectStage] || STAGE_ACTIONS.PRELIMINARY_SELECTION

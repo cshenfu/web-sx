@@ -127,6 +127,7 @@
         </div>
 
         <!-- ★ 点击选中：右上角固定卡片 -->
+        <!-- 点击选中：右上角固定卡片（保持原样） -->
         <ProjectActionCard
           v-if="popoverProject && !isEditing && !showVerifyPanel && !showDetailPanel && !showCreateProject && !showEditProject"
           :project="popoverProject"
@@ -136,7 +137,8 @@
           @action="executeAction"
         />
 
-        <!-- ★ hover：首次进入位置固定弹窗，鼠标移入卡片不消失；标题/按钮逻辑与固定卡片一致 -->
+        <!-- hover：点标题只打开详情，不触发场区点击 -->
+        <!-- ★ hover：点标题同样触发场区选中（flyTo + 高亮 + 风机图标 + 道路） -->
         <ProjectActionCard
           v-if="hoveredProject && isAreaView && viewMode === 'map' && !popoverProject && !isEditing && !showVerifyPanel && !showDetailPanel && !showCreateProject && !showEditProject"
           :project="hoveredProject"
@@ -862,15 +864,14 @@ async function openDetailPanel(project, tab) {
   showProjectDrawer.value = false
   viewMode.value = 'map'
 
-  // 先执行地图选中（设置 popoverProject / selectedProject、flyTo、渲染图标等）
+  // ★ 统一走"选中场区"流程：flyTo、高亮场区、渲染风机/升压站图标、加载道路
   await onProjectClick(p.id)
 
-  // ★ 拉 AI 详情，填充 mainInfo（解决 MainInfoTab 数据不完整的问题）
+  // 拉 AI 详情，填充 mainInfo
   try {
     const res = await api.getAiProjectData(p.id)
     if (res?.code === 200 && res.data) {
       const ai = res.data
-      // 保持 id 不变（ProjectDetailPanel 内部多个 tab 用 props.project.id 作为 aiProjectId 请求文件列表）
       selectedProject.value = {
         ...selectedProject.value,
         relationId: ai.relationId,
@@ -879,7 +880,6 @@ async function openDetailPanel(project, tab) {
         stageTimeList: ai.stageTimeList || [],
         rawAiData: ai,
       }
-      // 卡片那边同步一下（标题、状态等不受影响，只是让对象引用保持一致）
       if (popoverProject.value && String(popoverProject.value.id) === String(p.id)) {
         popoverProject.value = { ...popoverProject.value, ...selectedProject.value }
       }
