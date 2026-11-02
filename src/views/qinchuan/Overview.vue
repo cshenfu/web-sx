@@ -151,15 +151,19 @@
           @action="executeProjectAction"
         />
 
-        <!-- ★ hover：跟随鼠标的只读悬浮卡片 -->
+        <!-- ★ hover：首次进入位置固定弹窗，鼠标移入卡片不消失 -->
+        <!-- ★ hover：首次进入位置固定弹窗，鼠标移入卡片不消失；标题/按钮逻辑与固定卡片一致 -->
         <ProjectActionCard
           v-if="hoveredProject && isAreaView && viewMode === 'map' && !popoverProject && !selectedProject && !isEditing && !isActionPanelOpen && !isDetailFullscreen"
           :project="hoveredProject"
           hover-mode
           :position="hoveredPos"
-          :show-footer="false"
           :stage-map="stageMap"
           :actions="popoverActions"
+          @open-detail="handleOpenDetailPanel"
+          @action="executeProjectAction"
+          @mouseenter="onHoverCardEnter"
+          @mouseleave="onHoverCardLeave"
         />
 
         <div
@@ -544,9 +548,42 @@ const detailPanelTab = ref('main')
 const popoverProject = ref(null)
 const selectedProject = ref(null)
 
-// ★ hover 状态（跟随鼠标的只读卡片）
+// ★ hover 状态（首次进入位置的固定卡片）
 const hoveredProject = ref(null)
 const hoveredPos = reactive({ x: 0, y: 0 })
+
+// ★ hover 消失定时器：鼠标离开场区 0.8s 后才隐藏；期间移入卡片可取消
+let hoverHideTimer = null
+const HOVER_HIDE_DELAY = 800
+
+function clearHoverHideTimer() {
+  if (hoverHideTimer) {
+    clearTimeout(hoverHideTimer)
+    hoverHideTimer = null
+  }
+}
+
+function scheduleHoverHide() {
+  clearHoverHideTimer()
+  hoverHideTimer = setTimeout(() => {
+    hoveredProject.value = null
+    hoverHideTimer = null
+  }, HOVER_HIDE_DELAY)
+}
+
+function onHoverCardEnter() {
+  clearHoverHideTimer()
+}
+
+function onHoverCardLeave() {
+  scheduleHoverHide()
+}
+
+// 立即清掉 hover 状态（点击场区 / 打开详情 / 清选中 时用）
+function clearHoverState() {
+  clearHoverHideTimer()
+  hoveredProject.value = null
+}
 
 const popoverActions = computed(() => {
   const actions = STAGE_ACTIONS[popoverProject.value?.projectStage] || STAGE_ACTIONS.PRELIMINARY_SELECTION
@@ -735,6 +772,9 @@ function handleProjectSelect(item) {
     (selectedId != null && String(selectedId) === String(item.id))
   ) return
 
+  // ★ 点击场区：立即关闭 hover 弹窗 + 清定时器
+  clearHoverState()
+
   // ★ 恢复上一次选中的场区为普通样式，避免点 B 后 A 仍显示"取消颜色"
   const prevProject = popoverProject.value
   if (prevProject && String(prevProject.id) !== String(item.id) && isAreaView.value) {
@@ -744,8 +784,6 @@ function handleProjectSelect(item) {
   clearOverviewRoadLayer()
   popoverProject.value = item
   actionMenuOpen.value = false
-  // 点击选中时清掉 hover 卡片
-  hoveredProject.value = null
   void renderAreaCenterIcons()
 
   const map = mapRef.value?.getMap()
@@ -767,7 +805,7 @@ function handleProjectSelect(item) {
 
 async function handleOpenDetailPanel(item) {
   popoverProject.value = null
-  hoveredProject.value = null
+  clearHoverState()             // ★
   actionMenuOpen.value = false
   selectedProject.value = item
 
@@ -792,6 +830,7 @@ function openSiteMapDetailPanel(project, tab = 'main') {
 
 function executeProjectAction(action, project) {
   if (!project) return
+  clearHoverState()
   const item = resolveMapProject(project)
   actionProject.value = item
   actionMenuOpen.value = false
@@ -874,7 +913,7 @@ async function handleDeleteProject(project) {
     ElMessage.success('删除成功')
     if (String(popoverProject.value?.id) === String(project.id)) popoverProject.value = null
     if (String(actionProject.value?.id) === String(project.id)) actionProject.value = null
-    if (String(hoveredProject.value?.id) === String(project.id)) hoveredProject.value = null
+    if (String(hoveredProject.value?.id) === String(project.id)) clearHoverState()
     await Promise.all([fetchMapProjects(), fetchProjectList()])
   } catch (error) {
     ElMessage.error(error?.message || '删除失败')
@@ -972,7 +1011,7 @@ function startGeometryEdit(project, mode = 'area') {
   actionProject.value = item
   popoverProject.value = null
   selectedProject.value = null
-  hoveredProject.value = null
+  clearHoverState()             // ★ 原来 hoveredProject.value = null
   actionMenuOpen.value = false
   rightPanelMode.value = 'list'
   isDetailFullscreen.value = false
@@ -1399,7 +1438,7 @@ function handleTableSortChange({ prop, order }) {
 watch(() => filters.stage, () => { pagination.page = 1; fetchProjectList() })
 watch(viewMode, (val) => {
   if (val === 'list' && showLayerPanel.value) showLayerPanel.value = false
-  if (val === 'list') hoveredProject.value = null
+  if (val === 'list') clearHoverState()   // ★ 原来 hoveredProject.value = null
 })
 
 function setProjectIconVisible(chipId, visible) {
@@ -1892,26 +1931,26 @@ function addProjectArea(project, highlighted = false) {
     if (!isEditing.value && !isActionPanelOpen.value) handleProjectSelect(project)
   })
 
-  // ★ hover 绑定：跟随鼠标的只读卡片
+  // ★ hover 绑定：首次进入位置固定弹窗，离开 0.8s 后隐藏（移入卡片可取消）
   mapRef.value.offHover?.(fillLayerId)
   mapRef.value.onHover?.(fillLayerId, {
     onEnter: (_, e) => {
       if (isEditing.value || isActionPanelOpen.value) return
       if (String(popoverProject.value?.id ?? '') === String(project.id)) return
       if (String(selectedProject.value?.id ?? '') === String(project.id)) return
+      clearHoverHideTimer()
       hoveredProject.value = project
+      // ★ 只在首次进入时记录位置，后续鼠标移动不再跟随
       hoveredPos.x = e.point.x
       hoveredPos.y = e.point.y
     },
-    onMove: (_, e) => {
-      if (!hoveredProject.value) return
-      if (String(hoveredProject.value.id) !== String(project.id)) return
-      hoveredPos.x = e.point.x
-      hoveredPos.y = e.point.y
+    onMove: () => {
+      // ★ 不更新位置：弹窗固定在首次进入点
     },
     onLeave: () => {
       if (hoveredProject.value && String(hoveredProject.value.id) === String(project.id)) {
-        hoveredProject.value = null
+        // ★ 离开场区不立刻隐藏，延迟 0.8s；期间鼠标进入卡片会取消
+        scheduleHoverHide()
       }
     },
   })
@@ -2087,7 +2126,7 @@ function clearSelection() {
   clearOverviewRoadLayer()
   popoverProject.value = null
   selectedProject.value = null
-  hoveredProject.value = null
+  clearHoverState()             // ★ 原来 hoveredProject.value = null
   actionMenuOpen.value = false
   void renderAreaCenterIcons()
 
@@ -2117,10 +2156,12 @@ function handleBackToList() {
 }
 
 function handleMapBlankClick(e) {
-  // 表单类全屏覆盖时，点地图空白不处理
-  if (showCreateProject.value || showEditProject.value) return
-  // 没选中项目、也没打开详情面板 → 无事可做
-  if (!popoverProject.value && !showDetailPanel.value) return
+  // 编辑态 / 弹窗面板打开时，点击空白不做处理
+  if (isEditing.value || isActionPanelOpen.value) return
+  // 详情面板全屏时也不处理，避免误关
+  if (isDetailFullscreen.value) return
+  // 没选中项目 → 无事可做
+  if (!popoverProject.value && !selectedProject.value) return
 
   const map = mapRef.value?.getMap?.()
   if (!map) return
@@ -2130,7 +2171,7 @@ function handleMapBlankClick(e) {
     // 点到任意带 projectId 的图层（场区、风机、升压站…）→ 视为"点在场区上"，不关
     if (hits.some((f) => f.properties?.projectId != null)) return
 
-    // 编辑态：只收掉临时绘制/框选状态，不关闭详情面板
+    // 编辑态：只收掉临时绘制/框选状态，不关闭选中
     if (editMode.value !== null) {
       if (drawingNewPoint.value) {
         mapRef.value?.getDraw?.()?.changeMode('simple_select')
@@ -2143,10 +2184,10 @@ function handleMapBlankClick(e) {
       return
     }
 
-    // ★ 走到这里 = 点击空白 / 无 projectId 区域 → 取消场区选中 + 关闭详情面板
-    clearPopover()
+    // 点击空白 → 取消场区选中 + 关闭详情面板
+    clearSelection()
   } catch (err) {
-    console.warn('[site-map] handleMapBlankClick 查询失败:', err)
+    console.warn('[overview] handleMapBlankClick 查询失败:', err)
   }
 }
 
@@ -2594,7 +2635,7 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
     rightPanelMode.value = 'list'
     popoverProject.value = null
     selectedProject.value = null
-    hoveredProject.value = null
+    clearHoverState()           // ★ 原来 hoveredProject.value = null
     if (isEditing.value) exitEditMode()
     isDetailFullscreen.value = false
     renderProjectsByStage('overview')
@@ -2794,6 +2835,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  clearHoverHideTimer()          // ★ hover 定时器清理
   try { mapRef.value?.stopAutoRotate?.() } catch (e) { }
   unbindZoomListener()
   removeRoadLineLayers()

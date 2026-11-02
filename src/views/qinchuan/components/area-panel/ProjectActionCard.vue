@@ -47,7 +47,8 @@
       </div>
     </div>
 
-    <div v-if="showFooter && !hoverMode" class="tooltip-footer" @click.stop>
+    <!-- ★ hover 模式也显示 footer，操作与固定卡片完全一致 -->
+    <div v-if="showFooter" class="tooltip-footer" @click.stop>
       <button
         v-for="action in visibleActions"
         :key="action"
@@ -91,7 +92,7 @@ import { MoreFilled } from '@element-plus/icons-vue'
 const props = defineProps({
   project:        { type: Object, required: true },
   hoverMode:      { type: Boolean, default: false },
-  position:       { type: Object, default: () => ({ x: 0, y: 0 }) }, // hover 模式：跟随鼠标的像素坐标
+  position:       { type: Object, default: () => ({ x: 0, y: 0 }) }, // hover 模式：卡片左上角的像素坐标
   showFooter:     { type: Boolean, default: true },
   stageMap:       { type: Object, default: () => ({}) },             // code -> 中文，用于状态文案
   actions:        { type: Array,  default: null },                   // 传入则覆盖 STAGE_ACTIONS
@@ -143,9 +144,8 @@ const statusLabel = computed(() => props.stageMap[props.project.projectStage] ||
 
 const windCount = computed(() => (props.project.windTurbinePoints || []).filter((p) => Number(p.isReserve) !== 1).length)
 const altCount  = computed(() => (props.project.windTurbinePoints || []).filter((p) => Number(p.isReserve) === 1).length)
-// ★ 标题是否可点击：hover 模式 / 初步遴选（selection 分组）均不可点
+// ★ 标题是否可点击：仅初步遴选（selection 分组）不可点，hover 模式也允许点
 const titleClickable = computed(() => {
-  if (props.hoverMode) return false
   return getGroupKey(props.project?.projectStage) !== 'selection'
 })
 const allActions = computed(() => {
@@ -175,17 +175,40 @@ const overflowActions = computed(() => {
   return all.includes('delete') ? without.slice(4) : without.slice(5)
 })
 
+// ★ hover 模式：卡片左上角 = position 坐标，并 clamp 到视口内
 const cardStyle = computed(() => {
   if (!props.hoverMode) return {}
-  return { left: `${props.position.x + 16}px`, top: `${props.position.y + 16}px`, right: 'auto' }
+
+  // 卡片尺寸估计（hover 模式：header 54 + grid 76 + footer 48 ≈ 178，留余量）
+  const MARGIN = 12
+  const CARD_W = 375
+  const CARD_H = 200
+
+  const vw = (typeof window !== 'undefined' ? window.innerWidth  : 1920)
+  const vh = (typeof window !== 'undefined' ? window.innerHeight : 1080)
+
+  let x = props.position.x
+  let y = props.position.y
+
+  // 右侧 / 底部溢出 → 反向贴边；左侧 / 顶部溢出 → 正向贴边
+  if (x + CARD_W + MARGIN > vw) x = vw - CARD_W - MARGIN
+  if (y + CARD_H + MARGIN > vh) y = vh - CARD_H - MARGIN
+  if (x < MARGIN) x = MARGIN
+  if (y < MARGIN) y = MARGIN
+
+  return {
+    left: `${x}px`,
+    top: `${y}px`,
+    right: 'auto',
+  }
 })
 
 watch(() => props.project?.id, () => { actionMenuOpen.value = false })
 
- function onTitleClick() {
-   if (!titleClickable.value) return
-   emit('open-detail', props.project)
- }
+function onTitleClick() {
+  if (!titleClickable.value) return
+  emit('open-detail', props.project)
+}
 function emitAction(action) {
   actionMenuOpen.value = false
   emit('action', action, props.project)
@@ -205,7 +228,8 @@ function emitAction(action) {
 }
 .project-action-card.is-hover {
   top: auto; right: auto; height: auto; z-index: 100;
-  pointer-events: none;
+  /* ★ 必须 auto：否则 mouseenter / mouseleave 无法触发，父组件的延迟隐藏逻辑会失效 */
+  pointer-events: auto;
   box-shadow: 0 8px 24px rgba(15,23,42,.22);
 }
 .tooltip-header {

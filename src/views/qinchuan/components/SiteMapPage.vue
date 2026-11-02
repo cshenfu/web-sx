@@ -136,15 +136,18 @@
           @action="executeAction"
         />
 
-        <!-- ★ hover：跟随鼠标的只读悬浮卡片 -->
+        <!-- ★ hover：首次进入位置固定弹窗，鼠标移入卡片不消失；标题/按钮逻辑与固定卡片一致 -->
         <ProjectActionCard
           v-if="hoveredProject && isAreaView && viewMode === 'map' && !popoverProject && !isEditing && !showVerifyPanel && !showDetailPanel && !showCreateProject && !showEditProject"
           :project="hoveredProject"
           hover-mode
           :position="hoveredPos"
-          :show-footer="false"
           :stage-map="stageMap"
           :actions="cardActions"
+          @open-detail="(p) => openDetailPanel(p, 'main')"
+          @action="executeAction"
+          @mouseenter="onHoverCardEnter"
+          @mouseleave="onHoverCardLeave"
         />
 
         <slot name="map-overlay" :projects="projectList" :selected="popoverProject" />
@@ -523,6 +526,40 @@ const popoverProject = ref(null)
 // ★ hover 跟随鼠标卡片
 const hoveredProject = ref(null)
 const hoveredPos = reactive({ x: 0, y: 0 })
+
+// ★ hover 消失定时器：鼠标离开场区 0.8s 后才隐藏；期间移入卡片可取消
+let hoverHideTimer = null
+const HOVER_HIDE_DELAY = 800
+
+function clearHoverHideTimer() {
+  if (hoverHideTimer) {
+    clearTimeout(hoverHideTimer)
+    hoverHideTimer = null
+  }
+}
+
+function scheduleHoverHide() {
+  clearHoverHideTimer()
+  hoverHideTimer = setTimeout(() => {
+    hoveredProject.value = null
+    hoverHideTimer = null
+  }, HOVER_HIDE_DELAY)
+}
+
+function onHoverCardEnter() {
+  clearHoverHideTimer()
+}
+
+function onHoverCardLeave() {
+  scheduleHoverHide()
+}
+
+// 立即清掉 hover 状态（点击场区 / 打开详情 / 清选中 时用）
+function clearHoverState() {
+  clearHoverHideTimer()
+  hoveredProject.value = null
+}
+
 // ★ 详情面板 / 各类弹窗使用的项目（与 popoverProject 同步设置）
 const selectedProject = ref(null)
 
@@ -755,6 +792,9 @@ function handleSizeChange(size) { pagination.pageSize = size; pagination.page = 
 const deletingId = ref(null)
 function executeAction(action, project) {
   if (!project) return
+  // ★ 点击卡片按钮：先关 hover 弹窗 + 清定时器
+  clearHoverState()
+
   const mapProject = allMapProjects.value.find((p) => p.id === project.id) || project
 
   if (['material', 'researchMaterial', 'investMaterial'].includes(action)) {
@@ -806,7 +846,7 @@ async function handleDeleteProject(project) {
     showProjectDrawer.value = false; showDetailPanel.value = false
     await fetchMapProjects()
     if (String(popoverProject.value?.id ?? '') === String(id)) clearPopover()
-    if (String(hoveredProject.value?.id ?? '') === String(id)) hoveredProject.value = null
+    if (String(hoveredProject.value?.id ?? '') === String(id)) clearHoverState()
     if (projectList.value.length === 1 && pagination.page > 1) pagination.page -= 1
     await Promise.all([fetchProjectList(), fetchOverviewStats(), fetchCityStats()])
   } catch (err) { ElMessage.error(err?.message || '删除失败') }
@@ -814,6 +854,9 @@ async function handleDeleteProject(project) {
 }
 
 async function openDetailPanel(project, tab) {
+  // ★ 打开详情前，先关 hover 弹窗 + 清定时器
+  clearHoverState()
+
   const p = allMapProjects.value.find(item => item.id === project.id)
   if (!p) { ElMessage.warning('地图上未找到该项目'); return }
   showProjectDrawer.value = false
@@ -1153,25 +1196,26 @@ function addProjectArea(project, highlighted = false) {
   mapRef.value.offClick(fillLayerId)
   mapRef.value.onClick(fillLayerId, () => onProjectClick(project.id))
 
-  // ★ hover 绑定：跟随鼠标的只读卡片
+  // ★ hover 绑定：首次进入位置固定弹窗，离开 0.8s 后隐藏（移入卡片可取消）
   mapRef.value.offHover?.(fillLayerId)
   mapRef.value.onHover?.(fillLayerId, {
     onEnter: (_, e) => {
       if (isEditing.value || showCreateProject.value || showEditProject.value || showVerifyPanel.value || showDetailPanel.value) return
       if (String(popoverProject.value?.id ?? '') === String(project.id)) return
+      if (String(selectedProject.value?.id ?? '') === String(project.id)) return
+      clearHoverHideTimer()
       hoveredProject.value = project
+      // ★ 只在首次进入时记录位置，后续鼠标移动不再跟随
       hoveredPos.x = e.point.x
       hoveredPos.y = e.point.y
     },
-    onMove: (_, e) => {
-      if (!hoveredProject.value) return
-      if (String(hoveredProject.value.id) !== String(project.id)) return
-      hoveredPos.x = e.point.x
-      hoveredPos.y = e.point.y
+    onMove: () => {
+      // ★ 不更新位置：弹窗固定在首次进入点
     },
     onLeave: () => {
       if (hoveredProject.value && String(hoveredProject.value.id) === String(project.id)) {
-        hoveredProject.value = null
+        // ★ 离开场区不立刻隐藏，延迟 0.8s；期间鼠标进入卡片会取消
+        scheduleHoverHide()
       }
     },
   })
@@ -1228,7 +1272,7 @@ async function onProjectClick(projectId) {
   flyToProjectBounds(project)
   popoverProject.value = project
   selectedProject.value = project
-  hoveredProject.value = null
+  clearHoverState()             // ★ 原来 hoveredProject.value = null
   hasSaved.value = false
   isEditing.value = false
   isDirty.value = false
@@ -1488,7 +1532,7 @@ function clearPopover() {
   clearPopoverLayersOnly()
   popoverProject.value = null
   selectedProject.value = null
-  hoveredProject.value = null
+  clearHoverState()             // ★ 原来 hoveredProject.value = null
   showVerifyPanel.value = false
   showDetailPanel.value = false
   renderAreaCenterIcons()
@@ -1666,7 +1710,7 @@ function handleDrawerSortChange({ key, dir }) { drawerSort.key = key; drawerSort
 
 watch(viewMode, (val) => {
   if (val === 'list' && showProjectDrawer.value) showProjectDrawer.value = false
-  if (val === 'list') hoveredProject.value = null
+  if (val === 'list') clearHoverState()   // ★ 原来 hoveredProject.value = null
 })
 watch(showProjectDrawer, (val) => { if (val) { pagination.page = 1; fetchProjectList() } })
 
@@ -1718,7 +1762,7 @@ function startGeometryEdit(project, mode = 'area') {
   const p = allMapProjects.value.find((item) => String(item.id) === String(project.id)) || project
   popoverProject.value = p
   selectedProject.value = p
-  hoveredProject.value = null
+  clearHoverState()             // ★ 原来 hoveredProject.value = null
   isEditing.value = true
   isDirty.value = false
   hasSaved.value = false
@@ -1945,6 +1989,7 @@ onMounted(() => {
   fetchStageList(); fetchProjectList(); fetchMapProjects(); fetchOverviewStats(); fetchCityStats()
 })
 onUnmounted(() => {
+  clearHoverHideTimer()          // ★ hover 定时器清理
   removeRoadLineLayers()
   whlnPlugin?.destroy?.(); whlnPlugin = null
   unbindZoomListener()
@@ -2002,6 +2047,8 @@ function handleGenerateRequest(payload) {
   showGenerateModal.value = false
 }
 </script>
+
+
 
 <style scoped>
 .site-map-page { position: relative; width: 100%; height: 100%; overflow: hidden; background: #f5f7fa; }
