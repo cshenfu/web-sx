@@ -125,7 +125,7 @@
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { pageReport, terminateCalculation } from '@/api/modules/aiProject'
-import { getTempUrl } from '@/api/modules/upload'
+import { getTempUrlSX } from '@/api/modules/upload'
 import { renderAsync } from 'docx-preview'
 
 const emit = defineEmits(['row-action', 'open-confirm', 'create'])
@@ -213,7 +213,7 @@ function canPreview(row) {
   return false
 }
 
-/** 从 getTempUrl 返回值里提取 url（兼容多种形态） */
+/** 从 getTempUrlSX 返回值里提取 url（兼容多种形态） */
 function pickTempUrl(res) {
   if (!res) return ''
   if (typeof res === 'string') return res
@@ -238,16 +238,16 @@ function getFileExt(row) {
   return m ? m[1] : ''
 }
 
-/** 通过 getTempUrl(fileName) 拿临时地址，失败回退 row.fileUrl */
+/** 通过 getTempUrlSX(fileName) 拿临时地址，失败回退 row.fileUrl */
 async function resolvePreviewUrl(row) {
   const fileName = row.fileName || row.fileUrl || ''
   if (fileName) {
     try {
-      const res = await getTempUrl(fileName)
+      const res = await getTempUrlSX(fileName)
       const url = pickTempUrl(res)
       if (url) return url
     } catch (e) {
-      console.warn('[ProjectReportTab] getTempUrl 失败:', e)
+      console.warn('[ProjectReportTab] getTempUrlSX 失败:', e)
     }
   }
   return row.fileUrl || ''

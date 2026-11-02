@@ -1,4 +1,4 @@
-import { publicService } from '@/api/base'
+import { publicService,publicService4 } from '@/api/base'
 
 /**
  * 1. 根据 objectKey 下载文件
@@ -19,6 +19,12 @@ export async function downloadByObjectKey(objectKey) {
 export async function getTempUrl(objectKey) {
   return await publicService.get(
     `/admin-api/det/fs/get/object-key/temp-url?objectKey=${encodeURIComponent(objectKey)}`
+  )
+}
+// shanxi获取路径
+export async function getTempUrlSX(objectKey) {
+  return await publicService4.get(
+    `/ai/api/file/getObjectKeyTempUrl?path=${encodeURIComponent(objectKey)}`
   )
 }
 
