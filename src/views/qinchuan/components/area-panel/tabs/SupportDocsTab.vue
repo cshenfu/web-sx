@@ -1,10 +1,8 @@
-<!-- components/area-panel/tabs/SupportDocsTab.vue -->
 <template>
   <div class="support-docs-tab">
-    <!-- 阶段 Tabs -->
     <div class="stage-tabs">
       <button
-        v-for="stage in data.stages"
+        v-for="stage in safeData.stages"
         :key="stage"
         type="button"
         class="stage-tab"
@@ -15,10 +13,9 @@
       </button>
     </div>
 
-    <!-- 类型筛选 Pills -->
     <div class="type-filters">
       <span
-        v-for="filter in data.typeFilters"
+        v-for="filter in safeData.typeFilters"
         :key="filter.key"
         class="type-pill"
         :class="[`pill-${filter.color}`, { active: activeFilter === filter.key }]"
@@ -28,7 +25,6 @@
       </span>
     </div>
 
-    <!-- 列表头 -->
     <div class="file-list-header">
       <span class="file-list-title">文件列表</span>
       <button type="button" class="add-btn" @click="$emit('add-data')">
@@ -37,7 +33,6 @@
       </button>
     </div>
 
-    <!-- 文件列表 -->
     <div class="file-list">
       <FileListItem
         v-for="(file, idx) in filteredFiles"
@@ -51,24 +46,42 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import FileListItem from '../../shared/FileListItem.vue'
 
 const props = defineProps({
-  data: { type: Object, required: true },
+  data: { type: Object, default: () => ({}) },
 })
 
 defineEmits(['add-data', 'file-action'])
 
-const activeStage = ref(props.data.activeStage || props.data.stages[0])
+// ★ 归一化：无论父组件传不传 / 传什么，都保证 4 个字段有兜底
+const safeData = computed(() => ({
+  stages: [],
+  activeStage: '',
+  typeFilters: [],
+  files: [],
+  ...(props.data || {}),
+}))
+
+const activeStage = ref(safeData.value.activeStage || safeData.value.stages[0] || '')
 const activeFilter = ref('')
 
+// ★ props.data 变化（切换项目）时同步当前选中的 stage
+watch(safeData, (v) => {
+  if (!v.stages.includes(activeStage.value)) {
+    activeStage.value = v.activeStage || v.stages[0] || ''
+  }
+})
+
 const filteredFiles = computed(() => {
-  if (!activeFilter.value) return props.data.files
-  const label = props.data.typeFilters.find((f) => f.key === activeFilter.value)?.label
-  return props.data.files.filter((file) => file.tag === label)
+  const files = safeData.value.files || []
+  if (!activeFilter.value) return files
+  const label = (safeData.value.typeFilters || []).find((f) => f.key === activeFilter.value)?.label
+  return label ? files.filter((file) => file.tag === label) : files
 })
 </script>
+
 
 <style scoped>
 .support-docs-tab {

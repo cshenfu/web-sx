@@ -1,7 +1,7 @@
 <!-- components/area-panel/tabs/ProjectReportTab.vue -->
 <template>
   <div class="project-report-tab">
-    <!-- 子 Tab 保持原样 -->
+    <!-- 子 Tab -->
     <div class="sub-tabs" v-if="!hideSubTabs">
       <button
         v-for="tab in tabs"
@@ -45,33 +45,30 @@
             </td>
             <td class="ellipsis" :title="row.remark">{{ row.remark || '--' }}</td>
             <td class="text-gray">{{ formatDateTime(row.createTime) }}</td>
-            
+
             <td class="sticky-col" style="width: 140px; min-width: 140px;">
               <div class="action-cell">
-                <!-- <button 
-                  v-if="showConfirmBtn(row)" 
-                  class="action-btn warning" 
-                  @click="handleClickConfirm(row)"
-                >待确认</button> -->
-                  <button 
-                  class="action-btn warning" 
+                <button
+                  v-if="showConfirmBtn(row)"
+                  class="action-btn warning"
                   @click="handleClickConfirm(row)"
                 >待确认</button>
-                <button 
-                  v-if="canPreview(row)" 
-                  class="action-btn primary" 
+
+                <button
+                  v-if="canPreview(row)"
+                  class="action-btn primary"
                   @click="handlePreview(row)"
                 >预览</button>
-                
-                <button 
-                  v-if="row.status === 'GENERATING' || row.status === 'CALCULATION_IN_PROGRESS' || row.status === '4'" 
-                  class="action-btn danger" 
+
+                <button
+                  v-if="row.status === 'GENERATING' || row.status === 'CALCULATION_IN_PROGRESS' || row.status === '4'"
+                  class="action-btn danger"
                   @click="handleTerminate(row)"
                 >终止计算</button>
-                
-                <button 
-                  v-if="row.hasMoreActions" 
-                  class="action-btn more" 
+
+                <button
+                  v-if="row.hasMoreActions"
+                  class="action-btn more"
                   title="更多"
                   @click="$emit('row-action', row)"
                 >···</button>
@@ -80,8 +77,8 @@
           </tr>
         </tbody>
       </table>
-      
-      <!-- ★ 改动 1：空状态加创建按钮 -->
+
+      <!-- 空状态 -->
       <div v-if="!list.length && !loading" class="empty-state">
         <p class="empty-tip">暂无{{ currentTabLabel }}</p>
         <el-button type="primary" size="small" @click="handleCreate">
@@ -103,23 +100,45 @@
         @size-change="handleSizeChange"
       />
     </div>
+
+    <!-- ★ docx 本地预览弹窗 -->
+    <el-dialog
+      v-model="docxDialogVisible"
+      :title="docxDialogTitle"
+      width="80%"
+      top="5vh"
+      append-to-body
+      destroy-on-close
+      class="docx-preview-dialog"
+    >
+      <div v-loading="docxLoading" class="docx-body">
+        <div ref="docxContainerRef" class="docx-container" />
+      </div>
+      <template #footer>
+        <el-button @click="docxDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { pageReport, terminateCalculation } from '@/api/modules/aiProject'
+import { getTempUrl } from '@/api/modules/upload'
+import { renderAsync } from 'docx-preview'
 
-// ★ 改动 2：emit 增加 'create'
 const emit = defineEmits(['row-action', 'open-confirm', 'create'])
 
 const props = defineProps({
   project: { type: Object, required: true },
-  initialSubTab: { type: String, default: '' }, 
-  hideSubTabs: { type: Boolean, default: false } 
+  initialSubTab: { type: String, default: '' },
+  hideSubTabs: { type: Boolean, default: false }
 })
 
+// ============================================================
+// 报告列表
+// ============================================================
 const tabs = ref([
   { key: 'PROJECT_PROPOSAL', label: '项目建议书', count: 0 },
   { key: 'FEASIBILITY_STUDY', label: '可研报告', count: 0 },
@@ -135,13 +154,11 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(10)
 
-// ★ 改动 3：当前子 Tab 的中文名
 const currentTabLabel = computed(() => {
   const t = tabs.value.find(t => t.key === activeSubTab.value)
   return t?.label || '报告'
 })
 
-// ★ 改动 4：点击"创建"抛给父级
 function handleCreate() {
   emit('create', {
     subTab: activeSubTab.value,
@@ -151,11 +168,11 @@ function handleCreate() {
 }
 
 const SYSTEM_STATUS_MAP = {
-  1: '草稿', 2: '初始化', 3: '排队中', 4: '计算中', 5: '异常暂停', 
+  1: '草稿', 2: '初始化', 3: '排队中', 4: '计算中', 5: '异常暂停',
   6: '计算终止', 7: '计算完成', 8: '文件待解析', 9: '审核完成'
 }
 const UPLOAD_STATUS_MAP = {
-  'PENDING': '待解析', 'PARSING': '解析中', 'SUCCESS': '解析成功', 
+  'PENDING': '待解析', 'PARSING': '解析中', 'SUCCESS': '解析成功',
   'FAILED': '解析失败', 'NOT_REQUIRED': '无需解析'
 }
 
@@ -169,52 +186,158 @@ function handleClickConfirm(row) {
   emit('open-confirm', row.id)
 }
 
+// ============================================================
+// ★ 预览相关
+// ============================================================
+
+const docxDialogVisible = ref(false)
+const docxDialogTitle = ref('文档预览')
+const docxLoading = ref(false)
+const docxContainerRef = ref(null)
+
 function canPreview(row) {
-  if (row.sourceType === 'UPLOAD_PARSE') {
-    return !!row.fileUrl
-  }
+  const hasFile = !!(row.fileName || row.fileUrl)
+  if (row.sourceType === 'UPLOAD_PARSE') return hasFile
   if (row.sourceType === 'SYSTEM_GENERATE') {
     const allowedDesc = ['完成', '待解析', '解析中', '待确认']
     const descStr = (row.statusDesc || '') + (row.displayStatusDesc || '')
     const allowedStatus = [
-      'CALCULATION_COMPLETED', 'FILE_PARSED', 'COMPLETED', 
+      'CALCULATION_COMPLETED', 'FILE_PARSED', 'COMPLETED',
       'PENDING_CONFIRM', 'PARSING', '9', '7', '8', '4'
     ]
     if (allowedStatus.includes(String(row.status)) || allowedDesc.some(kw => descStr.includes(kw))) {
-      return true 
+      return hasFile
     }
     return false
   }
   return false
 }
 
-function handlePreview(row) {
-  if (row.sourceType === 'SYSTEM_GENERATE') {
-    if (!row.fileUrl) {
-      ElMessage.warning('该系统生成文件暂无直接预览地址，请等待生成或进入详情查看')
-      return
+/** 从 getTempUrl 返回值里提取 url（兼容多种形态） */
+function pickTempUrl(res) {
+  if (!res) return ''
+  if (typeof res === 'string') return res
+  if (typeof res === 'object') {
+    if (typeof res.url === 'string') return res.url
+    if (typeof res.tempUrl === 'string') return res.tempUrl
+    if (res.data) {
+      if (typeof res.data === 'string') return res.data
+      if (typeof res.data.url === 'string') return res.data.url
+      if (typeof res.data.tempUrl === 'string') return res.data.tempUrl
     }
-  } else {
-    if (!row.fileUrl) return ElMessage.warning('无预览地址')
   }
+  return ''
+}
 
-  let url = row.fileUrl
-  const fileName = row.fileName || url || ''
-  let ext = 'pdf'
-  
-  if (fileName.includes('.')) {
-    ext = fileName.split('.').pop().toLowerCase()
+/** 文件后缀：优先 row.fileSuffix，再回退 fileName 扩展名 */
+function getFileExt(row) {
+  const raw = String(row.fileSuffix || '').replace(/^\./, '').toLowerCase().trim()
+  if (raw) return raw
+  const name = String(row.fileName || '').toLowerCase()
+  const m = /\.([a-z0-9]+)(?:\?|#|$)/.exec(name)
+  return m ? m[1] : ''
+}
+
+/** 通过 getTempUrl(fileName) 拿临时地址，失败回退 row.fileUrl */
+async function resolvePreviewUrl(row) {
+  const fileName = row.fileName || row.fileUrl || ''
+  if (fileName) {
+    try {
+      const res = await getTempUrl(fileName)
+      const url = pickTempUrl(res)
+      if (url) return url
+    } catch (e) {
+      console.warn('[ProjectReportTab] getTempUrl 失败:', e)
+    }
   }
+  return row.fileUrl || ''
+}
 
-  if (ext === 'pdf' || row.sourceType === 'SYSTEM_GENERATE') {
-    window.open(url, '_blank')
-  } else if (['doc', 'docx'].includes(ext)) {
-    const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`
-    window.open(officeViewerUrl, '_blank')
-  } else {
-    window.open(url, '_blank')
+/** docx-preview 在弹窗里渲染 */
+async function openDocxPreview(url, title) {
+  docxDialogTitle.value = title || '文档预览'
+  docxDialogVisible.value = true
+  docxLoading.value = true
+  try {
+    await nextTick()
+    const el = docxContainerRef.value
+    if (!el) throw new Error('预览容器未就绪')
+    el.innerHTML = ''
+
+    const resp = await fetch(url, { mode: 'cors' })
+    if (!resp.ok) throw new Error(`文件下载失败 (${resp.status})`)
+    const blob = await resp.blob()
+
+    await renderAsync(blob, el, undefined, {
+      className: 'docx-preview',
+      inWrapper: true,
+      ignoreLastRenderedPageBreak: true,
+      experimental: true,
+      useBase64URL: true,
+      breakPages: true,
+    })
+  } catch (e) {
+    console.error('[ProjectReportTab] docx-preview 渲染失败:', e)
+
+    const isCors = e instanceof TypeError
+      || /CORS|Access-Control-Allow-Origin|Failed to fetch/i.test(e?.message || '')
+
+    if (isCors) {
+      ElMessage.warning('文件存储未配置跨域，已切换为在线预览（如仍打不开请下载查看）')
+    } else {
+      ElMessage.warning('本地预览失败，已尝试在线预览')
+    }
+
+    try {
+      window.open(
+        `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`,
+        '_blank'
+      )
+    } catch {}
+  } finally {
+    docxLoading.value = false
   }
 }
+
+/** 预览主入口 */
+async function handlePreview(row) {
+  const fileName = row.fileName || ''
+  const ext = getFileExt(row)
+
+  const url = await resolvePreviewUrl(row)
+  if (!url) {
+    ElMessage.warning('未获取到预览地址')
+    return
+  }
+
+  // PDF → 新窗口
+  if (ext === 'pdf') {
+    window.open(url, '_blank')
+    return
+  }
+
+  // DOCX → docx-preview 弹窗渲染
+  if (ext === 'docx') {
+    openDocxPreview(url, fileName || '文档预览')
+    return
+  }
+
+  // DOC（老格式）→ office viewer
+  if (ext === 'doc') {
+    window.open(
+      `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`,
+      '_blank'
+    )
+    return
+  }
+
+  // 其他 → 直接打开
+  window.open(url, '_blank')
+}
+
+// ============================================================
+// 列表加载
+// ============================================================
 
 watch(() => props.initialSubTab, (val) => {
   if (val && tabs.value.some(t => t.key === val)) {
@@ -238,7 +361,7 @@ async function fetchList() {
     if (res?.code === 0 || res?.code === 200) {
       list.value = res.data?.list || []
       total.value = Number(res.data?.total) || 0
-      
+
       const currentTab = tabs.value.find(t => t.key === activeSubTab.value)
       if (currentTab) currentTab.count = total.value
     }
@@ -252,7 +375,7 @@ async function fetchList() {
 async function fetchAllTabCounts() {
   if (!props.project?.id) return
   try {
-    const promises = tabs.value.map(tab => 
+    const promises = tabs.value.map(tab =>
       pageReport({ aiProjectId: props.project.id, reportType: tab.key, pageNo: 1, pageSize: 1 })
     )
     const results = await Promise.all(promises)
@@ -384,7 +507,33 @@ watch(() => props.project?.id, async (newId) => {
 .action-btn.more { color: #333333; font-weight: bold; font-size: 14px; }
 .action-btn.warning { color: #EF9600; font-weight: 500; }
 .empty-state { padding: 32px 0; color: #9CA3AF; text-align: center; font-size: 12px; }
-/* ★ 新增 */
 .empty-tip { margin: 0 0 12px; color: #9CA3AF; font-size: 13px; }
 .pagination-wrap { display: flex; justify-content: flex-end; padding-top: 12px; margin-top: 8px; }
+
+/* ★ docx 预览弹窗 */
+.docx-preview-dialog :deep(.el-dialog__body) {
+  padding: 0;
+  background: #f5f6f8;
+}
+.docx-body {
+  height: 75vh;
+  overflow: auto;
+  padding: 16px;
+  box-sizing: border-box;
+}
+.docx-container {
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  margin: 0 auto;
+  min-height: 300px;
+}
+.docx-container :deep(.docx-wrapper) {
+  background: transparent;
+  padding: 0;
+}
+.docx-container :deep(.docx-wrapper > section.docx) {
+  margin-bottom: 16px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
+  background: #fff;
+}
 </style>

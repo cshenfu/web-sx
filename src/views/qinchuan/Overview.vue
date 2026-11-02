@@ -52,8 +52,8 @@
         v-else
         class="left-layer wizard-layer"
         :create-project-mode="wizardMode"
-        :title="wizardTitleLabel"          
-        :max-step="wizardMaxStep"          
+        :title="wizardTitleLabel"
+        :max-step="wizardMaxStep"
         :project-name="activeProjectDetail?.name || activeProjectDetail?.projectName || ''"
         :project="activeProjectDetail"
         @close="wizardVisible = false"
@@ -106,7 +106,8 @@
           @submit="handleWizardSubmit"
         />
 
-        <div class="area-view-layer" v-show="!popoverProject && !isEditing && !isActionPanelOpen">          <template v-if="!selectedProject">
+        <div class="area-view-layer" v-show="!popoverProject && !isEditing && !isActionPanelOpen">
+          <template v-if="!selectedProject">
             <ProjectListPanel
               class="panel-below"
               v-model:model-value-expanded="listExpanded"
@@ -136,7 +137,7 @@
               @generate-report="reportModalVisible = true"
               @action="onDetailPanelAction"
               @open-confirm="handleOpenConfirm"
-              @create-report="handleCreateReport" 
+              @create-report="handleCreateReport"
             />
           </template>
         </div>
@@ -151,8 +152,7 @@
           @action="executeProjectAction"
         />
 
-        <!-- ★ hover：首次进入位置固定弹窗，鼠标移入卡片不消失 -->
-        <!-- ★ hover：首次进入位置固定弹窗，鼠标移入卡片不消失；标题/按钮逻辑与固定卡片一致 -->
+        <!-- ★ hover：首次进入位置固定弹窗 -->
         <ProjectActionCard
           v-if="hoveredProject && isAreaView && viewMode === 'map' && !popoverProject && !selectedProject && !isEditing && !isActionPanelOpen && !isDetailFullscreen"
           :project="hoveredProject"
@@ -405,7 +405,6 @@ import {
 } from '@/components/site-map/areaCenterIcon'
 import AddReportPanel from './components/area-panel/AddReportPanel.vue'
 import ConfirmReportPanel from './components/area-panel/ConfirmReportPanel.vue'
-// ★ 新增：共用的项目操作卡片
 import ProjectActionCard from './components/area-panel/ProjectActionCard.vue'
 
 const CITY_OPTIONS = [
@@ -548,11 +547,9 @@ const detailPanelTab = ref('main')
 const popoverProject = ref(null)
 const selectedProject = ref(null)
 
-// ★ hover 状态（首次进入位置的固定卡片）
 const hoveredProject = ref(null)
 const hoveredPos = reactive({ x: 0, y: 0 })
 
-// ★ hover 消失定时器：鼠标离开场区 0.8s 后才隐藏；期间移入卡片可取消
 let hoverHideTimer = null
 const HOVER_HIDE_DELAY = 800
 
@@ -579,7 +576,6 @@ function onHoverCardLeave() {
   scheduleHoverHide()
 }
 
-// 立即清掉 hover 状态（点击场区 / 打开详情 / 清选中 时用）
 function clearHoverState() {
   clearHoverHideTimer()
   hoveredProject.value = null
@@ -662,7 +658,6 @@ const reportKeyToWizardMode = {
   'feasibility-distributed': PACKAGE_TYPE.distributedDefault,
 }
 
-// ★ 新增
 const SUB_TAB_REPORT_CONFIG = {
   PROJECT_PROPOSAL:       { packageType: PACKAGE_TYPE.default, maxStep: 1, title: '一键生成项目建议书' },
   FEASIBILITY_STUDY:      { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成风电场可行性研究报告' },
@@ -772,10 +767,8 @@ function handleProjectSelect(item) {
     (selectedId != null && String(selectedId) === String(item.id))
   ) return
 
-  // ★ 点击场区：立即关闭 hover 弹窗 + 清定时器
   clearHoverState()
 
-  // ★ 恢复上一次选中的场区为普通样式，避免点 B 后 A 仍显示"取消颜色"
   const prevProject = popoverProject.value
   if (prevProject && String(prevProject.id) !== String(item.id) && isAreaView.value) {
     addProjectArea(prevProject, false)
@@ -803,21 +796,27 @@ function handleProjectSelect(item) {
   loadOverviewRoadData(item.id)
 }
 
+// ★★★ 关键修复：先走完整选中流程，再打开详情
 async function handleOpenDetailPanel(item) {
   if (!item) return
   actionMenuOpen.value = false
 
-  // ★ 先走"选中场区"流程：清 hover、flyTo、高亮场区、渲染风机/升压站图标、加载道路
-  handleProjectSelect(item)
+  const p = resolveMapProject(item)
 
-  // ★ 再打开全屏详情面板
-  selectedProject.value = item
-  activeAreaId.value = item.id
-  activeProjectDetail.value = buildDetailFromListItem(item)
+  // ★ 走完整"选中场区"流程：flyTo + 高亮场区 + 渲染风机/升压站 + 加载道路
+  //   handleProjectSelect 内部有同 id return 保护，从固定卡片点标题时不会重复 flyTo
+  handleProjectSelect(p)
+
+  // ★ 清 popoverProject 让 area-view-layer 的 v-show 生效（详情面板显示）
+  popoverProject.value = null
+
+  selectedProject.value = p
+  activeAreaId.value = p.id
+  activeProjectDetail.value = buildDetailFromListItem(p)
   rightPanelMode.value = 'detail'
   isDetailFullscreen.value = true
 
-  await loadAiProjectDetail(item.id)
+  await loadAiProjectDetail(p.id)
 }
 
 function resolveMapProject(project) {
@@ -969,7 +968,6 @@ async function onSiteMapDetailAction(payload) {
     showGeneratePanel.value = true
     return
   }
-  // ★ 新增
   if (payload?.type === 'create-report') {
     const config = getReportConfigBySubTab(payload.subTab)
     wizardMode.value = config.packageType
@@ -982,10 +980,8 @@ async function onSiteMapDetailAction(payload) {
   }
 }
 function onDetailPanelAction(payload) {
-  // 原有 stage-changed / generate-report 保留
   if (payload?.type === 'stage-changed') { /* ... */ }
   if (payload?.type === 'generate-report') { /* ... */ }
-  // ★ 新增
   if (payload?.type === 'create-report') {
     const config = getReportConfigBySubTab(payload.subTab)
     wizardMode.value = config.packageType
@@ -1014,7 +1010,7 @@ function startGeometryEdit(project, mode = 'area') {
   actionProject.value = item
   popoverProject.value = null
   selectedProject.value = null
-  clearHoverState()             // ★ 原来 hoveredProject.value = null
+  clearHoverState()
   actionMenuOpen.value = false
   rightPanelMode.value = 'list'
   isDetailFullscreen.value = false
@@ -1441,7 +1437,7 @@ function handleTableSortChange({ prop, order }) {
 watch(() => filters.stage, () => { pagination.page = 1; fetchProjectList() })
 watch(viewMode, (val) => {
   if (val === 'list' && showLayerPanel.value) showLayerPanel.value = false
-  if (val === 'list') clearHoverState()   // ★ 原来 hoveredProject.value = null
+  if (val === 'list') clearHoverState()
 })
 
 function setProjectIconVisible(chipId, visible) {
@@ -1934,7 +1930,6 @@ function addProjectArea(project, highlighted = false) {
     if (!isEditing.value && !isActionPanelOpen.value) handleProjectSelect(project)
   })
 
-  // ★ hover 绑定：首次进入位置固定弹窗，离开 0.8s 后隐藏（移入卡片可取消）
   mapRef.value.offHover?.(fillLayerId)
   mapRef.value.onHover?.(fillLayerId, {
     onEnter: (_, e) => {
@@ -1943,16 +1938,12 @@ function addProjectArea(project, highlighted = false) {
       if (String(selectedProject.value?.id ?? '') === String(project.id)) return
       clearHoverHideTimer()
       hoveredProject.value = project
-      // ★ 只在首次进入时记录位置，后续鼠标移动不再跟随
       hoveredPos.x = e.point.x
       hoveredPos.y = e.point.y
     },
-    onMove: () => {
-      // ★ 不更新位置：弹窗固定在首次进入点
-    },
+    onMove: () => {},
     onLeave: () => {
       if (hoveredProject.value && String(hoveredProject.value.id) === String(project.id)) {
-        // ★ 离开场区不立刻隐藏，延迟 0.8s；期间鼠标进入卡片会取消
         scheduleHoverHide()
       }
     },
@@ -2129,7 +2120,7 @@ function clearSelection() {
   clearOverviewRoadLayer()
   popoverProject.value = null
   selectedProject.value = null
-  clearHoverState()             // ★ 原来 hoveredProject.value = null
+  clearHoverState()
   actionMenuOpen.value = false
   void renderAreaCenterIcons()
 
@@ -2158,21 +2149,29 @@ function handleBackToList() {
   activeEditTool.value = ''
 }
 
+// ★★★ 关键修复：点场区外可以取消选中
 function handleMapBlankClick(e) {
-  // 编辑态 / 弹窗面板打开时，点击空白不做处理
+  // 编辑态 / 各类面板打开时，点地图空白不做取消处理（避免误关）
   if (isEditing.value || isActionPanelOpen.value) return
-  // 详情面板全屏时也不处理，避免误关
-  if (isDetailFullscreen.value) return
-  // 没选中项目 → 无事可做
-  if (!popoverProject.value && !selectedProject.value) return
+
+  // 没有任何选中 / 详情状态时，点空白直接返回
+  if (!popoverProject.value && !selectedProject.value && !isDetailFullscreen.value) return
 
   const map = mapRef.value?.getMap?.()
   if (!map) return
 
   try {
-    const hits = map.queryRenderedFeatures(e.point)
-    // 点到任意带 projectId 的图层（场区、风机、升压站…）→ 视为"点在场区上"，不关
-    if (hits.some((f) => f.properties?.projectId != null)) return
+    // ★ 只在场区多边形（-fill 层）上判定是否点在场区内，
+    //   避免风机/升压站/场区中心图标命中导致无法取消
+    const projectFillLayerIds = []
+    for (const p of mapProjects.value) {
+      const id = `overview-project-area-${p.id}-fill`
+      if (map.getLayer(id)) projectFillLayerIds.push(id)
+    }
+    const hits = projectFillLayerIds.length
+      ? map.queryRenderedFeatures(e.point, { layers: projectFillLayerIds })
+      : []
+    if (hits.length > 0) return
 
     // 编辑态：只收掉临时绘制/框选状态，不关闭选中
     if (editMode.value !== null) {
@@ -2187,7 +2186,8 @@ function handleMapBlankClick(e) {
       return
     }
 
-    // 点击空白 → 取消场区选中 + 关闭详情面板
+    // ★ 点空白：不管详情面板是否打开，都清掉选中并关闭详情
+    //   clearSelection 内部会把 isDetailFullscreen 置 false
     clearSelection()
   } catch (err) {
     console.warn('[overview] handleMapBlankClick 查询失败:', err)
@@ -2595,7 +2595,6 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
     if (map?.getLayer(PROVINCE_EXTRUSION_ID)) mapRef.value.removeLayer(PROVINCE_EXTRUSION_ID)
   },
   onEnter: async () => {
-    // ★ 进入市/区层级：锁死俯仰（右键、双指、代码都改不了 pitch）
     const map = mapRef.value?.getMap?.()
     if (map) {
       map.dragRotate.enable()
@@ -2622,13 +2621,11 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
     }
   },
   onExit: () => {
-    // ★ 退出市/区层级（回到省级及以上）：恢复俯仰与旋转
     const map = mapRef.value?.getMap?.()
     if (map) {
       map.dragRotate.enable()
       map.touchPitch.enable()
       map.setMaxPitch(60)
-      // 缩回省视图时把 pitch 拉回 45，保留大屏 3D 感
       if (map.getPitch() !== 45) map.easeTo({ pitch: 45, bearing: 0, duration: 800 })
     }
 
@@ -2638,7 +2635,7 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
     rightPanelMode.value = 'list'
     popoverProject.value = null
     selectedProject.value = null
-    clearHoverState()           // ★ 原来 hoveredProject.value = null
+    clearHoverState()
     if (isEditing.value) exitEditMode()
     isDetailFullscreen.value = false
     renderProjectsByStage('overview')
@@ -2661,13 +2658,10 @@ function focusCity(cityName) {
   const feature = shaanxiBoundary.features.find((item) => item.properties?.name === cityName)
   if (!feature) return
 
-  
-
-  // ★ 优先用 bbox fitBounds（自适应范围 + pitch:0 正俯视），避免固定 zoom 造成超出屏幕
   const bounds = getFeatureBounds(feature)
   if (bounds) {
     map.fitBounds(bounds, {
-      padding: { top: 80, bottom: 80, left: 340, right: 340 }, // 左右留出侧边面板空间
+      padding: { top: 80, bottom: 80, left: 340, right: 340 },
       pitch: 0,
       bearing: 0,
       maxZoom: AREA_ZOOM_THRESHOLD + 4,
@@ -2676,13 +2670,11 @@ function focusCity(cityName) {
     return
   }
 
-  // 兜底：用 centroid
   const center = resolveCityCenter(feature)
   if (!center) return
   map.flyTo({ center, zoom: AREA_ZOOM_THRESHOLD + 0.5, pitch: 0, bearing: 0, duration: 1500 })
 }
 
-// ★ 从 Polygon/MultiPolygon 提取 bbox
 function getFeatureBounds(feature) {
   const geom = feature?.geometry
   if (!geom) return null
@@ -2750,8 +2742,6 @@ function handleWizardSubmit(payload) {
 }
 const SHAANXI_BOUNDS = [[105.4, 31.6], [111.3, 39.6]]
 
-
-
 function handleStyleLoad() {
   try {
     syncMaskVisibility(true)
@@ -2769,8 +2759,6 @@ async function onMapReady() {
   const map = mapRef.value.getMap()
 
   try {
-    // ★ 初始视角 / center / zoom 已在 MapGL 构造时按容器尺寸算好，
-    //   这里不再 jumpTo，避免首帧"地球先小后大"的跳变。
     map.setMinZoom(0)
     mapRef.value.startAutoRotate(3)
     mapRef.value.setCentroidLabelsVisible?.(false)
@@ -2778,7 +2766,6 @@ async function onMapReady() {
     console.warn('[map] 初始化地球视角失败:', err)
   }
 
-  // ↓↓↓ 以下整段完全保留原样 ↓↓↓
   const handleEnterMap = () => {
     if (hasEntered) return
     hasEntered = true
@@ -2838,7 +2825,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  clearHoverHideTimer()          // ★ hover 定时器清理
+  clearHoverHideTimer()
   try { mapRef.value?.stopAutoRotate?.() } catch (e) { }
   unbindZoomListener()
   removeRoadLineLayers()

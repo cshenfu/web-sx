@@ -1,13 +1,12 @@
-<!-- components/area-panel/tabs/ReviewInfoTab.vue -->
 <template>
   <div class="review-info-tab">
     <!-- 顶部进度条 -->
-    <div class="progress-bar">
-      <div v-for="(step, idx) in data.timeline" :key="step.key" class="progress-step">
+    <div v-if="safeData.timeline.length" class="progress-bar">
+      <div v-for="(step, idx) in safeData.timeline" :key="step.key ?? idx" class="progress-step">
         <div class="progress-label">{{ step.label }}</div>
         <div class="progress-track">
           <span class="progress-dot" :class="{ done: step.date }" />
-          <span v-if="idx < data.timeline.length - 1" class="progress-line" />
+          <span v-if="idx < safeData.timeline.length - 1" class="progress-line" />
         </div>
         <div class="progress-date">{{ step.date || '' }}</div>
       </div>
@@ -15,7 +14,7 @@
 
     <!-- 时间轴分组 -->
     <div class="groups">
-      <div v-for="group in data.groups" :key="group.key" class="group-row">
+      <div v-for="(group, gi) in safeData.groups" :key="group.key ?? gi" class="group-row">
         <div class="group-axis">
           <span class="axis-stage">{{ group.stage }}</span>
           <span class="axis-dot" />
@@ -24,7 +23,7 @@
 
         <div class="group-content" :class="{ active: group.active }">
           <div class="group-meta">{{ group.date }} {{ group.to }}</div>
-          <div v-for="(item, idx) in group.items" :key="idx" class="group-item">
+          <div v-for="(item, idx) in group.items || []" :key="idx" class="group-item">
             <div class="item-top">
               <span class="tag">{{ item.tag }}</span>
               <span class="item-org">{{ item.org }}</span>
@@ -39,13 +38,26 @@
           </div>
         </div>
       </div>
+
+      <div v-if="!safeData.groups.length" class="empty-state">暂无审查信息~</div>
     </div>
   </div>
 </template>
 
 <script setup>
-defineProps({
-  data: { type: Object, required: true },
+import { computed } from 'vue'
+
+const props = defineProps({
+  data: { type: Object, default: () => ({}) },
+})
+
+// ★ 归一化：timeline / groups 一定存在且为数组
+const safeData = computed(() => {
+  const d = props.data || {}
+  return {
+    timeline: Array.isArray(d.timeline) ? d.timeline : [],
+    groups: Array.isArray(d.groups) ? d.groups : [],
+  }
 })
 </script>
 
@@ -218,5 +230,12 @@ defineProps({
   margin-top: 8px;
   color: #9CA3AF;
   font-size: 12px;
+}
+
+.empty-state {
+  padding: 48px 0;
+  color: #9CA3AF;
+  font-size: 12px;
+  text-align: center;
 }
 </style>
