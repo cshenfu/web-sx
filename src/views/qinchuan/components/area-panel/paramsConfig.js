@@ -60,7 +60,7 @@ export const LABELS = {
   '${investment_amount_environmental_protection}': '环保总投资', '${investment_amount_soil_water_protection}': '水保总投资',
   '${cost_standard}': '费用标准', '${quota_system}': '定额体系', '${price_level}': '价格水平',
   '${period_depreciation}': '折旧年限', '${depreciation_residual}': '残值率', '${insurance_premium_rate}': '保险费率',
-  '${land_use_tax}': '土地使用税(参数)', '${other_fee}': '其他费用', '${construction_phase}': '建设期',
+  '${land_use_tax}': '土地使用税', '${other_fee}': '其他费用', '${construction_phase}': '建设期',
   '${working_capital_per_kw}': '流动资金单位千瓦指标', '${working_capital_equity_ratio}': '流动资本金比例', '${working_capital_loan_ratio}': '流动资金贷款比例',
   '${project_funding_ratio}': '建设资本金比例', '${construction_loan_ratio}': '建设资金贷款比例', '${repayment_period}': '偿还年限',
   '${repayment_method}': '还款方式', '${fix_num_person}': '定员人数', '${employee_welfare_ratio}': '职工福利费及其他占比',
@@ -84,7 +84,7 @@ export const LABELS = {
 }
 
 export const UNITS = {
-  '${circuits_collector_box_loops_desc}': '回',
+  '${circuits_collector_box_loops_desc}': '回','${construction_phase}':'年',
   '${turbine_foundation_c15_concrete}': 'm³', '${turbine_foundation_c20_concrete}': 'm³',
   '${turbine_foundation_c40_concrete}': 'm³', '${turbine_foundation_c45_concrete}': 'm³',
   '${project_field_elevation_range}': 'm', '${windPowerLevel}': '级', '${50_year_maximum_wind_speed}': 'm/s', '${wind_farm_type}': '级',
