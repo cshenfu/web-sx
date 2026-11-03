@@ -381,9 +381,15 @@ const updateTableData = (fieldKey, rowIndex, colIndex, newVal) => {
   rawRows[rowIndex][realIdx] = newVal
 
   if (isTableData(raw)) {
-    formData.value[fieldKey] = { columns: cols, data: rawRows }
+    // 保留原始表头和完整数据，只修改对应单元格
+    formData.value[fieldKey] = {
+      columns: raw.columns,
+      data: rawRows
+    }
   } else {
-    formData.value[fieldKey] = [cols, ...rawRows]
+    // 数组格式同样保留原始表头
+    const originalHeaders = Array.isArray(raw) ? raw[0] : cols
+    formData.value[fieldKey] = [originalHeaders, ...rawRows]
   }
 }
 

@@ -129,7 +129,34 @@ export const MODULE_CONFIG = {
   ],
   '资源': [
     { title: '基础参数', cols: 3, fields: ['${windPowerLevel}', '${50_year_maximum_wind_speed}', '${wind_farm_type}'] },
-    { title: '', type: 'table', fieldKey: '${wind_resource_combined_table}', defaultColumns: ['测风塔编号', '测风塔经度', '测风塔纬度', '测风周期', '该风电场的空气密度', '高度对应的空气密度', '10m高度空气密度', '160m高度空气密度', '各测风塔各高度空气密度', '轮毂高度平均风速', '轮毂高度平均风功率密度', '各测风塔轮毂高度平均风速', '各测风塔轮毂高度平均风功率密度', '轮毂高度处的主风向', '轮毂高度处的次风向', '轮毂高度处的主风能方向', '轮毂高度处的次风能方向', '最大高度处代表性湍流强度', '各测风塔各高度湍流强度', '综合风切变', '发电量计算是否使用'] },
+{
+  title: '',
+  type: 'table',
+  fieldKey: '${wind_resource_combined_table}',
+
+  // 只展示原始数据中的指定列
+  columnIndexes: [
+    0, 1, 2, 3,
+    9, 10,
+    13, 15, 14, 16,
+    19, 20
+  ],
+
+  defaultColumns: [
+    '测风塔编号',
+    '测风塔经度',
+    '测风塔纬度',
+    '测风周期',
+    '测风塔轮毂高度处平均风速（m/s）',
+    '测风塔轮毂高度处平均风功率密度（W/m²）',
+    '主风向',
+    '主风能方向',
+    '次风向',
+    '次风能方向',
+    '综合风切变',
+    '是否参与发电量计算'
+  ]
+},
     { title: '空气密度参数', type: 'table', fieldKey: '${hubHeightAirDensityRange}', defaultColumns: ['测风塔编号', '高度 (m)', '空气密度 (kg/m³)'], width: '50%' },
     { title: '湍流强度参数', type: 'turbulence' }
   ],
