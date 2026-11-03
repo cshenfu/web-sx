@@ -50,10 +50,10 @@ const router = useRouter()
 const userName = ref(sessionStorage.getItem('userName') || '用户名')
 
 const navItems = [
-  { name: 'qinchuan', label: '秦川智筹', to: '/overview', module: 'qinchuan' },
-  { name: 'yanping', label: '研评智坊', to: '/yanping', module: 'yanping' },
-  { name: 'hucang', label: '湖仓汇源', to: '/hucang/geology', module: 'hucang' },
-  { name: 'guizhi', label: '规制中枢', to: '/guizhi/role', module: 'guizhi' },
+  { name: 'qinchuan', label: '华秦·智选', to: '/overview', module: 'qinchuan' },
+  { name: 'yanping', label: '华秦·算评', to: '/yanping', module: 'yanping' },
+  { name: 'hucang', label: '华秦·数基', to: '/hucang/geology', module: 'hucang' },
+  { name: 'guizhi', label: '华秦·督流', to: '/guizhi/role', module: 'guizhi' },
 ]
 
 function isActive(item) {

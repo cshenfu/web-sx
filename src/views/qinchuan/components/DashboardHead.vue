@@ -1,23 +1,24 @@
 <template>
   <div class="dashboard-head-wrapper">
-    <!-- 头部背景图（请确保你的图片路径正确） -->
+    <!-- 头部背景图 -->
     <img
       class="dashboard-head-img"
       :src="headImage"
       :alt="alt"
     />
+    <!-- 标题：改为动态字符串，样式类保持 -->
+    <div class="head-title">{{ title }}</div>
     
     <!-- 右侧操作区：日期 + 全屏按钮 -->
     <div class="head-right-info">
-      <!-- 日期部分 -->
       <span class="date-text">{{ currentDate }}，{{ currentDay }}</span>
       
-      <!-- 全屏按钮 -->
       <div 
         class="fullscreen-btn" 
         :title="isFullScreen ? '退出全屏' : '进入全屏'"
         @click="toggleFullScreen"
       >
+        <!-- 保持你原来的 svg 不变 -->
         <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
           <g filter="url(#filter0_dd_715_13239)">
             <path fill-rule="evenodd" clip-rule="evenodd" d="M15.5 10V15.5H10V13.5H13.5V10H15.5ZM24.5 10V13.5H28V15.5H22.5V10H24.5ZM13.5 28V24.5H10V22.5H15.5V28H13.5ZM22.5 28V22.5H27.9498V24.5H24.5V28H22.5Z" fill="#D8F0FF"/>
@@ -48,7 +49,12 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import headImage from '@/assets/img/qinchuan/dashbord/head.png'
 
-defineProps({
+const props = defineProps({
+  // 新增标题字段，接收外部传入的字符串
+  title: {
+    type: String,
+    default: '华勤智策数据全景图',
+  },
   alt: {
     type: String,
     default: '规划部业务数据全景图',
@@ -114,25 +120,55 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
+/* 核心标题样式 */
+.head-title {
+  /* 其他属性保持不变 */
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  
+  /* 应用字体，保留兜底字体 */
+  font-family: 'Alimama FangYuanTi VF';
+  
+  /* 这个字体是可变字体（VF），直接写数字字重即可 */
+  font-weight: 600; 
+  font-size: 30px; 
+  line-height: 1;
+  letter-spacing: 5px;
+  text-align: center;
+  white-space: nowrap;
+  color: #ffffff;
+  text-indent: 5px;
+
+  /* 多层发光效果 */
+  text-shadow: 
+    0 0 2px rgba(255, 255, 255, 0.9),
+    0 0 8px rgba(0, 145, 255, 0.9),
+    0 0 16px rgba(0, 145, 255, 0.7),
+    0 0 30px rgba(0, 145, 255, 0.5),
+    0 0 50px rgba(0, 145, 255, 0.3);
+}
+
 /* 右侧信息区域（日期 + 全屏按钮） */
 .head-right-info {
   position: absolute;
-  right: clamp(24px, 2.5vw, 48px); /* 右边距，可根据实际效果图微调 */
+  right: clamp(24px, 2.5vw, 48px);
   top: 40%;
   transform: translateY(-50%);
   z-index: 30;
   display: flex;
   align-items: center;
-  gap: 16px; /* 日期和按钮之间的间距 */
+  gap: 16px;
 }
 
 /* 日期文字样式 */
 .date-text {
-  color: #d8f0ff; /* 浅蓝色，与图标保持一致 */
+  color: #d8f0ff;
   font-size: 14px;
-  font-family: 'DIN Alternate', 'Roboto', sans-serif; /* 建议引入数字字体，这里兜底使用 */
+  font-family: 'DIN Alternate', 'Roboto', sans-serif;
   letter-spacing: 0.5px;
-  text-shadow: 0 0 8px rgba(0, 200, 255, 0.6); /* 文字发光 */
+  text-shadow: 0 0 8px rgba(0, 200, 255, 0.6);
   white-space: nowrap;
 }
 
@@ -143,7 +179,6 @@ onUnmounted(() => {
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  /* 增加悬浮时的发光效果 */
   filter: drop-shadow(0 0 5px rgba(0, 200, 255, 0.5));
 }
 

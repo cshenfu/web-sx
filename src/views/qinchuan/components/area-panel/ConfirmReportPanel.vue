@@ -39,14 +39,14 @@
               <span class="dot"></span>{{ subModule.title }}
             </div>
 
-            <!-- 1. 财务表格 (长表格合并，固定左侧，横向滚动) -->
+            <!-- 1. 财务表格 -->
             <div v-if="subModule.type === 'financial'" class="table-wrapper">
               <el-table 
                 :data="getFinancialRows(subModule)" 
                 size="small" 
                 border 
                 class="custom-table"
-                height="400"
+                max-height="400"
               >
                 <el-table-column prop="name" label="项目" width="180" fixed="left" />
                 <el-table-column 
@@ -75,11 +75,11 @@
               </el-table>
             </div>
 
-            <!-- 2. 测风塔湍流参数 (Grid 两列布局) -->
+            <!-- 2. 测风塔湍流参数 (卡片布局) -->
             <div v-else-if="subModule.type === 'turbulence'" class="turbulence-grid">
               <div v-for="(towerData, tIdx) in groupedTurbulenceData" :key="tIdx" class="tower-block">
-                <div class="tower-title">{{ towerData.name }}</div>
                 <el-table :data="towerData.list" size="small" border class="custom-table">
+                  <el-table-column prop="tower_code" label="测风塔塔号" align="center" />
                   <el-table-column prop="height" label="高度 (m)" align="center" />
                   <el-table-column prop="average_value" label="平均湍流强度" align="center" />
                   <el-table-column prop="representative_value" label="代表性湍流强度" align="center" />
@@ -87,8 +87,64 @@
               </div>
             </div>
 
-            <!-- 3. 普通动态表格 (GIS、概算表等) -->
-            <div v-else-if="subModule.type === 'table'" class="table-wrapper">
+            <!-- 3. 多行固定表格 (电气二次) -->
+            <div v-else-if="subModule.type === 'customRows'" class="table-wrapper">
+              <el-table :data="subModule.rows" size="small" border class="custom-table">
+                <el-table-column
+                  v-for="(col, cIdx) in subModule.columns"
+                  :key="cIdx"
+                  :label="col"
+                  :min-width="cIdx === 1 || cIdx === 4 ? 240 : 100"
+                >
+                  <template #default="{ row }">
+                    <el-input 
+                      v-if="row[cIdx] && row[cIdx].startsWith('${')" 
+                      v-model="formData[row[cIdx]]" 
+                      size="small" 
+                      class="table-edit-input" 
+                    />
+                    <span v-else>{{ row[cIdx] }}</span>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+
+            <!-- 4. 单行键值对表格 (GIS参数) -->
+            <div v-else-if="subModule.type === 'kvTable'" class="table-wrapper">
+              <el-table :data="[{}]" size="small" border class="custom-table">
+                <el-table-column
+                  v-for="(col, cIdx) in subModule.columns"
+                  :key="cIdx"
+                  :label="col"
+                  :min-width="120"
+                >
+                  <template #default>
+                    <el-input 
+                      v-model="formData[subModule.fields[cIdx]]" 
+                      size="small" 
+                      class="table-edit-input" 
+                    />
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+
+            <!-- 5. 概算总表 (树形合并) -->
+            <div v-else-if="subModule.type === 'estimateTable'" class="table-wrapper" :style="{ width: subModule.width || '100%' }">
+              <el-table :data="estimateRows" size="small" border class="custom-table" :span-method="estimateSpanMethod">
+                <el-table-column prop="parentName" label="项目名称" width="200" align="left" />
+                <el-table-column prop="childName" label="项目名称" width="250" align="left" />
+                <el-table-column prop="total" label="合计（万元）" align="left">
+                  <template #default="{ row }">
+                    <el-input v-if="row.totalField" v-model="formData[row.totalField]" size="small" class="table-edit-input" />
+                    <span v-else>{{ row.total }}</span>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+
+            <!-- 6. 普通动态表格 -->
+            <div v-else-if="subModule.type === 'table'" class="table-wrapper" :style="{ width: subModule.width || '100%' }">
               <!-- 用地面积特殊表格 -->
               <template v-if="subModule.fieldKey === '${wind_farm_engineering_land_area_table}'">
                 <el-table
@@ -117,42 +173,32 @@
               <!-- 普通数据表格 -->
               <template v-else>
                 <el-table
-                  v-if="isTableData(rawData[subModule.fieldKey])"
-                  :data="transformTableData(rawData[subModule.fieldKey])"
+                  :data="getProcessedTableData(subModule)"
                   size="small"
                   border
                   class="custom-table"
                   show-overflow-tooltip
                 >
                   <el-table-column
-                    v-for="(col, cIdx) in rawData[subModule.fieldKey].columns"
+                    v-for="(col, cIdx) in getProcessedTableColumns(subModule.fieldKey)"
                     :key="cIdx"
-                    :prop="'col_' + cIdx"
                     :label="col || `列 ${cIdx + 1}`"
-                    min-width="100"
-                  />
+                    min-width="120"
+                  >
+                    <template #default="{ row, $index }">
+                      <el-input
+                        v-model="row[`col_${cIdx}`]"
+                        size="small"
+                        class="table-edit-input"
+                        @change="updateTableData(subModule.fieldKey, $index, cIdx, $event)"
+                      />
+                    </template>
+                  </el-table-column>
                 </el-table>
-                <el-table
-                  v-else-if="Array.isArray(rawData[subModule.fieldKey])"
-                  :data="transformArrayData(rawData[subModule.fieldKey])"
-                  size="small"
-                  border
-                  class="custom-table"
-                  show-overflow-tooltip
-                >
-                  <el-table-column
-                    v-for="(colName, cIdx) in getArrayHeaders(rawData[subModule.fieldKey])"
-                    :key="cIdx"
-                    :prop="'col_' + cIdx"
-                    :label="colName"
-                    min-width="100"
-                  />
-                </el-table>
-                <div v-else class="empty-table-placeholder">暂无数据</div>
               </template>
             </div>
 
-            <!-- 4. 普通字段表单 -->
+            <!-- 7. 普通字段表单 -->
             <div 
               v-else 
               class="field-grid" 
@@ -196,10 +242,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { updateUploadDetail, getParamsData } from '@/api/modules/aiProject'
-import { MODULES, LABELS, UNITS, MODULE_CONFIG } from './paramsConfig.js' // 引入配置文件
+import { MODULES, LABELS, UNITS, MODULE_CONFIG } from './paramsConfig.js'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -207,9 +253,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'success'])
-// ★ 本地测试开关：true 时用 @/assets/js/data.json，不走接口
-//   联调/上线前改成 false
-const USE_LOCAL_MOCK = true
+
+const USE_LOCAL_MOCK = true 
+
 const loading = ref(false)
 const confirming = ref(false)
 const rawData = ref({})
@@ -220,11 +266,39 @@ const contentRef = ref(null)
 const landTableRows = ref([])
 const financialState = ref({})
 
+// ==========================================
+// 配置提取与预处理
+// ==========================================
+const fieldConfigMap = {}
+const tableFieldKeys = new Set()
+const disabledIfEmptyMap = {}
+
+Object.values(MODULE_CONFIG).forEach(mods => mods.forEach(sub => {
+  if (sub.type === 'table' || sub.type === 'financial' || sub.type === 'kvTable' || sub.type === 'customRows') {
+    if (sub.fieldKey) tableFieldKeys.add(sub.fieldKey)
+    if (sub.fieldKeys) sub.fieldKeys.forEach(k => tableFieldKeys.add(k))
+    if (sub.fields && sub.type === 'kvTable') sub.fields.forEach(k => tableFieldKeys.add(k))
+    if (sub.rows && sub.type === 'customRows') {
+      sub.rows.forEach(row => row.forEach(cell => {
+        if (typeof cell === 'string' && cell.startsWith('${')) tableFieldKeys.add(cell)
+      }))
+    }
+  }
+  if (sub.fieldKey) fieldConfigMap[sub.fieldKey] = sub
+  ;(sub.fields || []).forEach(f => {
+    if (typeof f === 'object' && f.disabledIfEmpty) disabledIfEmptyMap[f.key] = true
+  })
+}))
+tableFieldKeys.add('${wind_farm_engineering_land_area_table}')
+tableFieldKeys.add('${eachTierHeightTurbulenceTableList}')
+
+// ==========================================
+// 字段属性方法
+// ==========================================
 const companyName = computed(() => {
   return formData.value['${construct_project_name}'] || '陕西华电新能源发电有限公司'
 })
 
-// 提取字段属性方法
 const getFieldKey = (f) => typeof f === 'string' ? f : f.key
 const getFieldType = (f) => typeof f === 'string' ? 'text' : (f.type || 'text')
 const getFieldSpan = (f) => (typeof f === 'object' && f.span) ? f.span : 1
@@ -232,15 +306,9 @@ const getFieldLabel = (key) => LABELS[key] || key.replace('${', '').replace('}',
 const getUnit = (key) => UNITS[key] || ''
 
 const isFieldDisabled = (key) => {
-  const targetFields = [
-    '${turbine_foundation_c15_concrete}', '${turbine_foundation_c20_concrete}', 
-    '${turbine_foundation_c40_concrete}', '${turbine_foundation_c45_concrete}'
-  ]
-  if (targetFields.includes(key)) {
-    const rawVal = rawData.value[key]
-    return rawVal === undefined || rawVal === null || rawVal === ''
-  }
-  return false
+  if (!disabledIfEmptyMap[key]) return false
+  const rawVal = rawData.value[key]
+  return rawVal === undefined || rawVal === null || rawVal === ''
 }
 
 // ==========================================
@@ -248,49 +316,78 @@ const isFieldDisabled = (key) => {
 // ==========================================
 const isTableData = (val) => val && typeof val === 'object' && !Array.isArray(val) && val.columns && val.data
 
-// 处理表格里的空对象 {}、undefined
-const cellToText = (cell) => {
-  if (cell === null || cell === undefined) return ''
-  if (typeof cell === 'string' || typeof cell === 'number') return cell
-  if (typeof cell === 'object') {
-    if (Array.isArray(cell)) return cell.length ? `共 ${cell.length} 条` : ''
-    return Object.keys(cell).length ? JSON.stringify(cell) : ''
+const getProcessedTableColumns = (fieldKey) => {
+  const config = fieldConfigMap[fieldKey]
+  if (config && config.columnIndexes) {
+    return config.defaultColumns
   }
-  return cell
+  const raw = formData.value[fieldKey]
+  if (isTableData(raw) && raw.columns?.length > 0) {
+    return raw.columns
+  }
+  if (Array.isArray(raw) && raw.length > 0 && Array.isArray(raw[0])) {
+    return raw[0].map((cell, idx) => typeof cell === 'string' ? cell : `列 ${idx + 1}`)
+  }
+  return config?.defaultColumns || ['列1', '列2', '列3']
 }
 
-const transformTableData = (tableObj) => {
-  if (!tableObj || !tableObj.data) return []
-  return tableObj.data.map(row => {
+const getProcessedTableData = (subModule) => {
+  const fieldKey = subModule.fieldKey
+  const config = fieldConfigMap[fieldKey]
+  const raw = formData.value[fieldKey]
+  let rawRows = []
+  
+  if (isTableData(raw) && Array.isArray(raw.data)) {
+    rawRows = raw.data
+  } else if (Array.isArray(raw) && raw.length > 1) {
+    rawRows = raw.slice(1)
+  }
+
+  if (rawRows.length === 0) {
+    rawRows = [[]]
+  }
+
+  const cols = getProcessedTableColumns(fieldKey)
+  return rawRows.map(rowArr => {
     const rowData = {}
-    row.forEach((cell, idx) => {
-      rowData[`col_${idx}`] = cellToText(cell)
+    const safeRow = Array.isArray(rowArr) ? rowArr : []
+    
+    cols.forEach((_, idx) => {
+      const realIdx = config?.columnIndexes ? config.columnIndexes[idx] : idx
+      const cell = safeRow[realIdx]
+      rowData[`col_${idx}`] = (cell === null || cell === undefined || typeof cell === 'object' && !Array.isArray(cell)) ? '' : cell
     })
     return rowData
   })
 }
 
-const getArrayHeaders = (arr) => {
-  if (!arr || !arr.length) return []
-  const headers = arr[0]
-  if (!Array.isArray(headers)) return []
-  return headers.map((cell, idx) => typeof cell === 'string' ? cell : `列 ${idx + 1}`)
+const updateTableData = (fieldKey, rowIndex, colIndex, newVal) => {
+  let raw = formData.value[fieldKey]
+  const config = fieldConfigMap[fieldKey]
+  let cols = getProcessedTableColumns(fieldKey)
+  
+  if (!raw || (!isTableData(raw) && !Array.isArray(raw))) {
+    raw = { columns: cols, data: [] }
+  }
+
+  let rawRows = []
+  if (isTableData(raw)) rawRows = raw.data
+  else if (Array.isArray(raw)) rawRows = raw.slice(1)
+
+  if (rawRows.length === 0) rawRows = [[]]
+  if (!rawRows[rowIndex]) rawRows[rowIndex] = []
+  
+  const realIdx = config?.columnIndexes ? config.columnIndexes[colIndex] : colIndex
+  rawRows[rowIndex][realIdx] = newVal
+
+  if (isTableData(raw)) {
+    formData.value[fieldKey] = { columns: cols, data: rawRows }
+  } else {
+    formData.value[fieldKey] = [cols, ...rawRows]
+  }
 }
 
-const transformArrayData = (arr) => {
-  if (!arr || !arr.length) return []
-  return arr.slice(1).map((row) => {
-    const rowData = {}
-    if (Array.isArray(row)) {
-      row.forEach((cell, cIdx) => {
-        rowData[`col_${cIdx}`] = cellToText(cell)
-      })
-    }
-    return rowData
-  })
-}
-
-// 测风塔网格数据
+// 测风塔
 const groupedTurbulenceData = computed(() => {
   const rawList = rawData.value['${eachTierHeightTurbulenceTableList}'] || []
   if (!Array.isArray(rawList)) return []
@@ -305,20 +402,32 @@ const groupedTurbulenceData = computed(() => {
   }).filter(Boolean)
 })
 
-// 财务表格状态获取
+// 财务表格兜底
 const getFinancialRows = (subModule) => {
   const key = (subModule.fieldKeys || []).join('|')
-  return financialState.value[key]?.rows || []
+  const state = financialState.value[key]
+  if (!state || !state.rows || state.rows.length === 0) {
+    return (subModule.fieldKeys || []).map(k => ({
+      key: k,
+      name: getFieldLabel(k),
+      unit: '万元',
+      total: '',
+      years: Array.from({ length: 21 }, () => ''),
+      hasTotal: true
+    }))
+  }
+  return state.rows
 }
 const getFinancialHasTotal = (subModule) => {
   const key = (subModule.fieldKeys || []).join('|')
-  return financialState.value[key]?.hasTotal || false
+  return financialState.value[key]?.hasTotal ?? true
 }
 
-// 用地面积合并逻辑
+// 用地面积合并
 const landTableSpanMethod = ({ row, columnIndex, rowIndex }) => {
   if (columnIndex === 0) {
     const currentCategory = row.category
+    if (!currentCategory) return { rowspan: 1, colspan: 1 }
     if (rowIndex > 0 && currentCategory === landTableRows.value[rowIndex - 1]?.category) {
       return { rowspan: 0, colspan: 0 }
     } else {
@@ -332,11 +441,62 @@ const landTableSpanMethod = ({ row, columnIndex, rowIndex }) => {
   }
 }
 
+// 概算总表数据与合并逻辑
+const estimateRows = computed(() => {
+  return [
+    { parentName: '送出工程', childName: '送出工程', totalField: '${delivery_project}' },
+    { parentName: '送出工程', childName: '扩建工程', totalField: '${expansion_project}' },
+    { parentName: '送出工程', childName: '送出分摊费', totalField: '${outgoing_shared_cost}' },
+    
+    { parentName: '其他费用', childName: '配套费', totalField: '${supporting_cost}' },
+    { parentName: '其他费用', childName: '片区管理综合楼', totalField: '${area_management_building}' },
+    { parentName: '其他费用', childName: '智慧风场', totalField: '${smart_wind_farm}' },
+    { parentName: '其他费用', childName: '新能源场站感知设备', totalField: '${new_energy_sensing_equipment}' },
+    { parentName: '其他费用', childName: '研发费用', totalField: '${research_development_cost}' },
+    { parentName: '其他费用', childName: '科技费用', totalField: '${technology_cost}' },
+    { parentName: '其他费用', childName: '平台集控费', totalField: '${centralized_control_platform_cost}' },
+    
+    { parentName: '静态投资（部分）', childName: '', totalField: '${static_investment}' },
+    { parentName: '动态投资（部分）', childName: '', totalField: '${dynamic_investment}' },
+    { parentName: '单位千瓦静态投资（部分）', childName: '', totalField: '${static_investment_per_kw}' },
+    { parentName: '单位千瓦动态投资（部分）', childName: '', totalField: '${dynamic_investment_per_kw}' },
+    
+    { parentName: '静态投资', childName: '', totalField: '${project_static_investment}' },
+    { parentName: '动态投资', childName: '', totalField: '${project_dynamic_investment}' },
+    { parentName: '单位千瓦静态投资', childName: '', totalField: '${unit_kw_static_investment}' },
+    { parentName: '单位千瓦动态投资', childName: '', totalField: '${unit_kw_dynamic_investment}' }
+  ]
+})
+
+const estimateSpanMethod = ({ row, columnIndex, rowIndex }) => {
+  if (columnIndex === 0) {
+    if (!row.childName) {
+      return { rowspan: 1, colspan: 2 }
+    }
+    const currentParent = row.parentName
+    if (rowIndex > 0 && currentParent === estimateRows.value[rowIndex - 1].parentName) {
+      return { rowspan: 0, colspan: 0 }
+    } else {
+      let rowspan = 1
+      for (let i = rowIndex + 1; i < estimateRows.value.length; i++) {
+        if (estimateRows.value[i].parentName === currentParent) rowspan++
+        else break
+      }
+      return { rowspan, colspan: 1 }
+    }
+  } else if (columnIndex === 1) {
+    if (!row.childName) {
+      return { rowspan: 0, colspan: 0 }
+    }
+  }
+}
+
 // ==========================================
-// 数据加载与保存
+// 数据清理
 // ==========================================
 const cleanEmptyValues = (obj) => {
   for (let key in obj) {
+    if (tableFieldKeys.has(key)) continue
     if (obj[key] === null || obj[key] === undefined) {
       obj[key] = ''
     } else if (typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
@@ -350,28 +510,20 @@ const cleanEmptyValues = (obj) => {
   }
 }
 
-
-
-// ==========================================
-// 本地测试开关（联调/上线前改成 false）
-// ==========================================
-
 // ==========================================
 // 数据加载
 // ==========================================
-watch(() => props.visible, async (val) => {
-  if (!val) return
-  if (USE_LOCAL_MOCK || props.reportId) await loadData()
-})
+watch(() => [props.visible, props.reportId], async ([vis, rid]) => {
+  if (!vis) return
+  if (USE_LOCAL_MOCK || rid) await loadData()
+}, { immediate: true })
 
 async function loadData() {
   loading.value = true
   try {
-    // ---------- 1. 取数：mock 或接口 ----------
     let res
     if (USE_LOCAL_MOCK) {
       const mod = await import('@/assets/js/data.json')
-      // 深拷贝，防止 cleanEmptyValues / 双向绑定污染模块缓存
       res = { code: 200, data: JSON.parse(JSON.stringify(mod.default)) }
     } else {
       res = await getParamsData(props.reportId)
@@ -380,25 +532,44 @@ async function loadData() {
     if (res?.code === 0 || res?.code === 200) {
       rawData.value = res.data || {}
       formData.value = JSON.parse(JSON.stringify(rawData.value))
-
-      // ---------- 2. 清理输入空值 ----------
       cleanEmptyValues(formData.value)
 
-      // ---------- 3. 用地面积表格处理 ----------
-      const landRaw = rawData.value['${wind_farm_engineering_land_area_table}']
-      if (isTableData(landRaw)) {
-        landTableRows.value = landRaw.data.map((row, index) => ({
-          category: row[0] || '',
-          subItem: row[1] || '',
-          area: row[2],
-          _isEmpty: row[2] === undefined || row[2] === null || row[2] === '',
-          _rowIndex: index,
-        }))
-      } else {
-        landTableRows.value = []
+      // 修复 [Object Object] 问题
+      if (formData.value['${fixed_asset_original_value}'] && typeof formData.value['${fixed_asset_original_value}'] === 'object') {
+        formData.value['${fixed_asset_original_value}'] = Object.values(formData.value['${fixed_asset_original_value}'])[0] || ''
       }
 
-      // ---------- 4. 财务表格解析 ----------
+      // 1. 用地面积特殊初始化
+      const landRaw = rawData.value['${wind_farm_engineering_land_area_table}']
+      if (isTableData(landRaw) && landRaw.data.length > 0) {
+        landTableRows.value = landRaw.data.map((row, index) => ({
+          category: row[0] || '', subItem: row[1] || '', area: row[2],
+          _isEmpty: row[2] === undefined || row[2] === null || row[2] === '', _rowIndex: index,
+        }))
+      } else {
+        const rd = rawData.value
+        const defaultRows = [
+          ['永久征地', '风机基础', rd['${wind_turbine_foundation_land_area}']],
+          ['永久征地', '箱变基础', rd['${box_transformer_foundation_land_area}']],
+          ['永久征地', '进站道路', rd['${entrance_road_land_area}']],
+          ['永久征地', '升压站', rd['${booster_station_land_area}']],
+          ['永久征地', '合计', rd['${permanent_land_wind_farms}']],
+          ['长期租地', '检修道路', rd['${maintenance_road_total_land_area}']],
+          ['长期租地', '铁塔基础', rd['${tower_foundation_total_land_area}']],
+          ['长期租地', '合计', rd['${long_term_leasing_wind_farms}']],
+          ['临时租地', '施工吊装平台', rd['${construction_lifting_platform_total_land_area}']],
+          ['临时租地', '施工道路', rd['${construction_road_total_land_area}']],
+          ['临时租地', '直埋电缆', rd['${buried_cable_total_land_area}']],
+          ['临时租地', '临时施工区', rd['${temporary_construction_area}']],
+          ['临时租地', '合计', rd['${temporary_lease_wind_farm_land}']]
+        ]
+        landTableRows.value = defaultRows.map((row, index) => ({
+          category: row[0], subItem: row[1], area: row[2] ?? '',
+          _isEmpty: row[2] === undefined || row[2] === null || row[2] === '', _rowIndex: index
+        }))
+      }
+
+      // 2. 财务表格解析
       financialState.value = {}
       Object.values(MODULE_CONFIG).forEach((subModules) => {
         subModules.forEach((sub) => {
@@ -428,7 +599,6 @@ async function loadData() {
                 unit: '万元',
                 total: isTotal ? (values[0] ?? '') : '',
                 years,
-                // ★ 顺手补上 hasTotal，避免保存时 row.hasTotal 取不到（见下方说明）
                 hasTotal: isTotal,
               }
             })
@@ -450,8 +620,14 @@ async function loadData() {
   }
 }
 
+// ==========================================
+// 数据保存
+// ==========================================
 async function handleConfirm() {
-  if (!props.reportId) return
+  if (!props.reportId) {
+    ElMessage.warning('缺少报告ID，无法保存（若为本地测试请忽略此提示）')
+    return
+  }
   confirming.value = true
   try {
     let fileUrl = rawData.value.fileUrl || formData.value.fileUrl || ''
@@ -461,15 +637,16 @@ async function handleConfirm() {
       fileName = decodeURIComponent(lastPart.split('?')[0])
     }
 
-    // 1. 用地面积表格回写
+    // 1. 用地面积回写
     if (landTableRows.value.length > 0) {
+      const validRows = landTableRows.value.filter(r => r.category || r.subItem || r.area)
       formData.value['${wind_farm_engineering_land_area_table}'] = {
         columns: ['项目', '分项', '征地面积（㎡）'],
-        data: landTableRows.value.map(r => [r.category, r.subItem, r.area])
+        data: validRows.map(r => [r.category, r.subItem, r.area])
       }
     }
 
-    // 2. 财务表格二维数组回写
+    // 2. 财务表格回写
     Object.values(financialState.value).forEach(state => {
       state.rows.forEach(row => {
         const headers = row.hasTotal 
@@ -478,6 +655,20 @@ async function handleConfirm() {
         const values = row.hasTotal ? [row.total, ...row.years] : [...row.years]
         formData.value[row.key] = [headers, values]
       })
+    })
+
+    // 3. 过滤普通表格中全空行
+    Object.keys(formData.value).forEach(key => {
+      if (tableFieldKeys.has(key) && key !== '${wind_farm_engineering_land_area_table}' && key !== '${eachTierHeightTurbulenceTableList}') {
+        const val = formData.value[key]
+        if (isTableData(val)) {
+          val.data = val.data.filter(row => row.some(cell => cell !== null && cell !== undefined && cell !== ''))
+        } else if (Array.isArray(val) && val.length > 1) {
+          const headers = val[0]
+          const dataRows = val.slice(1).filter(row => row.some(cell => cell !== null && cell !== undefined && cell !== ''))
+          formData.value[key] = dataRows.length === 0 ? [] : [headers, ...dataRows]
+        }
+      }
     })
 
     const payload = {
@@ -489,7 +680,8 @@ async function handleConfirm() {
     const res = await updateUploadDetail(payload)
     if (res?.code === 0 || res?.code === 200) {
       ElMessage.success('保存成功')
-      emit('success'); emit('close')
+      emit('success')
+      emit('close')
     } else {
       ElMessage.error(res?.msg || '保存失败')
     }
@@ -501,23 +693,34 @@ async function handleConfirm() {
   }
 }
 
+// ==========================================
 // 导航交互
+// ==========================================
 function scrollToModule(moduleName) {
   activeModule.value = moduleName
   const el = document.getElementById(`module-${moduleName}`)
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const container = contentRef.value
+  if (el && container) {
+    const cRect = container.getBoundingClientRect()
+    const eRect = el.getBoundingClientRect()
+    const relativeTop = eRect.top - cRect.top + container.scrollTop
+    container.scrollTo({ top: relativeTop - 20, behavior: 'smooth' })
+  }
 }
 
 let scrollTimer = null
 function handleScroll() {
   if (scrollTimer) clearTimeout(scrollTimer)
   scrollTimer = setTimeout(() => {
-    const sections = contentRef.value?.querySelectorAll('.module-section')
+    const container = contentRef.value
+    if (!container) return
+    const sections = container.querySelectorAll('.module-section')
     if (!sections) return
-    const scrollTop = contentRef.value.scrollTop
+    const cTop = container.getBoundingClientRect().top
     for (let i = sections.length - 1; i >= 0; i--) {
       const section = sections[i]
-      if (section.offsetTop - 30 <= scrollTop) {
+      const sTop = section.getBoundingClientRect().top - cTop
+      if (sTop <= 30) {
         const id = section.id.replace('module-', '')
         if (activeModule.value !== id) activeModule.value = id
         break
@@ -525,10 +728,13 @@ function handleScroll() {
     }
   }, 100)
 }
+
+onUnmounted(() => {
+  if (scrollTimer) clearTimeout(scrollTimer)
+})
 </script>
 
 <style scoped>
-/* 样式部分与之前保持一致，新增 turbulence-grid 样式 */
 .confirm-panel { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 3000; background: #f7f9fc; display: flex; flex-direction: column; }
 .panel-header { flex: 0 0 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; background: #fff; border-bottom: 1px solid #e4e9f0; }
 .header-left .company-name { font-size: 18px; font-weight: 600; color: #333; }
@@ -569,13 +775,5 @@ function handleScroll() {
   border: 1px solid #ebeef5;
   border-radius: 4px;
   overflow: hidden;
-}
-.tower-title {
-  background: #f4f6f8;
-  padding: 8px 12px;
-  font-weight: 600;
-  font-size: 14px;
-  color: #333;
-  border-bottom: 1px solid #ebeef5;
 }
 </style>

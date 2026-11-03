@@ -1,18 +1,15 @@
 // src/views/xxx/paramsConfig.js
 
-// 模块顺序（去掉了“地质”模块，按你原本的14个模块来）
 export const MODULES = [
   '通用', '资源', '发电量', '电气一次', '电气二次', '集电线路', 
   '土建升压站', '风机基础', '道路', '土石方平衡', '用地面积', '环保水保', '概算', '财务'
 ]
 
-// 字段中文名映射
 export const LABELS = {
   '${project_name}': '项目名称', '${construct_project_name}': '投资（建设）单位',
   '${design_unit_name}': '设计单位', '${design_qualification_level}': '设计单位资质等级',
   '${project_city_name}': '项目所属市', '${district_site_belongs}': '项目所属县区', 
   '${project_township_name}': '项目所属乡镇', '${project_construction_site}': '项目详细地址',
-  // 以下三个回归通用
   '${project_landform_type}': '项目地貌', '${project_field_elevation_range}': '场区海拔高度', '${project_horst_type}': '地垒类型',
   '${windPowerLevel}': '风功率密度等级', '${50_year_maximum_wind_speed}': '50年一遇最大风速', '${wind_farm_type}': '风电场类型',
   '${projectSelectedDeviceInstallCapacity}': '装机容量', '${rated_power}': '风机单机容量', '${total_turbine_count}': '风机台数',
@@ -30,20 +27,23 @@ export const LABELS = {
   '${high_voltage_side_configuration}': '高压侧配置信息', '${low_voltage_side_configuration}': '低压侧配置信息',
   '${gis_arrangement}': 'GIS类型', '${gis_model_information}': 'GIS型号信息', '${gis_quantity}': 'GIS数量', '${gis_unit}': 'GIS单位', '${gis_remarks}': 'GIS备注',
   '${circuit_breaker_model}': '断路器型号', '${disconnector_switch_model}': '隔离开关型号', '${current_transformer_model}': '电流互感器型号', '${voltage_transformer_signal}': '电压互感器信号',
-  '${main_transformer_type}': '主变压器类型', '${main_transformer_model}': '主变压器型号', '${main_transformer_rated_capacity}': '主变压器额定容量',
-  '${main_transformer_voltage_ratio}': '主变压器电压比', '${connection_group_type}': '接线组别',
+  '${main_transformer_type}': '主变压器类型', '${main_transformer_model}': '主变压器型号', '${main_transformer_rated_capacity}': '额定容量',
+  '${main_transformer_voltage_ratio}': '电压比', '${connection_group_type}': '接线组别',
   '${main_transformer_num}': '主变本期台数', '${future_main_transformer_count}': '主变远期台数',
-  '${grounding_station_transformer_model}': '接地变兼站用变型号', '${grounding_station_transformer_voltage}': '接地变兼站用变电压',
-  '${grounding_station_transformer_capacity}': '接地变兼站用变容量', '${grounding_station_transformer_quantity}': '接地变兼站用变数量',
-  '${grounding_station_transformer_unit}': '接地变兼站用变单位', '${grounding_station_transformer_resistance}': '接地变兼站用变接地电阻',
-  '${grounding_transformer_model}': '接地变型号', '${grounding_transformer_voltage}': '接地变电压', '${grounding_transformer_capacity}': '接地变容量',
-  '${grounding_transformer_quantity}': '接地变数量', '${grounding_transformer_unit}': '接地变单位', '${small_resistance_value}': '接地变接地电阻',
+  '${grounding_station_transformer_model}': '型号', '${grounding_station_transformer_voltage}': '电压',
+  '${grounding_station_transformer_capacity}': '容量', '${grounding_station_transformer_quantity}': '数量',
+  '${grounding_station_transformer_unit}': '单位', '${grounding_station_transformer_resistance}': '接地电阻',
+  '${grounding_transformer_model}': '型号', '${grounding_transformer_voltage}': '电压', '${grounding_transformer_capacity}': '容量',
+  '${grounding_transformer_quantity}': '数量', '${grounding_transformer_unit}': '单位', '${small_resistance_value}': '接地电阻',
   '${box_type_station_with_variable_models}': '备用站用变', '${svg_reactive_compensation_device}': 'SVG无功补偿装置',
+  
   '${configuration_groups_transformer_booster_station}': '直流蓄电池', '${dc_battery_unit_type}': '直流蓄电池单位', '${dc_battery_quantity_value}': '直流蓄电池数量',
   '${ups_power_model_specification}': 'UPS电源配置', '${ups_power_unit_type}': 'UPS电源单位', '${ups_power_quantity_value}': 'UPS电源数量',
-  '${communication_power_supply}': '通讯电源设计', '${communication_power_unit_type}': '通讯电源单位', '${communication_power_quantity_value}': '通讯电源数量', '${communication_power_supply_settings}': '通讯电源描述',
+  '${communication_power_model_specification}': '通讯电源设计', '${communication_power_unit_type}': '通讯电源单位', '${communication_power_quantity_value}': '通讯电源数量', '${communication_power_supply_settings}': '通讯电源描述',
+  
   '${circuits_collector_box_loops_desc}': '回路数', '${method_laying_collector_lines}': '敷设方式',
-  '${total_line_route_length}': '线路路径总长度', '${new_overhead_line_length}': '新建架空线路长度',
+  '${total_line_route_length}': '线路路径总长度', '${single_circuit_line_length}': '单回路线路长度', '${double_circuit_line_length}': '双回路线路长度',
+  '${new_overhead_line_length}': '新建架空线路长度',
   '${double_circuit_overhead_line_length}': '双回架空线路路径长度', '${single_circuit_overhead_line_length}': '单回架空线路路径长度',
   '${buried_cable_length}': '地埋电缆长度', '${cable_conductor_material}': '电缆电芯材质',
   '${total_land_area_booster_station_site}': '总占地面积', '${area_occupied_within_enclosure_booster_station}': '围墙内占地面积',
@@ -74,27 +74,31 @@ export const LABELS = {
   '${material_cost}': '材料费', '${repair_cost}': '修理费',
   '${net_electricity_price_excluding_value_added_tax}': '上网电价（不含税）',
   '${net_electricity_price_including_value_added_tax}': '上网电价（含税）',
+  
   '${permanent_land_wind_farms}': '永久征地总面积', '${wind_turbine_foundation_land_area}': '风机基础征地面积', '${box_transformer_foundation_land_area}': '箱变基础征地面积',
   '${booster_station_land_area}': '升压站征地面积', '${entrance_road_land_area}': '进站道路征地面积',
-  '${long_term_leasing_wind_farms}': '长期征地总面积', '${maintenance_road_total_land_area}': '检修道路征地总面积', 
-  '${entrance_road_total_land_area}': '进站道路征地总面积', '${tower_foundation_total_land_area}': '铁塔基础征地总面积',
-  '${temporary_lease_wind_farm_land}': '临时征地总面积', '${construction_lifting_platform_total_land_area}': '施工吊装平台征地总面积',
-  '${construction_road_total_land_area}': '施工道路征地总面积', '${buried_cable_total_land_area}': '直埋电缆征地总面积', '${temporary_construction_area}': '临时施工区征地总面积'
+  '${long_term_leasing_wind_farms}': '长期租地总面积', '${maintenance_road_total_land_area}': '检修道路', 
+  '${entrance_road_total_land_area}': '进站道路', '${tower_foundation_total_land_area}': '铁塔基础',
+  '${temporary_lease_wind_farm_land}': '临时租地总面积', '${construction_lifting_platform_total_land_area}': '施工吊装平台',
+  '${construction_road_total_land_area}': '施工道路', '${buried_cable_total_land_area}': '直埋电缆', '${temporary_construction_area}': '临时施工区'
 }
 
-// 单位映射
 export const UNITS = {
+  '${circuits_collector_box_loops_desc}': '回',
+  '${turbine_foundation_c15_concrete}': 'm³', '${turbine_foundation_c20_concrete}': 'm³',
+  '${turbine_foundation_c40_concrete}': 'm³', '${turbine_foundation_c45_concrete}': 'm³',
   '${project_field_elevation_range}': 'm', '${windPowerLevel}': '级', '${50_year_maximum_wind_speed}': 'm/s', '${wind_farm_type}': '级',
-  '${projectSelectedDeviceInstallCapacity}': 'MW', '${rated_power}': 'KW', '${total_turbine_count}': '台',
+  '${projectSelectedDeviceInstallCapacity}': 'MW', '${rated_power}': 'kW', '${total_turbine_count}': '台',
   '${hub_height}': 'm', '${projectSelectedWakeReductionCoefficient}': '%', '${projectSelectedDeviceYearPower}': 'MWh', '${projectSelectedDeviceFullLoadHours}': 'h',
-  '${booster_station_voltage_level}': 'KV', '${current_outgoing_line_circuits}': '回', '${substation_future_outgoing_circuits}': '回',
-  '${planned_main_connection_capacity}': 'MW', '${current_main_connection_capacity}': 'MW', '${station_voltage_level}': 'KV', '${station_capacity_margin}': 'MW',
+  '${booster_station_voltage_level}': 'kV', '${current_outgoing_line_circuits}': '回', '${substation_future_outgoing_circuits}': '回',
+  '${planned_main_connection_capacity}': 'MW', '${current_main_connection_capacity}': 'MW', '${station_voltage_level}': 'kV', '${station_capacity_margin}': 'MW',
   '${grid_connection_distance}': 'km', '${standalone_lightning_rod_count}': '座', '${standalone_lightning_rod_height}': 'm',
-  '${structure_lightning_rod_count}': '座', '${structure_lightning_rod_height}': 'm', '${box_transformer_voltage}': 'KV', '${box_transformer_capacity}': 'KVA',
-  '${main_transformer_rated_capacity}': 'KVA', '${main_transformer_num}': '台', '${future_main_transformer_count}': '台',
-  '${grounding_station_transformer_voltage}': 'KV', '${grounding_station_transformer_capacity}': 'KVA', '${grounding_station_transformer_quantity}': '台',
-  '${grounding_transformer_voltage}': 'KV', '${grounding_transformer_capacity}': 'KVA', '${grounding_transformer_quantity}': '台',
-  '${total_line_route_length}': 'km', '${new_overhead_line_length}': 'km',
+  '${structure_lightning_rod_count}': '座', '${structure_lightning_rod_height}': 'm', '${box_transformer_voltage}': 'kV', '${box_transformer_capacity}': 'kVA',
+  '${main_transformer_rated_capacity}': 'kVA', '${main_transformer_num}': '台', '${future_main_transformer_count}': '台',
+  '${grounding_station_transformer_voltage}': 'kV', '${grounding_station_transformer_capacity}': 'kVA', '${grounding_station_transformer_quantity}': '台',
+  '${grounding_transformer_voltage}': 'kV', '${grounding_transformer_capacity}': 'kVA', '${grounding_transformer_quantity}': '台',
+  '${total_line_route_length}': 'km', '${single_circuit_line_length}': 'km', '${double_circuit_line_length}': 'km',
+  '${new_overhead_line_length}': 'km',
   '${double_circuit_overhead_line_length}': 'km', '${single_circuit_overhead_line_length}': 'km', '${buried_cable_length}': 'km',
   '${total_land_area_booster_station_site}': '㎡', '${area_occupied_within_enclosure_booster_station}': '㎡',
   '${turbine_foundation_excavation_volume}': 'm³', '${turbine_foundation_backfill_volume}': 'm³',
@@ -103,8 +107,8 @@ export const UNITS = {
   '${new_road_length}': 'km', '${width_of_subgrade}': 'm', '${pavement_width}': 'm', '${access_road_length}': 'km', '${road_reconstruction_length}': 'km', '${maintenance_road_length}': 'km', '${maintenance_road_surface_width}': 'm',
   '${total_excavation}': 'm³', '${total_backfill}': 'm³', '${waste_disposal_sites_num}': '个', '${waste_disposal_site_total_land_area}': '㎡',
   '${investment_amount_environmental_protection}': '万元', '${investment_amount_soil_water_protection}': '万元',
-  '${period_depreciation}': '年', '${depreciation_residual}': '%', '${insurance_premium_rate}': '%', '${land_use_tax}': '万元', '${other_fee}': '元/KW',
-  '${working_capital_per_kw}': '元/KW', '${working_capital_equity_ratio}': '%', '${working_capital_loan_ratio}': '%', '${project_funding_ratio}': '%', '${construction_loan_ratio}': '%',
+  '${period_depreciation}': '年', '${depreciation_residual}': '%', '${insurance_premium_rate}': '%', '${land_use_tax}': '万元', '${other_fee}': '元/kW',
+  '${working_capital_per_kw}': '元/kW', '${working_capital_equity_ratio}': '%', '${working_capital_loan_ratio}': '%', '${project_funding_ratio}': '%', '${construction_loan_ratio}': '%',
   '${repayment_period}': '年', '${fix_num_person}': '人', '${employee_welfare_ratio}': '%', '${grid_feed_in_tariff}': '元/kWh', '${long_term_loan_rate}': '%', '${short_term_loan_rate}': '%',
   '${curtailment_rate_single}': '%', '${annual_grid_energy_curtailment}': 'MWh', '${curtailment_equivalent_full_load_hours}': 'h', '${land_tax}': '万元',
   '${working_capital}': '万元', '${installed_capacity}': 'MW', '${annual_grid_energy}': 'MWh',
@@ -117,20 +121,16 @@ export const UNITS = {
   '${construction_road_total_land_area}': '㎡', '${buried_cable_total_land_area}': '㎡', '${temporary_construction_area}': '㎡'
 }
 
-// 核心表单配置
 export const MODULE_CONFIG = {
-  // 通用模块恢复包含这 3 个地质字段（现在总共 11 个字段，使用 2 列布局）
   '通用': [
-    { title: '', cols: 2, fields: [
-      '${project_name}', '${construct_project_name}', '${design_unit_name}', '${design_qualification_level}',
-      '${project_city_name}', '${district_site_belongs}', '${project_township_name}', '${project_construction_site}',
-      '${project_landform_type}', '${project_horst_type}', '${project_field_elevation_range}'
-    ]}
+    { title: '', cols: 2, fields: ['${project_name}', '${construct_project_name}', '${design_unit_name}', '${design_qualification_level}'] },
+    { title: '', cols: 4, fields: ['${project_city_name}', '${district_site_belongs}', '${project_township_name}', '${project_construction_site}'] },
+    { title: '', cols: 3, fields: ['${project_landform_type}', '${project_horst_type}', '${project_field_elevation_range}'] }
   ],
   '资源': [
     { title: '基础参数', cols: 3, fields: ['${windPowerLevel}', '${50_year_maximum_wind_speed}', '${wind_farm_type}'] },
-    { title: '', type: 'table', fieldKey: '${windTowerDatumTable}' },
-    { title: '空气密度参数', type: 'table', fieldKey: '${hubHeightAirDensityRange}' },
+    { title: '', type: 'table', fieldKey: '${wind_resource_combined_table}', defaultColumns: ['测风塔编号', '测风塔经度', '测风塔纬度', '测风周期', '该风电场的空气密度', '高度对应的空气密度', '10m高度空气密度', '160m高度空气密度', '各测风塔各高度空气密度', '轮毂高度平均风速', '轮毂高度平均风功率密度', '各测风塔轮毂高度平均风速', '各测风塔轮毂高度平均风功率密度', '轮毂高度处的主风向', '轮毂高度处的次风向', '轮毂高度处的主风能方向', '轮毂高度处的次风能方向', '最大高度处代表性湍流强度', '各测风塔各高度湍流强度', '综合风切变', '发电量计算是否使用'] },
+    { title: '空气密度参数', type: 'table', fieldKey: '${hubHeightAirDensityRange}', defaultColumns: ['测风塔编号', '高度 (m)', '空气密度 (kg/m³)'], width: '50%' },
     { title: '湍流强度参数', type: 'turbulence' }
   ],
   '发电量': [
@@ -139,13 +139,13 @@ export const MODULE_CONFIG = {
       '${hub_height}', '${projectSelectedWakeReductionCoefficient}', '',
       '${projectSelectedDeviceYearPower}', '${projectSelectedDeviceFullLoadHours}'
     ]},
-    { title: '发电量表参数', type: 'table', fieldKey: '${projectWindPowerFarmPowerTableData}' }
+    { title: '发电量表参数', type: 'table', fieldKey: '${single_turbine_generation_table}', defaultColumns: ['标签', 'X（m）', 'Y（m）', 'Z（m）', 'H（m）', '理论发电量', '平均风速', '尾流系数', '考虑尾流效应的发电量', '最终上网电量', '等效小时数', '尾流效应导致的平均折减率'] }
   ],
   '电气一次': [
     { title: '升压站参数', cols: 3, fields: [
       '${booster_station_construction_type}', '${expanded_booster_station}', '${booster_station_voltage_level}',
       { key: '${wire_type}', type: 'textarea', span: 2 }, '${current_outgoing_line_circuits}', '${substation_future_outgoing_circuits}',
-      '${planned_main_connection_capacity}', ''
+      '${planned_main_connection_capacity}', '${current_main_connection_capacity}'
     ]},
     { title: '接入站参数', cols: 3, fields: [
       '${grid_station_name}', '${station_voltage_level}', '${station_capacity_margin}',
@@ -159,13 +159,7 @@ export const MODULE_CONFIG = {
       { key: '${high_voltage_side_configuration}', type: 'textarea', span: 4 },
       { key: '${low_voltage_side_configuration}', type: 'textarea', span: 4 }
     ]},
-    { title: 'GIS参数', cols: 3, fields: [
-      '${gis_arrangement}', '${gis_model_information}', '${gis_quantity}', '${gis_unit}', '${gis_remarks}',
-      { key: '${circuit_breaker_model}', type: 'textarea', span: 3 },
-      { key: '${disconnector_switch_model}', type: 'textarea', span: 3 },
-      { key: '${current_transformer_model}', type: 'textarea', span: 3 },
-      { key: '${voltage_transformer_signal}', type: 'textarea', span: 3 }
-    ]},
+    { title: 'GIS参数', type: 'kvTable', columns: ['GIS类型', 'GIS型号', '断路器型号', '隔离开关型号', '电流互感器型号', '电压互感器信号'], fields: ['${gis_arrangement}', '${gis_model_information}', '${circuit_breaker_model}', '${disconnector_switch_model}', '${current_transformer_model}', '${voltage_transformer_signal}'] },
     { title: '主变压器参数', cols: 3, fields: [
       { key: '${main_transformer_type}', type: 'textarea', span: 2 }, '${main_transformer_model}', 
       '${main_transformer_rated_capacity}', '${main_transformer_voltage_ratio}', '${connection_group_type}',
@@ -184,21 +178,20 @@ export const MODULE_CONFIG = {
     ]}
   ],
   '电气二次': [
-    { title: '直流系统', cols: 3, fields: [
-      '${configuration_groups_transformer_booster_station}', '${dc_battery_unit_type}', '${dc_battery_quantity_value}'
-    ]},
-    { title: 'UPS电源', cols: 3, fields: [
-      '${ups_power_model_specification}', '${ups_power_unit_type}', '${ups_power_quantity_value}'
-    ]},
-    { title: '通讯电源', cols: 3, fields: [
-      '${communication_power_supply}', '${communication_power_unit_type}', '${communication_power_quantity_value}',
-      { key: '${communication_power_supply_settings}', type: 'textarea', span: 3 }
-    ]}
+    { 
+      title: '', type: 'customRows', 
+      columns: ['设备类型', '型号及规格', '单位', '数量', '描述'], 
+      rows: [
+        ['直流系统', '${configuration_groups_transformer_booster_station}', '${dc_battery_unit_type}', '${dc_battery_quantity_value}', ''],
+        ['UPS电源', '${ups_power_model_specification}', '${ups_power_unit_type}', '${ups_power_quantity_value}', ''],
+        ['通讯电源', '${communication_power_model_specification}', '${communication_power_unit_type}', '${communication_power_quantity_value}', '${communication_power_supply_settings}']
+      ]
+    }
   ],
   '集电线路': [
     { title: '', cols: 3, fields: [
       '${box_transformer_voltage}', '${circuits_collector_box_loops_desc}', '${method_laying_collector_lines}',
-      '${total_line_route_length}', '', '',
+      '${total_line_route_length}', '${single_circuit_line_length}', '${double_circuit_line_length}',
       '${new_overhead_line_length}', '${double_circuit_overhead_line_length}', '${single_circuit_overhead_line_length}',
       '${buried_cable_length}', { key: '${cable_conductor_material}', type: 'textarea', span: 2 }
     ]}
@@ -228,34 +221,26 @@ export const MODULE_CONFIG = {
   '土石方平衡': [
     { title: '', cols: 3, fields: [
       '${total_excavation}', '${total_backfill}', '${waste_disposal_sites_num}', '${waste_disposal_site_total_land_area}'
-    ]},
-    { title: '土石方平衡表', type: 'table', fieldKey: '${statistics_earthwork_volume_site_table}' }
+    ]}
   ],
   '用地面积': [
-    { title: '永久征地', cols: 3, fields: [
-      '${permanent_land_wind_farms}', '${wind_turbine_foundation_land_area}', '${box_transformer_foundation_land_area}',
-      '${booster_station_land_area}', '${entrance_road_land_area}'
-    ]},
-    { title: '长期租地', cols: 3, fields: [
-      '${long_term_leasing_wind_farms}', '${maintenance_road_total_land_area}', '${entrance_road_total_land_area}',
-      '${tower_foundation_total_land_area}'
-    ]},
-    { title: '临时征地', cols: 3, fields: [
-      '${temporary_lease_wind_farm_land}', '${construction_lifting_platform_total_land_area}',
-      '${construction_road_total_land_area}', '${buried_cable_total_land_area}', '${temporary_construction_area}'
-    ]},
-    { title: '', type: 'table', fieldKey: '${wind_farm_engineering_land_area_table}' }
+    { 
+      title: '', type: 'table', width: '50%',
+      fieldKey: '${wind_farm_engineering_land_area_table}', 
+      defaultColumns: ['项目', '分项', '征地面积（㎡）'], 
+      defaultRows: [
+        ['永久征地', '风机基础', ''], ['永久征地', '箱变基础', ''], ['永久征地', '进站道路', ''], ['永久征地', '升压站', ''], ['永久征地', '合计', ''],
+        ['长期租地', '检修道路', ''], ['长期租地', '铁塔基础', ''], ['长期租地', '合计', ''],
+        ['临时租地', '施工吊装平台', ''], ['临时租地', '施工道路', ''], ['临时租地', '直埋电缆', ''], ['临时租地', '临时施工区', ''], ['临时租地', '合计', '']
+      ]
+    }
   ],
   '环保水保': [
     { title: '', cols: 2, fields: ['${investment_amount_environmental_protection}', '${investment_amount_soil_water_protection}'] }
   ],
   '概算': [
     { title: '基础参数', cols: 3, fields: ['${cost_standard}', '${quota_system}', '${price_level}'] },
-    { title: '总概算表中参数', type: 'table', fieldKey: '${engineering_estimate_table}' },
-    { title: '施工辅助工程概算表', type: 'table', fieldKey: '${construction_auxiliary_table}' },
-    { title: '设备及安装工程概算表', type: 'table', fieldKey: '${installation_engineering_budgets_table}' },
-    { title: '建筑工程概算表', type: 'table', fieldKey: '${engineering_build_estimate_table}' },
-    { title: '其他费用概算表', type: 'table', fieldKey: '${other_cost_estimates_table}' }
+    { title: '总概算表中参数', type: 'estimateTable', width: '50%' }
   ],
   '财务': [
     { title: '基础参数', cols: 3, fields: [

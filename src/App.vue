@@ -22,4 +22,14 @@ html, body, #app {
   font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
   background: #f0f2f5;
 }
+  @font-face {
+  font-family: 'Alimama FangYuanTi VF';
+    /* 指向你刚才放的字体路径 */
+    src: url('@/assets/font/AlimamaFangYuanTiVF-Thin.woff2') format('woff2');
+    /* 可变字体（VF）支持字重范围，这样你写 600 或 700 都能生效 */
+    font-weight: 100 900; 
+    font-style: normal;
+    /* 优化体验：字体加载期间先用系统字体展示，防止文字消失 */
+    font-display: swap; 
+  }
 </style>
