@@ -53,7 +53,7 @@ const props = defineProps({
   // 新增标题字段，接收外部传入的字符串
   title: {
     type: String,
-    default: '华勤智策数据全景图',
+    default: '华秦智策数据全景图',
   },
   alt: {
     type: String,
