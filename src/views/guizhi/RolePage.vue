@@ -1,150 +1,100 @@
 <template>
   <div class="role-manage-root">
-    <div class="role-manage-page-bg">
-
-      <!-- 背景光晕 -->
+    <!-- 统一背景 -->
+    <div class="admin-page-bg">
+      <!-- 背景光晕层 -->
       <div class="bg-glow bg-glow-top-left"></div>
       <div class="bg-glow bg-glow-top-right"></div>
       <div class="bg-glow bg-glow-bottom-right"></div>
 
       <!-- 顶部 Header -->
-      <div class="page-header">
+      <div class="admin-page-header">
         <span class="page-title">角色管理</span>
-
-        <el-button
-          type="primary"
-          class="btn-add"
-          @click="handleAdd"
-        >
-          <el-icon>
-            <Plus />
-          </el-icon>
+        <el-button type="primary" class="btn-add" @click="handleAdd">
+          <el-icon><Plus /></el-icon>
           <span>添加角色</span>
         </el-button>
       </div>
 
       <!-- 页面主体 -->
       <div class="main-content">
-
-        <!-- 搜索区域 -->
+        <!-- 搜索与工具栏 -->
         <div class="toolbar">
+          <!-- 搜索栏 -->
+          <div class="admin-filter-bar">
+            <div class="filter-row">
+              <el-date-picker
+                v-model="searchForm.dateRange"
+                type="daterange"
+                range-separator="~"
+                start-placeholder="创建时间"
+                end-placeholder="结束时间"
+                value-format="YYYY-MM-DD"
+                class="filter-date"
+              />
 
-          <div class="filter-row">
-
-            <!-- 日期 -->
-            <el-date-picker
-              v-model="searchForm.dateRange"
-              type="daterange"
-              range-separator="~"
-              start-placeholder="创建时间"
-              end-placeholder="结束时间"
-              value-format="YYYY-MM-DD"
-              class="filter-date"
-            />
-
-            <!-- 搜索 -->
-            <el-input
-              v-model="searchForm.name"
-              placeholder="编号/名称"
-              clearable
-              class="filter-input"
-              @keyup.enter="handleSearch"
-            >
-              <template #prefix>
-                <el-icon>
-                  <Search />
-                </el-icon>
-              </template>
-            </el-input>
-
-            <!-- 操作按钮 -->
-            <div class="filter-buttons">
-              <el-button
-                class="btn-reset"
-                @click="handleReset"
+              <el-input
+                v-model="searchForm.name"
+                placeholder="编号/名称"
+                clearable
+                class="filter-input"
+                @keyup.enter="handleSearch"
               >
-                重置
-              </el-button>
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
 
-              <el-button
-                type="primary"
-                class="btn-search"
-                @click="handleSearch"
-              >
-                搜索
-              </el-button>
+              <div class="filter-buttons">
+                <el-button class="btn-reset" @click="handleReset">重置</el-button>
+                <el-button type="primary" class="btn-search" @click="handleSearch">搜索</el-button>
+              </div>
             </div>
           </div>
 
           <!-- 视图切换 -->
           <div class="view-mode-wrapper">
-            <el-radio-group
-              v-model="viewMode"
-              class="view-mode-group"
-            >
+            <el-radio-group v-model="viewMode" class="view-mode-group">
               <el-radio-button label="table">
-                <el-icon>
-                  <List />
-                </el-icon>
+                <el-icon><List /></el-icon>
                 <span>列表</span>
               </el-radio-button>
-
               <el-radio-button label="card">
-                <el-icon>
-                  <Grid />
-                </el-icon>
+                <el-icon><Grid /></el-icon>
                 <span>卡片</span>
               </el-radio-button>
             </el-radio-group>
           </div>
-
         </div>
 
         <!-- ================= 列表模式 ================= -->
         <template v-if="viewMode === 'table'">
-          <CommonTable
-            :data="pagedTableData"
-            :columns="columns"
-            :total="filteredData.length"
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-          >
-            <!-- 角色名称 -->
-            <template #name="{ row, $index }">
-              <span
-                class="role-tag"
-                :class="getRoleTagClass($index, row.name)"
-              >
-                {{ row.name }}
-              </span>
-            </template>
+          <div class="admin-table-area">
+            <CommonTable
+              :data="pagedTableData"
+              :columns="columns"
+              :total="filteredData.length"
+              v-model:current-page="currentPage"
+              v-model:page-size="pageSize"
+            >
+              <!-- 角色名称插槽 -->
+              <template #name="{ row, $index }">
+                <span class="role-tag" :class="getRoleTagClass($index, row.name)">
+                  {{ row.name }}
+                </span>
+              </template>
 
-            <!-- 操作 -->
-            <template #actions="{ row }">
-              <el-button
-                link
-                class="operation-btn-item"
-                @click="handleEdit(row)"
-              >
-                编辑
-              </el-button>
-
-              <el-button
-                link
-                class="operation-btn-item is-danger"
-                @click="handleDelete(row)"
-              >
-                删除
-              </el-button>
-            </template>
-          </CommonTable>
+              <!-- 操作插槽 -->
+              <template #actions="{ row }">
+                <el-button link type="primary" class="operation-btn-item" @click="handleEdit(row)">编辑</el-button>
+                <el-button link type="danger" class="operation-btn-item is-danger" @click="handleDelete(row)">删除</el-button>
+              </template>
+            </CommonTable>
+          </div>
         </template>
 
         <!-- ================= 卡片模式 ================= -->
-        <div
-          v-else
-          class="card-scroll-container"
-        >
+        <div v-else class="card-scroll-container">
           <div class="card-grid">
             <div
               v-for="item in filteredData"
@@ -155,42 +105,19 @@
             >
               <!-- 卡片顶部 -->
               <div class="role-card-header">
-                <span class="card-code">
-                  角色ID：{{ item.code }}
-                </span>
+                <span class="card-code">角色ID：{{ item.code }}</span>
 
-                <el-dropdown
-                  trigger="click"
-                  placement="bottom-end"
-                  @click.stop
-                >
-                  <button
-                    class="card-more-btn"
-                    type="button"
-                    @click.stop
-                  >
-                    <el-icon>
-                      <MoreFilled />
-                    </el-icon>
+                <el-dropdown trigger="click" placement="bottom-end" @click.stop>
+                  <button class="card-more-btn" type="button" @click.stop>
+                    <el-icon><MoreFilled /></el-icon>
                   </button>
-
                   <template #dropdown>
                     <el-dropdown-menu>
                       <el-dropdown-item @click="handleEdit(item)">
-                        <el-icon>
-                          <Edit />
-                        </el-icon>
-                        编辑
+                        <el-icon><Edit /></el-icon> 编辑
                       </el-dropdown-item>
-
-                      <el-dropdown-item
-                        class="delete-dropdown-item"
-                        @click="handleDelete(item)"
-                      >
-                        <el-icon>
-                          <Delete />
-                        </el-icon>
-                        删除
+                      <el-dropdown-item class="delete-dropdown-item" @click="handleDelete(item)">
+                        <el-icon><Delete /></el-icon> 删除
                       </el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
@@ -198,26 +125,19 @@
               </div>
 
               <!-- 角色名称 -->
-              <div class="card-name">
-                {{ item.name }}
-              </div>
+              <div class="card-name">{{ item.name }}</div>
 
               <!-- 角色描述 -->
-              <div class="card-desc">
-                {{ item.desc }}
-              </div>
+              <div class="card-desc">{{ item.desc }}</div>
 
               <!-- 创建时间 -->
               <div class="card-time">
-                <el-icon>
-                  <Clock />
-                </el-icon>
+                <el-icon><Clock /></el-icon>
                 <span>{{ item.createTime }}</span>
               </div>
             </div>
           </div>
         </div>
-
       </div>
     </div>
 
@@ -227,56 +147,27 @@
       :title="isEdit ? '编辑角色' : '新增角色'"
       width="800px"
       destroy-on-close
-      class="custom-dialog"
+      class="admin-custom-dialog"
     >
-      <el-form
-        ref="formRef"
-        :model="formData"
-        :rules="rules"
-        label-width="100px"
-      >
-        <!-- 基础信息 -->
+      <el-form ref="formRef" :model="formData" :rules="rules" label-width="100px">
+        <!-- 基础信息 (内部采用3列 Grid 布局) -->
         <div class="form-row">
           <el-form-item label="角色ID">
-            <el-input
-              v-model="formData.code"
-              disabled
-              placeholder="系统自动生成"
-            />
+            <el-input v-model="formData.code" disabled placeholder="系统自动生成" />
           </el-form-item>
 
-          <el-form-item
-            label="角色名称"
-            prop="name"
-          >
-            <el-input
-              v-model="formData.name"
-              placeholder="请输入，最多20个字"
-              maxlength="20"
-            />
+          <el-form-item label="角色名称" prop="name">
+            <el-input v-model="formData.name" placeholder="请输入，最多20个字" maxlength="20" />
           </el-form-item>
 
-          <el-form-item
-            label="角色描述"
-            prop="desc"
-          >
-            <el-input
-              v-model="formData.desc"
-              placeholder="请输入，最多50个字"
-              maxlength="50"
-            />
+          <el-form-item label="角色描述" prop="desc">
+            <el-input v-model="formData.desc" placeholder="请输入，最多50个字" maxlength="50" />
           </el-form-item>
         </div>
 
         <!-- 权限配置 -->
-        <el-tabs
-          v-model="activeTab"
-          class="permission-tabs"
-        >
-          <el-tab-pane
-            label="菜单权限"
-            name="menu"
-          >
+        <el-tabs v-model="activeTab" class="permission-tabs">
+          <el-tab-pane label="菜单权限" name="menu">
             <div class="tree-container">
               <el-tree
                 ref="treeRef"
@@ -285,42 +176,21 @@
                 node-key="id"
                 default-expand-all
                 :default-checked-keys="formData.menuKeys"
-                :props="{
-                  label: 'label',
-                  children: 'children'
-                }"
+                :props="{ label: 'label', children: 'children' }"
               />
             </div>
           </el-tab-pane>
 
-          <el-tab-pane
-            label="数据权限"
-            name="data"
-          >
-            <div class="empty-tip">
-              数据权限配置区域（待开发）
-            </div>
+          <el-tab-pane label="数据权限" name="data">
+            <div class="empty-tip">数据权限配置区域（待开发）</div>
           </el-tab-pane>
         </el-tabs>
       </el-form>
 
       <!-- Footer -->
       <template #footer>
-        <el-button
-          class="dialog-cancel-btn"
-          @click="dialogVisible = false"
-        >
-          取消
-        </el-button>
-
-        <el-button
-          type="primary"
-          class="dialog-save-btn"
-          :loading="saveLoading"
-          @click="handleSave"
-        >
-          保存
-        </el-button>
+        <el-button class="dialog-cancel-btn" @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" class="dialog-save-btn" :loading="saveLoading" @click="handleSave">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -329,16 +199,7 @@
 <script setup>
 import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import {
-  List,
-  Grid,
-  Plus,
-  Search,
-  MoreFilled,
-  Edit,
-  Delete,
-  Clock
-} from '@element-plus/icons-vue'
+import { List, Grid, Plus, Search, MoreFilled, Edit, Delete, Clock } from '@element-plus/icons-vue'
 import CommonTable from './components/CommonTable.vue'
 
 // ================= 视图与分页 =================
@@ -352,20 +213,16 @@ const searchForm = reactive({
   name: ''
 })
 
-// ================= 表格数据 =================
+// ================= 表格假数据 =================
 const tableData = ref([
-  { id: 1,  code: 'JS09876456', name: '成员',     desc: '可查看系统基础信息及授权范围内的业务数据，支持日常业务操作。',                 createTime: '2025-06-09 09:00:00' },
-  { id: 2,  code: 'JS09876457', name: '项目经理', desc: '负责项目整体管理与进度跟踪，可查看项目数据并协调相关业务工作。',               createTime: '2025-06-10 09:00:00' },
-  { id: 3,  code: 'JS09876458', name: '数据管理', desc: '负责业务数据维护、数据质量检查及相关数据资源的日常管理。',                     createTime: '2025-06-11 09:00:00' },
-  { id: 4,  code: 'JS09876459', name: '部门主管', desc: '负责本部门业务数据查看与审核，可对部门成员的相关操作进行管理。',               createTime: '2025-06-12 09:00:00' },
-  { id: 5,  code: 'JS09876460', name: '管理员',   desc: '负责系统基础配置、用户管理、角色权限配置及系统运行维护。',                     createTime: '2025-06-13 09:00:00' },
-  { id: 6,  code: 'JS09876461', name: '成员',     desc: '可根据授权范围访问业务功能，完成日常数据查询、录入及业务操作。',               createTime: '2025-06-14 09:00:00' },
-  { id: 7,  code: 'JS09876462', name: '成员',     desc: '主要用于普通业务人员访问系统功能及查看权限范围内的业务信息。',                 createTime: '2025-06-15 09:00:00' },
-  { id: 8,  code: 'JS09876463', name: '成员',     desc: '负责日常业务信息维护，可根据系统授权执行对应的数据操作。',                     createTime: '2025-06-16 09:00:00' },
-  { id: 9,  code: 'JS09876464', name: '成员',     desc: '具备基础业务访问权限，可进行授权范围内的数据查询和业务处理。',                 createTime: '2025-06-17 09:00:00' },
-  { id: 10, code: 'JS09876465', name: '成员',     desc: '面向普通业务用户使用，提供基础功能访问及相关业务数据操作权限。',               createTime: '2025-06-18 09:00:00' },
-  { id: 11, code: 'JS09876466', name: '成员',     desc: '负责授权范围内的日常业务处理及相关信息维护工作。',                             createTime: '2025-06-19 09:00:00' },
-  { id: 12, code: 'JS09876467', name: '成员',     desc: '可访问授权业务模块，支持日常数据查询和基础业务操作。',                         createTime: '2025-06-20 09:00:00' }
+  { id: 1,  code: 'JS09876456', name: '成员',     desc: '可查看系统基础信息及授权范围内的业务数据，支持日常业务操作。', createTime: '2025-06-09 09:00:00' },
+  { id: 2,  code: 'JS09876457', name: '项目经理', desc: '负责项目整体管理与进度跟踪，可查看项目数据并协调相关业务工作。', createTime: '2025-06-10 09:00:00' },
+  { id: 3,  code: 'JS09876458', name: '数据管理', desc: '负责业务数据维护、数据质量检查及相关数据资源的日常管理。', createTime: '2025-06-11 09:00:00' },
+  { id: 4,  code: 'JS09876459', name: '部门主管', desc: '负责本部门业务数据查看与审核，可对部门成员的相关操作进行管理。', createTime: '2025-06-12 09:00:00' },
+  { id: 5,  code: 'JS09876460', name: '管理员',   desc: '负责系统基础配置、用户管理、角色权限配置及系统运行维护。', createTime: '2025-06-13 09:00:00' },
+  { id: 6,  code: 'JS09876461', name: '成员',     desc: '可根据授权范围访问业务功能，完成日常数据查询、录入及业务操作。', createTime: '2025-06-14 09:00:00' },
+  { id: 7,  code: 'JS09876462', name: '成员',     desc: '主要用于普通业务人员访问系统功能及查看权限范围内的业务信息。', createTime: '2025-06-15 09:00:00' },
+  { id: 8,  code: 'JS09876463', name: '成员',     desc: '负责日常业务信息维护，可根据系统授权执行对应的数据操作。', createTime: '2025-06-16 09:00:00' },
 ])
 
 // ================= 表格列配置 =================
@@ -376,7 +233,7 @@ const columns = [
   { prop: 'createTime', label: '创建时间', minWidth: 180 }
 ]
 
-// ================= 筛选结果 =================
+// ================= 筛选与分页 =================
 const filteredData = computed(() => {
   const [start, end] = searchForm.dateRange || []
   const keyword = (searchForm.name || '').trim().toLowerCase()
@@ -387,18 +244,15 @@ const filteredData = computed(() => {
       const matchName = row.name.toLowerCase().includes(keyword)
       if (!matchCode && !matchName) return false
     }
-
     if (start || end) {
       const rowDate = row.createTime.slice(0, 10)
       if (start && rowDate < start) return false
       if (end && rowDate > end) return false
     }
-
     return true
   })
 })
 
-// ================= 分页数据 =================
 const pagedTableData = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   return filteredData.value.slice(start, start + pageSize.value)
@@ -428,7 +282,7 @@ const handleReset = () => {
   currentPage.value = 1
 }
 
-// ================= 弹窗 =================
+// ================= 弹窗与表单 =================
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const saveLoading = ref(false)
@@ -445,43 +299,32 @@ const formData = reactive({
 })
 
 const rules = {
-  name: [
-    { required: true, message: '请输入角色名称', trigger: 'blur' }
-  ]
+  name: [{ required: true, message: '请输入角色名称', trigger: 'blur' }]
 }
 
 // ================= 菜单权限树 =================
 const menuTreeData = ref([
   {
-    id: 'qinchuan',
-    label: '秦川智筹',
+    id: 'qinchuan', label: '秦川智筹',
     children: [
-      { id: 'q1', label: '功能名称' },
-      { id: 'q2', label: '功能名称' },
-      { id: 'q3', label: '功能名称' },
-      { id: 'q4', label: '功能名称' },
-      { id: 'q5', label: '功能名称' }
+      { id: 'q1', label: '功能名称' }, { id: 'q2', label: '功能名称' }, { id: 'q3', label: '功能名称' },
+      { id: 'q4', label: '功能名称' }, { id: 'q5', label: '功能名称' }
     ]
   },
   {
-    id: 'yanping',
-    label: '研评智坊',
+    id: 'yanping', label: '研评智坊',
     children: [
-      { id: 'y1', label: '功能名称' },
-      { id: 'y2', label: '功能名称' }
+      { id: 'y1', label: '功能名称' }, { id: 'y2', label: '功能名称' }
     ]
   },
   {
-    id: 'hucang',
-    label: '湖仓汇源',
+    id: 'hucang', label: '湖仓汇源',
     children: [
       {
-        id: 'hc1',
-        label: '地质库',
+        id: 'hc1', label: '地质库',
         children: [
           {
-            id: 'hc1-1',
-            label: '地质数据库',
+            id: 'hc1-1', label: '地质数据库',
             children: [
               { id: 'hc1-1-1', label: '添加' },
               { id: 'hc1-1-2', label: '编辑' },
@@ -494,31 +337,26 @@ const menuTreeData = ref([
   }
 ])
 
-// ================= 新增 =================
+// ================= 新增 / 编辑 =================
 const handleAdd = () => {
   isEdit.value = false
   activeTab.value = 'menu'
-
   formData.id = ''
   formData.code = 'JS' + Math.floor(Math.random() * 100000000)
   formData.name = ''
   formData.desc = ''
   formData.menuKeys = []
-
   dialogVisible.value = true
 }
 
-// ================= 编辑 =================
 const handleEdit = (row) => {
   isEdit.value = true
   activeTab.value = 'menu'
-
   formData.id = row.id
   formData.code = row.code
   formData.name = row.name
   formData.desc = row.desc
-  formData.menuKeys = ['q1', 'y1']
-
+  formData.menuKeys = ['q1', 'y1'] // 模拟回显
   dialogVisible.value = true
 }
 
@@ -534,7 +372,6 @@ const handleSave = () => {
   formRef.value.validate((valid) => {
     if (!valid) return
 
-    // treeRef 仅在「菜单权限」Tab 下存在
     if (treeRef.value) {
       formData.menuKeys = [
         ...treeRef.value.getCheckedKeys(),
@@ -543,18 +380,12 @@ const handleSave = () => {
     }
 
     saveLoading.value = true
-
     setTimeout(() => {
       saveLoading.value = false
-
       if (isEdit.value) {
         const idx = tableData.value.findIndex((r) => r.id === formData.id)
         if (idx > -1) {
-          tableData.value[idx] = {
-            ...tableData.value[idx],
-            name: formData.name,
-            desc: formData.desc
-          }
+          tableData.value[idx] = { ...tableData.value[idx], name: formData.name, desc: formData.desc }
         }
       } else {
         tableData.value.unshift({
@@ -566,7 +397,6 @@ const handleSave = () => {
         })
         currentPage.value = 1
       }
-
       dialogVisible.value = false
       ElMessage.success(isEdit.value ? '编辑成功' : '新增成功')
     }, 500)
@@ -575,21 +405,15 @@ const handleSave = () => {
 
 // ================= 删除 =================
 const handleDelete = (row) => {
-  ElMessageBox.confirm(
-    `确定要删除角色 "${row.name}" 吗？`,
-    '提示',
-    {
-      type: 'warning',
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      customClass: 'custom-message-box'
-    }
-  )
+  ElMessageBox.confirm(`确定要删除角色 "${row.name}" 吗？`, '提示', {
+    type: 'warning',
+    confirmButtonText: '确定',
+    cancelButtonText: '取消'
+  })
     .then(() => {
       const idx = tableData.value.findIndex((r) => r.id === row.id)
       if (idx > -1) tableData.value.splice(idx, 1)
 
-      // 删完当前页后回到合理页码
       const maxPage = Math.max(1, Math.ceil(filteredData.value.length / pageSize.value))
       if (currentPage.value > maxPage) currentPage.value = maxPage
 
@@ -600,110 +424,16 @@ const handleDelete = (row) => {
 </script>
 
 <style scoped lang="scss">
-/* =========================================================
-   页面整体
-========================================================= */
+/* 引入公共样式 */
+@import './components/css/admin-common.scss';
+
 .role-manage-root {
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
 
-.role-manage-page-bg {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: linear-gradient(122deg, #eef3fa 0%, #f7f8fc 48%, #eaf2fb 100%);
-}
-
-/* =========================================================
-   背景光晕
-========================================================= */
-.bg-glow {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.bg-glow-top-left {
-  left: -80px;
-  top: -140px;
-  width: 430px;
-  height: 430px;
-  background: radial-gradient(circle, rgba(255, 205, 220, 0.45) 0%, rgba(255, 205, 220, 0) 70%);
-  filter: blur(45px);
-}
-
-.bg-glow-top-right {
-  right: 60px;
-  top: -160px;
-  width: 420px;
-  height: 420px;
-  background: radial-gradient(circle, rgba(184, 219, 255, 0.45) 0%, rgba(184, 219, 255, 0) 70%);
-  filter: blur(50px);
-}
-
-.bg-glow-bottom-right {
-  right: -100px;
-  bottom: -180px;
-  width: 560px;
-  height: 560px;
-  background: radial-gradient(circle, rgba(172, 216, 255, 0.4) 0%, rgba(172, 216, 255, 0) 70%);
-  filter: blur(55px);
-}
-
-/* =========================================================
-   顶部 Header
-========================================================= */
-.page-header {
-  position: relative;
-  z-index: 2;
-  height: 48px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  box-sizing: border-box;
-  border-bottom: 1px solid rgba(218, 226, 236, 0.9);
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.page-title {
-  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  color: #152536;
-}
-
-/* =========================================================
-   添加按钮
-========================================================= */
-.btn-add {
-  height: 28px;
-  padding: 0 13px;
-  border-radius: 7px;
-  border: none !important;
-  font-size: 14px;
-  box-shadow: 0 4px 10px rgba(2, 120, 231, 0.18);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: #0783eb !important;
-  color: #fff !important;
-}
-
-.btn-add:hover {
-  background: #0675d4 !important;
-}
-
-/* =========================================================
-   主体
-========================================================= */
+/* ========== 页面主体与工具栏 ========== */
 .main-content {
   position: relative;
   z-index: 2;
@@ -716,138 +446,55 @@ const handleDelete = (row) => {
   overflow: hidden;
 }
 
-/* =========================================================
-   搜索工具栏
-========================================================= */
 .toolbar {
   position: relative;
   flex-shrink: 0;
-  min-height: 40px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 9px;
 }
 
-.filter-row {
-  display: flex;
+/* 修复搜索栏宽度拉伸 */
+.admin-filter-bar {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+
+  .filter-row {
+    padding: 0 !important;
+    .filter-date {
+      width: 240px !important;
+      max-width: 240px !important;
+      flex: none !important;
+    }
+    .filter-input {
+      width: 240px !important;
+      max-width: 240px !important;
+      flex: none !important;
+    }
+  }
+}
+
+/* 添加按钮 */
+.btn-add {
+  height: 28px;
+  padding: 0 13px;
+  border-radius: 7px;
+  border: none !important;
+  font-size: 14px;
+  box-shadow: 0 4px 10px rgba(2, 120, 231, 0.18);
+  display: inline-flex;
   align-items: center;
-  gap: 9px;
-  min-width: 0;
-}
-
-/* 日期 */
-.filter-date {
-  width: 218px;
-}
-
-.filter-row :deep(.el-date-editor.el-input__wrapper) {
-  height: 26px;
-  padding: 0 8px;
-  border-radius: 6px;
-  box-shadow: 0 0 0 1px #dfe6ee inset;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-.filter-row :deep(.el-date-editor.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px #cbd7e5 inset;
-}
-
-.filter-row :deep(.el-date-editor.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 1px #1686e9 inset;
-}
-
-/* 输入框 */
-.filter-input {
-  width: 280px;
-}
-
-.filter-row :deep(.el-input__wrapper) {
-  height: 26px;
-  padding: 0 9px;
-  border-radius: 6px;
-  box-shadow: 0 0 0 1px #dfe6ee inset;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-.filter-row :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px #cbd7e5 inset;
-}
-
-.filter-row :deep(.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 1px #1686e9 inset;
-}
-
-.filter-row :deep(.el-input__inner) {
-  font-size: 14px;
-  color: #536274;
-}
-
-.filter-row :deep(.el-input__inner::placeholder) {
-  color: #8190a2;
-  font-size: 12px;
-}
-
-.filter-row :deep(.el-input__prefix-inner) {
-  color: #748397;
-}
-
-/* 日期文字 */
-.filter-row :deep(.el-range-input) {
-  font-size: 14px;
-  color: #536274;
-}
-
-.filter-row :deep(.el-range-input::placeholder) {
-  color: #8190a2;
-  font-size: 12px;
-}
-
-/* =========================================================
-   搜索按钮
-========================================================= */
-.filter-buttons {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.btn-reset,
-.btn-search {
-  height: 26px;
-  padding: 0 14px;
-  border-radius: 6px;
-  font-size: 14px;
-  line-height: 26px;
-}
-
-.btn-reset {
-  color: #657487;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid #dfe6ee;
-}
-
-.btn-reset:hover {
-  color: #167ddd;
-  border-color: #b9d4ed;
-  background: #fff;
-}
-
-.btn-search {
-  background: #087fe5 !important;
-  border-color: #087fe5 !important;
+  gap: 5px;
+  background: #0783eb !important;
   color: #fff !important;
-  box-shadow: 0 3px 8px rgba(8, 127, 229, 0.15);
+  &:hover {
+    background: #0675d4 !important;
+  }
 }
 
-.btn-search:hover {
-  background: #0874d0 !important;
-  border-color: #0874d0 !important;
-}
-
-/* =========================================================
-   列表 / 卡片切换
-========================================================= */
+/* ========== 视图切换 ========== */
 .view-mode-wrapper {
   display: flex;
   align-items: center;
@@ -881,25 +528,16 @@ const handleDelete = (row) => {
 .view-mode-group :deep(.el-radio-button:first-child .el-radio-button__inner) {
   border-radius: 6px 0 0 6px;
 }
-
 .view-mode-group :deep(.el-radio-button:last-child .el-radio-button__inner) {
   border-radius: 0 6px 6px 0;
 }
-
 .view-mode-group :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
   color: #147fe1;
   background: #fff;
   border-color: #d7e1ec;
-  box-shadow: 0 0 0 1px rgba(20, 127, 225, 0.04);
 }
 
-.view-mode-group :deep(.el-icon) {
-  font-size: 14px;
-}
-
-/* =========================================================
-   角色名称 Tag
-========================================================= */
+/* ========== 角色 Tag 颜色 ========== */
 .role-tag {
   display: inline-flex;
   align-items: center;
@@ -914,84 +552,25 @@ const handleDelete = (row) => {
   white-space: nowrap;
 }
 
-.tag-gray {
-  color: #647385;
-  background: #e9eef3;
-  border: 1px solid #e0e7ed;
-}
+.tag-gray   { color: #647385; background: #e9eef3; border: 1px solid #e0e7ed; }
+.tag-purple { color: #9a55df; background: #f1e3ff; border: 1px solid #dfc2fa; }
+.tag-cyan   { color: #0b9da2; background: #d8f7f6; border: 1px solid #b5e9e7; }
+.tag-green  { color: #1d9b5a; background: #dcf8e8; border: 1px solid #b9eaca; }
+.tag-blue   { color: #2579d5; background: #dceeff; border: 1px solid #bcdcff; }
 
-.tag-purple {
-  color: #9a55df;
-  background: #f1e3ff;
-  border: 1px solid #dfc2fa;
-}
-
-.tag-cyan {
-  color: #0b9da2;
-  background: #d8f7f6;
-  border: 1px solid #b5e9e7;
-}
-
-.tag-green {
-  color: #1d9b5a;
-  background: #dcf8e8;
-  border: 1px solid #b9eaca;
-}
-
-.tag-blue {
-  color: #2579d5;
-  background: #dceeff;
-  border: 1px solid #bcdcff;
-}
-
-/* =========================================================
-   表格操作按钮
-========================================================= */
-.operation-btn-item {
-  margin: 0 !important;
-  padding: 0 !important;
-  height: auto;
-  font-size: 14px;
-  color: #718092 !important;
-}
-
-.operation-btn-item:hover {
-  color: #187ed9 !important;
-}
-
-.operation-btn-item.is-danger {
-  color: #f15e64 !important;
-}
-
-.operation-btn-item.is-danger:hover {
-  color: #e9474e !important;
-}
-
-/* =========================================================
-   卡片区域
-========================================================= */
+/* ========== 卡片区域 ========== */
 .card-scroll-container {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 0 0 10px;
+
+  &::-webkit-scrollbar { width: 5px; }
+  &::-webkit-scrollbar-thumb { background: rgba(150, 165, 180, 0.35); border-radius: 5px; }
+  &::-webkit-scrollbar-track { background: transparent; }
 }
 
-.card-scroll-container::-webkit-scrollbar {
-  width: 5px;
-}
-
-.card-scroll-container::-webkit-scrollbar-thumb {
-  background: rgba(150, 165, 180, 0.35);
-  border-radius: 5px;
-}
-
-.card-scroll-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-/* 4列 */
 .card-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -999,9 +578,6 @@ const handleDelete = (row) => {
   width: 100%;
 }
 
-/* =========================================================
-   角色卡片
-========================================================= */
 .role-card {
   position: relative;
   min-width: 0;
@@ -1029,9 +605,6 @@ const handleDelete = (row) => {
   box-shadow: 0 2px 8px rgba(22, 136, 239, 0.1);
 }
 
-/* =========================================================
-   卡片 Header
-========================================================= */
 .role-card-header {
   width: 100%;
   height: 24px;
@@ -1069,20 +642,11 @@ const handleDelete = (row) => {
   display: flex;
   align-items: center;
   justify-content: center;
+  
+  &:hover { background: #f1f4f7; color: #167fe0; }
+  :deep(.el-icon) { font-size: 14px; }
 }
 
-.card-more-btn:hover {
-  background: #f1f4f7;
-  color: #167fe0;
-}
-
-.card-more-btn :deep(.el-icon) {
-  font-size: 14px;
-}
-
-/* =========================================================
-   卡片名称
-========================================================= */
 .card-name {
   margin-top: 6px;
   margin-bottom: 7px;
@@ -1096,9 +660,6 @@ const handleDelete = (row) => {
   text-overflow: ellipsis;
 }
 
-/* =========================================================
-   卡片描述
-========================================================= */
 .card-desc {
   flex: 1;
   min-height: 0;
@@ -1112,9 +673,6 @@ const handleDelete = (row) => {
   word-break: break-all;
 }
 
-/* =========================================================
-   卡片时间
-========================================================= */
 .card-time {
   flex-shrink: 0;
   display: flex;
@@ -1124,90 +682,11 @@ const handleDelete = (row) => {
   color: #b1bbc6;
   font-size: 12px;
   line-height: 14px;
+
+  :deep(.el-icon) { font-size: 14px; color: #c2cbd4; }
 }
 
-.card-time :deep(.el-icon) {
-  font-size: 14px;
-  color: #c2cbd4;
-}
-
-/* =========================================================
-   Dropdown
-========================================================= */
-:deep(.el-dropdown-menu) {
-  min-width: 82px;
-  padding: 4px;
-  border-radius: 6px;
-}
-
-:deep(.el-dropdown-menu__item) {
-  height: 30px;
-  padding: 0 9px;
-  gap: 5px;
-  border-radius: 4px;
-  font-size: 14px;
-  color: #4d5b6b;
-}
-
-:deep(.el-dropdown-menu__item:hover) {
-  background: #f3f7fb;
-  color: #187ed9;
-}
-
-:deep(.delete-dropdown-item) {
-  color: #f05b61 !important;
-}
-
-:deep(.delete-dropdown-item:hover) {
-  color: #e84950 !important;
-  background: #fff4f4 !important;
-}
-
-/* =========================================================
-   Dialog
-========================================================= */
-.custom-dialog {
-  :deep(.el-dialog) {
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: 0 12px 40px rgba(30, 55, 80, 0.16);
-  }
-
-  :deep(.el-dialog__header) {
-    height: 54px;
-    margin-right: 0;
-    padding: 0 22px;
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    border-bottom: 1px solid #e7ecf2;
-  }
-
-  :deep(.el-dialog__title) {
-    color: #172536;
-    font-size: 14px;
-    font-weight: 600;
-  }
-
-  :deep(.el-dialog__headerbtn) {
-    top: 0;
-    right: 15px;
-    height: 54px;
-  }
-
-  :deep(.el-dialog__body) {
-    padding: 22px;
-  }
-
-  :deep(.el-dialog__footer) {
-    padding: 13px 22px;
-    border-top: 1px solid #e7ecf2;
-  }
-}
-
-/* =========================================================
-   表单
-========================================================= */
+/* ========== 弹窗专属样式 ========== */
 .form-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1218,54 +697,18 @@ const handleDelete = (row) => {
   margin-bottom: 0;
 }
 
-.form-row :deep(.el-form-item__label) {
-  color: #536274;
-  font-size: 14px;
-}
-
-.form-row :deep(.el-input__wrapper) {
-  height: 34px;
-  border-radius: 6px;
-  box-shadow: 0 0 0 1px #dfe6ee inset;
-}
-
-.form-row :deep(.el-input__inner) {
-  font-size: 14px;
-}
-
-.form-row :deep(.el-input__inner::placeholder) {
-  font-size: 12px;
-  color: #8190a2;
-}
-
-/* =========================================================
-   Tabs
-========================================================= */
 .permission-tabs {
   margin-top: 22px;
 
-  :deep(.el-tabs__header) {
-    margin-bottom: 15px;
-  }
-
-  :deep(.el-tabs__item) {
-    height: 38px;
-    color: #69788a;
-    font-size: 14px;
-  }
-
-  :deep(.el-tabs__item.is-active) {
-    color: #087fe5;
-  }
-
-  :deep(.el-tabs__active-bar) {
-    background-color: #087fe5;
-  }
+  :deep(.el-tabs__header) { margin-bottom: 15px; }
+  :deep(.el-tabs__item) { height: 38px; color: #69788a; font-size: 14px; }
+  :deep(.el-tabs__item.is-active) { color: #087fe5; }
+  :deep(.el-tabs__active-bar) { background-color: #087fe5; }
 }
-
-/* =========================================================
-   权限树
-========================================================= */
+/* 覆盖公共表格容器的内边距，使其与搜索栏左右完美对齐 */
+.admin-table-area {
+  padding: 10px 0 14px !important;
+}
 .tree-container {
   min-height: 300px;
   max-height: 400px;
@@ -1275,25 +718,12 @@ const handleDelete = (row) => {
   background: #fafbfd;
   border: 1px solid #e2e8ef;
   border-radius: 7px;
+
+  :deep(.el-tree) { background: transparent; color: #425466; font-size: 14px; }
+  :deep(.el-tree-node__content) { height: 30px; }
+  :deep(.el-tree-node__content:hover) { background: #f0f6fc; }
 }
 
-.tree-container :deep(.el-tree) {
-  background: transparent;
-  color: #425466;
-  font-size: 14px;
-}
-
-.tree-container :deep(.el-tree-node__content) {
-  height: 30px;
-}
-
-.tree-container :deep(.el-tree-node__content:hover) {
-  background: #f0f6fc;
-}
-
-/* =========================================================
-   空状态
-========================================================= */
 .empty-tip {
   padding: 50px 20px;
   color: #9aa7b5;
@@ -1301,76 +731,22 @@ const handleDelete = (row) => {
   font-size: 12px;
 }
 
-/* =========================================================
-   Dialog 按钮
-========================================================= */
-.dialog-cancel-btn,
-.dialog-save-btn {
-  height: 34px;
-  padding: 0 18px;
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-.dialog-cancel-btn {
-  color: #657487;
-  border-color: #dfe6ee;
-  background: #fff;
-}
-
-.dialog-cancel-btn:hover {
-  color: #087fe5;
-  border-color: #bcd7ee;
-}
-
-.dialog-save-btn {
-  background: #087fe5 !important;
-  border-color: #087fe5 !important;
-}
-
-.dialog-save-btn:hover {
-  background: #0874d0 !important;
-  border-color: #0874d0 !important;
-}
-
-/* =========================================================
-   MessageBox
-========================================================= */
-:deep(.custom-message-box) {
-  border-radius: 8px;
-}
-
-/* =========================================================
-   响应式
-========================================================= */
+/* ========== 响应式 ========== */
 @media screen and (max-width: 1100px) {
-  .card-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+  .card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media screen and (max-width: 800px) {
-  .card-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .filter-row {
-    flex-wrap: wrap;
-  }
+  .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-filter-bar .filter-row { flex-wrap: wrap; }
 }
 
 @media screen and (max-width: 600px) {
-  .card-grid {
-    grid-template-columns: 1fr;
-  }
+  .card-grid { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+}
 
-  .filter-date,
-  .filter-input {
-    width: 180px;
-  }
-
-  .form-row {
-    grid-template-columns: 1fr;
-  }
+.admin-filter-bar{
+  background-color: rgba($color: #000000, $alpha: 0);
 }
 </style>

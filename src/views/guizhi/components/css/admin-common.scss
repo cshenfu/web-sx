@@ -1,0 +1,373 @@
+/* =========================================================
+   1. 页面基础布局与背景
+   (使用这些类名前，请在页面根节点加上这些 class)
+========================================================= */
+.admin-page-bg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(122deg, #eef3fa 0%, #f7f8fc 48%, #eaf2fb 100%);
+
+  /* 背景光晕 */
+  .bg-glow {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .bg-glow-top-left {
+    left: -80px;
+    top: -140px;
+    width: 430px;
+    height: 430px;
+    background: radial-gradient(circle, rgba(255, 205, 220, 0.45) 0%, rgba(255, 205, 220, 0) 70%);
+    filter: blur(45px);
+  }
+  .bg-glow-top-right {
+    right: 60px;
+    top: -160px;
+    width: 420px;
+    height: 420px;
+    background: radial-gradient(circle, rgba(184, 219, 255, 0.45) 0%, rgba(184, 219, 255, 0) 70%);
+    filter: blur(50px);
+  }
+  .bg-glow-bottom-right {
+    right: -100px;
+    bottom: -180px;
+    width: 560px;
+    height: 560px;
+    background: radial-gradient(circle, rgba(172, 216, 255, 0.4) 0%, rgba(172, 216, 255, 0) 70%);
+    filter: blur(55px);
+  }
+}
+
+/* 顶部 Header */
+.admin-page-header {
+  position: relative;
+  z-index: 2;
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(218, 226, 236, 0.9);
+  background: rgba(255, 255, 255, 0.18);
+
+  .page-title {
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: #152536;
+  }
+}
+
+/* 主卡片容器 */
+.admin-main-card {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 10px 16px 14px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #e1e7ef;
+  border-radius: 6px;
+  box-shadow: 0 3px 12px rgba(34, 57, 86, 0.035);
+  overflow: hidden;
+}
+
+/* =========================================================
+   2. 顶部搜索栏与控件
+========================================================= */
+.admin-filter-bar {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.72);
+  border-bottom: 1px solid #e8edf3;
+
+  .filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    box-sizing: border-box;
+  }
+
+  /* 统一控件高度 (日期、下拉、输入框) */
+  :deep(.el-input),
+  :deep(.el-select) {
+    --el-input-height: 26px;
+  }
+
+  :deep(.el-input__wrapper),
+  :deep(.el-select__wrapper),
+  :deep(.el-date-editor.el-input__wrapper) {
+    min-height: 26px;
+    height: 26px;
+    padding: 0 9px;
+    box-sizing: border-box;
+    background: #fff;
+    border-radius: 6px;
+    box-shadow: 0 0 0 1px #dfe6ee inset;
+    transition: box-shadow 0.15s ease;
+  }
+
+  :deep(.el-input__wrapper:hover),
+  :deep(.el-select__wrapper:hover),
+  :deep(.el-date-editor.el-input__wrapper:hover) {
+    box-shadow: 0 0 0 1px #cbd7e5 inset;
+  }
+
+  :deep(.el-input__wrapper.is-focus),
+  :deep(.el-select__wrapper.is-focused),
+  :deep(.el-date-editor.el-input__wrapper.is-focus) {
+    box-shadow: 0 0 0 1px #1686e9 inset;
+  }
+
+  /* 文字与占位符统一 */
+  :deep(.el-input__inner),
+  :deep(.el-select__placeholder),
+  :deep(.el-select__selected-item),
+  :deep(.el-range-input) {
+    font-size: 14px;
+    color: #536274;
+  }
+
+  :deep(.el-input__inner::placeholder),
+  :deep(.el-range-input::placeholder) {
+    font-size: 12px;
+    color: #8190a2;
+  }
+
+  /* 按钮组统一 */
+  .filter-buttons {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .btn-reset,
+  .btn-search {
+    height: 26px;
+    padding: 0 14px;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-reset {
+    color: #657487;
+    background: #fff;
+    border: 1px solid #dfe6ee;
+  }
+
+  .btn-reset:hover {
+    color: #167ddd;
+    background: #f2f8ff;
+    border-color: #b9d4ed;
+  }
+
+  .btn-search {
+    background: #087fe5 !important;
+    border-color: #087fe5 !important;
+    color: #fff !important;
+    box-shadow: 0 3px 8px rgba(8, 127, 229, 0.15);
+  }
+
+  .btn-search:hover {
+    background: #0874d0 !important;
+    border-color: #0874d0 !important;
+  }
+}
+
+/* =========================================================
+   3. 表格容器与操作按钮
+========================================================= */
+.admin-table-area {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px 14px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* 表格里的操作列按钮 (编辑/删除) */
+.operation-btn-item {
+  margin: 0 !important;
+  padding: 0 !important;
+  height: auto;
+  font-size: 14px;
+  color: #718092 !important;
+}
+
+.operation-btn-item:hover {
+  color: #187ed9 !important;
+}
+
+.operation-btn-item.is-danger {
+  color: #f15e64 !important;
+}
+
+.operation-btn-item.is-danger:hover {
+  color: #e9474e !important;
+}
+
+/* =========================================================
+   4. 弹窗重写 (通用样式)
+========================================================= */
+.admin-custom-dialog {
+  :deep(.el-dialog) {
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(30, 55, 80, 0.16);
+  }
+
+  :deep(.el-dialog__header) {
+    height: 54px;
+    margin-right: 0;
+    padding: 0 22px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #e7ecf2;
+  }
+
+  :deep(.el-dialog__title) {
+    color: #172536;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  :deep(.el-dialog__headerbtn) {
+    top: 0;
+    right: 15px;
+    height: 54px;
+  }
+
+  :deep(.el-dialog__body) {
+    padding: 22px;
+  }
+
+  :deep(.el-dialog__footer) {
+    padding: 13px 22px;
+    border-top: 1px solid #e7ecf2;
+  }
+
+  /* 表单控件高度 */
+  :deep(.el-input__wrapper) {
+    height: 34px;
+    border-radius: 6px;
+    box-shadow: 0 0 0 1px #dfe6ee inset;
+  }
+  :deep(.el-input__inner) {
+    font-size: 14px;
+  }
+  :deep(.el-input__inner::placeholder) {
+    font-size: 12px;
+    color: #8190a2;
+  }
+
+  /* 弹窗按钮 */
+  .dialog-cancel-btn,
+  .dialog-save-btn {
+    height: 34px;
+    padding: 0 18px;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+
+  .dialog-cancel-btn {
+    color: #657487;
+    border-color: #dfe6ee;
+    background: #fff;
+  }
+
+  .dialog-cancel-btn:hover {
+    color: #087fe5;
+    border-color: #bcd7ee;
+  }
+
+  .dialog-save-btn {
+    background: #087fe5 !important;
+    border-color: #087fe5 !important;
+  }
+
+  .dialog-save-btn:hover {
+    background: #0874d0 !important;
+    border-color: #0874d0 !important;
+  }
+}
+
+
+/* =========================================================
+   5. 全局数据表格统一样式 (对应 CommonTable 的视觉效果)
+========================================================= */
+.common-el-table,
+.data-panel .el-table,
+.decl-table {
+  --el-table-border-color: #e6ebf1;
+  --el-table-header-bg-color: #f2f5f9;
+  --el-table-row-hover-bg-color: #f7faff;
+
+  width: 100% !important;
+  border-radius: 5px;
+  border: 1px solid #e1e7ef;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.96);
+
+  /* 表头 */
+  th.el-table__cell {
+    height: 40px;
+    padding: 0;
+    background: #f2f5f9 !important;
+    color: #637285;
+    font-size: 14px;
+    font-weight: 600;
+    border-bottom: 1px solid #e0e7ef;
+  }
+
+  th .cell {
+    padding: 0 14px;
+    line-height: 40px;
+  }
+
+  /* 行 */
+  td.el-table__cell {
+    height: 40px;
+    padding: 0;
+    border-bottom: 1px solid #e8edf3;
+    color: #304153;
+    font-size: 14px;
+  }
+
+  td .cell {
+    padding: 0 14px;
+    line-height: 40px;
+  }
+
+  /* 悬浮与去掉底部线 */
+  .el-table__body tr:hover > td.el-table__cell {
+    background: #f8fbff !important;
+  }
+  
+  .el-table__body tr:last-child td.el-table__cell {
+    border-bottom: none;
+  }
+
+  .el-table__inner-wrapper::before {
+    display: none;
+  }
+}

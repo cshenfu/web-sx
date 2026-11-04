@@ -1,18 +1,19 @@
 <template>
   <div class="enterprise-root">
-    <div class="enterprise-page-bg">
+    <!-- 统一背景 -->
+    <div class="admin-page-bg">
       <!-- 背景光晕层 -->
-      <div class="bg-glow-top-left"></div>
-      <div class="bg-glow-bottom-right"></div>
-      <div class="bg-glow-top-right"></div>
+      <div class="bg-glow bg-glow-top-left"></div>
+      <div class="bg-glow bg-glow-bottom-right"></div>
+      <div class="bg-glow bg-glow-top-right"></div>
 
       <!-- 顶部 Header -->
-      <div class="page-header">
+      <div class="admin-page-header">
         <span class="page-title">企业介绍</span>
       </div>
 
-      <!-- 主卡片 -->
-      <div class="main-card">
+      <!-- 主卡片（透明化，露出光晕） -->
+      <div class="transparent-main-card">
         <!-- 卡片头部操作栏 -->
         <div class="card-header">
           <div class="header-left"></div>
@@ -20,42 +21,41 @@
             <!-- 基本信息 Tab 按钮 -->
             <template v-if="activeTab === 'basic'">
               <template v-if="!isBasicEditing">
-                <el-button link type="primary" class="btn-edit" @click="handleStartEditBasic">
-                  <el-icon class="mr-1"><Edit /></el-icon>
-                  编辑基本信息
+                <el-button class="btn-action" @click="handleStartEditBasic">
+                  <el-icon class="mr-1"><Edit /></el-icon> 编辑基本信息
                 </el-button>
               </template>
               <template v-else>
-                <el-button @click="handleCancelEditBasic">取消</el-button>
-                <el-button type="primary" :loading="saveLoading" @click="handleSaveBasic">保存</el-button>
+                <el-button class="btn-action" @click="handleCancelEditBasic">取消</el-button>
+                <el-button type="primary" class="btn-primary-action" :loading="saveLoading" @click="handleSaveBasic">保存</el-button>
               </template>
             </template>
             
             <!-- 项目业绩 Tab 按钮 -->
             <template v-else-if="activeTab === 'performance'">
-              <el-button plain>导入业绩</el-button>
-              <el-button type="primary" @click="handleAddPerformance">添加业绩</el-button>
+              <el-button class="btn-action">导入业绩</el-button>
+              <el-button type="primary" class="btn-primary-action" @click="handleAddPerformance">添加业绩</el-button>
             </template>
             
             <!-- 技术能力 Tab 按钮 -->
             <template v-else-if="activeTab === 'tech'">
-              <el-button plain>导入能力</el-button>
-              <el-button type="primary" @click="handleAddTech">添加能力</el-button>
+              <el-button class="btn-action">导入能力</el-button>
+              <el-button type="primary" class="btn-primary-action" @click="handleAddTech">添加能力</el-button>
             </template>
 
             <!-- 财务审计 Tab 按钮 -->
             <template v-else-if="activeTab === 'finance'">
-              <el-button type="primary" @click="handleAddFinance">添加财务审计</el-button>
+              <el-button type="primary" class="btn-primary-action" @click="handleAddFinance">添加财务审计</el-button>
             </template>
 
             <!-- 申报情况 Tab 按钮 -->
             <template v-else-if="activeTab === 'apply'">
               <template v-if="!isDeclEditing">
-                <el-button type="primary" @click="handleStartEditDecl">编辑</el-button>
+                <el-button type="primary" class="btn-primary-action" @click="handleStartEditDecl">编辑</el-button>
               </template>
               <template v-else>
-                <el-button @click="handleCancelEditDecl">取消</el-button>
-                <el-button type="primary" :loading="declSaveLoading" @click="handleSaveDecl">保存</el-button>
+                <el-button class="btn-action" @click="handleCancelEditDecl">取消</el-button>
+                <el-button type="primary" class="btn-primary-action" :loading="declSaveLoading" @click="handleSaveDecl">保存</el-button>
               </template>
             </template>
           </div>
@@ -96,10 +96,9 @@
             <!-- Tab 内容区 -->
             <div class="tab-content">
               <!-- ==================== 基本信息 ==================== -->
-              <div v-if="activeTab === 'basic'" class="basic-info">
+              <div v-if="activeTab === 'basic'" class="basic-info content-card">
                 <div class="section-title">
-                  <span class="blue-bar"></span>
-                  基本信息
+                  <span class="blue-bar"></span>基本信息
                 </div>
 
                 <el-form label-width="180px" label-position="left" class="read-only-form">
@@ -201,12 +200,12 @@
               </div>
 
               <!-- ==================== 项目业绩 ==================== -->
-              <div v-else-if="activeTab === 'performance'" class="data-panel">
+              <div v-else-if="activeTab === 'performance'" class="data-panel content-card" style="padding: 20px;">
                 <div class="section-title">
                   <span class="blue-bar"></span>项目业绩
                 </div>
                 
-                <el-table v-loading="performanceLoading" :data="performanceList" border stripe empty-text="暂无项目业绩数据">
+                <el-table v-loading="performanceLoading" :data="performanceList" empty-text="暂无项目业绩数据" class="common-el-table">
                   <el-table-column type="index" label="序号" width="60" align="center" />
                   <el-table-column prop="projectName" label="项目名称" min-width="180" show-overflow-tooltip />
                   <el-table-column prop="projectType" label="类型" min-width="100" />
@@ -241,15 +240,15 @@
 
                   <el-table-column label="操作" width="120" fixed="right" align="center">
                     <template #default="{ row }">
-                      <el-button link type="primary" @click="handleEditPerformance(row)">编辑</el-button>
-                      <el-button link type="danger" @click="handleDeletePerformance(row)">删除</el-button>
+                      <el-button link type="primary" class="operation-btn-item" @click="handleEditPerformance(row)">编辑</el-button>
+                      <el-button link type="danger" class="operation-btn-item is-danger" @click="handleDeletePerformance(row)">删除</el-button>
                     </template>
                   </el-table-column>
                 </el-table>
               </div>
 
               <!-- ==================== 技术能力 ==================== -->
-              <div v-else-if="activeTab === 'tech'" class="data-panel">
+              <div v-else-if="activeTab === 'tech'" class="data-panel content-card" style="padding: 20px;">
                 <div class="section-title">
                   <span class="blue-bar"></span>技术能力
                 </div>
@@ -259,7 +258,7 @@
                   <el-date-picker v-model="techUpdateDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" style="width: 200px" />
                 </div>
                 
-                <el-table v-loading="techLoading" :data="techList" border stripe empty-text="暂无技术能力数据">
+                <el-table v-loading="techLoading" :data="techList" empty-text="暂无技术能力数据" class="common-el-table">
                   <el-table-column type="index" label="序号" width="60" align="center" />
                   <el-table-column prop="projectName" label="项目名称" min-width="180" show-overflow-tooltip />
                   <el-table-column prop="projectType" label="类型" min-width="120" />
@@ -299,20 +298,20 @@
                   
                   <el-table-column label="操作" width="120" fixed="right" align="center">
                     <template #default="{ row }">
-                      <el-button link type="primary" @click="handleEditTech(row)">编辑</el-button>
-                      <el-button link type="danger" @click="handleDeleteTech(row)">删除</el-button>
+                      <el-button link type="primary" class="operation-btn-item" @click="handleEditTech(row)">编辑</el-button>
+                      <el-button link type="danger" class="operation-btn-item is-danger" @click="handleDeleteTech(row)">删除</el-button>
                     </template>
                   </el-table-column>
                 </el-table>
               </div>
 
               <!-- ==================== 财务审计 ==================== -->
-              <div v-else-if="activeTab === 'finance'" class="data-panel">
+              <div v-else-if="activeTab === 'finance'" class="data-panel content-card" style="padding: 20px;">
                 <div class="section-title">
                   <span class="blue-bar"></span>财务审计
                 </div>
 
-                <el-table v-loading="financeLoading" :data="financeList" border stripe empty-text="暂无财务审计数据">
+                <el-table v-loading="financeLoading" :data="financeList" empty-text="暂无财务审计数据" class="common-el-table">
                   <el-table-column type="index" label="序号" width="60" align="center" />
                   <el-table-column prop="financialYear" label="财务年份" min-width="120" />
                   <el-table-column prop="auditFirm" label="审计公司" min-width="200" show-overflow-tooltip />
@@ -329,15 +328,15 @@
                   </el-table-column>
                   <el-table-column label="操作" width="120" fixed="right" align="center">
                     <template #default="{ row }">
-                      <el-button link type="primary" @click="handleEditFinance(row)">编辑</el-button>
-                      <el-button link type="danger" @click="handleDeleteFinance(row)">删除</el-button>
+                      <el-button link type="primary" class="operation-btn-item" @click="handleEditFinance(row)">编辑</el-button>
+                      <el-button link type="danger" class="operation-btn-item is-danger" @click="handleDeleteFinance(row)">删除</el-button>
                     </template>
                   </el-table-column>
                 </el-table>
               </div>
 
               <!-- ==================== 申报情况 ==================== -->
-              <div v-else-if="activeTab === 'apply'" class="data-panel">
+              <div v-else-if="activeTab === 'apply'" class="data-panel content-card" style="padding: 20px;">
                 <!-- 子 Tab 切换 -->
                 <div class="sub-tabs">
                   <div class="sub-tab-item" :class="{ active: declLevel === 'province' }" @click="switchDeclLevel('province')">
@@ -351,8 +350,7 @@
                 <el-table 
                   v-loading="declLoading" 
                   :data="isDeclEditing ? editDeclList : declList" 
-                  border 
-                  class="decl-table"
+                  class="common-el-table decl-table"
                   :class="{ 'edit-table': isDeclEditing }"
                   size="small"
                   style="width: 100%"
@@ -411,7 +409,7 @@
                   <!-- 编辑模式下显示操作列 -->
                   <el-table-column v-if="isDeclEditing" label="操作" width="60" align="center" fixed="right">
                     <template #default="{ $index }">
-                      <el-button link type="danger" @click="handleRemoveDeclRow($index)">
+                      <el-button link type="danger" class="operation-btn-item is-danger" @click="handleRemoveDeclRow($index)">
                         <el-icon style="font-size: 18px;"><Remove /></el-icon>
                       </el-button>
                     </template>
@@ -709,27 +707,11 @@ const licenseInputRef = ref(null)
 const licenseUploading = ref(false)
 
 const createEmptyForm = () => ({
-  companyId: COMPANY_ID, 
-  enterpriseName: '', 
-  unifiedSocialCreditCode: '', 
-  legalRepresentative: '',
-  registeredAddress: '', 
-  registrationDate: '', 
-  paidUpCapital: null, 
-  paidUpCapitalUnit: '亿元',
-  ultimateParentCompanyName: '', 
-  ultimateParentEquityRatio: '', 
-  shareholderStructure: '', 
-  financialDate: '',
-  fixedAssets: null, 
-  fixedAssetsUnit: '亿元', 
-  totalAssets: null, 
-  totalAssetsUnit: '亿元', 
-  netAssets: null, 
-  netAssetsUnit: '亿元', 
-  companyProfile: '',
-  companyFileReqDTO: null,
-  licensePreviewUrl: ''
+  id: null, companyId: COMPANY_ID, enterpriseName: '', unifiedSocialCreditCode: '', legalRepresentative: '',
+  registeredAddress: '', registrationDate: '', paidUpCapital: null, paidUpCapitalUnit: '亿元',
+  ultimateParentCompanyName: '', ultimateParentEquityRatio: '', shareholderStructure: '', financialDate: '',
+  fixedAssets: null, fixedAssetsUnit: '亿元', totalAssets: null, totalAssetsUnit: '亿元', netAssets: null, netAssetsUnit: '亿元',
+  companyProfile: '', companyFileReqDTO: null, licensePreviewUrl: ''
 })
 const editForm = reactive(createEmptyForm())
 
@@ -763,17 +745,12 @@ const financeInputRef = ref(null)
 const editingFinanceId = ref(null)
 
 const createEmptyFinanceForm = () => ({
-  id: null,
-  companyId: COMPANY_ID,
-  financialYear: '',
-  auditFirm: '',
-  auditBatchNo: '',
-  fileList: []
+  id: null, companyId: COMPANY_ID, financialYear: '', auditFirm: '', auditBatchNo: '', fileList: []
 })
 const editFinanceForm = reactive(createEmptyFinanceForm())
 
 // --- 申报情况 ---
-const declLevel = ref('province') // 'province' | 'city'
+const declLevel = ref('province')
 const declLoading = ref(false)
 const declList = ref([])
 const isDeclEditing = ref(false)
@@ -807,26 +784,15 @@ function isPdf(file) {
 // ================= 基本信息逻辑 =================
 async function fillEditForm(data = {}) {
   const empty = createEmptyForm()
-  const filled = { 
-    ...empty, 
-    ...data, 
-    companyId: COMPANY_ID, 
-    registrationDate: formatDate(data.registrationDate), 
-    financialDate: formatDate(data.financialDate) 
-  }
+  const filled = { ...empty, ...data, companyId: COMPANY_ID, registrationDate: formatDate(data.registrationDate), financialDate: formatDate(data.financialDate) }
   
   if (data.fileRespDTO && data.fileRespDTO.filePath) {
     filled.companyFileReqDTO = { ...data.fileRespDTO }
-    if (data.fileRespDTO.filePath.startsWith('http')) {
-      filled.licensePreviewUrl = data.fileRespDTO.filePath
-    } else {
-      filled.licensePreviewUrl = await obsUpload.getFileUrl(data.fileRespDTO.filePath)
-    }
+    filled.licensePreviewUrl = data.fileRespDTO.filePath.startsWith('http') ? data.fileRespDTO.filePath : await obsUpload.getFileUrl(data.fileRespDTO.filePath)
   } else {
     filled.companyFileReqDTO = null
     filled.licensePreviewUrl = ''
   }
-  
   Object.assign(editForm, filled)
 }
 
@@ -861,18 +827,12 @@ function handleCancelEditBasic() {
 
 async function handleSaveBasic() {
   if (!editForm.enterpriseName?.trim()) return ElMessage.warning('请填写企业名称')
-  
   saveLoading.value = true
   try {
     const payload = JSON.parse(JSON.stringify(editForm))
     delete payload.licensePreviewUrl
     
-    let response
-    if (editForm.id) {
-      response = await api.updateCompanyBasicInfo(payload)
-    } else {
-      response = await api.createCompanyBasicInfo(payload)
-    }
+    let response = editForm.id ? await api.updateCompanyBasicInfo(payload) : await api.createCompanyBasicInfo(payload)
     unwrapResponse(response)
     ElMessage.success(editForm.id ? '更新成功' : '新增成功')
     isBasicEditing.value = false
@@ -884,39 +844,23 @@ async function handleSaveBasic() {
   }
 }
 
-function triggerLicenseUpload() {
-  licenseInputRef.value.click()
-}
+function triggerLicenseUpload() { licenseInputRef.value.click() }
 
 async function handleLicenseFileChange(e) {
   const file = e.target.files[0]
   if (!file) return
   if (!['.jpg', '.jpeg', '.png'].some(ext => file.name.toLowerCase().endsWith(ext))) {
-    ElMessage.warning('仅支持 jpg、png 格式图片')
-    e.target.value = ''
-    return
+    ElMessage.warning('仅支持 jpg、png 格式图片'); e.target.value = ''; return
   }
-  
   licenseUploading.value = true
   try {
     const uploadResult = await obsUpload.uploadFile(file)
-    const realPath = uploadResult.obsPath
-    const previewUrl = await obsUpload.getFileUrl(realPath)
-    
-    editForm.companyFileReqDTO = {
-      companyId: COMPANY_ID,
-      fileCategoryCode: 'BASIC_INFO',
-      fileName: file.name,
-      filePath: realPath,
-      fileSuffix: '.' + file.name.split('.').pop().toLowerCase(),
-      fileType: 0
-    }
-    editForm.licensePreviewUrl = previewUrl
+    editForm.companyFileReqDTO = { companyId: COMPANY_ID, fileCategoryCode: 'BASIC_INFO', fileName: file.name, filePath: uploadResult.obsPath, fileSuffix: '.' + file.name.split('.').pop().toLowerCase(), fileType: 0 }
+    editForm.licensePreviewUrl = await obsUpload.getFileUrl(uploadResult.obsPath)
   } catch (error) {
     ElMessage.error(error.message || '上传失败')
   } finally {
-    licenseUploading.value = false
-    e.target.value = ''
+    licenseUploading.value = false; e.target.value = ''
   }
 }
 
@@ -925,80 +869,37 @@ async function getPerformanceList() {
   performanceLoading.value = true
   try {
     const response = await api.getProjectPerformanceList(COMPANY_ID)
-    const data = unwrapResponse(response)
-    let list = Array.isArray(data) ? data : (data?.records || data?.list || [])
-    
-    const promises = list.map(async (item) => {
-      if (item.fileList && item.fileList.length > 0) {
-        await Promise.all(item.fileList.map(async (file) => {
-          if (file.filePath && !file.filePath.startsWith('http')) {
-            try { file.previewUrl = await obsUpload.getFileUrl(file.filePath) } catch (e) { file.previewUrl = '' }
-          } else {
-            file.previewUrl = file.filePath || ''
-          }
-        }))
-      }
-      return item
-    })
-    await Promise.all(promises)
+    let list = unwrapResponse(response) || []
+    await Promise.all(list.map(async item => {
+      if (item.fileList) await Promise.all(item.fileList.map(async file => {
+        file.previewUrl = file.filePath.startsWith('http') ? file.filePath : await obsUpload.getFileUrl(file.filePath)
+      }))
+    }))
     performanceList.value = list
   } catch (error) {
-    performanceList.value = []
-    ElMessage.error(error.message || '获取项目业绩失败')
-  } finally {
-    performanceLoading.value = false
-  }
+    performanceList.value = []; ElMessage.error('获取项目业绩失败')
+  } finally { performanceLoading.value = false }
 }
 
 function createEmptyPerfRow() {
-  return {
-    projectName: '', projectType: '', installedCapacity: undefined, installedCapacityUnit: '万kW',
-    electricityBusinessLicenseNo: '', gridConnectionAgreementNo: '', purchaseSalesContractNo: '', fileList: []
-  }
+  return { projectName: '', projectType: '', installedCapacity: undefined, installedCapacityUnit: '万kW', electricityBusinessLicenseNo: '', gridConnectionAgreementNo: '', purchaseSalesContractNo: '', fileList: [] }
 }
 
-function handleAddPerformance() {
-  isBatchAdd.value = true
-  editingPerfId.value = null
-  editPerfList.value = [createEmptyPerfRow()]
-  perfDialogVisible.value = true
-}
+function handleAddPerformance() { isBatchAdd.value = true; editingPerfId.value = null; editPerfList.value = [createEmptyPerfRow()]; perfDialogVisible.value = true }
 
 function handleEditPerformance(row) {
-  isBatchAdd.value = false
-  editingPerfId.value = row.id
+  isBatchAdd.value = false; editingPerfId.value = row.id
   const clonedRow = JSON.parse(JSON.stringify(row))
   if (!clonedRow.fileList) clonedRow.fileList = []
-  
-  clonedRow.fileList = clonedRow.fileList.map(file => {
-    const displayUrl = file.previewUrl || (file.filePath && file.filePath.startsWith('http') ? file.filePath : '')
-    return {
-      name: file.fileName,
-      url: displayUrl,
-      previewUrl: displayUrl,
-      filePath: file.filePath,
-      fileSuffix: file.fileSuffix,
-      status: 'success',
-      uid: file.id || Date.now() + Math.random()
-    }
-  })
-  
-  editPerfList.value = [clonedRow]
-  perfDialogVisible.value = true
+  clonedRow.fileList = clonedRow.fileList.map(file => ({ name: file.fileName, url: file.previewUrl || file.filePath, previewUrl: file.previewUrl, filePath: file.filePath, fileSuffix: file.fileSuffix, status: 'success', uid: file.id || Date.now() + Math.random() }))
+  editPerfList.value = [clonedRow]; perfDialogVisible.value = true
 }
 
-function handleAddPerfRow() {
-  editPerfList.value.push(createEmptyPerfRow())
-}
-
-function handleRemovePerfRow(index) {
-  if (editPerfList.value.length === 1 && isBatchAdd.value) return ElMessage.warning('至少保留一行')
-  editPerfList.value.splice(index, 1)
-}
+function handleAddPerfRow() { editPerfList.value.push(createEmptyPerfRow()) }
+function handleRemovePerfRow(index) { if (editPerfList.value.length === 1 && isBatchAdd.value) return ElMessage.warning('至少保留一行'); editPerfList.value.splice(index, 1) }
 
 const beforeUpload = (file) => {
-  const isAllowed = ['.png', '.jpg', '.jpeg', '.pdf'].some(ext => file.name.toLowerCase().endsWith(ext))
-  if (!isAllowed) return ElMessage.warning('只允许上传图片或 PDF 文件'), false
+  if (!['.png', '.jpg', '.jpeg', '.pdf'].some(ext => file.name.toLowerCase().endsWith(ext))) return ElMessage.warning('只允许上传图片或 PDF 文件'), false
   if (file.size / 1024 / 1024 > 10) return ElMessage.warning('文件大小不能超过 10MB'), false
   return true
 }
@@ -1007,83 +908,47 @@ async function customUpload(options, row) {
   const { file, onSuccess, onError } = options
   try {
     const uploadResult = await obsUpload.uploadFile(file)
-    const realFilePath = uploadResult.obsPath
-    if (!realFilePath) throw new Error('上传成功但未返回文件路径')
-
-    const previewUrl = await obsUpload.getFileUrl(realFilePath)
-
+    const previewUrl = await obsUpload.getFileUrl(uploadResult.obsPath)
     const targetFile = row.fileList.find(f => f.uid === file.uid)
     if (targetFile) {
-      targetFile.url = previewUrl
-      targetFile.previewUrl = previewUrl
-      targetFile.filePath = realFilePath
-      targetFile.fileSuffix = '.' + file.name.split('.').pop().toLowerCase()
-      targetFile.name = file.name
-      targetFile.status = 'success'
+      targetFile.url = previewUrl; targetFile.previewUrl = previewUrl; targetFile.filePath = uploadResult.obsPath
+      targetFile.fileSuffix = '.' + file.name.split('.').pop().toLowerCase(); targetFile.name = file.name; targetFile.status = 'success'
     }
     onSuccess(uploadResult, file)
-  } catch (error) {
-    ElMessage.error(error.message || '图片上传失败')
-    onError(error, file)
-    row.fileList = row.fileList.filter(f => f.uid !== file.uid)
-  }
+  } catch (error) { ElMessage.error(error.message || '图片上传失败'); onError(error, file); row.fileList = row.fileList.filter(f => f.uid !== file.uid) }
 }
 
 async function handleSavePerformance() {
   const currentNames = new Set()
   const existingNames = performanceList.value.filter(item => item.id !== editingPerfId.value).map(item => item.projectName)
-
   for (let i = 0; i < editPerfList.value.length; i++) {
     const row = editPerfList.value[i]
     if (!row.projectName?.trim()) return ElMessage.warning(`第 ${i + 1} 行：项目名称不能为空`)
     if (existingNames.includes(row.projectName.trim())) return ElMessage.warning(`项目名称 "${row.projectName}" 已存在`)
-    if (currentNames.has(row.projectName.trim())) return ElMessage.warning(`当前批次项目名称 "${row.projectName}" 重复`)
+    if (currentNames.has(row.projectName.trim())) return ElMessage.warning(`当前批次项目名称重复`)
     currentNames.add(row.projectName.trim())
     if (!row.electricityBusinessLicenseNo?.trim()) return ElMessage.warning(`第 ${i + 1} 行：许可证编号不能为空`)
     if (!row.purchaseSalesContractNo?.trim()) return ElMessage.warning(`第 ${i + 1} 行：合同编号不能为空`)
   }
-
   perfSaveLoading.value = true
   try {
     const promises = editPerfList.value.map(async (row) => {
-      const reqFileList = (row.fileList || []).filter(f => f.filePath).map(f => ({
-        companyId: COMPANY_ID, fileCategoryCode: 'PROJECT_PERFORMANCE',
-        fileName: f.fileName || f.name, filePath: f.filePath,
-        fileSuffix: f.fileSuffix, fileType: 0
-      }))
-      const payload = {
-        companyId: COMPANY_ID, projectName: row.projectName.trim(), projectType: row.projectType,
-        installedCapacity: row.installedCapacity, installedCapacityUnit: row.installedCapacityUnit,
-        electricityBusinessLicenseNo: row.electricityBusinessLicenseNo,
-        gridConnectionAgreementNo: row.gridConnectionAgreementNo,
-        purchaseSalesContractNo: row.purchaseSalesContractNo,
-        fileList: reqFileList
-      }
+      const reqFileList = (row.fileList || []).filter(f => f.filePath).map(f => ({ companyId: COMPANY_ID, fileCategoryCode: 'PROJECT_PERFORMANCE', fileName: f.fileName || f.name, filePath: f.filePath, fileSuffix: f.fileSuffix, fileType: 0 }))
+      const payload = { companyId: COMPANY_ID, projectName: row.projectName.trim(), projectType: row.projectType, installedCapacity: row.installedCapacity, installedCapacityUnit: row.installedCapacityUnit, electricityBusinessLicenseNo: row.electricityBusinessLicenseNo, gridConnectionAgreementNo: row.gridConnectionAgreementNo, purchaseSalesContractNo: row.purchaseSalesContractNo, fileList: reqFileList }
       if (isBatchAdd.value) return api.createProjectPerformance(payload)
       else { payload.id = editingPerfId.value; return api.updateProjectPerformance(payload) }
     })
-
     await Promise.all(promises)
-    ElMessage.success('保存成功')
-    perfDialogVisible.value = false
-    getPerformanceList()
-  } catch (error) {
-    ElMessage.error(error.message || '保存失败')
-  } finally {
-    perfSaveLoading.value = false
-  }
+    ElMessage.success('保存成功'); perfDialogVisible.value = false; getPerformanceList()
+  } catch (error) { ElMessage.error(error.message || '保存失败') } finally { perfSaveLoading.value = false }
 }
 
 async function handleDeletePerformance(row) {
   try {
     await ElMessageBox.confirm(`确定删除项目 "${row.projectName}" 吗？`, '提示', { type: 'warning' })
-    const response = await api.deleteProjectPerformance(row.id)
-    unwrapResponse(response)
-    ElMessage.success('删除成功')
-    getPerformanceList()
-  } catch (error) {
-    if (error !== 'cancel') ElMessage.error(error.message || '删除失败')
-  }
+    unwrapResponse(await api.deleteProjectPerformance(row.id))
+    ElMessage.success('删除成功'); getPerformanceList()
+  } catch (error) { if (error !== 'cancel') ElMessage.error(error.message || '删除失败') }
 }
 
 // ================= 技术能力逻辑 =================
@@ -1091,137 +956,63 @@ async function getTechList() {
   techLoading.value = true
   try {
     const response = await api.getTechResearchList(COMPANY_ID)
-    const data = unwrapResponse(response)
-    let list = Array.isArray(data) ? data : (data?.records || data?.list || [])
-    
-    const promises = list.map(async (item) => {
-      if (item.fileList && item.fileList.length > 0) {
-        await Promise.all(item.fileList.map(async (file) => {
-          if (file.filePath && !file.filePath.startsWith('http')) {
-            try { file.previewUrl = await obsUpload.getFileUrl(file.filePath) } catch (e) { file.previewUrl = '' }
-          } else {
-            file.previewUrl = file.filePath || ''
-          }
-        }))
-      }
-      return item
-    })
-    await Promise.all(promises)
+    let list = unwrapResponse(response) || []
+    await Promise.all(list.map(async item => {
+      if (item.fileList) await Promise.all(item.fileList.map(async file => {
+        file.previewUrl = file.filePath.startsWith('http') ? file.filePath : await obsUpload.getFileUrl(file.filePath)
+      }))
+    }))
     techList.value = list
-  } catch (error) {
-    techList.value = []
-    ElMessage.error(error.message || '获取技术能力失败')
-  } finally {
-    techLoading.value = false
-  }
+  } catch (error) { techList.value = []; ElMessage.error('获取技术能力失败') } finally { techLoading.value = false }
 }
 
-function createEmptyTechRow() {
-  return {
-    projectName: '', projectType: '', researchUnit: '', 
-    researchTimeRange: [], 
-    gridConnectionAgreementNo: '', purchaseSalesContractNo: '', 
-    fileList: []
-  }
-}
+function createEmptyTechRow() { return { projectName: '', projectType: '', researchUnit: '', researchTimeRange: [], gridConnectionAgreementNo: '', purchaseSalesContractNo: '', fileList: [] } }
 
-function handleAddTech() {
-  isTechBatchAdd.value = true
-  editingTechId.value = null
-  editTechList.value = [createEmptyTechRow()]
-  techDrawerVisible.value = true
-}
+function handleAddTech() { isTechBatchAdd.value = true; editingTechId.value = null; editTechList.value = [createEmptyTechRow()]; techDrawerVisible.value = true }
 
 function handleEditTech(row) {
-  isTechBatchAdd.value = false
-  editingTechId.value = row.id
+  isTechBatchAdd.value = false; editingTechId.value = row.id
   const clonedRow = JSON.parse(JSON.stringify(row))
   if (!clonedRow.fileList) clonedRow.fileList = []
-  
-  clonedRow.fileList = clonedRow.fileList.map(file => {
-    const displayUrl = file.previewUrl || (file.filePath && file.filePath.startsWith('http') ? file.filePath : '')
-    return { name: file.fileName, url: displayUrl, previewUrl: displayUrl, filePath: file.filePath, fileSuffix: file.fileSuffix, status: 'success', uid: file.id || Date.now() + Math.random() }
-  })
-  
-  if (row.researchStartDate && row.researchEndDate) {
-    clonedRow.researchTimeRange = [row.researchStartDate, row.researchEndDate]
-  } else {
-    clonedRow.researchTimeRange = []
-  }
-  
-  editTechList.value = [clonedRow]
-  techDrawerVisible.value = true
+  clonedRow.fileList = clonedRow.fileList.map(file => ({ name: file.fileName, url: file.previewUrl || file.filePath, previewUrl: file.previewUrl, filePath: file.filePath, fileSuffix: file.fileSuffix, status: 'success', uid: file.id || Date.now() + Math.random() }))
+  clonedRow.researchTimeRange = (row.researchStartDate && row.researchEndDate) ? [row.researchStartDate, row.researchEndDate] : []
+  editTechList.value = [clonedRow]; techDrawerVisible.value = true
 }
 
-function handleAddTechRow() {
-  editTechList.value.push(createEmptyTechRow())
-}
-
-function handleRemoveTechRow(index) {
-  if (editTechList.value.length === 1 && isTechBatchAdd.value) return ElMessage.warning('至少保留一行')
-  editTechList.value.splice(index, 1)
-}
+function handleAddTechRow() { editTechList.value.push(createEmptyTechRow()) }
+function handleRemoveTechRow(index) { if (editTechList.value.length === 1 && isTechBatchAdd.value) return ElMessage.warning('至少保留一行'); editTechList.value.splice(index, 1) }
 
 async function handleSaveTech() {
   const currentNames = new Set()
   const existingNames = techList.value.filter(item => item.id !== editingTechId.value).map(item => item.projectName)
-
   for (let i = 0; i < editTechList.value.length; i++) {
     const row = editTechList.value[i]
     if (!row.projectName?.trim()) return ElMessage.warning(`第 ${i + 1} 行：项目名称不能为空`)
     if (existingNames.includes(row.projectName.trim())) return ElMessage.warning(`项目名称 "${row.projectName}" 已存在`)
-    if (currentNames.has(row.projectName.trim())) return ElMessage.warning(`当前批次项目名称 "${row.projectName}" 重复`)
+    if (currentNames.has(row.projectName.trim())) return ElMessage.warning(`当前批次项目名称重复`)
     currentNames.add(row.projectName.trim())
     if (!row.projectType?.trim()) return ElMessage.warning(`第 ${i + 1} 行：类型不能为空`)
     if (!row.researchTimeRange || row.researchTimeRange.length !== 2) return ElMessage.warning(`第 ${i + 1} 行：可研时间不能为空`)
     if (!row.fileList || row.fileList.length === 0) return ElMessage.warning(`第 ${i + 1} 行：业绩凭证不能为空`)
   }
-
   techSaveLoading.value = true
   try {
     const payloadList = editTechList.value.map((row) => {
-      const reqFileList = (row.fileList || []).filter(f => f.filePath).map(f => ({
-        companyId: COMPANY_ID, fileCategoryCode: 'TECHNICAL_CAPABILITY',
-        fileName: f.fileName || f.name, filePath: f.filePath,
-        fileSuffix: f.fileSuffix, fileType: 0
-      }))
-      return {
-        companyId: COMPANY_ID, 
-        projectName: row.projectName.trim(), 
-        projectType: row.projectType,
-        researchUnit: row.researchUnit,
-        researchStartDate: row.researchTimeRange[0],
-        researchEndDate: row.researchTimeRange[1],
-        fileList: reqFileList
-      }
+      const reqFileList = (row.fileList || []).filter(f => f.filePath).map(f => ({ companyId: COMPANY_ID, fileCategoryCode: 'TECHNICAL_CAPABILITY', fileName: f.fileName || f.name, filePath: f.filePath, fileSuffix: f.fileSuffix, fileType: 0 }))
+      return { companyId: COMPANY_ID, projectName: row.projectName.trim(), projectType: row.projectType, researchUnit: row.researchUnit, researchStartDate: row.researchTimeRange[0], researchEndDate: row.researchTimeRange[1], fileList: reqFileList }
     })
-
-    if (isTechBatchAdd.value) {
-      await api.batchCreateTechResearch(payloadList)
-    } else {
-      payloadList[0].id = editingTechId.value
-      await api.updateTechResearch(payloadList[0])
-    }
-    
-    ElMessage.success('保存成功')
-    techDrawerVisible.value = false
-    getTechList()
-  } catch (error) {
-    ElMessage.error(error.message || '保存失败')
-  } finally {
-    techSaveLoading.value = false
-  }
+    if (isTechBatchAdd.value) await api.batchCreateTechResearch(payloadList)
+    else { payloadList[0].id = editingTechId.value; await api.updateTechResearch(payloadList[0]) }
+    ElMessage.success('保存成功'); techDrawerVisible.value = false; getTechList()
+  } catch (error) { ElMessage.error(error.message || '保存失败') } finally { techSaveLoading.value = false }
 }
 
 async function handleDeleteTech(row) {
   try {
     await ElMessageBox.confirm(`确定删除项目 "${row.projectName}" 吗？`, '提示', { type: 'warning' })
     await api.deleteTechResearch(row.id)
-    ElMessage.success('删除成功')
-    getTechList()
-  } catch (error) {
-    if (error !== 'cancel') ElMessage.error(error.message || '删除失败')
-  }
+    ElMessage.success('删除成功'); getTechList()
+  } catch (error) { if (error !== 'cancel') ElMessage.error(error.message || '删除失败') }
 }
 
 // ================= 财务审计逻辑 =================
@@ -1229,377 +1020,202 @@ async function getFinanceList() {
   financeLoading.value = true
   try {
     const response = await api.getFinancialAuditList(COMPANY_ID)
-    const data = unwrapResponse(response)
-    let list = Array.isArray(data) ? data : (data?.records || data?.list || [])
-    
-    const promises = list.map(async (item) => {
-      if (item.fileList && item.fileList.length > 0) {
-        await Promise.all(item.fileList.map(async (file) => {
-          if (file.filePath && !file.filePath.startsWith('http')) {
-            try { file.previewUrl = await obsUpload.getFileUrl(file.filePath) } catch (e) { file.previewUrl = '' }
-          } else {
-            file.previewUrl = file.filePath || ''
-          }
-        }))
-      }
-      return item
-    })
-    await Promise.all(promises)
+    let list = unwrapResponse(response) || []
+    await Promise.all(list.map(async item => {
+      if (item.fileList) await Promise.all(item.fileList.map(async file => {
+        file.previewUrl = file.filePath.startsWith('http') ? file.filePath : await obsUpload.getFileUrl(file.filePath)
+      }))
+    }))
     financeList.value = list
-  } catch (error) {
-    financeList.value = []
-    ElMessage.error(error.message || '获取财务审计失败')
-  } finally {
-    financeLoading.value = false
-  }
+  } catch (error) { financeList.value = []; ElMessage.error('获取财务审计失败') } finally { financeLoading.value = false }
 }
 
-function handleAddFinance() {
-  isFinanceEditing.value = false
-  editingFinanceId.value = null
-  Object.assign(editFinanceForm, createEmptyFinanceForm())
-  financeDrawerVisible.value = true
-}
+function handleAddFinance() { isFinanceEditing.value = false; editingFinanceId.value = null; Object.assign(editFinanceForm, createEmptyFinanceForm()); financeDrawerVisible.value = true }
 
 function handleEditFinance(row) {
-  isFinanceEditing.value = true
-  editingFinanceId.value = row.id
-  
+  isFinanceEditing.value = true; editingFinanceId.value = row.id
   const clonedRow = JSON.parse(JSON.stringify(row))
   clonedRow.financialYear = clonedRow.financialYear ? String(clonedRow.financialYear) : ''
-  
-  if (clonedRow.fileList && clonedRow.fileList.length > 0) {
-    clonedRow.fileList = [{
-      fileName: clonedRow.fileList[0].fileName,
-      filePath: clonedRow.fileList[0].filePath,
-      fileSuffix: clonedRow.fileList[0].fileSuffix || '.pdf',
-      previewUrl: clonedRow.fileList[0].previewUrl
-    }]
-  } else {
-    clonedRow.fileList = []
-  }
-  
-  Object.assign(editFinanceForm, clonedRow)
-  financeDrawerVisible.value = true
+  clonedRow.fileList = (clonedRow.fileList && clonedRow.fileList.length > 0) ? [{ fileName: clonedRow.fileList[0].fileName, filePath: clonedRow.fileList[0].filePath, fileSuffix: clonedRow.fileList[0].fileSuffix || '.pdf', previewUrl: clonedRow.fileList[0].previewUrl }] : []
+  Object.assign(editFinanceForm, clonedRow); financeDrawerVisible.value = true
 }
 
-function triggerFinanceUpload() {
-  financeInputRef.value.click()
-}
+function triggerFinanceUpload() { financeInputRef.value.click() }
 
 async function handleFinanceFileChange(e) {
   const file = e.target.files[0]
   if (!file) return
-  if (!file.name.toLowerCase().endsWith('.pdf')) {
-    ElMessage.warning('仅支持 pdf 格式文件')
-    e.target.value = ''
-    return
-  }
-  if (file.size / 1024 / 1024 > 100) {
-    ElMessage.warning('文件大小不能超过 100M')
-    e.target.value = ''
-    return
-  }
-  
+  if (!file.name.toLowerCase().endsWith('.pdf')) { ElMessage.warning('仅支持 pdf 格式文件'); e.target.value = ''; return }
+  if (file.size / 1024 / 1024 > 100) { ElMessage.warning('文件大小不能超过 100M'); e.target.value = ''; return }
   financeUploading.value = true
   try {
     const uploadResult = await obsUpload.uploadFile(file)
-    const realPath = uploadResult.obsPath
-    editFinanceForm.fileList = [{
-      companyId: COMPANY_ID,
-      fileCategoryCode: 'FINANCIAL_AUDIT',
-      fileName: file.name,
-      filePath: realPath,
-      fileSuffix: '.pdf',
-      fileType: 0
-    }]
-  } catch (error) {
-    ElMessage.error(error.message || '上传失败')
-  } finally {
-    financeUploading.value = false
-    e.target.value = ''
-  }
+    editFinanceForm.fileList = [{ companyId: COMPANY_ID, fileCategoryCode: 'FINANCIAL_AUDIT', fileName: file.name, filePath: uploadResult.obsPath, fileSuffix: '.pdf', fileType: 0 }]
+  } catch (error) { ElMessage.error(error.message || '上传失败') } finally { financeUploading.value = false; e.target.value = '' }
 }
 
 async function handleSaveFinance() {
   if (!editFinanceForm.financialYear) return ElMessage.warning('请选择财务年份')
-  
   financeSaveLoading.value = true
   try {
-    const payload = JSON.parse(JSON.stringify(editFinanceForm))
-    payload.financialYear = parseInt(payload.financialYear, 10)
-    
-    if (isFinanceEditing.value) {
-      payload.id = editingFinanceId.value
-      await api.updateFinancialAudit(payload)
-    } else {
-      await api.createFinancialAudit(payload)
-    }
-    
-    ElMessage.success('保存成功')
-    financeDrawerVisible.value = false
-    getFinanceList()
-  } catch (error) {
-    ElMessage.error(error.message || '保存失败')
-  } finally {
-    financeSaveLoading.value = false
-  }
+    const payload = JSON.parse(JSON.stringify(editFinanceForm)); payload.financialYear = parseInt(payload.financialYear, 10)
+    if (isFinanceEditing.value) { payload.id = editingFinanceId.value; await api.updateFinancialAudit(payload) }
+    else { await api.createFinancialAudit(payload) }
+    ElMessage.success('保存成功'); financeDrawerVisible.value = false; getFinanceList()
+  } catch (error) { ElMessage.error(error.message || '保存失败') } finally { financeSaveLoading.value = false }
 }
 
 async function handleDeleteFinance(row) {
   try {
     await ElMessageBox.confirm(`确定删除该财务审计记录吗？`, '提示', { type: 'warning' })
     await api.deleteFinancialAudit(row.id)
-    ElMessage.success('删除成功')
-    getFinanceList()
-  } catch (error) {
-    if (error !== 'cancel') ElMessage.error(error.message || '删除失败')
-  }
+    ElMessage.success('删除成功'); getFinanceList()
+  } catch (error) { if (error !== 'cancel') ElMessage.error(error.message || '删除失败') }
 }
 
 async function previewFinanceFile(file) {
-  if (file.previewUrl) {
-    window.open(file.previewUrl, '_blank')
-  } else if (file.filePath) {
-    let finalUrl = file.filePath
-    if (!finalUrl.startsWith('http')) {
-      finalUrl = await obsUpload.getFileUrl(file.filePath)
-    }
-    if (finalUrl) window.open(finalUrl, '_blank')
-    else ElMessage.error('获取文件预览地址失败')
-  }
+  if (file.previewUrl) window.open(file.previewUrl, '_blank')
+  else if (file.filePath) { const url = file.filePath.startsWith('http') ? file.filePath : await obsUpload.getFileUrl(file.filePath); if (url) window.open(url, '_blank') }
 }
 
 // ================= 申报情况逻辑 =================
 async function getDeclList() {
   declLoading.value = true
   try {
-    const response = await api.getDeclarationListByLevel({
-      companyId: COMPANY_ID,
-      level: declLevel.value
-    })
-    const data = unwrapResponse(response)
-    declList.value = Array.isArray(data) ? data : (data?.records || data?.list || [])
-  } catch (error) {
-    declList.value = []
-    ElMessage.error(error.message || '获取申报情况失败')
-  } finally {
-    declLoading.value = false
-  }
+    const response = await api.getDeclarationListByLevel({ companyId: COMPANY_ID, level: declLevel.value })
+    declList.value = unwrapResponse(response) || []
+  } catch (error) { declList.value = []; ElMessage.error('获取申报情况失败') } finally { declLoading.value = false }
 }
 
-function switchDeclLevel(level) {
-  if (declLevel.value === level || isDeclEditing.value) return
-  declLevel.value = level
-  getDeclList()
-}
+function switchDeclLevel(level) { if (declLevel.value === level || isDeclEditing.value) return; declLevel.value = level; getDeclList() }
 
 function handleStartEditDecl() {
   originalDeclList.value = JSON.parse(JSON.stringify(declList.value))
-  // 把 null / undefined 转换为空字符串方便输入
-  editDeclList.value = JSON.parse(JSON.stringify(declList.value)).map(item => ({
-    ...item,
-    windPowerQuota: item.windPowerQuota ?? '',
-    photovoltaicQuota: item.photovoltaicQuota ?? '',
-    baseProjectQuota: item.baseProjectQuota ?? '',
-    windPowerGridConnected: item.windPowerGridConnected ?? '',
-    photovoltaicGridConnected: item.photovoltaicGridConnected ?? ''
-  }))
+  editDeclList.value = JSON.parse(JSON.stringify(declList.value)).map(item => ({ ...item, windPowerQuota: item.windPowerQuota ?? '', photovoltaicQuota: item.photovoltaicQuota ?? '', baseProjectQuota: item.baseProjectQuota ?? '', windPowerGridConnected: item.windPowerGridConnected ?? '', photovoltaicGridConnected: item.photovoltaicGridConnected ?? '' }))
   isDeclEditing.value = true
 }
-
-function handleCancelEditDecl() {
-  editDeclList.value = []
-  isDeclEditing.value = false
-}
+function handleCancelEditDecl() { editDeclList.value = []; isDeclEditing.value = false }
 
 function handleAddDeclRow() {
   let newYear = 2021
-  if (editDeclList.value.length > 0) {
-    // 获取当前最大年份，新增行的年份 = 最大年份 + 1
-    const maxYear = Math.max(...editDeclList.value.map(r => Number(r.declarationYear) || 0))
-    newYear = Math.max(2021, maxYear + 1)
-  }
-  
-  editDeclList.value.push({
-    id: null,
-    companyId: COMPANY_ID,
-    declarationLevel: declLevel.value,
-    declarationYear: newYear,
-    windPowerQuota: '',
-    photovoltaicQuota: '',
-    baseProjectQuota: '',
-    windPowerGridConnected: '',
-    photovoltaicGridConnected: ''
-  })
+  if (editDeclList.value.length > 0) { const maxYear = Math.max(...editDeclList.value.map(r => Number(r.declarationYear) || 0)); newYear = Math.max(2021, maxYear + 1) }
+  editDeclList.value.push({ id: null, companyId: COMPANY_ID, declarationLevel: declLevel.value, declarationYear: newYear, windPowerQuota: '', photovoltaicQuota: '', baseProjectQuota: '', windPowerGridConnected: '', photovoltaicGridConnected: '' })
 }
-
-function handleRemoveDeclRow(index) {
-  editDeclList.value.splice(index, 1)
-}
+function handleRemoveDeclRow(index) { editDeclList.value.splice(index, 1) }
 
 async function handleSaveDecl() {
-  // 校验并清理数据
   const validRows = []
   const fields = ['windPowerQuota', 'photovoltaicQuota', 'baseProjectQuota', 'windPowerGridConnected', 'photovoltaicGridConnected']
-  
   for (let i = 0; i < editDeclList.value.length; i++) {
     const row = editDeclList.value[i]
-    
-    // 判断是否全为空
     const isAllEmpty = fields.every(f => row[f] === '' || row[f] === null || row[f] === undefined)
-    if (isAllEmpty) {
-      continue // 全为空则直接跳过（自动删除）
-    }
-    
-    if (!row.declarationYear || row.declarationYear < 2021) {
-      return ElMessage.warning(`第 ${i + 1} 行：年份不能为空且不能小于 2021 年`)
-    }
-
-    // 校验必填、大于等于0、最多3位小数
+    if (isAllEmpty) continue
+    if (!row.declarationYear || row.declarationYear < 2021) return ElMessage.warning(`第 ${i + 1} 行：年份不能为空且不能小于 2021 年`)
     const values = []
     for (const f of fields) {
       const val = row[f]
-      if (val === '' || val === null || val === undefined) {
-        return ElMessage.warning(`第 ${i + 1} 行：填写了任意一项后，所有项必填`)
-      }
+      if (val === '' || val === null || val === undefined) return ElMessage.warning(`第 ${i + 1} 行：填写了任意一项后，所有项必填`)
       const num = Number(val)
-      if (isNaN(num) || num < 0) {
-        return ElMessage.warning(`第 ${i + 1} 行：数值必须大于等于0`)
-      }
-      if (String(val).split('.')[1]?.length > 3) {
-        return ElMessage.warning(`第 ${i + 1} 行：小数位数不能超过3位`)
-      }
+      if (isNaN(num) || num < 0) return ElMessage.warning(`第 ${i + 1} 行：数值必须大于等于0`)
+      if (String(val).split('.')[1]?.length > 3) return ElMessage.warning(`第 ${i + 1} 行：小数位数不能超过3位`)
       values.push(num)
     }
-    
-    // 至少有一个大于0
-    if (!values.some(v => v > 0)) {
-      return ElMessage.warning(`第 ${i + 1} 行：各项数值不能全为0，至少有一个大于0`)
-    }
-
-    // 转为数字类型
-    const submitRow = { ...row }
-    fields.forEach(f => submitRow[f] = Number(row[f]))
-    validRows.push(submitRow)
+    if (!values.some(v => v > 0)) return ElMessage.warning(`第 ${i + 1} 行：各项数值不能全为0，至少有一个大于0`)
+    const submitRow = { ...row }; fields.forEach(f => submitRow[f] = Number(row[f])); validRows.push(submitRow)
   }
 
   declSaveLoading.value = true
   try {
-    // 比对找出需要删除的行（存在于原始列表中，但在当前列表中找不到或者被清空了）
     const validIds = validRows.map(r => r.id).filter(id => id)
-    const toDeleteIds = originalDeclList.value
-      .filter(ori => ori.id && !validIds.includes(ori.id))
-      .map(ori => ori.id)
-
-    // 拆分更新和新增
+    const toDeleteIds = originalDeclList.value.filter(ori => ori.id && !validIds.includes(ori.id)).map(ori => ori.id)
     const toUpdate = validRows.filter(r => r.id)
     const toCreate = validRows.filter(r => !r.id)
-
-    // 执行删除
-    if (toDeleteIds.length > 0) {
-      await Promise.all(toDeleteIds.map(id => api.deleteDeclaration(id)))
-    }
-
-    // 执行更新
-    if (toUpdate.length > 0) {
-      await Promise.all(toUpdate.map(row => api.updateDeclaration(row)))
-    }
-
-    // 执行新增
-    if (toCreate.length > 0) {
-      await api.batchCreateDeclaration(toCreate)
-    }
-
-    ElMessage.success('保存成功')
-    isDeclEditing.value = false
-    getDeclList()
-  } catch (error) {
-    ElMessage.error(error.message || '保存失败')
-  } finally {
-    declSaveLoading.value = false
-  }
+    if (toDeleteIds.length > 0) await Promise.all(toDeleteIds.map(id => api.deleteDeclaration(id)))
+    if (toUpdate.length > 0) await Promise.all(toUpdate.map(row => api.updateDeclaration(row)))
+    if (toCreate.length > 0) await api.batchCreateDeclaration(toCreate)
+    ElMessage.success('保存成功'); isDeclEditing.value = false; getDeclList()
+  } catch (error) { ElMessage.error(error.message || '保存失败') } finally { declSaveLoading.value = false }
 }
 
-// ================= 其他 Tabs 逻辑 =================
+// ================= 其他 =================
 function handleTabChange(tabName) {
   if (tabName !== 'basic') isBasicEditing.value = false
   if (tabName !== 'apply') isDeclEditing.value = false
-  
   if (tabName === 'performance') getPerformanceList()
   else if (tabName === 'tech') getTechList()
   else if (tabName === 'finance') getFinanceList()
   else if (tabName === 'apply') getDeclList()
 }
 
-onMounted(() => {
-  getCompanyInfo()
-})
+onMounted(() => { getCompanyInfo() })
 </script>
 
 <style scoped lang="scss">
-.enterprise-root { width: 100%; height: 100%; }
+@import './components/css/admin-common.scss';
 
-/* ========== 外层容器与背景 ========== */
-.enterprise-page-bg {
-  position: relative; width: 100%; height: 100%; display: flex; flex-direction: column;
-  background: linear-gradient(122.01deg, #E6EEF8 0%, #D2E0F4 100%), #FFFFFF; overflow: hidden;
-}
-.bg-glow-top-left {
-  position: absolute; left: -1.61%; top: -18.52%; width: 350px; height: 350px;
-  background: linear-gradient(135deg, #FFCCD5 0%, #FECFEF 100%); opacity: 0.49; filter: blur(129.5px); border-radius: 50%; pointer-events: none; z-index: 1;
-}
-.bg-glow-bottom-right {
-  position: absolute; right: 4.64%; bottom: -18.13%; width: 450px; height: 450px;
-  background: linear-gradient(120deg, #A1C4FD 0%, #C2E9FB 100%); opacity: 0.7; filter: blur(123px); border-radius: 50%; pointer-events: none; z-index: 1;
-}
-.bg-glow-top-right {
-  position: absolute; right: 19.01%; top: -37.04%; width: 300px; height: 300px;
-  background: linear-gradient(120deg, #A1C4FD 0%, #C2E9FB 100%); opacity: 0.7; filter: blur(123px); border-radius: 50%; pointer-events: none; z-index: 1;
+.enterprise-root { 
+  width: 100%; 
+  height: 100%; 
+  overflow: hidden; 
 }
 
-/* ========== 顶部 Header ========== */
-.page-header {
-  position: relative; z-index: 2; display: flex; align-items: center; height: 67px; padding: 15px 20px;
-  box-sizing: border-box; flex-shrink: 0; border-bottom: 1px solid #E2E9F0;
-}
-.page-title { font-family: 'PingFang SC'; font-weight: 500; font-size: 16px; color: #0B1C2C; }
-
-/* ========== 主卡片 ========== */
-.main-card {
-  position: relative; z-index: 2; flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 16px 12px 30px;
-  background: #FFFFFF; border: 1px solid #DFE5EC; border-radius: 12px; box-shadow: 0 4px 16px rgba(11, 28, 44, 0.04); overflow: hidden;
+/* ========== 主卡片透明化 ========== */
+.transparent-main-card {
+  position: relative; z-index: 2; flex: 1; min-height: 0; display: flex; flex-direction: column; 
+  margin: 10px 16px 14px; 
+  /* 没有白底，完全透出下面光晕 */
 }
 
 /* ========== 卡片头部操作栏 ========== */
 .card-header {
-  display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 20px;
-  border-bottom: 1px solid #E2E9F0; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; padding: 0 20px;
+  border-bottom: 1px solid rgba(226, 233, 240, 0.6); flex-shrink: 0;
 }
-.btn-edit { font-size: 14px; color: #0278E7 !important; display: inline-flex; align-items: center; &:hover { color: #0267C7 !important; } }
 .mr-1 { margin-right: 4px; }
 
-/* ========== 左右分栏主体 ========== */
-.content-body { flex: 1; min-height: 0; display: flex; }
-
-/* 左侧树形导航 */
-.left-tree { width: 260px; flex-shrink: 0; background: #FAFBFC; border-right: 1px solid #E2E9F0; padding: 16px 8px; overflow-y: auto; }
-:deep(.el-tree) { background: transparent; }
-:deep(.el-tree-node__content) { height: 36px; border-radius: 6px; margin-bottom: 2px; }
-:deep(.el-tree-node__content:hover) { background-color: #F0F4F8; }
-:deep(.el-tree-node.is-current > .el-tree-node__content) { background-color: transparent; }
-.custom-tree-node { font-size: 14px; color: #667383; flex: 1; display: flex; align-items: center; padding: 0 8px; border-radius: 6px; transition: all 0.15s ease; }
-.custom-tree-node.is-active {
-  color: #0278E7; font-weight: 500; background: #E6F2FF; position: relative;
-  &::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 14px; border-radius: 0 2px 2px 0; background: #0278E7; }
+/* 统一操作按钮：类似列表/卡片切换的质感 */
+.btn-action, .btn-primary-action {
+  height: 28px; padding: 0 16px; border-radius: 6px; font-size: 14px; display: inline-flex; align-items: center; gap: 4px;
+}
+.btn-action {
+  color: #657487; background: #fff; border: 1px solid #dfe6ee;
+  &:hover { color: #087fe5; border-color: #b9d4ed; background: #f2f8ff; }
+}
+.btn-primary-action {
+  background: #087fe5 !important; border-color: #087fe5 !important; color: #fff !important;
+  box-shadow: 0 3px 8px rgba(8, 127, 229, 0.15);
+  &:hover { background: #0874d0 !important; border-color: #0874d0 !important; }
 }
 
-/* 右侧内容区 */
-.right-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* ========== 左右分栏 ========== */
+.content-body { flex: 1; min-height: 0; display: flex; }
 
-/* Tabs 样式 */
+/* ========== 左侧导航（半透明白 + 毛玻璃） ========== */
+.left-tree { 
+  width: 260px; flex-shrink: 0; 
+  background: rgba(255, 255, 255, 0.65); 
+  backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(226, 233, 240, 0.6); 
+  padding: 16px 8px; overflow-y: auto; 
+}
+:deep(.el-tree) { background: transparent; }
+:deep(.el-tree-node__content) { height: 36px; border-radius: 6px; margin-bottom: 2px; }
+:deep(.el-tree-node__content:hover) { background-color: rgba(240, 244, 248, 0.6); }
+:deep(.el-tree-node.is-current > .el-tree-node__content) { background-color: transparent; }
+.custom-tree-node {
+  font-size: 14px; color: #667383; flex: 1; display: flex; align-items: center; padding: 0 8px; border-radius: 6px; transition: all 0.15s ease;
+  &.is-active {
+    color: #0278E7; font-weight: 500; background: #E6F2FF; position: relative;
+    &::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 14px; border-radius: 0 2px 2px 0; background: #0278E7; }
+  }
+}
+
+/* ========== 右侧内容区 ========== */
+.right-content { flex: 1; min-width: 0; display: flex; flex-direction: column; background-color: rgba(255, 255, 255, 0.65); }
+
+/* Tabs */
 .detail-tabs {
-  padding: 0 20px; margin-bottom: 0 !important; flex-shrink: 0; border-bottom: 1px solid #E2E9F0;
+  padding: 0 20px; margin-bottom: 0 !important; flex-shrink: 0; border-bottom: 1px solid rgba(226, 233, 240, 0.6);
   :deep(.el-tabs__nav-wrap::after) { display: none; }
   :deep(.el-tabs__item) { height: 48px; font-size: 14px; color: #667383; &.is-active { color: #0278E7; font-weight: 500; } }
   :deep(.el-tabs__active-bar) { background-color: #0278E7; }
@@ -1608,32 +1224,28 @@ onMounted(() => {
 /* 详情滚动区 */
 .tab-content { flex: 1; min-height: 0; overflow-y: auto; padding: 20px; }
 
-/* ========== 表单及详情样式 ========== */
+/* 给内容主体加一层半透明白卡片，保证字清晰 */
+.content-card {
+  // background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(50, 80, 110, 0.05);
+}
+
+/* ========== 表单样式 ========== */
 .basic-info { padding-top: 4px; }
 .section-title { display: flex; align-items: center; font-size: 15px; font-weight: 600; color: #0B1C2C; margin-bottom: 24px; }
 .blue-bar { width: 3px; height: 14px; background-color: #0278E7; margin-right: 8px; border-radius: 2px; }
-
-/* 技术能力筛选栏 */
-.tech-filter-bar { display: flex; align-items: center; margin-bottom: 16px; }
-.filter-label { font-size: 14px; font-weight: 500; color: #333; margin-right: 12px; }
-
 :deep(.el-form-item__label) { font-size: 14px; color: #667383; }
-
-/* 只读输入框样式 */
 .readonly-input { width: 100%; max-width: 800px; }
-:deep(.readonly-input .el-input__wrapper), :deep(.readonly-input .el-textarea__inner) {
-  background-color: #F8FAFC !important; box-shadow: none !important; border-radius: 6px; color: #0B1C2C; font-size: 14px; padding: 4px 12px;
-}
+:deep(.readonly-input .el-input__wrapper), :deep(.readonly-input .el-textarea__inner) { background-color: #F8FAFC !important; box-shadow: none !important; border-radius: 6px; color: #0B1C2C; font-size: 14px; padding: 4px 12px; }
 :deep(.readonly-input .el-textarea__inner) { padding: 8px 12px; line-height: 1.6; }
-
-/* 编辑输入框样式 */
 .editing-input { width: 100%; max-width: 800px; }
 
-/* 带单位的输入框 */
 .input-with-unit { display: flex; align-items: center; }
 .unit { margin-left: 12px; font-size: 14px; color: #667383; }
 
-/* 资产负债情况框 */
 .asset-box {
   border: 1px solid #E2E9F0; border-radius: 8px; padding: 16px; display: flex; flex-direction: column;
   gap: 16px; width: 100%; max-width: 400px; background: #FAFBFC;
@@ -1641,69 +1253,35 @@ onMounted(() => {
 .asset-row { display: flex; align-items: center; }
 .asset-label { width: 80px; font-size: 14px; color: #667383; text-align: right; margin-right: 16px; }
 
-/* 营业执照 */
-.upload-tip {
-  font-size: 14px;
-  color: #8D9AAF;
-  margin: 12px 0;
-}
-.license-preview {
-  margin-top: 12px;
-}
+/* ========== 附件横向滚动 ========== */
+.list-attachments { display: flex; flex-wrap: nowrap; overflow-x: auto; align-items: center; padding-bottom: 4px; }
+.list-attachments::-webkit-scrollbar { height: 6px; }
+.list-attachments::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 3px; }
+.list-attachments::-webkit-scrollbar-track { background: transparent; }
 
-/* 接口数据表格与编辑弹窗 */
-.data-panel { padding-top: 4px; }
-.data-panel :deep(.el-table) { width: 100%; border-radius: 8px; }
+.tech-filter-bar { display: flex; align-items: center; margin-bottom: 16px; }
+.filter-label { font-size: 14px; font-weight: 500; color: #333; margin-right: 12px; }
 
-/* ========== 附件列表横向滚动 ========== */
-.list-attachments {
-  display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  align-items: center;
-  padding-bottom: 4px;
-  
-  &::-webkit-scrollbar { height: 6px; }
-  &::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 3px; }
-  &::-webkit-scrollbar-track { background: transparent; }
+.upload-tip { font-size: 14px; color: #8D9AAF; margin: 12px 0; }
+.license-preview { margin-top: 12px; }
+
+/* ========== 抽屉样式 ========== */
+.custom-drawer {
+  :deep(.el-drawer) { height: 100%; }
+  :deep(.el-drawer__body) { padding: 0; display: flex; flex-direction: column; height: calc(100% - 55px); }
+  .drawer-body { flex: 1; overflow-y: auto; padding: 20px; }
+  .drawer-footer { padding: 16px 20px; border-top: 1px solid #E2E9F0; text-align: right; background: #fff; }
 }
 
-/* 编辑抽屉内上传组件横向滚动 */
-.upload-scroll-container {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 6px;
-  
-  &::-webkit-scrollbar { height: 6px; }
-  &::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 3px; }
-}
+.upload-scroll-container { width: 100%; overflow-x: auto; overflow-y: hidden; padding-bottom: 6px; }
+.upload-scroll-container::-webkit-scrollbar { height: 6px; }
+.upload-scroll-container::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 3px; }
 
-/* 覆盖 element-plus 的上传列表样式，强制不换行 */
 .perf-uploader {
-  :deep(.el-upload-list--picture-card) {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow: visible;
-  }
-  :deep(.el-upload--picture-card) {
-    width: 60px;
-    height: 60px;
-    line-height: 60px;
-    flex-shrink: 0;
-    margin-right: 8px;
-    border: none !important;
-    background-color: transparent !important;
-  }
-  :deep(.el-upload-list--picture-card .el-upload-list__item) {
-    width: 60px;
-    height: 60px;
-    margin: 0 8px 0 0;
-    flex-shrink: 0;
-  }
-  :deep(.el-upload-list--picture-card .el-upload-list__item-thumbnail) {
-    object-fit: cover;
-  }
+  :deep(.el-upload-list--picture-card) { display: flex; flex-wrap: nowrap; overflow: visible; }
+  :deep(.el-upload--picture-card) { width: 60px; height: 60px; line-height: 60px; flex-shrink: 0; margin-right: 8px; border: none !important; background-color: transparent !important; }
+  :deep(.el-upload-list--picture-card .el-upload-list__item) { width: 60px; height: 60px; margin: 0 8px 0 0; flex-shrink: 0; }
+  :deep(.el-upload-list--picture-card .el-upload-list__item-thumbnail) { object-fit: cover; }
 }
 
 .add-row-btn {
@@ -1711,184 +1289,36 @@ onMounted(() => {
   &:hover { background-color: #F8FAFC; }
 }
 
-/* ========== 统一抽屉样式 ========== */
-.custom-drawer {
-  :deep(.el-drawer) {
-    height: 100%;
-  }
-  :deep(.el-drawer__body) {
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    height: calc(100% - 55px); /* 减去 header 高度 */
-  }
-  .drawer-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px;
-  }
-  .drawer-footer {
-    padding: 16px 20px;
-    border-top: 1px solid #E2E9F0;
-    text-align: right;
-    background: #fff;
-  }
-}
-
-/* ========== 无感输入框及表格样式重写 ========== */
+/* ========== 无感输入框及表格重写 ========== */
 .edit-table {
-  /* 1. 极致压缩单元格高度 */
-  :deep(.el-table__cell) {
-    padding: 4px 0 !important; 
-  }
-  :deep(.cell) {
-    padding: 0 8px !important;
-    line-height: 32px;
-  }
-
-  /* 2. 彻底干掉所有输入框的边框和背景，像文本一样 */
-  :deep(.el-input__wrapper),
-  :deep(.el-textarea__inner),
-  :deep(.el-date-editor .el-input__wrapper) {
-    box-shadow: none !important;
-    background-color: transparent !important;
-    padding: 0 2px !important;
-    border-radius: 0;
-  }
-
-  /* 3. 悬浮时给一个极其轻微的灰色背景，提示这里可以点击 */
-  :deep(.el-input__wrapper:hover),
-  :deep(.el-textarea__inner:hover) {
-    background-color: #f5f7fa !important;
-  }
-
-  /* 4. 聚焦时去掉那圈丑陋的蓝框，只留光标 */
-  :deep(.el-input__wrapper.is-focus),
-  :deep(.el-textarea__inner:focus) {
-    background-color: #fff !important;
-    box-shadow: none !important; 
-  }
-
-  /* 5. 隐藏数字输入框右侧的加减小按钮，更清爽 */
-  :deep(.el-input-number .el-input__inner) {
-    text-align: center !important; /* 申报情况里年份/数字居中好看 */
-  }
-  :deep(.el-input-number__increase),
-  :deep(.el-input-number__decrease) {
-    display: none !important;
-  }
-
-  /* 6. 缩小上传图片的按钮和预览图尺寸（32x32） */
-  :deep(.el-upload--picture-card) {
-    width: 32px !important;
-    height: 32px !important;
-    line-height: 32px !important;
-    margin: 0 !important;
-    border-radius: 2px;
-    border: 1px dashed #dcdfe6;
-    background-color: transparent;
-  }
-  :deep(.el-upload--picture-card:hover) {
-    border-color: #0278E7;
-    background-color: #f5f7fa;
-  }
-  
-  :deep(.el-upload-list--picture-card .el-upload-list__item) {
-    width: 32px !important;
-    height: 32px !important;
-    margin: 0 8px 0 0 !important;
-    border-radius: 2px;
-  }
-  
-  /* 遮罩层里面的小图标也调小 */
-  :deep(.el-upload-list__item-actions) {
-    font-size: 12px;
-  }
-  
-  /* 取消虚线框的悬浮间距 */
-  :deep(.upload-scroll-container) {
-    padding-bottom: 0;
-  }
+  :deep(.el-table__cell) { padding: 4px 0 !important; }
+  :deep(.cell) { padding: 0 8px !important; line-height: 32px; }
+  :deep(.el-input__wrapper), :deep(.el-textarea__inner), :deep(.el-date-editor .el-input__wrapper) { box-shadow: none !important; background-color: transparent !important; padding: 0 2px !important; border-radius: 0; }
+  :deep(.el-input__wrapper:hover), :deep(.el-textarea__inner:hover) { background-color: #f5f7fa !important; }
+  :deep(.el-input__wrapper.is-focus), :deep(.el-textarea__inner:focus) { background-color: #fff !important; box-shadow: none !important; }
+  :deep(.el-input-number .el-input__inner) { text-align: center !important; }
+  :deep(.el-input-number__increase), :deep(.el-input-number__decrease) { display: none !important; }
+  :deep(.el-upload--picture-card) { width: 32px !important; height: 32px !important; line-height: 32px !important; margin: 0 !important; border-radius: 2px; border: 1px dashed #dcdfe6; background-color: transparent; }
+  :deep(.el-upload--picture-card:hover) { border-color: #0278E7; background-color: #f5f7fa; }
+  :deep(.el-upload-list--picture-card .el-upload-list__item) { width: 32px !important; height: 32px !important; margin: 0 8px 0 0 !important; border-radius: 2px; }
+  :deep(.el-upload-list__item-actions) { font-size: 12px; }
+  :deep(.upload-scroll-container) { padding-bottom: 0; }
 }
 
-/* ========== 财务审计抽屉表单样式 ========== */
-.finance-drawer-body {
-  padding: 30px 40px 20px 20px;
-}
-.finance-form {
-  :deep(.el-form-item__label) {
-    font-weight: 500;
-    color: #0B1C2C;
-  }
-}
-.finance-upload-box {
-  width: 100%;
-}
-.upload-btn-wrap {
-  margin-bottom: 8px;
-}
+/* ========== 财务审计表单 ========== */
+.finance-drawer-body { padding: 30px 40px 20px 20px; }
+.finance-form :deep(.el-form-item__label) { font-weight: 500; color: #0B1C2C; }
+.finance-upload-box { width: 100%; }
+.upload-btn-wrap { margin-bottom: 8px; }
 .uploaded-file {
-  display: flex;
-  align-items: center;
-  margin-top: 12px;
-  padding: 8px 12px;
-  background-color: #F8FAFC;
-  border-radius: 4px;
-  border: 1px solid #E2E9F0;
-  
-  .file-name {
-    font-size: 14px;
-    color: #0278E7;
-    cursor: pointer;
-    text-decoration: underline;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-    
-    &:hover {
-      color: #0267C7;
-    }
-  }
+  display: flex; align-items: center; margin-top: 12px; padding: 8px 12px; background-color: #F8FAFC; border-radius: 4px; border: 1px solid #E2E9F0;
+  .file-name { font-size: 14px; color: #0278E7; cursor: pointer; text-decoration: underline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; &:hover { color: #0267C7; } }
 }
 
-/* ========== 申报情况子 Tab 样式 ========== */
-.sub-tabs {
-  display: flex;
-  gap: 32px;
-  border-bottom: 1px solid #E2E9F0;
-  margin-bottom: 20px;
-}
+/* ========== 申报情况 ========== */
+.sub-tabs { display: flex; gap: 32px; border-bottom: 1px solid #E2E9F0; margin-bottom: 20px; }
 .sub-tab-item {
-  font-size: 14px;
-  color: #667383;
-  padding: 8px 0;
-  cursor: pointer;
-  position: relative;
-  
-  &.active {
-    color: #0278E7;
-    font-weight: 500;
-    
-    &::after {
-      content: '';
-      position: absolute;
-      bottom: -1px;
-      left: 0;
-      width: 100%;
-      height: 2px;
-      background-color: #0278E7;
-    }
-  }
-}
-
-/* 申报表格专用修正，处理多级表头 */
-.decl-table {
-  width: 100% !important;
-  :deep(th.el-table__cell) {
-    background-color: #F8FAFC !important;
-    color: #333;
-    font-weight: 600;
-  }
+  font-size: 14px; color: #667383; padding: 8px 0; cursor: pointer; position: relative;
+  &.active { color: #0278E7; font-weight: 500; &::after { content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 2px; background-color: #0278E7; } }
 }
 </style>
