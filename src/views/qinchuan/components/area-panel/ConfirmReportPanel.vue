@@ -767,6 +767,13 @@ onUnmounted(() => {
 .table-wrapper { margin-top: 12px; border-radius: 4px; overflow-x: auto; }
 .custom-table { width: 100%; }
 .custom-table :deep(th.el-table__cell) { background-color: #f4f6f8; color: #333; font-weight: 500; }
+/* 所有表格的表头文字水平、垂直居中 */
+.confirm-panel :deep(.el-table th.el-table__cell .cell) {
+  text-align: center !important;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
 .table-edit-input :deep(.el-input__wrapper) { box-shadow: none; background: transparent; }
 .table-edit-input :deep(.el-input__inner) { text-align: center; }
 

@@ -123,10 +123,36 @@ export const UNITS = {
 
 export const MODULE_CONFIG = {
   '通用': [
-    { title: '', cols: 2, fields: ['${project_name}', '${construct_project_name}', '${design_unit_name}', '${design_qualification_level}'] },
-    { title: '', cols: 4, fields: ['${project_city_name}', '${district_site_belongs}', '${project_township_name}', '${project_construction_site}'] },
-    { title: '', cols: 3, fields: ['${project_landform_type}', '${project_horst_type}', '${project_field_elevation_range}'] }
-  ],
+  {
+    title: '',
+    cols: 2,
+    fields: [
+      '${project_name}',
+      '${construct_project_name}',
+      '${design_unit_name}',
+      '${design_qualification_level}'
+    ]
+  },
+  {
+    title: '',
+    cols: 2,
+    fields: [
+      '${project_city_name}',
+      '${district_site_belongs}',
+      '${project_township_name}',
+      '${project_construction_site}'
+    ]
+  },
+  {
+    title: '',
+    cols: 2,
+    fields: [
+      '${project_landform_type}',
+      '${project_horst_type}',
+      '${project_field_elevation_range}'
+    ]
+  }
+],
   '资源': [
     { title: '基础参数', cols: 3, fields: ['${windPowerLevel}', '${50_year_maximum_wind_speed}', '${wind_farm_type}'] },
 {
@@ -290,7 +316,7 @@ export const MODULE_CONFIG = {
       '${labor_wages_benefits}', '${insurance_cost}', '${other_expenses}'
     ]},
     { title: '', type: 'financial', fieldKeys: ['${material_cost}', '${repair_cost}'] },
-    { title: '', cols: 3, fields: ['${fixed_asset_original_value}'] },
+    { title: '总成本费用估算表参数', cols: 3, fields: ['${fixed_asset_original_value}'] },
     { title: '利润与利润分配表参数', cols: 3, fields: ['${income_tax}'] },
     { title: '', type: 'financial', fieldKeys: ['${net_electricity_price_excluding_value_added_tax}', '${net_electricity_price_including_value_added_tax}'] }
   ]
