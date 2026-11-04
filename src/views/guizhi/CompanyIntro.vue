@@ -42,6 +42,22 @@
               <el-button plain>导入能力</el-button>
               <el-button type="primary" @click="handleAddTech">添加能力</el-button>
             </template>
+
+            <!-- 财务审计 Tab 按钮 -->
+            <template v-else-if="activeTab === 'finance'">
+              <el-button type="primary" @click="handleAddFinance">添加财务审计</el-button>
+            </template>
+
+            <!-- 申报情况 Tab 按钮 -->
+            <template v-else-if="activeTab === 'apply'">
+              <template v-if="!isDeclEditing">
+                <el-button type="primary" @click="handleStartEditDecl">编辑</el-button>
+              </template>
+              <template v-else>
+                <el-button @click="handleCancelEditDecl">取消</el-button>
+                <el-button type="primary" :loading="declSaveLoading" @click="handleSaveDecl">保存</el-button>
+              </template>
+            </template>
           </div>
         </div>
 
@@ -290,22 +306,124 @@
                 </el-table>
               </div>
 
-              <!-- ==================== 财务审计 / 申报情况 ==================== -->
-              <div v-else class="data-panel">
+              <!-- ==================== 财务审计 ==================== -->
+              <div v-else-if="activeTab === 'finance'" class="data-panel">
                 <div class="section-title">
-                  <span class="blue-bar"></span>
-                  {{ tabTitleMap[activeTab] }}
+                  <span class="blue-bar"></span>财务审计
                 </div>
-                <el-table v-loading="fileLoading" :data="fileList" border stripe empty-text="暂无文件数据">
-                  <el-table-column prop="fileName" label="文件名称" min-width="220" show-overflow-tooltip />
-                  <el-table-column prop="fileSuffix" label="文件格式" width="100" />
-                  <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip />
-                  <el-table-column label="操作" width="100" fixed="right">
+
+                <el-table v-loading="financeLoading" :data="financeList" border stripe empty-text="暂无财务审计数据">
+                  <el-table-column type="index" label="序号" width="60" align="center" />
+                  <el-table-column prop="financialYear" label="财务年份" min-width="120" />
+                  <el-table-column prop="auditFirm" label="审计公司" min-width="200" show-overflow-tooltip />
+                  <el-table-column prop="auditBatchNo" label="审计批号" min-width="200" show-overflow-tooltip />
+                  <el-table-column label="审计材料" min-width="250">
                     <template #default="{ row }">
-                      <el-button link type="primary" @click="viewFile(row)">查看</el-button>
+                      <div v-if="row.fileList && row.fileList.length > 0">
+                        <el-button link type="primary" @click="previewFinanceFile(row.fileList[0])">
+                          {{ row.fileList[0].fileName }}
+                        </el-button>
+                      </div>
+                      <span v-else class="text-gray-400">-</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="120" fixed="right" align="center">
+                    <template #default="{ row }">
+                      <el-button link type="primary" @click="handleEditFinance(row)">编辑</el-button>
+                      <el-button link type="danger" @click="handleDeleteFinance(row)">删除</el-button>
                     </template>
                   </el-table-column>
                 </el-table>
+              </div>
+
+              <!-- ==================== 申报情况 ==================== -->
+              <div v-else-if="activeTab === 'apply'" class="data-panel">
+                <!-- 子 Tab 切换 -->
+                <div class="sub-tabs">
+                  <div class="sub-tab-item" :class="{ active: declLevel === 'province' }" @click="switchDeclLevel('province')">
+                    在陕西省申报情况
+                  </div>
+                  <div class="sub-tab-item" :class="{ active: declLevel === 'city' }" @click="switchDeclLevel('city')">
+                    在所属市申报情况
+                  </div>
+                </div>
+
+                <el-table 
+                  v-loading="declLoading" 
+                  :data="isDeclEditing ? editDeclList : declList" 
+                  border 
+                  class="decl-table"
+                  :class="{ 'edit-table': isDeclEditing }"
+                  size="small"
+                  style="width: 100%"
+                >
+                  <el-table-column prop="declarationYear" label="年份" min-width="120" align="center">
+                    <template #default="{ row }">
+                      <span v-if="!isDeclEditing">{{ row.declarationYear }}</span>
+                      <el-input-number 
+                        v-else 
+                        v-model="row.declarationYear" 
+                        :controls="false" 
+                        :min="2021"
+                        placeholder="年份" 
+                        class="no-border-input" 
+                        style="width: 100%" 
+                      />
+                    </template>
+                  </el-table-column>
+                  
+                  <el-table-column label="取得指标规模/万千瓦" align="center">
+                    <el-table-column label="风电" min-width="120" align="center">
+                      <template #default="{ row }">
+                        <span v-if="!isDeclEditing">{{ row.windPowerQuota ?? '-' }}</span>
+                        <el-input v-else v-model="row.windPowerQuota" placeholder="请输入" class="no-border-input" />
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="光伏" min-width="120" align="center">
+                      <template #default="{ row }">
+                        <span v-if="!isDeclEditing">{{ row.photovoltaicQuota ?? '-' }}</span>
+                        <el-input v-else v-model="row.photovoltaicQuota" placeholder="请输入" class="no-border-input" />
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="基地项目" min-width="120" align="center">
+                      <template #default="{ row }">
+                        <span v-if="!isDeclEditing">{{ row.baseProjectQuota ?? '-' }}</span>
+                        <el-input v-else v-model="row.baseProjectQuota" placeholder="请输入" class="no-border-input" />
+                      </template>
+                    </el-table-column>
+                  </el-table-column>
+                  
+                  <el-table-column label="并网规模/万千瓦" align="center">
+                    <el-table-column label="风电" min-width="120" align="center">
+                      <template #default="{ row }">
+                        <span v-if="!isDeclEditing">{{ row.windPowerGridConnected ?? '-' }}</span>
+                        <el-input v-else v-model="row.windPowerGridConnected" placeholder="请输入" class="no-border-input" />
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="光伏" min-width="120" align="center">
+                      <template #default="{ row }">
+                        <span v-if="!isDeclEditing">{{ row.photovoltaicGridConnected ?? '-' }}</span>
+                        <el-input v-else v-model="row.photovoltaicGridConnected" placeholder="请输入" class="no-border-input" />
+                      </template>
+                    </el-table-column>
+                  </el-table-column>
+
+                  <!-- 编辑模式下显示操作列 -->
+                  <el-table-column v-if="isDeclEditing" label="操作" width="60" align="center" fixed="right">
+                    <template #default="{ $index }">
+                      <el-button link type="danger" @click="handleRemoveDeclRow($index)">
+                        <el-icon style="font-size: 18px;"><Remove /></el-icon>
+                      </el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+
+                <!-- 编辑模式下的添加行按钮 -->
+                <div v-if="isDeclEditing" class="add-row-btn" style="border: none; text-align: left; margin-top: 16px;">
+                  <el-button link type="primary" @click="handleAddDeclRow">
+                    + 添加数据
+                  </el-button>
+                </div>
               </div>
             </div>
           </div>
@@ -322,7 +440,7 @@
         class="custom-drawer"
       >
         <div class="drawer-body">
-          <el-table :data="editPerfList" border max-height="calc(100vh - 200px)" class="edit-table">
+          <el-table :data="editPerfList" border max-height="calc(100vh - 200px)" class="edit-table" size="small">
             <el-table-column label="项目名称 *" min-width="160">
               <template #default="{ row }">
                 <el-input v-model="row.projectName" placeholder="请输入名称" class="no-border-input" />
@@ -407,7 +525,7 @@
         class="custom-drawer"
       >
         <div class="drawer-body">
-          <el-table :data="editTechList" border max-height="calc(100vh - 200px)" class="edit-table">
+          <el-table :data="editTechList" border max-height="calc(100vh - 200px)" class="edit-table" size="small">
             <el-table-column label="项目名称*" min-width="160">
               <template #default="{ row }">
                 <el-input v-model="row.projectName" placeholder="请输入" class="no-border-input" />
@@ -489,6 +607,60 @@
         </template>
       </el-drawer>
 
+      <!-- ==================== 财务审计 添加/编辑 抽屉 ==================== -->
+      <el-drawer
+        v-model="financeDrawerVisible"
+        :title="isFinanceEditing ? '编辑审计' : '添加审计'"
+        direction="rtl"
+        size="400px"
+        destroy-on-close
+        class="custom-drawer"
+      >
+        <div class="drawer-body finance-drawer-body">
+          <el-form :model="editFinanceForm" label-width="100px" label-position="left" class="finance-form">
+            <el-form-item label="财务年份" required>
+              <el-date-picker
+                v-model="editFinanceForm.financialYear"
+                type="year"
+                placeholder="请选择"
+                value-format="YYYY"
+                style="width: 100%"
+              />
+            </el-form-item>
+            <el-form-item label="审计公司">
+              <el-input v-model="editFinanceForm.auditFirm" placeholder="请输入" />
+            </el-form-item>
+            <el-form-item label="审计批号">
+              <el-input v-model="editFinanceForm.auditBatchNo" placeholder="请输入" />
+            </el-form-item>
+            
+            <el-form-item label="审计材料">
+              <div class="finance-upload-box">
+                <div class="upload-btn-wrap">
+                  <el-button type="primary" plain @click="triggerFinanceUpload" :loading="financeUploading">上传数据</el-button>
+                  <input type="file" ref="financeInputRef" style="display: none;" accept=".pdf" @change="handleFinanceFileChange" />
+                </div>
+                <div class="upload-tip">说明：支持 pdf 格式文件，最多1个文件，最大100M</div>
+                
+                <!-- 已上传文件展示 -->
+                <div v-if="editFinanceForm.fileList && editFinanceForm.fileList.length > 0" class="uploaded-file">
+                  <el-icon color="#F56C6C" style="margin-right: 4px;"><Document /></el-icon>
+                  <span class="file-name" @click="previewFinanceFile(editFinanceForm.fileList[0])">{{ editFinanceForm.fileList[0].fileName }}</span>
+                  <el-button link type="danger" @click="editFinanceForm.fileList = []" style="margin-left: 12px;">删除</el-button>
+                </div>
+              </div>
+            </el-form-item>
+          </el-form>
+        </div>
+
+        <template #footer>
+          <div class="drawer-footer">
+            <el-button @click="financeDrawerVisible = false">取消</el-button>
+            <el-button type="primary" :loading="financeSaveLoading" @click="handleSaveFinance">保存</el-button>
+          </div>
+        </template>
+      </el-drawer>
+
     </div>
   </div>
 </template>
@@ -537,7 +709,6 @@ const licenseInputRef = ref(null)
 const licenseUploading = ref(false)
 
 const createEmptyForm = () => ({
-  id: null, 
   companyId: COMPANY_ID, 
   enterpriseName: '', 
   unifiedSocialCreditCode: '', 
@@ -562,12 +733,6 @@ const createEmptyForm = () => ({
 })
 const editForm = reactive(createEmptyForm())
 
-// --- 文件通用 ---
-const fileLoading = ref(false)
-const fileList = ref([])
-const tabTitleMap = { tech: '技术能力', finance: '财务审计', apply: '申报情况' }
-const fileCategoryMap = { tech: 'TECHNICAL_CAPABILITY', finance: 'FINANCIAL_AUDIT', apply: 'DECLARATION_STATUS' }
-
 // --- 项目业绩 ---
 const performanceLoading = ref(false)
 const performanceList = ref([])
@@ -587,6 +752,34 @@ const isTechBatchAdd = ref(false)
 const editTechList = ref([])
 const editingTechId = ref(null)
 
+// --- 财务审计 ---
+const financeLoading = ref(false)
+const financeList = ref([])
+const financeDrawerVisible = ref(false)
+const financeSaveLoading = ref(false)
+const isFinanceEditing = ref(false)
+const financeUploading = ref(false)
+const financeInputRef = ref(null)
+const editingFinanceId = ref(null)
+
+const createEmptyFinanceForm = () => ({
+  id: null,
+  companyId: COMPANY_ID,
+  financialYear: '',
+  auditFirm: '',
+  auditBatchNo: '',
+  fileList: []
+})
+const editFinanceForm = reactive(createEmptyFinanceForm())
+
+// --- 申报情况 ---
+const declLevel = ref('province') // 'province' | 'city'
+const declLoading = ref(false)
+const declList = ref([])
+const isDeclEditing = ref(false)
+const declSaveLoading = ref(false)
+const editDeclList = ref([])
+const originalDeclList = ref([])
 
 // ================= 公共方法 =================
 function unwrapResponse(response) {
@@ -651,6 +844,7 @@ async function getCompanyInfo(showMessage = false) {
 function handleNodeClick(data) {
   currentNodeId.value = data.id
   isBasicEditing.value = false
+  isDeclEditing.value = false
   getCompanyInfo(true)
   if (activeTab.value !== 'basic') handleTabChange(activeTab.value)
 }
@@ -736,15 +930,13 @@ async function getPerformanceList() {
     
     const promises = list.map(async (item) => {
       if (item.fileList && item.fileList.length > 0) {
-        const filePromises = item.fileList.map(async (file) => {
+        await Promise.all(item.fileList.map(async (file) => {
           if (file.filePath && !file.filePath.startsWith('http')) {
             try { file.previewUrl = await obsUpload.getFileUrl(file.filePath) } catch (e) { file.previewUrl = '' }
           } else {
             file.previewUrl = file.filePath || ''
           }
-          return file
-        })
-        await Promise.all(filePromises)
+        }))
       }
       return item
     })
@@ -927,8 +1119,8 @@ async function getTechList() {
 function createEmptyTechRow() {
   return {
     projectName: '', projectType: '', researchUnit: '', 
-    researchTimeRange: [], // 对应截图里的可研时间，提交时拆分为开始结束日期
-    gridConnectionAgreementNo: '', purchaseSalesContractNo: '', // 接口里没有，但截图有，保留前端展示
+    researchTimeRange: [], 
+    gridConnectionAgreementNo: '', purchaseSalesContractNo: '', 
     fileList: []
   }
 }
@@ -951,7 +1143,6 @@ function handleEditTech(row) {
     return { name: file.fileName, url: displayUrl, previewUrl: displayUrl, filePath: file.filePath, fileSuffix: file.fileSuffix, status: 'success', uid: file.id || Date.now() + Math.random() }
   })
   
-  // 处理回显的可研时间
   if (row.researchStartDate && row.researchEndDate) {
     clonedRow.researchTimeRange = [row.researchStartDate, row.researchEndDate]
   } else {
@@ -994,8 +1185,6 @@ async function handleSaveTech() {
         fileName: f.fileName || f.name, filePath: f.filePath,
         fileSuffix: f.fileSuffix, fileType: 0
       }))
-      
-      // 接口真实字段映射，接口里没有的如 gridConnectionAgreementNo, purchaseSalesContractNo 就丢弃不传
       return {
         companyId: COMPANY_ID, 
         projectName: row.projectName.trim(), 
@@ -1035,45 +1224,312 @@ async function handleDeleteTech(row) {
   }
 }
 
-// ================= 其他 Tabs 逻辑 =================
-async function getCompanyFiles(tabName) {
-  const fileCategoryCode = fileCategoryMap[tabName]
-  if (!fileCategoryCode) return
-  fileLoading.value = true
+// ================= 财务审计逻辑 =================
+async function getFinanceList() {
+  financeLoading.value = true
   try {
-    const response = await api.getCompanyFileList({ companyId: COMPANY_ID, fileCategoryCode })
+    const response = await api.getFinancialAuditList(COMPANY_ID)
     const data = unwrapResponse(response)
-    fileList.value = Array.isArray(data) ? data : (data?.records || data?.list || [])
+    let list = Array.isArray(data) ? data : (data?.records || data?.list || [])
+    
+    const promises = list.map(async (item) => {
+      if (item.fileList && item.fileList.length > 0) {
+        await Promise.all(item.fileList.map(async (file) => {
+          if (file.filePath && !file.filePath.startsWith('http')) {
+            try { file.previewUrl = await obsUpload.getFileUrl(file.filePath) } catch (e) { file.previewUrl = '' }
+          } else {
+            file.previewUrl = file.filePath || ''
+          }
+        }))
+      }
+      return item
+    })
+    await Promise.all(promises)
+    financeList.value = list
   } catch (error) {
-    fileList.value = []
-    ElMessage.error(error.message || `获取${tabTitleMap[tabName]}文件失败`)
+    financeList.value = []
+    ElMessage.error(error.message || '获取财务审计失败')
   } finally {
-    fileLoading.value = false
+    financeLoading.value = false
   }
 }
 
+function handleAddFinance() {
+  isFinanceEditing.value = false
+  editingFinanceId.value = null
+  Object.assign(editFinanceForm, createEmptyFinanceForm())
+  financeDrawerVisible.value = true
+}
+
+function handleEditFinance(row) {
+  isFinanceEditing.value = true
+  editingFinanceId.value = row.id
+  
+  const clonedRow = JSON.parse(JSON.stringify(row))
+  clonedRow.financialYear = clonedRow.financialYear ? String(clonedRow.financialYear) : ''
+  
+  if (clonedRow.fileList && clonedRow.fileList.length > 0) {
+    clonedRow.fileList = [{
+      fileName: clonedRow.fileList[0].fileName,
+      filePath: clonedRow.fileList[0].filePath,
+      fileSuffix: clonedRow.fileList[0].fileSuffix || '.pdf',
+      previewUrl: clonedRow.fileList[0].previewUrl
+    }]
+  } else {
+    clonedRow.fileList = []
+  }
+  
+  Object.assign(editFinanceForm, clonedRow)
+  financeDrawerVisible.value = true
+}
+
+function triggerFinanceUpload() {
+  financeInputRef.value.click()
+}
+
+async function handleFinanceFileChange(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    ElMessage.warning('仅支持 pdf 格式文件')
+    e.target.value = ''
+    return
+  }
+  if (file.size / 1024 / 1024 > 100) {
+    ElMessage.warning('文件大小不能超过 100M')
+    e.target.value = ''
+    return
+  }
+  
+  financeUploading.value = true
+  try {
+    const uploadResult = await obsUpload.uploadFile(file)
+    const realPath = uploadResult.obsPath
+    editFinanceForm.fileList = [{
+      companyId: COMPANY_ID,
+      fileCategoryCode: 'FINANCIAL_AUDIT',
+      fileName: file.name,
+      filePath: realPath,
+      fileSuffix: '.pdf',
+      fileType: 0
+    }]
+  } catch (error) {
+    ElMessage.error(error.message || '上传失败')
+  } finally {
+    financeUploading.value = false
+    e.target.value = ''
+  }
+}
+
+async function handleSaveFinance() {
+  if (!editFinanceForm.financialYear) return ElMessage.warning('请选择财务年份')
+  
+  financeSaveLoading.value = true
+  try {
+    const payload = JSON.parse(JSON.stringify(editFinanceForm))
+    payload.financialYear = parseInt(payload.financialYear, 10)
+    
+    if (isFinanceEditing.value) {
+      payload.id = editingFinanceId.value
+      await api.updateFinancialAudit(payload)
+    } else {
+      await api.createFinancialAudit(payload)
+    }
+    
+    ElMessage.success('保存成功')
+    financeDrawerVisible.value = false
+    getFinanceList()
+  } catch (error) {
+    ElMessage.error(error.message || '保存失败')
+  } finally {
+    financeSaveLoading.value = false
+  }
+}
+
+async function handleDeleteFinance(row) {
+  try {
+    await ElMessageBox.confirm(`确定删除该财务审计记录吗？`, '提示', { type: 'warning' })
+    await api.deleteFinancialAudit(row.id)
+    ElMessage.success('删除成功')
+    getFinanceList()
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error(error.message || '删除失败')
+  }
+}
+
+async function previewFinanceFile(file) {
+  if (file.previewUrl) {
+    window.open(file.previewUrl, '_blank')
+  } else if (file.filePath) {
+    let finalUrl = file.filePath
+    if (!finalUrl.startsWith('http')) {
+      finalUrl = await obsUpload.getFileUrl(file.filePath)
+    }
+    if (finalUrl) window.open(finalUrl, '_blank')
+    else ElMessage.error('获取文件预览地址失败')
+  }
+}
+
+// ================= 申报情况逻辑 =================
+async function getDeclList() {
+  declLoading.value = true
+  try {
+    const response = await api.getDeclarationListByLevel({
+      companyId: COMPANY_ID,
+      level: declLevel.value
+    })
+    const data = unwrapResponse(response)
+    declList.value = Array.isArray(data) ? data : (data?.records || data?.list || [])
+  } catch (error) {
+    declList.value = []
+    ElMessage.error(error.message || '获取申报情况失败')
+  } finally {
+    declLoading.value = false
+  }
+}
+
+function switchDeclLevel(level) {
+  if (declLevel.value === level || isDeclEditing.value) return
+  declLevel.value = level
+  getDeclList()
+}
+
+function handleStartEditDecl() {
+  originalDeclList.value = JSON.parse(JSON.stringify(declList.value))
+  // 把 null / undefined 转换为空字符串方便输入
+  editDeclList.value = JSON.parse(JSON.stringify(declList.value)).map(item => ({
+    ...item,
+    windPowerQuota: item.windPowerQuota ?? '',
+    photovoltaicQuota: item.photovoltaicQuota ?? '',
+    baseProjectQuota: item.baseProjectQuota ?? '',
+    windPowerGridConnected: item.windPowerGridConnected ?? '',
+    photovoltaicGridConnected: item.photovoltaicGridConnected ?? ''
+  }))
+  isDeclEditing.value = true
+}
+
+function handleCancelEditDecl() {
+  editDeclList.value = []
+  isDeclEditing.value = false
+}
+
+function handleAddDeclRow() {
+  let newYear = 2021
+  if (editDeclList.value.length > 0) {
+    // 获取当前最大年份，新增行的年份 = 最大年份 + 1
+    const maxYear = Math.max(...editDeclList.value.map(r => Number(r.declarationYear) || 0))
+    newYear = Math.max(2021, maxYear + 1)
+  }
+  
+  editDeclList.value.push({
+    id: null,
+    companyId: COMPANY_ID,
+    declarationLevel: declLevel.value,
+    declarationYear: newYear,
+    windPowerQuota: '',
+    photovoltaicQuota: '',
+    baseProjectQuota: '',
+    windPowerGridConnected: '',
+    photovoltaicGridConnected: ''
+  })
+}
+
+function handleRemoveDeclRow(index) {
+  editDeclList.value.splice(index, 1)
+}
+
+async function handleSaveDecl() {
+  // 校验并清理数据
+  const validRows = []
+  const fields = ['windPowerQuota', 'photovoltaicQuota', 'baseProjectQuota', 'windPowerGridConnected', 'photovoltaicGridConnected']
+  
+  for (let i = 0; i < editDeclList.value.length; i++) {
+    const row = editDeclList.value[i]
+    
+    // 判断是否全为空
+    const isAllEmpty = fields.every(f => row[f] === '' || row[f] === null || row[f] === undefined)
+    if (isAllEmpty) {
+      continue // 全为空则直接跳过（自动删除）
+    }
+    
+    if (!row.declarationYear || row.declarationYear < 2021) {
+      return ElMessage.warning(`第 ${i + 1} 行：年份不能为空且不能小于 2021 年`)
+    }
+
+    // 校验必填、大于等于0、最多3位小数
+    const values = []
+    for (const f of fields) {
+      const val = row[f]
+      if (val === '' || val === null || val === undefined) {
+        return ElMessage.warning(`第 ${i + 1} 行：填写了任意一项后，所有项必填`)
+      }
+      const num = Number(val)
+      if (isNaN(num) || num < 0) {
+        return ElMessage.warning(`第 ${i + 1} 行：数值必须大于等于0`)
+      }
+      if (String(val).split('.')[1]?.length > 3) {
+        return ElMessage.warning(`第 ${i + 1} 行：小数位数不能超过3位`)
+      }
+      values.push(num)
+    }
+    
+    // 至少有一个大于0
+    if (!values.some(v => v > 0)) {
+      return ElMessage.warning(`第 ${i + 1} 行：各项数值不能全为0，至少有一个大于0`)
+    }
+
+    // 转为数字类型
+    const submitRow = { ...row }
+    fields.forEach(f => submitRow[f] = Number(row[f]))
+    validRows.push(submitRow)
+  }
+
+  declSaveLoading.value = true
+  try {
+    // 比对找出需要删除的行（存在于原始列表中，但在当前列表中找不到或者被清空了）
+    const validIds = validRows.map(r => r.id).filter(id => id)
+    const toDeleteIds = originalDeclList.value
+      .filter(ori => ori.id && !validIds.includes(ori.id))
+      .map(ori => ori.id)
+
+    // 拆分更新和新增
+    const toUpdate = validRows.filter(r => r.id)
+    const toCreate = validRows.filter(r => !r.id)
+
+    // 执行删除
+    if (toDeleteIds.length > 0) {
+      await Promise.all(toDeleteIds.map(id => api.deleteDeclaration(id)))
+    }
+
+    // 执行更新
+    if (toUpdate.length > 0) {
+      await Promise.all(toUpdate.map(row => api.updateDeclaration(row)))
+    }
+
+    // 执行新增
+    if (toCreate.length > 0) {
+      await api.batchCreateDeclaration(toCreate)
+    }
+
+    ElMessage.success('保存成功')
+    isDeclEditing.value = false
+    getDeclList()
+  } catch (error) {
+    ElMessage.error(error.message || '保存失败')
+  } finally {
+    declSaveLoading.value = false
+  }
+}
+
+// ================= 其他 Tabs 逻辑 =================
 function handleTabChange(tabName) {
   if (tabName !== 'basic') isBasicEditing.value = false
+  if (tabName !== 'apply') isDeclEditing.value = false
+  
   if (tabName === 'performance') getPerformanceList()
   else if (tabName === 'tech') getTechList()
-  else if (fileCategoryMap[tabName]) getCompanyFiles(tabName)
-}
-
-async function viewFile(row) {
-  if (!row?.id) return
-  try {
-    const data = unwrapResponse(await api.getCompanyFile(row.id))
-    if (data?.filePath) {
-      let finalUrl = data.filePath
-      if (!finalUrl.startsWith('http')) finalUrl = await obsUpload.getFileUrl(data.filePath)
-      if (finalUrl) window.open(finalUrl, '_blank')
-      else ElMessage.error('获取文件预览地址失败')
-    } else {
-      ElMessage.info(data?.fileName || '已获取文件详情')
-    }
-  } catch (error) {
-    ElMessage.error(error.message || '获取文件详情失败')
-  }
+  else if (tabName === 'finance') getFinanceList()
+  else if (tabName === 'apply') getDeclList()
 }
 
 onMounted(() => {
@@ -1281,44 +1737,158 @@ onMounted(() => {
 
 /* ========== 无感输入框及表格样式重写 ========== */
 .edit-table {
-  /* 隐藏表格内部输入框自带的边框、阴影，让它和表格融为一体 */
-  :deep(.no-border-input .el-input__wrapper),
-  :deep(.no-border-input .el-textarea__inner) {
-    box-shadow: none !important;
-    background-color: transparent !important;
-    padding: 0 4px;
+  /* 1. 极致压缩单元格高度 */
+  :deep(.el-table__cell) {
+    padding: 4px 0 !important; 
   }
-  :deep(.no-border-input .el-input__wrapper.is-focus) {
-    box-shadow: 0 0 0 1px #0278E7 inset !important;
-    background-color: #fff !important;
-    border-radius: 2px;
-  }
-  
-  :deep(.no-border-input .el-input-number) {
-    width: 100%;
+  :deep(.cell) {
+    padding: 0 8px !important;
+    line-height: 32px;
   }
 
-  /* 日期选择器无感化 */
-  :deep(.no-border-date-picker .el-input__wrapper) {
+  /* 2. 彻底干掉所有输入框的边框和背景，像文本一样 */
+  :deep(.el-input__wrapper),
+  :deep(.el-textarea__inner),
+  :deep(.el-date-editor .el-input__wrapper) {
     box-shadow: none !important;
     background-color: transparent !important;
-    padding: 0 4px;
+    padding: 0 2px !important;
+    border-radius: 0;
   }
-  :deep(.no-border-date-picker .el-input__wrapper.is-focus) {
-    box-shadow: 0 0 0 1px #0278E7 inset !important;
+
+  /* 3. 悬浮时给一个极其轻微的灰色背景，提示这里可以点击 */
+  :deep(.el-input__wrapper:hover),
+  :deep(.el-textarea__inner:hover) {
+    background-color: #f5f7fa !important;
+  }
+
+  /* 4. 聚焦时去掉那圈丑陋的蓝框，只留光标 */
+  :deep(.el-input__wrapper.is-focus),
+  :deep(.el-textarea__inner:focus) {
     background-color: #fff !important;
+    box-shadow: none !important; 
+  }
+
+  /* 5. 隐藏数字输入框右侧的加减小按钮，更清爽 */
+  :deep(.el-input-number .el-input__inner) {
+    text-align: center !important; /* 申报情况里年份/数字居中好看 */
+  }
+  :deep(.el-input-number__increase),
+  :deep(.el-input-number__decrease) {
+    display: none !important;
+  }
+
+  /* 6. 缩小上传图片的按钮和预览图尺寸（32x32） */
+  :deep(.el-upload--picture-card) {
+    width: 32px !important;
+    height: 32px !important;
+    line-height: 32px !important;
+    margin: 0 !important;
+    border-radius: 2px;
+    border: 1px dashed #dcdfe6;
+    background-color: transparent;
+  }
+  :deep(.el-upload--picture-card:hover) {
+    border-color: #0278E7;
+    background-color: #f5f7fa;
+  }
+  
+  :deep(.el-upload-list--picture-card .el-upload-list__item) {
+    width: 32px !important;
+    height: 32px !important;
+    margin: 0 8px 0 0 !important;
     border-radius: 2px;
   }
   
-  /* 覆盖 upload 卡片的默认样式，贴合原型图 */
-  :deep(.el-upload--picture-card) {
-    width: 40px !important;
-    height: 40px !important;
-    line-height: 40px !important;
+  /* 遮罩层里面的小图标也调小 */
+  :deep(.el-upload-list__item-actions) {
+    font-size: 12px;
   }
-  :deep(.el-upload-list--picture-card .el-upload-list__item) {
-    width: 40px !important;
-    height: 40px !important;
+  
+  /* 取消虚线框的悬浮间距 */
+  :deep(.upload-scroll-container) {
+    padding-bottom: 0;
+  }
+}
+
+/* ========== 财务审计抽屉表单样式 ========== */
+.finance-drawer-body {
+  padding: 30px 40px 20px 20px;
+}
+.finance-form {
+  :deep(.el-form-item__label) {
+    font-weight: 500;
+    color: #0B1C2C;
+  }
+}
+.finance-upload-box {
+  width: 100%;
+}
+.upload-btn-wrap {
+  margin-bottom: 8px;
+}
+.uploaded-file {
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background-color: #F8FAFC;
+  border-radius: 4px;
+  border: 1px solid #E2E9F0;
+  
+  .file-name {
+    font-size: 14px;
+    color: #0278E7;
+    cursor: pointer;
+    text-decoration: underline;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    
+    &:hover {
+      color: #0267C7;
+    }
+  }
+}
+
+/* ========== 申报情况子 Tab 样式 ========== */
+.sub-tabs {
+  display: flex;
+  gap: 32px;
+  border-bottom: 1px solid #E2E9F0;
+  margin-bottom: 20px;
+}
+.sub-tab-item {
+  font-size: 14px;
+  color: #667383;
+  padding: 8px 0;
+  cursor: pointer;
+  position: relative;
+  
+  &.active {
+    color: #0278E7;
+    font-weight: 500;
+    
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background-color: #0278E7;
+    }
+  }
+}
+
+/* 申报表格专用修正，处理多级表头 */
+.decl-table {
+  width: 100% !important;
+  :deep(th.el-table__cell) {
+    background-color: #F8FAFC !important;
+    color: #333;
+    font-weight: 600;
   }
 }
 </style>

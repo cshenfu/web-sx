@@ -44,7 +44,7 @@
           <!-- 左侧导航区 -->
           <div class="left-nav">
             <!-- 文件分类左侧菜单 -->
-            <div v-if="activeTab === 'file'" class="nav-list">
+            <div v-if="activeTab === 'file'" class="nav-list" v-loading="navLoading">
               <div
                 v-for="item in fileNavList"
                 :key="item.id"
@@ -52,12 +52,12 @@
                 :class="{ active: currentFileNav === item.id }"
                 @click="handleFileNavClick(item.id)"
               >
-                {{ item.label }}
+                {{ item.name }}
               </div>
             </div>
 
             <!-- 对接部门左侧菜单（省市区三级） -->
-            <div v-else class="dept-nav">
+            <div v-else class="dept-nav" v-loading="navLoading">
               <div class="level-tabs">
                 <div
                   class="level-tab"
@@ -90,7 +90,7 @@
                   :class="{ active: currentDeptNav === item.id }"
                   @click="handleDeptNavClick(item.id)"
                 >
-                  {{ item.label }}
+                  {{ item.name }}
                 </div>
               </div>
             </div>
@@ -131,12 +131,13 @@
               <!-- 文件分类表格 -->
               <CommonTable
                 v-if="activeTab === 'file'"
-                :data="pagedData"
+                :data="tableData"
                 :columns="fileColumns"
-                :total="filteredFileData.length"
+                :total="total"
                 v-model:current-page="currentPage"
                 v-model:page-size="pageSize"
                 :action-width="120"
+                :loading="tableLoading"
               >
                 <template #actions="{ row }">
                   <el-button link type="primary" class="operation-btn-item" @click="handleEdit(row)">
@@ -151,12 +152,13 @@
               <!-- 对接部门表格 -->
               <CommonTable
                 v-else
-                :data="pagedData"
+                :data="tableData"
                 :columns="deptColumns"
-                :total="filteredDeptData.length"
+                :total="total"
                 v-model:current-page="currentPage"
                 v-model:page-size="pageSize"
                 :action-width="120"
+                :loading="tableLoading"
               >
                 <template #actions="{ row }">
                   <el-button link type="primary" class="operation-btn-item" @click="handleEdit(row)">
@@ -198,12 +200,12 @@
             <span class="row-label">类型名称</span>
             <div class="row-inputs">
               <el-input
-                v-model="item.shortName"
+                v-model="item.name"
                 placeholder="简称，如国土意见"
                 class="short-input"
               />
               <el-input
-                v-model="item.fullName"
+                v-model="item.detailName"
                 placeholder="全称，如国土意见"
                 class="full-input"
               />
@@ -222,12 +224,14 @@
 
           <el-form-item label="适用阶段" required class="stage-form-item">
             <el-checkbox-group v-model="formData.stages">
-              <el-checkbox label="立项阶段" />
-              <el-checkbox label="投资决策" />
-              <el-checkbox label="建设准备" />
-              <el-checkbox label="建设实施" />
-              <el-checkbox label="竣工验收" />
-              <el-checkbox label="投产运营" />
+              <el-checkbox 
+                v-for="stage in allStageList" 
+                :key="stage.id" 
+                :label="stage.id" 
+                :value="stage.id"
+              >
+                {{ stage.name }}
+              </el-checkbox>
             </el-checkbox-group>
           </el-form-item>
         </template>
@@ -256,203 +260,224 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CirclePlus, Remove, Plus } from '@element-plus/icons-vue'
 import CommonTable from './components/CommonTable.vue'
+import * as dicApi from '@/api/modules/dic'
 
-// ================= 状态 =================
+// ================= 全局状态 =================
 const activeTab = ref('file')
+const tableData = ref([])
+const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
+const tableLoading = ref(false)
+const navLoading = ref(false)
 
 const searchForm = reactive({
   type: '',
   name: ''
 })
 
-// ================= 左侧：文件分类导航 =================
-const currentFileNav = ref('all')
-const fileNavList = ref([
-  { id: 'all',    label: '全部阶段',   stage: '' },
-  { id: 'stage1', label: '立项阶段',   stage: '立项阶段' },
-  { id: 'stage2', label: '投资决策',   stage: '投资决策' },
-  { id: 'stage3', label: '建设准备',   stage: '建设准备' },
-  { id: 'stage4', label: '建设实施',   stage: '建设实施' },
-  { id: 'stage5', label: '竣工验收',   stage: '竣工验收' },
-  { id: 'stage6', label: '投产运营',   stage: '投产运营' }
-])
-
-// ================= 左侧：对接部门（省市区） =================
-const deptLevel = ref('district')
-const currentDeptNav = ref('d5')
-
-const mockDeptData = {
-  province: [{ id: 'p1', label: '陕西省' }],
-  city: [{ id: 'c1', label: '榆林市' }],
-  district: [
-    { id: 'd1',  label: '榆阳区' },
-    { id: 'd2',  label: '横山区' },
-    { id: 'd3',  label: '神木市' },
-    { id: 'd4',  label: '府谷县' },
-    { id: 'd5',  label: '靖边县' },
-    { id: 'd6',  label: '定边县' },
-    { id: 'd7',  label: '绥德县' },
-    { id: 'd8',  label: '米脂县' },
-    { id: 'd9',  label: '佳县' },
-    { id: 'd10', label: '吴堡县' },
-    { id: 'd11', label: '清涧县' },
-    { id: 'd12', label: '子洲县' }
-  ]
+// 统一处理响应
+function unwrapResponse(response) {
+  let result = response
+  if (result && Object.prototype.hasOwnProperty.call(result, 'data') && (result.status || result.config || result.headers)) {
+    result = result.data
+  }
+  if (result && typeof result === 'object' && Object.prototype.hasOwnProperty.call(result, 'code')) {
+    if (result.code !== 0 && result.code !== 200) throw new Error(result.msg || '接口请求失败')
+    return result.data
+  }
+  return result
 }
-const currentDeptList = computed(() => mockDeptData[deptLevel.value] || [])
 
-// ================= 右侧表格数据 =================
-const fileTableData = ref([
-  { id: 1, shortName: '国土意见', fullName: '国土空间规划意见书',       stage: '立项阶段', updateTime: '2025-01-02 08:00' },
-  { id: 2, shortName: '国土批复', fullName: '国土空间规划批复文件',     stage: '投资决策', updateTime: '2025-01-02 08:00' },
-  { id: 3, shortName: '林草意见', fullName: '林地草地使用意见书',       stage: '立项阶段', updateTime: '2025-01-02 08:00' },
-  { id: 4, shortName: '林草批复', fullName: '林地草地使用批复文件',     stage: '投资决策', updateTime: '2025-01-02 08:00' },
-  { id: 5, shortName: '环保意见', fullName: '环境影响评价意见书',       stage: '立项阶段', updateTime: '2025-01-02 08:00' },
-  { id: 6, shortName: '环保批复', fullName: '环境影响评价批复文件',     stage: '投资决策', updateTime: '2025-01-02 08:00' }
-])
+// ================= 1. 文件分类逻辑 =================
+const currentFileNav = ref('all')
+const fileNavList = ref([])
+const allStageList = ref([]) 
 
-const deptTableData = ref([
-  { id: 1,  deptName: '靖边县武装部',             districtId: 'd5', updateTime: '2025-01-02 08:00' },
-  { id: 2,  deptName: '靖边县资源规划局',         districtId: 'd5', updateTime: '2025-01-02 08:00' },
-  { id: 3,  deptName: '榆阳市生态环境局靖边分局', districtId: 'd5', updateTime: '2025-01-02 08:00' },
-  { id: 4,  deptName: '榆阳区武装部',             districtId: 'd1', updateTime: '2025-01-02 08:00' },
-  { id: 5,  deptName: '榆阳区资源规划局',         districtId: 'd1', updateTime: '2025-01-02 08:00' },
-  { id: 6,  deptName: '神木市武装部',             districtId: 'd3', updateTime: '2025-01-02 08:00' },
-  { id: 7,  deptName: '神木市生态环境局',         districtId: 'd3', updateTime: '2025-01-02 08:00' },
-  { id: 8,  deptName: '横山区资源规划局',         districtId: 'd2', updateTime: '2025-01-02 08:00' },
-  { id: 9,  deptName: '府谷县武装部',             districtId: 'd4', updateTime: '2025-01-02 08:00' },
-  { id: 10, deptName: '定边县资源规划局',         districtId: 'd6', updateTime: '2025-01-02 08:00' }
-])
-
-// ================= 表格列配置 =================
-const fileColumns = [
-  { prop: 'shortName',  label: '类型简称', minWidth: 120 },
-  { prop: 'fullName',   label: '类型全称', minWidth: 200 },
-  { prop: 'stage',      label: '适用阶段', minWidth: 120 },
-  { prop: 'updateTime', label: '更新日期', minWidth: 160 }
-]
-
-const deptColumns = [
-  { prop: 'deptName',   label: '部门名称', minWidth: 250 },
-  { prop: 'updateTime', label: '更新日期', minWidth: 160 }
-]
-
-// ================= 筛选：文件分类 =================
-const filteredFileData = computed(() => {
-  const nav = fileNavList.value.find((n) => n.id === currentFileNav.value)
-  const stageFilter = nav ? nav.stage : ''
-
-  const keyword = (searchForm.name || '').trim().toLowerCase()
-  const typeFilter = searchForm.type
-
-  return fileTableData.value.filter((row) => {
-    if (stageFilter && row.stage !== stageFilter) return false
-
-    if (typeFilter) {
-      const isOpinion = row.shortName.includes('意见')
-      const isReply = row.shortName.includes('批复')
-      if (typeFilter === '1' && !isOpinion) return false
-      if (typeFilter === '2' && !isReply) return false
+// 获取适用阶段列表（左侧）
+const loadStages = async () => {
+  try {
+    navLoading.value = true
+    const res = await dicApi.getConfigDataStages()
+    const data = unwrapResponse(res) || []
+    
+    allStageList.value = data
+    
+    // 组装左侧导航：手工加一个"全部阶段"
+    fileNavList.value = [
+      { id: 'all', name: '全部阶段' },
+      ...data.map(item => ({
+        id: item.id,
+        name: item.name,
+        stage: item.bizScenarioType
+      }))
+    ]
+    
+    // 如果左侧有数据，默认选中第一项并加载数据
+    if (fileNavList.value.length > 0) {
+      currentFileNav.value = fileNavList.value[0].id
+      getTableData()
     }
+  } catch (error) {
+    ElMessage.error(error.message || '获取适用阶段失败')
+  } finally {
+    navLoading.value = false
+  }
+}
 
-    if (keyword) {
-      const matchShort = row.shortName.toLowerCase().includes(keyword)
-      const matchFull = row.fullName.toLowerCase().includes(keyword)
-      if (!matchShort && !matchFull) return false
-    }
-
-    return true
-  })
-})
-
-// ================= 筛选：对接部门 =================
-const filteredDeptData = computed(() => {
-  // 省 / 市 层级只有单一节点，直接显示全部；区层级按 districtId 过滤
-  const isDistrict = deptLevel.value === 'district'
-  const keyword = (searchForm.name || '').trim().toLowerCase()
-
-  return deptTableData.value.filter((row) => {
-    if (isDistrict && currentDeptNav.value && row.districtId !== currentDeptNav.value) {
-      return false
-    }
-
-    if (keyword && !row.deptName.toLowerCase().includes(keyword)) return false
-
-    return true
-  })
-})
-
-// ================= 当前 Tab 的分页切片 =================
-const currentFiltered = computed(() =>
-  activeTab.value === 'file' ? filteredFileData.value : filteredDeptData.value
-)
-
-const pagedData = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  return currentFiltered.value.slice(start, start + pageSize.value)
-})
-
-// ================= 左侧导航交互 =================
 const handleFileNavClick = (id) => {
   currentFileNav.value = id
   currentPage.value = 1
+  getTableData()
+}
+
+// ================= 2. 对接部门逻辑 =================
+const deptLevel = ref('province') 
+const currentDeptNav = ref('')
+const deptTreeData = reactive({
+  province: [],
+  city: [],
+  district: []
+})
+
+const currentDeptList = computed(() => deptTreeData[deptLevel.value] || [])
+
+// 加载省市区级联数据（用 listByParentId 模拟）
+const loadDeptLevelData = async (level, parentId) => {
+  try {
+    navLoading.value = true
+    const res = await dicApi.getConfigDataByParentId(parentId)
+    const data = unwrapResponse(res) || []
+    
+    deptTreeData[level] = data.map(item => ({
+      id: item.id,
+      name: item.name
+    }))
+    
+    // 默认选中第一个并请求右侧数据
+    if (deptTreeData[level].length > 0) {
+      currentDeptNav.value = deptTreeData[level][0].id
+      getTableData()
+    } else {
+      currentDeptNav.value = ''
+      tableData.value = []
+      total.value = 0
+    }
+  } catch (error) {
+    ElMessage.error(error.message || `获取${level}级部门失败`)
+  } finally {
+    navLoading.value = false
+  }
 }
 
 const handleDeptLevelChange = (level) => {
   deptLevel.value = level
-  const list = mockDeptData[level] || []
-  currentDeptNav.value = list.length ? list[0].id : ''
-  currentPage.value = 1
+  currentDeptNav.value = ''
+  // 假设 parentId=0 是根节点
+  if (level === 'province') loadDeptLevelData('province', 0) 
+  else if (level === 'city') loadDeptLevelData('city', deptTreeData.province[0]?.id || 0)
+  else loadDeptLevelData('district', deptTreeData.city[0]?.id || 0)
 }
 
 const handleDeptNavClick = (id) => {
   currentDeptNav.value = id
   currentPage.value = 1
+  getTableData()
 }
 
-// ================= Tab 切换 =================
-const handleTabChange = () => {
-  handleReset()
-  currentPage.value = 1
+// ================= 3. 核心：统一获取右侧列表数据 =================
+const getTableData = async () => {
+  try {
+    tableLoading.value = true
+    
+    // 确定当前的 parentId
+    const parentId = activeTab.value === 'file' 
+      ? (currentFileNav.value === 'all' ? undefined : currentFileNav.value)
+      : (currentDeptNav.value || undefined)
 
-  if (activeTab.value === 'file') {
-    currentFileNav.value = 'all'
-  } else {
-    deptLevel.value = 'district'
-    currentDeptNav.value = 'd5'
+    const params = {
+      pageNo: currentPage.value,
+      pageSize: pageSize.value
+    }
+    
+    // 只有不是"全部阶段"或没有选中部门时，才传 parentId
+    if (parentId) {
+      params.parentId = parentId
+    }
+
+    if (searchForm.name) {
+      params.name = searchForm.name
+    }
+
+    const res = await dicApi.pageConfigData(params)
+    const data = unwrapResponse(res)
+    
+    tableData.value = data.list || []
+    total.value = data.total || 0
+  } catch (error) {
+    tableData.value = []
+    total.value = 0
+    ElMessage.error(error.message || '获取列表失败')
+  } finally {
+    tableLoading.value = false
   }
 }
 
-// ================= 搜索 / 重置 =================
+// ================= 4. 表格列配置 =================
+const fileColumns = [
+  { prop: 'name',       label: '类型简称', minWidth: 150, showOverflowTooltip: true },
+  { prop: 'detailName', label: '类型全称', minWidth: 200, showOverflowTooltip: true },
+  { prop: 'sortOrder',  label: '排序号',   width: 100, align: 'center' },
+  { prop: 'notes',      label: '备注',     minWidth: 150, showOverflowTooltip: true }
+]
+
+const deptColumns = [
+  { prop: 'name',       label: '部门名称', minWidth: 250, showOverflowTooltip: true },
+  { prop: 'notes',      label: '备注',     minWidth: 150, showOverflowTooltip: true }
+]
+
+// ================= 5. 搜索 / 重置 / Tab切换 =================
 const handleSearch = () => {
   currentPage.value = 1
-  ElMessage.success(`搜索完成，共 ${currentFiltered.value.length} 条`)
+  getTableData()
 }
 
 const handleReset = () => {
   searchForm.type = ''
   searchForm.name = ''
   currentPage.value = 1
+  getTableData()
+}
+
+const handleTabChange = () => {
+  handleReset()
+  if (activeTab.value === 'file') {
+    if (fileNavList.value.length > 0) {
+      currentFileNav.value = fileNavList.value[0].id
+      getTableData()
+    }
+  } else {
+    deptLevel.value = 'province'
+    loadDeptLevelData('province', 0)
+  }
 }
 
 const handleMock = (type) => {
   ElMessage.info(`模拟${type}操作`)
 }
 
-// ================= 弹窗 / 表单 =================
+// ================= 6. 弹窗 / 表单 =================
 const dialogVisible = ref(false)
 const saveLoading = ref(false)
 const formRef = ref(null)
 const editingId = ref(null)
 
 const formData = reactive({
-  fileItems: [{ shortName: '', fullName: '' }],
+  fileItems: [{ name: '', detailName: '' }],
   stages: [],
   deptName: ''
 })
@@ -467,9 +492,8 @@ const dialogTitle = computed(() => {
   return isFile ? '添加文件分类' : '添加对接部门'
 })
 
-// ================= 动态行 =================
 const addFileRow = () => {
-  formData.fileItems.push({ shortName: '', fullName: '' })
+  formData.fileItems.push({ name: '', detailName: '' })
 }
 
 const removeFileRow = (index) => {
@@ -478,137 +502,118 @@ const removeFileRow = (index) => {
   }
 }
 
-// ================= 新增 =================
+// ================= 7. 新增 / 编辑 / 保存 =================
 const handleAdd = () => {
   editingId.value = null
-  formData.fileItems = [{ shortName: '', fullName: '' }]
-  formData.stages = []
+  formData.fileItems = [{ name: '', detailName: '' }]
+  formData.stages = (activeTab.value === 'file' && currentFileNav.value !== 'all') 
+    ? [currentFileNav.value] 
+    : []
   formData.deptName = ''
   dialogVisible.value = true
 }
 
-// ================= 编辑 =================
 const handleEdit = (row) => {
   editingId.value = row.id
-
   if (activeTab.value === 'file') {
-    formData.fileItems = [{ shortName: row.shortName, fullName: row.fullName }]
-    formData.stages = row.stage ? row.stage.split('、') : []
+    formData.fileItems = [{ name: row.name, detailName: row.detailName }]
+    formData.stages = row.parentId ? [row.parentId] : []
   } else {
-    formData.deptName = row.deptName
+    formData.deptName = row.name
   }
-
   dialogVisible.value = true
 }
 
-// ================= 时间格式化 =================
-const formatNow = () => {
-  const d = new Date()
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-// ================= 保存 =================
 const handleSave = () => {
-  formRef.value.validate((valid) => {
+  formRef.value.validate(async (valid) => {
     if (!valid) return
 
     if (activeTab.value === 'file') {
-      const hasEmpty = formData.fileItems.some((it) => !it.shortName || !it.fullName)
-      if (hasEmpty) {
-        ElMessage.warning('请填写完整的类型名称')
-        return
-      }
-      if (formData.stages.length === 0) {
-        ElMessage.warning('请至少选择一个适用阶段')
-        return
-      }
+      const hasEmpty = formData.fileItems.some((it) => !it.name || !it.detailName)
+      if (hasEmpty) return ElMessage.warning('请填写完整的类型名称')
+      if (formData.stages.length === 0) return ElMessage.warning('请至少选择一个适用阶段')
     }
 
     saveLoading.value = true
-
-    setTimeout(() => {
-      saveLoading.value = false
-      const now = formatNow()
-
+    try {
       if (activeTab.value === 'file') {
-        const stageText = formData.stages.join('、')
-        const first = formData.fileItems[0]
-
+        const selectedStages = allStageList.value.filter(s => formData.stages.includes(s.id))
+        
         if (editingId.value) {
-          const idx = fileTableData.value.findIndex((r) => r.id === editingId.value)
-          if (idx > -1) {
-            fileTableData.value[idx] = {
-              ...fileTableData.value[idx],
-              shortName: first.shortName,
-              fullName: first.fullName,
-              stage: stageText,
-              updateTime: now
-            }
+          const payload = {
+            id: editingId.value,
+            name: formData.fileItems[0].name,
+            detailName: formData.fileItems[0].detailName,
+            parentId: formData.stages[0]
           }
+          await dicApi.updateConfigData(payload)
         } else {
-          const startId = Date.now()
-          const newRows = formData.fileItems.map((it, i) => ({
-            id: startId + i,
-            shortName: it.shortName,
-            fullName: it.fullName,
-            stage: stageText,
-            updateTime: now
-          }))
-          fileTableData.value.unshift(...newRows)
-          currentPage.value = 1
+          const payload = {
+            stageList: selectedStages.map(s => ({ id: s.id, name: s.name, stage: s.bizScenarioType })),
+            typeList: formData.fileItems.map((it, index) => ({
+              name: it.name,
+              detailName: it.detailName,
+              sortOrder: index + 1
+            }))
+          }
+          await dicApi.batchCreateConfigData(payload)
         }
       } else {
+        const payload = {
+          name: formData.deptName,
+          parentId: currentDeptNav.value || 0
+        }
         if (editingId.value) {
-          const idx = deptTableData.value.findIndex((r) => r.id === editingId.value)
-          if (idx > -1) {
-            deptTableData.value[idx] = {
-              ...deptTableData.value[idx],
-              deptName: formData.deptName,
-              updateTime: now
-            }
-          }
+          payload.id = editingId.value
+          await dicApi.updateConfigData(payload)
         } else {
-          deptTableData.value.unshift({
-            id: Date.now(),
-            deptName: formData.deptName,
-            districtId: deptLevel.value === 'district' ? currentDeptNav.value : '',
-            updateTime: now
-          })
-          currentPage.value = 1
+          await dicApi.createConfigData(payload)
         }
       }
 
+      ElMessage.success('保存成功')
       dialogVisible.value = false
-      ElMessage.success(editingId.value ? '编辑成功' : '保存成功')
-    }, 400)
+      getTableData()
+    } catch (error) {
+      ElMessage.error(error.message || '保存失败')
+    } finally {
+      saveLoading.value = false
+    }
   })
 }
 
-// ================= 删除 =================
+// ================= 8. 删除 =================
 const handleDelete = (row) => {
   ElMessageBox.confirm('确定要删除这条数据吗？', '提示', {
     type: 'warning',
     confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    customClass: 'custom-message-box'
+    cancelButtonText: '取消'
   })
-    .then(() => {
-      if (activeTab.value === 'file') {
-        const idx = fileTableData.value.findIndex((r) => r.id === row.id)
-        if (idx > -1) fileTableData.value.splice(idx, 1)
-      } else {
-        const idx = deptTableData.value.findIndex((r) => r.id === row.id)
-        if (idx > -1) deptTableData.value.splice(idx, 1)
+    .then(async () => {
+      try {
+        await dicApi.deleteConfigData(row.id)
+        ElMessage.success('删除成功')
+        
+        if (tableData.value.length === 1 && currentPage.value > 1) {
+          currentPage.value--
+        }
+        getTableData()
+      } catch (error) {
+        ElMessage.error(error.message || '删除失败')
       }
-
-      const maxPage = Math.max(1, Math.ceil(currentFiltered.value.length / pageSize.value))
-      if (currentPage.value > maxPage) currentPage.value = maxPage
-
-      ElMessage.success('删除成功')
     })
     .catch(() => {})
 }
+
+// ================= 监听分页变化 =================
+watch([currentPage, pageSize], () => {
+  getTableData()
+})
+
+// ================= 初始化 =================
+onMounted(() => {
+  loadStages()
+})
 </script>
 
 <style scoped lang="scss">
@@ -632,7 +637,7 @@ const handleDelete = (row) => {
 }
 
 /* =========================================================
-   背景光晕（沿用组件1）
+   背景光晕
 ========================================================= */
 .bg-glow {
   position: absolute;
