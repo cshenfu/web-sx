@@ -1243,9 +1243,34 @@ onMounted(() => { getCompanyInfo() })
 :deep(.readonly-input .el-textarea__inner) { padding: 8px 12px; line-height: 1.6; }
 .editing-input { width: 100%; max-width: 800px; }
 
-.input-with-unit { display: flex; align-items: center; }
-.unit { margin-left: 12px; font-size: 14px; color: #667383; }
+/* 带单位的输入框 */
+.input-with-unit { 
+  display: flex; 
+  align-items: center; 
+  width: 100%;
+  max-width: 800px; 
+}
 
+/* 让内部输入框占满剩余空间，而不是写死 100% */
+.input-with-unit :deep(.el-input) {
+  flex: 1;
+}
+
+/* 覆盖内部输入框原本写死的 max-width，防止撑爆父容器 */
+.input-with-unit .readonly-input,
+.input-with-unit .editing-input {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* 单位文本不被压缩，且不换行 */
+.unit { 
+  margin-left: 12px; 
+  font-size: 14px; 
+  color: #667383; 
+  flex-shrink: 0; 
+  white-space: nowrap;
+}
 .asset-box {
   border: 1px solid #E2E9F0; border-radius: 8px; padding: 16px; display: flex; flex-direction: column;
   gap: 16px; width: 100%; max-width: 400px; background: #FAFBFC;
