@@ -420,6 +420,14 @@ function handleDropdownVisibleChange(visible) {
 
 function handleSelect(option) {
   selectedKey.value = option.key
+  
+  // ★ 如果是竞配申报文件，直接抛出事件，并 return 阻断后续逻辑
+  if (option.key === 'bidding') {
+    emit('generate-competitive', props.project)
+    return
+  }
+  
+  // 其他类型保持原有逻辑
   emit('confirm', { option, project: props.project })
 }
 

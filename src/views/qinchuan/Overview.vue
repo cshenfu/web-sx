@@ -288,6 +288,7 @@
       @close="reportModalVisible = false"
       @confirm="handleReportConfirm"
       @add-report="reportModalVisible = false"
+      @generate-competitive="handleOpenCompetitivePanel"
       @open-add-report="handleOpenAddReport"
     />
 
@@ -694,6 +695,14 @@ const popoverAltCount = computed(() => {
 function handleOpenAddReport() {
   reportModalVisible.value = false
   showAddReportPanel.value = true
+}
+
+function handleOpenCompetitivePanel(project) {
+  reportModalVisible.value = false // 关闭弹窗
+  generatePanelProject.value = project
+  generatePanelActionKey.value = 'bidding' // ★ 对应你配置里的 key
+  generatePanelSubCode.value = ''
+  showGeneratePanel.value = true // 打开全屏面板
 }
 
 function handleReportPanelSuccess() {
@@ -2909,9 +2918,12 @@ onUnmounted(() => {
   min-height: 0;
 }
 .area-summary.wizard-layer {
-  width: auto;
-  height: auto;
+  width: 50%;
+  height: 100%;
+  z-index: 2000;
   padding-top: 0;
+  top: 0;
+  left: 0;
 }
 
 .area-view-layer { position: absolute; z-index: 20; top: 60px; right: 12px; bottom: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; overflow: visible; }

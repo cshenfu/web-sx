@@ -24,3 +24,39 @@ export async function createCNSReport(data) {
 export async function createTZJCReport(data) {
     return await publicService4.post('/api/investDecision/report/calc',data);
 }
+
+
+
+// 竞配文件
+export async function createJPReport(data) {
+    return await publicService4.post('/api/competAllocat/report/calc',data);
+}
+
+
+
+// 创建智能评审报告关联
+export async function createZNPSReport(data) {
+    return await publicService4.post('/api/reviewRelation/create',data);
+}
+
+// 删除智能评审报告关联
+export async function deleteZNPSReport(id) {
+    return await publicService4.post(`/api/reviewRelation/delete/${id}`);
+}
+
+
+// 根据智能评审ID获取智能评审报告关联详情
+export async function getZNPSReport(id) {
+    return await publicService4.get(`/api/reviewRelation/get/${id}`);
+}
+
+// 分页查询智能评审报告
+export async function getZNPSPage(data) {
+    return await publicService4.post('/api/reviewRelation/page',data);
+}
+
+
+// 分页查询智能评审报告
+export async function getCompanyData(id) {
+    return await publicService4.post(`/api/shanxi/report/enterprise-info/calc?enterpriseId=${id}`);
+}
