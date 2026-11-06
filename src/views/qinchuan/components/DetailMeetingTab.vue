@@ -414,6 +414,12 @@ function handleSetOwner(step) {
 }
 
 function handleAction(action, step) {
+  console.log('[DetailMeetingTab] emit=', {
+    key: action.key,
+    subCode: step.subCode,
+    unlocked: step.unlocked,
+    label: action.label,
+  })   // ★ 加这行
   emit('action', {
     key: action.key,
     label: action.label,

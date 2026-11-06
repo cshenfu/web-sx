@@ -253,7 +253,7 @@
       :initial-tab="detailTabMapped"
       @back="showDetailPanel = false"
       @toggle-fullscreen="() => {}"
-      @generate-report="(proj) => { if (proj) selectedProject = proj; showGenerateModal = true }"
+      @generate-report="handleGenerateReportFromHeader"
       @open-confirm="handleOpenConfirm"
       @create-report="handleCreateReportFromDetail"
       @support-add-data="() => {}"
@@ -272,11 +272,11 @@
       :initial-tab="detailPanelTab"
       @close="showDetailPanel = false"
       @action="onDetailPanelAction"
-      @generate-report="(proj) => { if (proj) selectedProject = proj; showGenerateModal = true }"
+      @generate-report="handleGenerateReportFromHeader"
       @open-confirm="handleOpenConfirm"
     />
 
-    <GenerateReportPanel :visible="showGeneratePanel" :project="generatePanelProject" :action-key="generatePanelActionKey" :sub-code="generatePanelSubCode" @close="showGeneratePanel = false" @generated="onReportGenerated" />
+    <GenerateReportPanel :visible="showGeneratePanel" :project="generatePanelProject" :action-key="generatePanelActionKey" :sub-code="generatePanelSubCode" @close="showGeneratePanel = false" :ai-detail="selectedProject" @generated="onReportGenerated" />
     <AssignDialog v-model="showAssignDialog" :project="assignTargetProject" @success="onAssignSuccess" />
     <ReserveApprovalDialog v-model="showReserveDialog" :project="selectedProject" @saved="onReserveSaved" />
 
@@ -475,6 +475,12 @@ const SUB_TAB_REPORT_CONFIG = {
   COMPETITIVE_ALLOCATION: { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成竞配申报报告' },
   PROJECT_INITIATION:     { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成请示文件' },
   POST_EVALUATION:        { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成后评价报告' },
+}
+
+// ★ 处理头部“报告/函件生成”按钮
+function handleGenerateReportFromHeader(proj) {
+  if (proj) selectedProject.value = proj
+  showGenerateModal.value = true
 }
 function getReportConfigBySubTab(subTab) {
   return SUB_TAB_REPORT_CONFIG[subTab] || SUB_TAB_REPORT_CONFIG.FEASIBILITY_STUDY
@@ -891,6 +897,8 @@ async function openDetailPanel(project, tab) {
       const ai = res.data
       selectedProject.value = {
         ...selectedProject.value,
+        aiProjectId: ai.aiProjectId ?? p.id, // ★ 补充：把真实的 aiProjectId 塞进去
+        id: ai.aiProjectId ?? p.id,          // ★ 补充：把 id 替换成 AI 项目 ID（对齐首页逻辑）
         relationId: ai.relationId,
         reportProjectId: ai.reportProjectId,
         mainInfo: buildMainInfoFromAi(ai),

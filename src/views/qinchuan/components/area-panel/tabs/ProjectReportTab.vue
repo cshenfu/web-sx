@@ -48,15 +48,15 @@
 
             <td class="sticky-col" style="width: 140px; min-width: 140px;">
               <div class="action-cell">
-                <!-- <button
+                <button
                   v-if="showConfirmBtn(row)"
                   class="action-btn warning"
                   @click="handleClickConfirm(row)"
-                >待确认</button> -->
-                <button 
+                >待确认</button>
+                <!-- <button 
                   class="action-btn warning" 
                   @click="handleClickConfirm(row)"
-                >待确认</button>
+                >待确认</button> -->
                 <button
                   v-if="canPreview(row)"
                   class="action-btn primary"

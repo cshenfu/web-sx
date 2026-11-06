@@ -347,6 +347,8 @@ function handleFileDeleted() {
 }
 
 function handleMeetingAction(payload) {
+   console.log('[ProjectDetailPanel] handleMeetingAction=', payload)   // ★ 加这行
+  console.log('[ProjectDetailPanel] has action?', GENERATE_REPORT_ACTIONS.has(payload.key)) 
   // 拦截智能审查
   if (payload.key === 'intelligent-review') {
     emit('action', { 

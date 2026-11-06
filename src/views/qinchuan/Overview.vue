@@ -317,6 +317,7 @@
       @saved="onVerifySaved"
     />
 
+    <!-- 修复头部按钮绑定 -->
     <SiteMapProjectDetailPanel
       :visible="showSiteMapDetailPanel"
       :project="actionProject"
@@ -324,13 +325,15 @@
       :initial-tab="detailPanelTab"
       @close="showSiteMapDetailPanel = false"
       @action="onSiteMapDetailAction"
-      @generate-report="(proj) => { if(proj) activeProjectDetail = proj; reportModalVisible = true }"
+      @generate-report="handleGenerateReportFromHeader"   
       @open-confirm="handleOpenConfirm"
     />
+
 
     <SiteMapGenerateReportPanel
       :visible="showGeneratePanel"
       :project="generatePanelProject"
+      :ai-detail="activeProjectDetail"
       :action-key="generatePanelActionKey"
       :sub-code="generatePanelSubCode"
       @close="showGeneratePanel = false"
@@ -956,6 +959,8 @@ async function refreshActionProjectData() {
 }
 
 async function onSiteMapDetailAction(payload) {
+  console.log('[parent] onSiteMapDetailAction=', payload)          // ★ 加这行
+  console.log('[parent] before set: showGeneratePanel=', showGeneratePanel.value)
   if (payload?.type === 'stage-changed') {
     showSiteMapDetailPanel.value = false
     await refreshActionProjectData()
@@ -993,9 +998,16 @@ function onDetailPanelAction(payload) {
     return
   }
 }
+// 1. 修复头部按钮（必须加 .value，否则 ref 被覆盖，真实数据永远进不来）
+function handleGenerateReportFromHeader(proj) {
+  if (proj) activeProjectDetail.value = proj
+  reportModalVisible.value = true
+}
+
+// 2. 修复生成完面板闪退的问题（不要写 showGeneratePanel.value = false）
 function onReportGenerated() {
-  showGeneratePanel.value = false
-  ElMessage.success('报告生成完成')
+  // showGeneratePanel.value = false   // ★ 删掉或者注释掉这行！
+  ElMessage.success('报告已生成并提交，可在右侧预览或下载')
 }
 
 function startGeometryEdit(project, mode = 'area') {
@@ -1533,6 +1545,7 @@ async function loadAiProjectDetail(aiProjectId) {
   detailLoading.value = true
   try {
     const res = await newApi.getAiProjectData(aiProjectId)
+     console.log('[getAiProjectData]', JSON.stringify(res.data, null, 2))  // ★ 加这行
     if (res?.code === 200 && res.data) {
       const ai = res.data
       const base = activeProjectDetail.value || {}
