@@ -1,7 +1,7 @@
 <template>
   <div class="log-root">
-    <!-- 统一背景 -->
-    <div class="admin-page-bg">
+    <!-- 💡 用 v-show 控制列表页的显隐 -->
+    <div class="admin-page-bg" v-show="!showReportPreview">
       <!-- 背景光晕层 -->
       <div class="bg-glow bg-glow-top-left"></div>
       <div class="bg-glow bg-glow-bottom-right"></div>
@@ -23,20 +23,17 @@
               <el-option label="陕西省延安市延长区" value="延长区" />
               <el-option label="陕西省西安市" value="西安市" />
             </el-select>
-
             <!-- 项目类型 -->
             <el-select v-model="searchForm.projectType" placeholder="项目类型" clearable class="filter-select">
               <el-option label="风电" value="wind" />
               <el-option label="光伏" value="solar" />
             </el-select>
-
             <!-- 全部状态 -->
             <el-select v-model="searchForm.status" placeholder="全部状态" clearable class="filter-select">
               <el-option label="计划中" value="planning" />
               <el-option label="排队中" value="queueing" />
               <el-option label="已完成" value="completed" />
             </el-select>
-
             <!-- 创建时间 -->
             <el-date-picker
               v-model="searchForm.dateRange"
@@ -47,7 +44,6 @@
               value-format="YYYY-MM-DD"
               class="filter-date"
             />
-
             <!-- 项目编号 -->
             <el-input
               v-model="searchForm.projectCode"
@@ -56,7 +52,6 @@
               class="filter-input"
               @keyup.enter="handleSearch"
             />
-
             <!-- 项目名称 -->
             <el-input
               v-model="searchForm.projectName"
@@ -65,7 +60,6 @@
               class="filter-input"
               @keyup.enter="handleSearch"
             />
-
             <!-- 按钮组 -->
             <div class="filter-buttons">
               <el-button type="primary" class="btn-search" @click="handleSearch">搜索</el-button>
@@ -85,6 +79,7 @@
             :show-page-sizes="true"
             :show-jumper="true"
             :action-width="120"
+            @row-click="handleRowClick"
           >
             <!-- 项目名称列 -->
             <template #projectName="{ row }">
@@ -100,20 +95,30 @@
               <span :class="['status-text', row.status]">{{ row.statusText }}</span>
             </template>
 
-            <!-- 操作列（组件内部会自动渲染这一列，直接提供插槽内容即可） -->
+            <!-- 操作列 -->
             <template #actions="{ row }">
-              <template v-if="row.status === 'completed'">
-                <el-button link type="primary" class="action-btn" @click="handleView(row)">查看</el-button>
-              </template>
-              <template v-else>
-                <el-button link type="primary" class="action-btn" @click="handleCancel(row)">取消</el-button>
-              </template>
-              <el-button link type="danger" class="action-btn btn-delete" @click="handleDelete(row)">删除</el-button>
+              <div @click.stop>
+                <template v-if="row.status === 'completed'">
+                  <el-button link type="primary" class="action-btn" @click="handleView(row)">查看</el-button>
+                </template>
+                <template v-else>
+                  <el-button link type="primary" class="action-btn" @click="handleCancel(row)">取消</el-button>
+                </template>
+                <el-button link type="danger" class="action-btn btn-delete" @click="handleDelete(row)">删除</el-button>
+              </div>
             </template>
           </CommonTable>
         </div>
       </div>
     </div>
+
+    <!-- 💡 全屏预览组件（嵌在当前 Layout 内部） -->
+    <ReviewReportPreview
+      v-if="showReportPreview"
+      :visible="showReportPreview"
+      :project-row="currentSelectedRow"
+      @close="showReportPreview = false"
+    />
   </div>
 </template>
 
@@ -123,6 +128,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 // 引入公共表格组件
 import CommonTable from '@/views/guizhi/components/CommonTable.vue'
+// 💡 引入报告预览组件
+import ReviewReportPreview from './components/ReviewReportPreview.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -144,7 +151,7 @@ const searchForm = reactive({
   projectName: ''
 })
 
-// ================= 表格列配置（已移除多余的 actions 列） =================
+// ================= 表格列配置 =================
 const columns = [
   { prop: 'projectCode',     label: '项目编号',     minWidth: 120 },
   { prop: 'projectName',     label: '项目名称',     minWidth: 200, slot: 'projectName' },
@@ -246,6 +253,15 @@ const pagedTableData = computed(() => {
   return filteredData.value.slice(start, start + pageSize.value)
 })
 
+// ================= 💡 行点击预览逻辑 =================
+const showReportPreview = ref(false)
+const currentSelectedRow = ref({})
+
+const handleRowClick = (row) => {
+  currentSelectedRow.value = row
+  showReportPreview.value = true
+}
+
 // ================= 交互操作 =================
 const handleAddProject = () => {
   router.push('/yanping/review/create')
@@ -267,7 +283,8 @@ const handleReset = () => {
 }
 
 const handleView = (row) => {
-  console.log('查看项目', row)
+  // 如果“查看”按钮也需直接触发预览，可以直接调用 handleRowClick(row)
+  handleRowClick(row)
 }
 
 const handleCancel = (row) => {

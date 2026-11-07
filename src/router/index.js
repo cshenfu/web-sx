@@ -43,7 +43,6 @@ const routes = [
           { path: 'create', name: 'ReviewCreate', component: () => import('@/views/yanping/review/Create.vue'), meta: { title: '智能评审-创建', module: 'yanping', sidebar: 'yanping-review', key: 'create' } },
           { path: 'project', name: 'ReviewProject', component: () => import('@/views/yanping/review/Project.vue'), meta: { title: '智能评审-项目', module: 'yanping', sidebar: 'yanping-review', key: 'project' } },
           { path: 'draft', name: 'ReviewDraft', component: () => import('@/views/yanping/review/DefaultProject.vue'), meta: { title: '智能评审-草稿', module: 'yanping', sidebar: 'yanping-review', key: 'draft' } },
-          { path: 'default-project', name: 'ReviewDefaultProject', component: () => import('@/views/yanping/review/DefaultProject.vue'), meta: { title: '智能评审-项目', module: 'yanping', sidebar: 'yanping-review', key: 'default-project' } }
         ]
       },
       {
@@ -54,7 +53,6 @@ const routes = [
           { path: 'create', name: 'BudgetCreate', component: () => import('@/views/yanping/budget/estimateProject/estimateList/estimateTemplateList.vue'), meta: { title: '技经概算-创建', module: 'yanping', sidebar: 'yanping-budget', key: 'create' } },
           { path: 'project', name: 'BudgetProject', component: () => import('@/views/yanping/budget/estimateProject/estimateList/estimateList.vue'), meta: { title: '技经概算-项目', module: 'yanping', sidebar: 'yanping-budget', key: 'project' } },
           { path: 'draft', name: 'BudgetDraft', component: () => import('@/views/yanping/budget/DefaultProject.vue'), meta: { title: '技经概算-草稿', module: 'yanping', sidebar: 'yanping-budget', key: 'draft' } },
-          { path: 'default-project', name: 'BudgetDefaultProject', component: () => import('@/views/yanping/budget/DefaultProject.vue'), meta: { title: '技经概算-项目', module: 'yanping', sidebar: 'yanping-budget', key: 'default-project' } },
           { path: 'newTemplatePreview', name: 'BudgetNewTemplatePreview', component: () => import('@/views/yanping/budget/estimateProject/templatePreview/NewTemplatePreview.vue'), meta: { title: '新项目预览', module: 'yanping', sidebar: 'yanping-budget', key: 'project' } },
           { path: 'set', name: 'BudgetSet', component: () => import('@/views/yanping/budget/estimateProject/estimateList/index2.vue'), meta: { title: '模版设置', module: 'yanping', sidebar: 'yanping-budget', key: 'project' } }
         ]
@@ -67,7 +65,6 @@ const routes = [
           { path: 'create', name: 'FinanceCreate', component: () => import('@/views/yanping/finance/financeEval/create/Create.vue'), meta: { title: '财务评价-创建', module: 'yanping', sidebar: 'yanping-finance', key: 'create' } },
           { path: 'project', name: 'FinanceProject', component: () => import('@/views/yanping/finance/financeEval/project/Project.vue'), meta: { title: '财务评价-项目', module: 'yanping', sidebar: 'yanping-finance', key: 'project' } },
           { path: 'draft', name: 'FinanceDraft', component: () => import('@/views/yanping/finance/DefaultProject.vue'), meta: { title: '财务评价-草稿', module: 'yanping', sidebar: 'yanping-finance', key: 'draft' } },
-          { path: 'default-project', name: 'FinanceDefaultProject', component: () => import('@/views/yanping/finance/DefaultProject.vue'), meta: { title: '财务评价-项目', module: 'yanping', sidebar: 'yanping-finance', key: 'default-project' } },
           { path: 'preview', name: 'FinancePreview', component: () => import('@/views/yanping/finance/financeEval/preview/FinancePreview.vue'), meta: { title: '财务评价-项目预览', module: 'yanping', sidebar: 'yanping-finance', key: 'project' } }
         ]
       }

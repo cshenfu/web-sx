@@ -27,7 +27,6 @@ export const sidebarConfig = {
     { key: 'create', icon: 'Plus', label: '创建', path: '/yanping/review/create', roles: ['admin', 'user', 'viewer'] },
     { key: 'project', icon: 'Folder', label: '项目', path: '/yanping/review/project', roles: ['admin', 'user', 'viewer'] },
     { key: 'draft', icon: 'Document', label: '草稿', path: '/yanping/review/draft', roles: ['admin', 'user', 'viewer'] },
-    { key: 'default-project', icon: 'Star', label: '项目', path: '/yanping/review/default-project', roles: ['admin', 'user', 'viewer'] }
   ],
 
   // ─────────────────────────────────────────────
@@ -38,7 +37,6 @@ export const sidebarConfig = {
     { key: 'create', icon: 'Plus', label: '创建', path: '/yanping/budget/create', roles: ['admin', 'user', 'viewer'] },
     { key: 'project', icon: 'Folder', label: '项目', path: '/yanping/budget/project', roles: ['admin', 'user', 'viewer'] },
     { key: 'draft', icon: 'Document', label: '草稿', path: '/yanping/budget/draft', roles: ['admin', 'user', 'viewer'] },
-    { key: 'default-project', icon: 'Star', label: '项目', path: '/yanping/budget/default-project', roles: ['admin', 'user', 'viewer'] }
   ],
 
   // ─────────────────────────────────────────────
@@ -49,7 +47,6 @@ export const sidebarConfig = {
     { key: 'create', icon: 'Plus', label: '创建', path: '/yanping/finance/create', roles: ['admin', 'user', 'viewer'] },
     { key: 'project', icon: 'Folder', label: '项目', path: '/yanping/finance/project', roles: ['admin', 'user', 'viewer'] },
     { key: 'draft', icon: 'Document', label: '草稿', path: '/yanping/finance/draft', roles: ['admin', 'user', 'viewer'] },
-    { key: 'default-project', icon: 'Star', label: '项目', path: '/yanping/finance/default-project', roles: ['admin', 'user', 'viewer'] }
   ],
 
   // ─────────────────────────────────────────────
