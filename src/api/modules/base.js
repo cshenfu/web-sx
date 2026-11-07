@@ -1,5 +1,5 @@
 
-import { publicService3 } from '@/api/base';
+import { publicService,publicService3 } from '@/api/base';
 // 获取全国地址信息
 export async function getProvince() {
     return await publicService3.get('/web/area/totalArea');
@@ -22,7 +22,7 @@ export async function getTempUrl(data) {
 }
 // 获取临时obs token凭证
 export async function getCertificate(data) {
-    return await publicService3.get('/admin-api/basic/obs/get/temp-certificate',data);
+    return await publicService.get('/admin-api/basic/obs/get/temp-certificate',data);
 }
 // 加密狗验证签名
 export async function verifySign(data) {
