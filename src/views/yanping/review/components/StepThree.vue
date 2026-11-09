@@ -17,7 +17,7 @@
 
     <div class="footer-actions">
       <!-- 💡 加了上一步按钮 -->
-      <button type="button" class="btn" :disabled="submitting" @click="emit('prev')">上一步</button>
+      <!-- <button type="button" class="btn" :disabled="submitting" @click="emit('prev')">上一步</button> -->
       <button type="button" class="btn" :disabled="submitting" @click="submitStep(true)">
         {{ submitting && submitMode === 'draft' ? '保存中…' : '保存草稿' }}
       </button>

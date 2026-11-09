@@ -13,6 +13,11 @@ export async function createLXReport(data) {
     return await publicService4.post('/ai/sx-report/initiation/params',data);
 }
 
+// 投审会
+export async function createTSHReport(data) {
+    return await publicService4.post('/ai/sx-report/meeting-notice/params',data);
+}
+
 
 // 承诺书
 export async function createCNSReport(data) {

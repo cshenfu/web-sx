@@ -295,10 +295,14 @@ const handleConfirmSelect = async () => {
     form.currentProjectCapacity = selectedProjectInfo.value.currentProjectCapacity
     form.totalProjectCapacity = selectedProjectInfo.value.currentProjectCapacity
   }
-  
-  emit('project-selected', selectedProjectInfo.value)
+
+  // 💡 明确把 sxProjectId 交给父组件
+  emit('project-selected', {
+    ...selectedProjectInfo.value,
+    sxProjectId: selectedProjectInfo.value?.id,
+  })
   hasSelectedProject.value = true
-  
+
   try {
     const res = await getAiProjectData(selectedProjectId.value)
     if (res.code === 200 && res.data) {
@@ -1070,6 +1074,7 @@ function buildPayload(isDraft) {
     isTerrainImage: uploadState.terrain.files.length ? 1 : 0, terrainImageFile: serialize(uploadState.terrain.files),
   }
   if (form.boosterLocationSource === 'auto') { editProjectWindReqDTO.boosterStationLocations = '[]'; editProjectWindReqDTO.userBoosterStationAreaPoint = '[]'; editProjectWindReqDTO.boosterStationFilePath = '[]' }
+  
   return { editProjectWindReqDTO: removeUndefined(editProjectWindReqDTO), sxProjectId: toProjectId(project.sxProjectId ?? project.id) }
 }
 
@@ -1093,6 +1098,7 @@ async function submitStep(isDraft) {
   submitMode.value = isDraft ? 'draft' : 'next'
   submitError.value = ''
   const payload = buildPayload(isDraft)
+  console.log(payload,"ddddddddddddddddddddddddddddddddddddddddddddddddddddddddd")
 
   try {
     const response = await newApi.saveUpdateProject(payload)

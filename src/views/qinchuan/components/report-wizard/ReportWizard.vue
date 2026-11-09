@@ -129,6 +129,7 @@ const collectedData = ref({})
 function resolveSxProjectId(project) {
   if (!project) return 0
   const raw = project.sxProjectId ?? project.id
+  console.log(raw,"rawrawrawrawrawraw")
   if (raw === '' || raw === null || raw === undefined) return 0
   return String(raw)
 }

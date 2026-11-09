@@ -261,9 +261,12 @@ const onLayerInputChange = ({ id, value }) => {
 // 修改 Create.vue 中的 handleProjectSelected 和渲染逻辑
 
 const handleProjectSelected = (project) => {
-  workingProject.value = { ...workingProject.value, ...project }
-  // 当首次选择项目时，StepOne 会立即同步一次 map-data-updated
-  // 但为了保险，这里可以先根据项目默认数据渲染一次
+  workingProject.value = {
+    ...workingProject.value,
+    ...project,
+    // 💡 关键：把第一步选中的项目 id 同步为 sxProjectId
+    sxProjectId: project.sxProjectId ?? project.id ?? workingProject.value.sxProjectId,
+  }
   renderMapLayers({
     coordinate: project.coordinate || [],
     windTurbinePoints: project.windTurbinePoints || [],
@@ -414,13 +417,15 @@ const renderMapLayers = async (data) => {
 function updateWorkingProject(data) {
   if (!data) return
   const { savedProjectId, form } = data
-  const preservedSxProjectId = workingProject.value.sxProjectId
+
+  // 💡 如果 form 中带了 sxProjectId，以它为准；否则保留当前值
+  const nextSxProjectId = form?.sxProjectId ?? workingProject.value.sxProjectId
 
   workingProject.value = {
     ...workingProject.value,
     ...(form && typeof form === 'object' ? form : {}),
     ...(savedProjectId ? { id: savedProjectId } : {}),
-    sxProjectId: preservedSxProjectId,
+    sxProjectId: nextSxProjectId,
   }
 }
 
