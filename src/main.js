@@ -7,6 +7,8 @@ import Antd from 'ant-design-vue'
 import 'ant-design-vue/dist/reset.css'
 
 import ElementPlus, { ElMessageBox } from 'element-plus'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'   // ★ 引入中文包
+
 import 'element-plus/dist/index.css'
 import './styles/element-plus-overrides.css'
 
@@ -53,6 +55,6 @@ app.use(createPinia())
 app.use(router)
 
 app.use(Antd)
-app.use(ElementPlus)
+app.use(ElementPlus, { locale: zhCn }) 
 
 app.mount('#app')
