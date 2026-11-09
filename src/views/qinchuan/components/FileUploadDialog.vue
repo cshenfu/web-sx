@@ -201,7 +201,7 @@ const EXTRA_FIELDS_MAP = {
   ],
   '水保批复': [
     { key: 'waterConservationInvestment', label: '水保投资', required: false, suffix: '万元' },
-    { key: 'soilWaterConservationFee', label: '水土保持补偿费', required: true, suffix: '万元' },
+    { key: 'soilWaterConservationFee', label: '水土保持补偿费', required: false, suffix: '万元' },
   ],
   '贷款意向书': [
     { key: 'loanRate', label: '贷款利率', required: true, suffix: '%' },
