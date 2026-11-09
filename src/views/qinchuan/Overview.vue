@@ -2918,7 +2918,7 @@ onUnmounted(() => {
   min-height: 0;
 }
 .area-summary.wizard-layer {
-  width: 50%;
+  width: 100%;
   height: 100%;
   z-index: 2000;
   padding-top: 0;
