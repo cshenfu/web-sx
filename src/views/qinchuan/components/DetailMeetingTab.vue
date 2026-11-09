@@ -414,18 +414,14 @@ function handleSetOwner(step) {
 }
 
 function handleAction(action, step) {
-  console.log('[DetailMeetingTab] emit=', {
-    key: action.key,
-    subCode: step.subCode,
-    unlocked: step.unlocked,
-    label: action.label,
-  })   // ★ 加这行
   emit('action', {
     key: action.key,
     label: action.label,
-    step: step.subDesc,
-    subCode: step.subCode,
+    step: step.subDesc,           // to陕西公司
+    subCode: step.subCode,        // PIM_TO_SHAANXI_COMPANY
     record: step.lastRecord,
+    // ★ 新增：给 updateFile 用
+    fileTypeTag: ACTION_TO_FILE_TAG[action.key] || action.label?.replace(/^(生成|上传)/, '') || '',
   })
 }
 

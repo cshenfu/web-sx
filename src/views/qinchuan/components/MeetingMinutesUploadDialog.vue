@@ -117,7 +117,7 @@
   
   const emit = defineEmits(['close', 'saved'])
   
-  const FORCE_FILE_TYPE = 2
+  const FORCE_FILE_TYPE = 7
   
   const fileInputRef = ref(null)
   const selectedFile = ref(null)
@@ -251,7 +251,9 @@
       obtainDate: form.obtainDate,
     }
   }
-  
+  function normalizeBool(v) {
+    return v === 1 || v === '1' || v === true || v === 'true'
+  }
 async function handleSave() {
   if (!selectedFile.value) {
     ElMessage.warning('请先选择文件')

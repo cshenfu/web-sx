@@ -284,7 +284,13 @@ const props = defineProps({
   actionKey: { type: String, default: '' },
   subCode: { type: String, default: '' },
   aiDetail: { type: Object, default: null },
+  source: { type: String, default: '' },                    // ★
+  firstBusinessTitle: { type: String, default: '' },        // ★
+  secondaryBusinessTitle: { type: String, default: '' },    // ★
+  fileTypeTag: { type: String, default: '' },               // ★
 })
+
+const needUpdateFile = computed(() => props.source === 'sitemap-detail')
 
 const emit = defineEmits(['close', 'generated'])
 
@@ -697,10 +703,30 @@ async function syncToMeetingTab(fileUrl, fileName, fileSuffix) {
 }
 
 // ================= 核心生成逻辑 =================
+
+function buildUpdateFilePayload({ id, fileUrl, fileName, resData }) {
+  const recognitionContent = resData?.params ?? {}
+  return {
+    id,
+    aiProjectId: aiProjectId.value,
+    firstBusinessTitle: props.firstBusinessTitle || '',
+    secondaryBusinessTitle: props.secondaryBusinessTitle || props.subCode || '',
+    fileTypeTag: props.fileTypeTag || title.value,
+    isRequiredUpload: false,
+    recognitionContent,
+    fileUrlList: [{
+      fileName,
+      filePath: fileUrl,
+      fileSuffix: 'docx',
+      recognitionContent,
+    }],
+  }
+}
+
 async function handleGenerate() {
   if (generating.value) return
 
-  // 校验
+  // ========== ① 校验 ==========
   if (isCompetitive.value) {
     if (!compForm.competitiveFileId) return ElMessage.warning('请选择竞配申报文件')
     if (!compForm.reportId) return ElMessage.warning('请选择可研报告')
@@ -719,10 +745,10 @@ async function handleGenerate() {
   generatedFilePath.value = ''
 
   try {
+    // ========== ② 获取 Word 渲染参数 ==========
     let resData = null
 
     if (isCompetitive.value) {
-      // 竞配直接用之前拿到的参数，不再重复请求
       resData = { params: compResParams.value }
     } else if (['gen-application', 'gen-letter'].includes(props.actionKey)) {
       const submitData = {
@@ -752,6 +778,7 @@ async function handleGenerate() {
       resData = res.data || res
     }
 
+    // ========== ③ 渲染 Word 并展示 ==========
     const fillData = mergeFillData(resData.params || {}, props.aiDetail)
     const blob = await renderTemplateToBlob(fillData)
 
@@ -766,14 +793,72 @@ async function handleGenerate() {
       })
     }
 
+    // ========== ④ 上传 OSS ==========
     const fileName = `${title.value}_${props.subCode || 'R'}_${Date.now()}.docx`
     const fileUrl = await uploadGeneratedFile(blob, fileName)
     generatedFilePath.value = fileUrl
 
+    // ========== ⑤ createReport 落库 ==========
+    let createRes = null
     try {
-      await submitReport({ fileUrl, fileName, resData })
-    } catch (e) { console.warn('[createReport] 提交失败', e) }
+      createRes = await submitReport({ fileUrl, fileName, resData })
+      if (createRes?.code !== 200) {
+        console.warn('[createReport] 返回非 200:', createRes)
+      }
+    } catch (e) {
+      console.warn('[createReport] 提交失败', e)
+    }
 
+    // ========== ⑥ 仅 sitemap-detail 来源：create 后调 updateFile 补全归档 ==========
+    const needUpdate = props.source === 'sitemap-detail'
+    if (needUpdate && createRes?.code === 200) {
+      // —— 内联 extractCreatedId ——
+      const d = createRes?.data
+      const newRecordId =
+        d == null
+          ? null
+          : typeof d === 'number' || typeof d === 'string'
+            ? d
+            : (d.id ?? d.reportId ?? d.recordId ?? null)
+
+      if (!newRecordId) {
+        console.warn('[updateFile] createReport 返回中未获取到记录 ID，跳过归档')
+        ElMessage.warning('报告已生成，但未获取到归档 ID，请检查后端返回结构')
+      } else {
+        // —— 内联 buildUpdateFilePayload ——
+        const recognitionContent = resData?.params ?? {}
+        const updatePayload = {
+          id: newRecordId,
+          aiProjectId: aiProjectId.value,
+          firstBusinessTitle: props.firstBusinessTitle || '',
+          secondaryBusinessTitle: props.secondaryBusinessTitle || props.subCode || '',
+          fileTypeTag: props.fileTypeTag || title.value,
+          isRequiredUpload: false,
+          recognitionContent,
+          fileUrlList: [
+            {
+              fileName,
+              filePath: fileUrl,
+              fileSuffix: 'docx',
+              recognitionContent,
+            },
+          ],
+        }
+
+        try {
+          const updateRes = await fileApi.updateFile(updatePayload)
+          if (updateRes?.code !== 200) {
+            console.warn('[updateFile] 返回非 200:', updateRes)
+            ElMessage.warning('报告已生成，但归档信息更新失败：' + (updateRes?.msg || ''))
+          }
+        } catch (e) {
+          console.warn('[updateFile] 调用失败', e)
+          ElMessage.warning('报告已生成，但归档信息更新失败')
+        }
+      }
+    }
+
+    // ========== ⑦ 同步上会流程（占位） ==========
     await syncToMeetingTab(fileUrl, fileName, 'docx')
 
     ElMessage.success('报告已生成并同步至上会流程')

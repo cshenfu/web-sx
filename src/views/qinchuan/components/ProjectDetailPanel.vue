@@ -368,9 +368,19 @@ function handleMeetingAction(payload) {
 
   // 拦截所有生成操作
   if (GENERATE_REPORT_ACTIONS.has(payload.key)) {
-    emit('action', { type: 'generate-report', actionKey: payload.key, subCode: payload.subCode, step: payload.step, project: props.project })
-    return
-  }
+  emit('action', {
+    type: 'generate-report',
+    actionKey: payload.key,
+    subCode: payload.subCode,
+    step: payload.step,
+    project: props.project,
+    // ★ 新增：归档层级参数
+    firstBusinessTitle: activeTabConfig.value.fileCode || '',   // PROJECT_INITIATION_MEETING_MATERIALS
+    secondaryBusinessTitle: payload.subCode || '',              // PIM_TO_SHAANXI_COMPANY
+    fileTypeTag: payload.fileTypeTag || '',                     // 立项申请
+  })
+  return
+}
 
   // 拦截所有上传操作
   if (MEETING_UPLOAD_ACTIONS.has(payload.key)) {

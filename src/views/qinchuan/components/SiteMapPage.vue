@@ -1441,23 +1441,23 @@ function buildRoadLineFeatures(data) {
     })
   }
   // ★ 分支 B：loops（老格式，作为兜底）
-  else if (Array.isArray(loops)) {
-    loops.forEach((loop, loopIndex) => {
-      const loopName = loop?.loopname || String(loopIndex + 1)
-      pushLineFeatures(
-        lineFeatures,
-        loop?.cablepoletower,
-        {
-          category: 'line',
-          loopIndex,
-          loopName,
-          loopLength: loop?.looplength || '',
-          fanCount: Number(loop?.fan) || (loop?.fanidarr?.length ?? 0),
-          label: `35kV 线路 ${loopName}`,
-        }
-      )
-    })
-  }
+  // else if (Array.isArray(loops)) {
+  //   loops.forEach((loop, loopIndex) => {
+  //     const loopName = loop?.loopname || String(loopIndex + 1)
+  //     pushLineFeatures(
+  //       lineFeatures,
+  //       loop?.cablepoletower,
+  //       {
+  //         category: 'line',
+  //         loopIndex,
+  //         loopName,
+  //         loopLength: loop?.looplength || '',
+  //         fanCount: Number(loop?.fan) || (loop?.fanidarr?.length ?? 0),
+  //         label: `35kV 线路 ${loopName}`,
+  //       }
+  //     )
+  //   })
+  // }
 
   return { roadFeatures, lineFeatures }
 }

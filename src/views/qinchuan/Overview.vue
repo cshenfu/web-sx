@@ -337,6 +337,10 @@
       :ai-detail="activeProjectDetail"
       :action-key="generatePanelActionKey"
       :sub-code="generatePanelSubCode"
+      :source="generatePanelSource"
+      :first-business-title="generatePanelFirstBusinessTitle"
+      :secondary-business-title="generatePanelSecondaryBusinessTitle"
+      :file-type-tag="generatePanelFileTypeTag"
       @close="showGeneratePanel = false"
       @generated="onReportGenerated"
     />
@@ -556,7 +560,10 @@ const hoveredPos = reactive({ x: 0, y: 0 })
 
 let hoverHideTimer = null
 const HOVER_HIDE_DELAY = 800
-
+const generatePanelSource = ref('')
+const generatePanelFirstBusinessTitle = ref('')
+const generatePanelSecondaryBusinessTitle = ref('')
+const generatePanelFileTypeTag = ref('')
 function clearHoverHideTimer() {
   if (hoverHideTimer) {
     clearTimeout(hoverHideTimer)
@@ -698,13 +705,16 @@ function handleOpenAddReport() {
 }
 
 function handleOpenCompetitivePanel(project) {
-  reportModalVisible.value = false // 关闭弹窗
+  reportModalVisible.value = false
   generatePanelProject.value = project
-  generatePanelActionKey.value = 'bidding' // ★ 对应你配置里的 key
+  generatePanelActionKey.value = 'bidding'
   generatePanelSubCode.value = ''
-  showGeneratePanel.value = true // 打开全屏面板
+  generatePanelSource.value = 'competitive-modal'
+  generatePanelFirstBusinessTitle.value = ''
+  generatePanelSecondaryBusinessTitle.value = ''
+  generatePanelFileTypeTag.value = ''
+  showGeneratePanel.value = true
 }
-
 function handleReportPanelSuccess() {
   fetchMapProjects()
   fetchProjectList()
@@ -979,6 +989,10 @@ async function onSiteMapDetailAction(payload) {
     generatePanelProject.value = payload.project || actionProject.value
     generatePanelActionKey.value = payload.actionKey || ''
     generatePanelSubCode.value = payload.subCode || ''
+    generatePanelSource.value = 'sitemap-detail'
+    generatePanelFirstBusinessTitle.value = payload.firstBusinessTitle || ''
+    generatePanelSecondaryBusinessTitle.value = payload.secondaryBusinessTitle || ''
+    generatePanelFileTypeTag.value = payload.fileTypeTag || ''
     showGeneratePanel.value = true
     return
   }
