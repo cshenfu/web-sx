@@ -230,11 +230,8 @@ function buildFileGroups(record, actions) {
     fileName: f.fileName,
     filePath: f.filePath,
     fileSuffix: f.fileSuffix,
-    label:
-      f.recognitionContent?.fileType ||
-      f.fileBusinessType ||
-      actions[i]?.label?.replace(/^(生成|上传)/, '') ||
-      '文件',
+    // ★ 优先用 record.fileTypeTag（业务语义标签），不再取枚举值 "2"
+    label: record.fileTypeTag || f.fileBusinessType || '文件',
     uploaderName: record.uploaderName || record.assignedUploaderName || '-',
     uploadTime: record.updateTime || record.createTime,
     raw: f,
@@ -413,14 +410,14 @@ function handleSetOwner(step) {
   })
 }
 
+// DetailMeetingTab.vue
 function handleAction(action, step) {
   emit('action', {
     key: action.key,
     label: action.label,
-    step: step.subDesc,           // to陕西公司
-    subCode: step.subCode,        // PIM_TO_SHAANXI_COMPANY
-    record: step.lastRecord,
-    // ★ 新增：给 updateFile 用
+    step: step.subDesc,
+    subCode: step.subCode,
+    record: null,   // ★ 新增操作不传 record，避免复用旧 id 和 fileTypeTag
     fileTypeTag: ACTION_TO_FILE_TAG[action.key] || action.label?.replace(/^(生成|上传)/, '') || '',
   })
 }

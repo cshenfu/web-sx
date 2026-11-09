@@ -276,7 +276,19 @@
       @open-confirm="handleOpenConfirm"
     />
 
-    <GenerateReportPanel :visible="showGeneratePanel" :project="generatePanelProject" :action-key="generatePanelActionKey" :sub-code="generatePanelSubCode" @close="showGeneratePanel = false" :ai-detail="selectedProject" @generated="onReportGenerated" />
+    <GenerateReportPanel
+      :visible="showGeneratePanel"
+      :project="generatePanelProject"
+      :action-key="generatePanelActionKey"
+      :sub-code="generatePanelSubCode"
+      :source="generatePanelSource"
+      :first-business-title="generatePanelFirstBusinessTitle"
+      :secondary-business-title="generatePanelSecondaryBusinessTitle"
+      :file-type-tag="generatePanelFileTypeTag"
+      :ai-detail="selectedProject"
+      @close="showGeneratePanel = false"
+      @generated="onReportGenerated"
+    />    
     <AssignDialog v-model="showAssignDialog" :project="assignTargetProject" @success="onAssignSuccess" />
     <ReserveApprovalDialog v-model="showReserveDialog" :project="selectedProject" @saved="onReserveSaved" />
 
@@ -286,6 +298,7 @@
       @close="showGenerateModal = false"
       @add-report="showGenerateModal = false"
       @confirm="handleReportConfirm"
+      @generate-competitive="handleOpenCompetitivePanel"
       @generate-request="handleGenerateRequest"
       @open-add-report="handleOpenAddReport"
     />
@@ -482,6 +495,17 @@ function handleGenerateReportFromHeader(proj) {
   if (proj) selectedProject.value = proj
   showGenerateModal.value = true
 }
+function handleOpenCompetitivePanel(project) {
+  showGenerateModal.value = false
+  generatePanelProject.value = project || selectedProject.value
+  generatePanelActionKey.value = 'bidding'
+  generatePanelSubCode.value = ''
+  generatePanelSource.value = 'competitive-modal'
+  generatePanelFirstBusinessTitle.value = ''
+  generatePanelSecondaryBusinessTitle.value = ''
+  generatePanelFileTypeTag.value = ''
+  showGeneratePanel.value = true
+}
 function getReportConfigBySubTab(subTab) {
   return SUB_TAB_REPORT_CONFIG[subTab] || SUB_TAB_REPORT_CONFIG.FEASIBILITY_STUDY
 }
@@ -506,6 +530,11 @@ const showGeneratePanel = ref(false)
 const generatePanelProject = ref(null)
 const generatePanelActionKey = ref('')
 const generatePanelSubCode = ref('')
+// ★ 新增
+const generatePanelSource = ref('')
+const generatePanelFirstBusinessTitle = ref('')
+const generatePanelSecondaryBusinessTitle = ref('')
+const generatePanelFileTypeTag = ref('')
 
 const showAddReportPanel = ref(false)
 const showConfirmPanel = ref(false)
@@ -924,9 +953,13 @@ function onDetailPanelAction(payload) {
     return
   }
   if (payload?.type === 'generate-report') {
-    generatePanelProject.value = payload.project
-    generatePanelActionKey.value = payload.actionKey
-    generatePanelSubCode.value = payload.subCode
+    generatePanelProject.value = payload.project || selectedProject.value
+    generatePanelActionKey.value = payload.actionKey || ''
+    generatePanelSubCode.value = payload.subCode || ''
+    generatePanelSource.value = 'sitemap-detail'   // ★ 触发 updateFile
+    generatePanelFirstBusinessTitle.value = payload.firstBusinessTitle || ''
+    generatePanelSecondaryBusinessTitle.value = payload.secondaryBusinessTitle || ''
+    generatePanelFileTypeTag.value = payload.fileTypeTag || ''
     showGeneratePanel.value = true
     return
   }
@@ -937,15 +970,68 @@ function onDetailPanelAction(payload) {
 }
 
 // ★ 全量面板 / 简版面板共用的 "create-report" 处理
+// 打开 GeneratePanel（用于 report-tab 的各种 subTab）
+function openGeneratePanelFromReportTab(payload, { actionKey, fileTypeTag, firstBusinessTitle }) {
+  generatePanelProject.value = payload.project || selectedProject.value
+  generatePanelActionKey.value = actionKey
+  generatePanelSubCode.value = ''
+  generatePanelSource.value = 'report-tab'
+  generatePanelFirstBusinessTitle.value = firstBusinessTitle || ''
+  generatePanelSecondaryBusinessTitle.value = ''
+  generatePanelFileTypeTag.value = fileTypeTag || ''
+  showGeneratePanel.value = true
+  showDetailPanel.value = false
+}
+
 function handleCreateReportFromDetail(payload) {
   if (!payload?.subTab) return
-  const config = getReportConfigBySubTab(payload.subTab)
-  wizardMode.value = config.packageType
-  wizardTitleLabel.value = config.title
-  wizardMaxStep.value = config.maxStep
-  wizardReportSubTab.value = payload.subTab
-  wizardVisible.value = true
-  showDetailPanel.value = false
+  const subTab = payload.subTab
+  const project = payload.project || selectedProject.value
+  const stage =
+    project?.projectStage ||
+    project?.stage ||
+    selectedProject.value?.projectStage ||
+    selectedProject.value?.stage ||
+    ''
+
+  switch (subTab) {
+    case 'COMPETITIVE_ALLOCATION':
+      return openGeneratePanelFromReportTab(payload, { actionKey: 'bidding' })
+
+    case 'FEASIBILITY_STUDY':
+      return openGeneratePanelFromReportTab(payload, {
+        actionKey: 'gen-report',
+        fileTypeTag: '可研审查报告',
+        firstBusinessTitle: 'PROJECT_FEASIBILITY_MATERIALS',
+      })
+
+    case 'PROJECT_INITIATION':
+      if (stage === 'INVESTMENT_DECISION') {
+        return openGeneratePanelFromReportTab(payload, {
+          actionKey: 'gen-invest-letter',
+          fileTypeTag: '投资决策请示函',
+          firstBusinessTitle: 'INVESTMENT_DECISION_MATERIALS',
+        })
+      }
+      return openGeneratePanelFromReportTab(payload, {
+        actionKey: 'gen-letter',
+        fileTypeTag: '立项请示函',
+        firstBusinessTitle: 'PROJECT_INITIATION_MATERIALS',
+      })
+
+    case 'PROJECT_PROPOSAL':
+    case 'POST_EVALUATION':
+    default: {
+      const config = getReportConfigBySubTab(subTab)
+      wizardMode.value = config.packageType
+      wizardTitleLabel.value = config.title
+      wizardMaxStep.value = config.maxStep
+      wizardReportSubTab.value = subTab
+      wizardVisible.value = true
+      showDetailPanel.value = false
+      return
+    }
+  }
 }
 
 function onReportGenerated() { console.log('[site-map] 报告已生成') }

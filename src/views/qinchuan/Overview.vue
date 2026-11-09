@@ -614,6 +614,8 @@ const showGeneratePanel = ref(false)
 const generatePanelProject = ref(null)
 const generatePanelActionKey = ref('')
 const generatePanelSubCode = ref('')
+// ★ 新增
+
 const showAssignDialog = ref(false)
 const showReserveDialog = ref(false)
 const showEditProject = ref(false)
@@ -714,6 +716,75 @@ function handleOpenCompetitivePanel(project) {
   generatePanelSecondaryBusinessTitle.value = ''
   generatePanelFileTypeTag.value = ''
   showGeneratePanel.value = true
+}
+
+
+// 打开 GenerateReportPanel（report-tab 的 subTab 都走这里）
+function openGeneratePanelFromReportTab(payload, { actionKey, fileTypeTag = '', firstBusinessTitle = '' }) {
+  generatePanelProject.value = payload.project || activeProjectDetail.value
+  generatePanelActionKey.value = actionKey
+  generatePanelSubCode.value = ''
+  generatePanelSource.value = 'report-tab'
+  generatePanelFirstBusinessTitle.value = firstBusinessTitle
+  generatePanelSecondaryBusinessTitle.value = ''
+  generatePanelFileTypeTag.value = fileTypeTag
+  showGeneratePanel.value = true
+  isDetailFullscreen.value = false
+}
+
+// 打开 ReportWizard（项目建议书 / 后评价）
+function openReportWizard(payload) {
+  const config = getReportConfigBySubTab(payload.subTab)
+  wizardMode.value = config.packageType
+  wizardTitleLabel.value = config.title
+  wizardMaxStep.value = config.maxStep
+  wizardReportSubTab.value = payload.subTab
+  wizardVisible.value = true
+  isDetailFullscreen.value = false
+}
+
+// ★ 统一分发：onSiteMapDetailAction / onDetailPanelAction 都调它
+function dispatchCreateReport(payload) {
+  if (!payload?.subTab) return
+  const subTab = payload.subTab
+  const project = payload.project || activeProjectDetail.value
+  const stage =
+    project?.projectStage ||
+    project?.stage ||
+    activeProjectDetail.value?.projectStage ||
+    activeProjectDetail.value?.stage ||
+    ''
+
+  switch (subTab) {
+    case 'COMPETITIVE_ALLOCATION':
+      return openGeneratePanelFromReportTab(payload, { actionKey: 'bidding' })
+
+    case 'FEASIBILITY_STUDY':
+      return openGeneratePanelFromReportTab(payload, {
+        actionKey: 'gen-report',
+        fileTypeTag: '可研审查报告',
+        firstBusinessTitle: 'PROJECT_FEASIBILITY_MATERIALS',
+      })
+
+    case 'PROJECT_INITIATION':
+      if (stage === 'INVESTMENT_DECISION') {
+        return openGeneratePanelFromReportTab(payload, {
+          actionKey: 'gen-invest-letter',
+          fileTypeTag: '投资决策请示函',
+          firstBusinessTitle: 'INVESTMENT_DECISION_MATERIALS',
+        })
+      }
+      return openGeneratePanelFromReportTab(payload, {
+        actionKey: 'gen-letter',
+        fileTypeTag: '立项请示函',
+        firstBusinessTitle: 'PROJECT_INITIATION_MATERIALS',
+      })
+
+    case 'PROJECT_PROPOSAL':
+    case 'POST_EVALUATION':
+    default:
+      return openReportWizard(payload)
+  }
 }
 function handleReportPanelSuccess() {
   fetchMapProjects()
@@ -978,15 +1049,45 @@ async function refreshActionProjectData() {
 }
 
 async function onSiteMapDetailAction(payload) {
-  console.log('[parent] onSiteMapDetailAction=', payload)          // ★ 加这行
-  console.log('[parent] before set: showGeneratePanel=', showGeneratePanel.value)
   if (payload?.type === 'stage-changed') {
     showSiteMapDetailPanel.value = false
     await refreshActionProjectData()
     return
   }
+
   if (payload?.type === 'generate-report') {
     generatePanelProject.value = payload.project || actionProject.value
+    generatePanelActionKey.value = payload.actionKey || ''
+    generatePanelSubCode.value = payload.subCode || ''
+    // ★ 新增：带上归档层级信息 + 来源标记
+    generatePanelSource.value = 'sitemap-detail'
+    generatePanelFirstBusinessTitle.value = payload.firstBusinessTitle || ''
+    generatePanelSecondaryBusinessTitle.value = payload.secondaryBusinessTitle || ''
+    generatePanelFileTypeTag.value = payload.fileTypeTag || ''
+    showGeneratePanel.value = true
+    return
+  }
+
+  if (payload?.type === 'create-report') {
+    // ★ 不再直接 openWizard，改成分发
+    dispatchCreateReport(payload)
+    showSiteMapDetailPanel.value = false
+    return
+  }
+}
+async function onDetailPanelAction(payload) {
+  if (!payload?.type) return
+
+  // ============ 阶段推进：刷新数据并关闭全屏详情 ============
+  if (payload.type === 'stage-changed') {
+    isDetailFullscreen.value = false
+    await refreshActionProjectData()
+    return
+  }
+
+  // ============ 会议 tab 里点「生成 XXX 报告」 ============
+  if (payload.type === 'generate-report') {
+    generatePanelProject.value = payload.project || activeProjectDetail.value
     generatePanelActionKey.value = payload.actionKey || ''
     generatePanelSubCode.value = payload.subCode || ''
     generatePanelSource.value = 'sitemap-detail'
@@ -996,30 +1097,20 @@ async function onSiteMapDetailAction(payload) {
     showGeneratePanel.value = true
     return
   }
-  if (payload?.type === 'create-report') {
-    const config = getReportConfigBySubTab(payload.subTab)
-    wizardMode.value = config.packageType
-    wizardTitleLabel.value = config.title
-    wizardMaxStep.value = config.maxStep
-    wizardReportSubTab.value = payload.subTab
-    wizardVisible.value = true
-    showSiteMapDetailPanel.value = false
+
+  // ============ 报告列表 tab 里点「创建 XXX」 ============
+  if (payload.type === 'create-report') {
+    dispatchCreateReport(payload)
     return
   }
-}
-function onDetailPanelAction(payload) {
-  if (payload?.type === 'stage-changed') { /* ... */ }
-  if (payload?.type === 'generate-report') { /* ... */ }
-  if (payload?.type === 'create-report') {
-    const config = getReportConfigBySubTab(payload.subTab)
-    wizardMode.value = config.packageType
-    wizardTitleLabel.value = config.title
-    wizardMaxStep.value = config.maxStep
-    wizardReportSubTab.value = payload.subTab
-    wizardVisible.value = true
-    isDetailFullscreen.value = false
+
+  // ============ 智能审查：暂未接，先记录 ============
+  if (payload.type === 'intelligent-review') {
+    console.warn('[overview] intelligent-review 尚未处理', payload)
     return
   }
+
+  // ============ 其他（meeting / set-owner 等）：保持静默 ============
 }
 // 1. 修复头部按钮（必须加 .value，否则 ref 被覆盖，真实数据永远进不来）
 function handleGenerateReportFromHeader(proj) {

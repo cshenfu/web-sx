@@ -810,7 +810,7 @@ async function handleGenerate() {
     }
 
     // ========== ⑥ 仅 sitemap-detail 来源：create 后调 updateFile 补全归档 ==========
-    const needUpdate = props.source === 'sitemap-detail'
+    const needUpdate = ['sitemap-detail', 'report-tab'].includes(props.source)
     if (needUpdate && createRes?.code === 200) {
       // —— 内联 extractCreatedId ——
       const d = createRes?.data
