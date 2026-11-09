@@ -62,10 +62,10 @@
           :label="field.label"
           :required="field.required"
         >
-          <template #label>
+          <!-- <template #label>
             <span v-if="field.required" class="required-star">*</span>
             {{ field.label }}
-          </template>
+          </template> -->
           
           <div class="input-wrapper">
             <el-date-picker
@@ -197,10 +197,10 @@ const HIDE_COMMON_FIELDS_MAP = {
 // 特定字段的额外配置 (水保、环保等)
 const EXTRA_FIELDS_MAP = {
   '环评批复': [
-    { key: 'environmentalProtectionInvestment', label: '环保投资', required: true, suffix: '万元' },
+    { key: 'environmentalProtectionInvestment', label: '环保投资', required: false, suffix: '万元' },
   ],
   '水保批复': [
-    { key: 'waterConservationInvestment', label: '水保投资', required: true, suffix: '万元' },
+    { key: 'waterConservationInvestment', label: '水保投资', required: false, suffix: '万元' },
     { key: 'soilWaterConservationFee', label: '水土保持补偿费', required: true, suffix: '万元' },
   ],
   '贷款意向书': [
