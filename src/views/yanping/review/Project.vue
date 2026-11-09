@@ -69,11 +69,11 @@
         </div>
 
         <!-- 表格 + 分页 -->
-        <div class="admin-table-area">
+        <div class="admin-table-area" v-loading="loading">
           <CommonTable
-            :data="pagedTableData"
+            :data="tableData"
             :columns="columns"
-            :total="filteredData.length"
+            :total="total"
             v-model:current-page="currentPage"
             v-model:page-size="pageSize"
             :show-page-sizes="true"
@@ -123,13 +123,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-// 引入公共表格组件
 import CommonTable from '@/views/guizhi/components/CommonTable.vue'
-// 💡 引入报告预览组件
 import ReviewReportPreview from './components/ReviewReportPreview.vue'
+// 💡 引入智能评审分页接口
+import { getZNPSPage } from '@/api/modules/report'
 
 const router = useRouter()
 const route = useRoute()
@@ -140,6 +140,8 @@ const isDraft = computed(() => route.name === 'ReviewDraft')
 // ================= 分页 =================
 const currentPage = ref(1)
 const pageSize = ref(10)
+const total = ref(0)
+const loading = ref(false)
 
 // ================= 搜索表单 =================
 const searchForm = reactive({
@@ -154,7 +156,7 @@ const searchForm = reactive({
 // ================= 表格列配置 =================
 const columns = [
   { prop: 'projectCode',     label: '项目编号',     minWidth: 120 },
-  { prop: 'projectName',     label: '项目名称',     minWidth: 200, slot: 'projectName' },
+  { prop: 'projectName',     label: '项目名称',     minWidth: 300, slot: 'projectName' },
   { prop: 'region',          label: '项目区域',     minWidth: 180 },
   { prop: 'totalCapacity',   label: '总规划容量',   minWidth: 100 },
   { prop: 'currentCapacity', label: '本期规划容量', minWidth: 110 },
@@ -165,92 +167,97 @@ const columns = [
   { prop: 'createTime',      label: '创建时间',     minWidth: 160 }
 ]
 
-// ================= 模拟数据 =================
-const tableData = ref([])
-
-const fetchTableData = () => {
-  // TODO: 在这里根据 isDraft.value 调用不同的后端接口
-  
-  tableData.value = [
-    {
-      id: 1,
-      projectCode: 'PH93678907',
-      projectName: '延长紫沙100MW风电场',
-      projectType: 'wind',
-      region: '陕西省延安市延长区',
-      totalCapacity: '200',
-      currentCapacity: '200',
-      status: 'planning',
-      statusText: '计划中',
-      company: 'XXXX分公司',
-      creator: '张三',
-      approver: '',
-      createTime: '2025-06-09 09:00:00'
-    },
-    {
-      id: 2,
-      projectCode: 'PH93678907',
-      projectName: '延长紫沙100MW风电场',
-      projectType: 'wind',
-      region: '陕西省延安市延长区',
-      totalCapacity: '200',
-      currentCapacity: '200',
-      status: 'queueing',
-      statusText: '排队中',
-      company: 'XXXX分公司',
-      creator: '张三',
-      approver: '',
-      createTime: '2025-06-09 09:00:00'
-    },
-    {
-      id: 3,
-      projectCode: 'PH93678907',
-      projectName: '延长紫沙100MW风电场',
-      projectType: 'wind',
-      region: '陕西省延安市延长区',
-      totalCapacity: '200',
-      currentCapacity: '200',
-      status: 'completed',
-      statusText: '已完成',
-      company: 'XXXX分公司',
-      creator: '张三',
-      approver: '',
-      createTime: '2025-06-09 09:00:00'
-    }
-  ]
+// ================= 工具函数 =================
+/** 时间戳格式化 YYYY-MM-DD HH:mm:ss */
+const formatTimestamp = (ts) => {
+  if (!ts) return ''
+  const d = new Date(ts)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
+
+/** 后端状态 -> 前端状态映射（请根据实际枚举调整） */
+const mapStatus = (reportProjectStatus) => {
+  const map = {
+    '1': { status: 'planning', statusText: '计划中' },
+    '2': { status: 'queueing', statusText: '排队中' },
+    '3': { status: 'queueing', statusText: '排队中' },
+    '4': { status: 'completed', statusText: '已完成' }
+  }
+  return map[reportProjectStatus] || { status: 'planning', statusText: '计划中' }
+}
+
+/** 后端项目类型 -> 前端项目类型（1 风电 / 2 光伏，请根据实际枚举调整） */
+const mapProjectType = (reportItemType) => {
+  return reportItemType === 1 ? 'wind' : 'solar'
+}
+
+// ================= 获取列表数据 =================
+const fetchTableData = async () => {
+  loading.value = true
+  try {
+    const params = {
+      pageNo: currentPage.value,
+      pageSize: pageSize.value,
+      projectCode: searchForm.projectCode || '',
+      projectName: searchForm.projectName || ''
+    }
+
+    // 如果后端支持以下筛选条件，可按实际参数名传入（当前接口示例只给了上面四个）
+    if (searchForm.region) params.region = searchForm.region
+    if (searchForm.projectType) {
+      params.reportItemType = searchForm.projectType === 'wind' ? 1 : 2
+    }
+    if (searchForm.status) {
+      const statusMap = { planning: '1', queueing: '2', completed: '4' }
+      params.reportProjectStatus = statusMap[searchForm.status]
+    }
+    if (searchForm.dateRange?.length) {
+      params.startTime = searchForm.dateRange[0]
+      params.endTime = searchForm.dateRange[1]
+    }
+
+    const res = await getZNPSPage(params)
+    const list = res?.data?.list || []
+    total.value = res?.data?.total || 0
+
+    tableData.value = list.map((item) => {
+      const statusInfo = mapStatus(item.reportProjectStatus)
+      return {
+        ...item, // 保留原始字段，供预览组件使用（reviewProjectId 等）
+        projectCode: item.reportProjectCode,
+        projectName: item.reportProjectName,
+        projectType: mapProjectType(item.reportItemType),
+        region: [item.provinceName, item.cityName, item.districtName].filter(Boolean).join('') || '',
+        totalCapacity: item.totalProjectCapacity,
+        currentCapacity: item.currentProjectCapacity,
+        status: statusInfo.status,
+        statusText: statusInfo.statusText,
+        company: '', // 接口未返回，按需补充
+        creator: '', // 接口未返回，按需补充
+        approver: '', // 接口未返回，按需补充
+        createTime: formatTimestamp(item.createTime)
+      }
+    })
+  } catch (error) {
+    console.error('获取智能评审列表失败', error)
+    ElMessage.error('获取列表失败')
+    tableData.value = []
+    total.value = 0
+  } finally {
+    loading.value = false
+  }
+}
+
+const tableData = ref([])
 
 onMounted(() => {
   fetchTableData()
 })
 
-// ================= 筛选逻辑 =================
-const filteredData = computed(() => {
-  const [start, end] = searchForm.dateRange || []
-  const code = (searchForm.projectCode || '').trim().toLowerCase()
-  const name = (searchForm.projectName || '').trim().toLowerCase()
-
-  return tableData.value.filter((row) => {
-    if (searchForm.region && !row.region.includes(searchForm.region)) return false
-    if (searchForm.projectType && row.projectType !== searchForm.projectType) return false
-    if (searchForm.status && row.status !== searchForm.status) return false
-    if (code && !row.projectCode.toLowerCase().includes(code)) return false
-    if (name && !row.projectName.toLowerCase().includes(name)) return false
-
-    if (start || end) {
-      const rowDate = row.createTime.slice(0, 10)
-      if (start && rowDate < start) return false
-      if (end && rowDate > end) return false
-    }
-
-    return true
-  })
-})
-
-// ================= 分页切片 =================
-const pagedTableData = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  return filteredData.value.slice(start, start + pageSize.value)
+// ================= 分页变化时重新请求 =================
+watch([currentPage, pageSize], () => {
+  fetchTableData()
 })
 
 // ================= 💡 行点击预览逻辑 =================
@@ -268,8 +275,12 @@ const handleAddProject = () => {
 }
 
 const handleSearch = () => {
-  currentPage.value = 1
-  ElMessage.success(`搜索完成，共 ${filteredData.value.length} 条`)
+  // 如果当前不是第一页，修改 currentPage 会触发 watch 自动请求
+  if (currentPage.value === 1) {
+    fetchTableData()
+  } else {
+    currentPage.value = 1
+  }
 }
 
 const handleReset = () => {
@@ -279,11 +290,15 @@ const handleReset = () => {
   searchForm.dateRange = []
   searchForm.projectCode = ''
   searchForm.projectName = ''
-  currentPage.value = 1
+
+  if (currentPage.value === 1) {
+    fetchTableData()
+  } else {
+    currentPage.value = 1
+  }
 }
 
 const handleView = (row) => {
-  // 如果“查看”按钮也需直接触发预览，可以直接调用 handleRowClick(row)
   handleRowClick(row)
 }
 
@@ -303,7 +318,7 @@ const handleDelete = (row) => {
 </script>
 
 <style scoped lang="scss">
-/* 引入公共样式 */
+/* 原样式保持不变 */
 @import '@/views/guizhi/components/css/admin-common.scss';
 
 .log-root {
@@ -318,7 +333,7 @@ const handleDelete = (row) => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px 10px !important;
-  
+
   .page-title {
     font-size: 16px !important;
     font-weight: bold !important;
@@ -338,7 +353,7 @@ const handleDelete = (row) => {
   background: transparent !important;
   border-bottom: none !important;
   padding: 0 !important;
-  
+
   .filter-row {
     padding: 0 !important;
     margin-bottom: 10px !important;
@@ -355,8 +370,8 @@ const handleDelete = (row) => {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px; 
-  
+  gap: 10px;
+
   :deep(.el-date-editor.filter-date) {
     width: 260px !important;
     max-width: 260px !important;
@@ -409,13 +424,13 @@ const handleDelete = (row) => {
   font-weight: 500;
 }
 .status-text.planning {
-  color: #1677ff; /* 计划中：蓝色 */
+  color: #1677ff;
 }
 .status-text.queueing {
-  color: #faad14; /* 排队中：橙色 */
+  color: #faad14;
 }
 .status-text.completed {
-  color: #52c41a; /* 已完成：绿色 */
+  color: #52c41a;
 }
 
 /* 操作列按钮样式微调 */
