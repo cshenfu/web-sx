@@ -75,6 +75,9 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { getProvince } from '@/api/modules/public';
 import { filterAreaInfo } from '../../commonData';
 
+// 陕西省区域编码（接口返回为字符串）
+const SHANXI_REGION_CODE = '610000';
+
 const emit = defineEmits([
   'viewType',
   'handleSearchCommon',
@@ -84,7 +87,7 @@ const emit = defineEmits([
 const props = defineProps({
   activeKey: {
     type: Number,
-    default: 0,
+    default: 1, // 本页固定公共数据
   },
 });
 
@@ -119,13 +122,14 @@ const dataState = {
   ],
 };
 
+// activeKey 固定 1（公共），fallback 也用公共那套
 const statusOptions = computed(() =>
-  dataState[props.activeKey] || dataState[0],
+  dataState[props.activeKey] || dataState[1],
 );
 
 const createEmptySearchInfo = () => ({
   rangeType: '0',
-  geo: [],
+  geo: [], // UI 保持空，请求时由父组件兜底陕西
   status: undefined,
   geologyCode: '',
   projectCode: '',
@@ -136,8 +140,13 @@ const searchInfo = reactive(createEmptySearchInfo());
 onMounted(() => {
   getProvince().then((res) => {
     if (res?.code === 200) {
-      areaCodeData.value = res.data?.subList || [];
-      areaCodeOptions.value = filterAreaInfo(0, areaCodeData.value);
+      const all = res.data?.subList || [];
+      const shanxi = all.filter(
+        (item) => item.regionCode === SHANXI_REGION_CODE,
+      );
+      areaCodeData.value = shanxi;
+      areaCodeOptions.value = filterAreaInfo(0, shanxi);
+      // 注意：不设置 searchInfo.geo，保持 UI 空
     }
   });
 });

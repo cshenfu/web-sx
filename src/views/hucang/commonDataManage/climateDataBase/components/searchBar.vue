@@ -105,7 +105,7 @@ const emit = defineEmits(['getModeType', 'addEvent', 'useFileEvent', 'update:mod
 const searchKey = ref({
     activeKey: 1,
     modeType: 'b',
-    areaLevel: 0,
+    areaLevel: 0,                       // 0 会被 allList 删掉，靠 affiliationCode 限陕西
     affiliationCode: [],
     codeNo: '',
 });
@@ -117,7 +117,19 @@ const statusData = computed(() => {
     searchKey.value.status = null;
     return searchKey.value.source == 2 ? USER_COMMON_DATA_STATUS : PUBLIC_COMMON_STATUS;
 });
+// 陕西省区域编码（接口返回为字符串）
+const SHANXI_REGION_CODE = '610000';
 
+// 构造发请求的 payload：affiliationCode 为空时兜底陕西，保证请求永远带 610000
+const buildSearchPayload = () => {
+    const codes = searchKey.value.affiliationCode;
+    return {
+        ...searchKey.value,
+        affiliationCode: (codes && codes.length > 0)
+            ? [...codes]
+            : [SHANXI_REGION_CODE],
+    };
+};
 // 标签切换
 const chooseTabs = (index) => {
     searchKey.value.activeKey = index;
@@ -133,16 +145,18 @@ const add = () => {
 };
 // 搜索
 const handleSearch = () => {
-    mitt.emit('handleSearch', searchKey.value);
+    mitt.emit('handleSearch', buildSearchPayload());
 };
-// 重置
+
 const resetSearch = () => {
+    // UI 重置为空，不回显陕西
     searchKey.value.affiliationCode = [];
     searchKey.value.areaLevel = 0;
     searchKey.value.codeNo = '';
     searchKey.value.modeType = defaultModeType.value;
     areaCodeOptions.value = areaCodeData.value;
-    mitt.emit('resetSearch', searchKey.value);
+    // 请求兜底陕西
+    mitt.emit('resetSearch', buildSearchPayload());
 };
 const changeMode = async (e) => {
     defaultModeType.value = e.target.value;
@@ -158,22 +172,25 @@ const openDropDown = (open, type) => {
 };
 const changeAreaData = (val) => {
     areaCodeOptions.value = filterAreaInfo(val * 1, areaCodeData.value);
-    searchKey.value.affiliationCode = []
-    mitt.emit('handleSearch', searchKey.value)
+    searchKey.value.affiliationCode = [];   // UI 清空
+    handleSearch();                          // 走 helper，请求仍带陕西
 };
 
 onMounted(async () => {
     try {
         const res = await getProvince();
         if (res.code === 200) {
-            areaCodeData.value = res.data?.subList;
-            areaCodeOptions.value = res.data?.subList;
+            const all = res.data?.subList || [];
+            const shanxi = all.filter(item => item.regionCode === SHANXI_REGION_CODE);
+            areaCodeData.value = shanxi;
+            areaCodeOptions.value = shanxi;
+            // 注意：不设置 searchKey.affiliationCode，保持 UI 空
         }
     } catch (e) {
         console.log(e);
     }
-    handleSearch()
-})
+    handleSearch();   // 首次请求：affiliationCode 走兜底 = ['610000']
+});
 onActivated(() => {
     mitt.emit('handleSearch', searchKey.value)
 })

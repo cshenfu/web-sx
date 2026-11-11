@@ -126,14 +126,16 @@
         </div>
 
         <!-- ★ 点击选中：右上角固定卡片 -->
+        <!-- ★ 点击选中：右上角固定卡片 -->
         <ProjectActionCard
-          v-if="popoverProject && !isEditing && !showVerifyPanel && !showDetailPanel && !showCreateProject && !showEditProject"
+          v-if="popoverProject && !isEditing && !showVerifyPanel && !showDetailPanel && !showSiteMapDetailPanel && !showCreateProject && !showEditProject"
           :project="popoverProject"
           :stage-map="stageMap"
           :actions="cardActions"
           @open-detail="(p) => openDetailPanel(p, 'main')"
           @action="executeAction"
         />
+        <!-- (hover 的卡片也加上 !showSiteMapDetailPanel) -->
 
         <!-- ★ hover：点标题同样走完整场区选中流程 -->
         <ProjectActionCard
@@ -245,9 +247,9 @@
     />
     <ProjectDrawer :visible="showProjectDrawer" :list="projectList" :total="pagination.total" :page="pagination.page" :page-size="pagination.pageSize" :selected-id="popoverProject?.id ?? null" :loading="listLoading" :row-actions="rowActions" @close="showProjectDrawer = false" @select="focusProject" @action="handleDrawerAction" @page-change="handlePageChange" @size-change="handleSizeChange" @sort-change="handleDrawerSortChange" />
 
-    <!-- ★ 智能选址（PRELIMINARY_SELECTION）：用全量 overview 详情面板（5 tab） -->
+        <!-- ★ 1. 点击“项目名称”进的全量面板 -->
     <ProjectDetailPanelFull
-      v-if="showDetailPanel && isSmartSite"
+      v-if="showDetailPanel"
       :project="selectedProject"
       :is-fullscreen="true"
       :initial-tab="detailTabMapped"
@@ -256,6 +258,7 @@
       @generate-report="handleGenerateReportFromHeader"
       @open-confirm="handleOpenConfirm"
       @create-report="handleCreateReportFromDetail"
+      @action="onDetailPanelAction"
       @support-add-data="() => {}"
       @support-file-action="() => {}"
       @survey-add-data="() => {}"
@@ -263,14 +266,13 @@
       @report-row-action="() => {}"
     />
 
-    <!-- 其他阶段：保持现有简版 -->
+    <!-- ★ 2. 点击“操作按钮”进的简版面板 -->
     <ProjectDetailPanel
-      v-else
-      :visible="showDetailPanel"
+      :visible="showSiteMapDetailPanel"
       :project="selectedProject"
       :stage="props.stage || selectedProject?.projectStage || ''"
       :initial-tab="detailPanelTab"
-      @close="showDetailPanel = false"
+      @close="showSiteMapDetailPanel = false"
       @action="onDetailPanelAction"
       @generate-report="handleGenerateReportFromHeader"
       @open-confirm="handleOpenConfirm"
@@ -414,6 +416,15 @@ const PROVINCE_BOUNDARY_SOURCE_ID = 'site-province-boundary-src'
 const CITY_BOUNDARY_LAYER_ID = 'site-city-boundary-line'
 const CITY_BOUNDARY_SOURCE_ID = 'site-city-boundary-src'
 const SHAANXI_FIT_BOUNDS = [[105.4, 31.7], [111.2, 39.6]]
+
+// ★ 星空渐变阈值（zoom）
+//   zoom 6.8 ≈ 整个陕西范围 → 不显示星空
+//   zoom 8    ≈ 看到某市/部分         → 星空开始淡入
+//   zoom 10   ≈ 看到市内部/场区       → 星空完全覆盖
+const STARFIELD_FADE_START = 7
+const STARFIELD_FADE_END = 10
+const SHAANXI_FIT_PADDING = { top: 120, bottom: 120, left: 120, right: 120 }
+const MIN_ZOOM_OFFSET = 2
 const PROVINCE_CODE = '610000'
 
 const PROJECT_ICON_LAYER_MAP = { 'wind-gh': ['project-wind-all', 'project-wind-bx-all'], booster: ['project-booster-all'] }
@@ -510,6 +521,7 @@ function getReportConfigBySubTab(subTab) {
   return SUB_TAB_REPORT_CONFIG[subTab] || SUB_TAB_REPORT_CONFIG.FEASIBILITY_STUDY
 }
 const showDetailPanel = ref(false)
+const showSiteMapDetailPanel = ref(false) // ★ 新增：专门控制简版面板
 const detailPanelTab = ref('main')
 
 // ★ 简版面板 tab（'main' / 'material' / 'meeting'）→ 全量面板 tab（'main' / 'survey' / 'support' / 'report' / 'review'）
@@ -539,7 +551,44 @@ const generatePanelFileTypeTag = ref('')
 const showAddReportPanel = ref(false)
 const showConfirmPanel = ref(false)
 const confirmReportId = ref(null)
+  // ============================================================
+  // ★ 计算并应用"当前容器下完整看到陕西"对应的最小 zoom
+  //   用户不能再缩小到超过陕西范围
+  // ============================================================
+  function applyMinZoomForShaanxi(map, padding = SHAANXI_FIT_PADDING) {
+    if (!map) return
+    const container = map.getContainer()
+    const W = container.clientWidth - padding.left - padding.right
+    const H = container.clientHeight - padding.top - padding.bottom
+    if (W <= 0 || H <= 0) return
 
+    const [[w, s], [e, n]] = SHAANXI_FIT_BOUNDS
+    const toY = (lat) => {
+      const m = Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360))
+      return (Math.PI - m) / (2 * Math.PI)
+    }
+    const dx = (e - w) / 360
+    const dy = Math.abs(toY(s) - toY(n))
+    const zx = Math.log2(W / (dx * 256))
+    const zy = Math.log2(H / (dy * 256))
+    const fitZ = Math.min(zx, zy)
+
+    // ★ 关键：允许缩小 0.8 级，这样你能看到陕西完整的轮廓，甚至带一点周边省份
+    const minZ = Math.max(3.5, fitZ - MIN_ZOOM_OFFSET) 
+    
+    map.setMinZoom(minZ)
+    if (map.getZoom() < minZ) map.jumpTo({ zoom: minZ })
+  }
+
+  // ★ window resize 时重新计算 minZoom
+  function handleWindowResize() {
+    // requestAnimationFrame 等 MapLibre 内部 resize 完成
+    requestAnimationFrame(() => {
+      const map = mapRef.value?.getMap?.()
+      if (!map) return
+      applyMinZoomForShaanxi(map)
+    })
+  }
 
 function handleOpenAddReport() {
    showGenerateModal.value = false
@@ -850,11 +899,11 @@ function executeAction(action, project) {
   const mapProject = allMapProjects.value.find((p) => p.id === project.id) || project
 
   if (['material', 'researchMaterial', 'investMaterial'].includes(action)) {
-    openDetailPanel(mapProject, 'material');
+    openSiteMapDetailPanel(mapProject, 'material');
     return
   }
   if (['establishMeeting', 'researchReview', 'investMeeting'].includes(action)) {
-    openDetailPanel(mapProject, 'meeting');
+    openSiteMapDetailPanel(mapProject, 'meeting');
     return
   }
   if (action === 'assign') { assignTargetProject.value = mapProject; showAssignDialog.value = true; return }
@@ -906,28 +955,25 @@ async function handleDeleteProject(project) {
 }
 
 // ★ 打开详情面板 —— 统一走"选中场区"完整流程
+// ★ 打开全量详情面板（点击标题）
 async function openDetailPanel(project, tab) {
-  // ★ 打开详情前，先关 hover 弹窗 + 清定时器
   clearHoverState()
-
   const p = allMapProjects.value.find(item => item.id === project.id)
   if (!p) { ElMessage.warning('地图上未找到该项目'); return }
   showProjectDrawer.value = false
   viewMode.value = 'map'
 
-  // ★ 走完整选中流程：flyTo、高亮场区、渲染风机/升压站图标、加载道路
-  //   onProjectClick 内部有同 id return 保护，从固定卡片点标题不会重复 flyTo
   await onProjectClick(p.id)
 
-  // ★ 拉 AI 详情，填充 mainInfo（全量面板主要信息 tab 需要）
   try {
     const res = await api.getAiProjectData(p.id)
     if (res?.code === 200 && res.data) {
       const ai = res.data
       selectedProject.value = {
         ...selectedProject.value,
-        aiProjectId: ai.aiProjectId ?? p.id, // ★ 补充：把真实的 aiProjectId 塞进去
-        id: ai.aiProjectId ?? p.id,          // ★ 补充：把 id 替换成 AI 项目 ID（对齐首页逻辑）
+        listItemId: p.id,
+        aiProjectId: ai.aiProjectId ?? p.id,
+        id: p.id,
         relationId: ai.relationId,
         reportProjectId: ai.reportProjectId,
         mainInfo: buildMainInfoFromAi(ai),
@@ -943,7 +989,20 @@ async function openDetailPanel(project, tab) {
   }
 
   detailPanelTab.value = tab
-  showDetailPanel.value = true
+  showSiteMapDetailPanel.value = false // ★ 互斥
+  showDetailPanel.value = true         // ★ 打开全量
+}
+
+// ★ 新增：打开简版详情面板（点击操作按钮）
+async function openSiteMapDetailPanel(project, tab = 'main') {
+  clearHoverState()
+  const p = allMapProjects.value.find(item => item.id === project.id) || project
+  await onProjectClick(p.id)
+  
+  selectedProject.value = p
+  detailPanelTab.value = tab
+  showDetailPanel.value = false        // ★ 互斥
+  showSiteMapDetailPanel.value = true  // ★ 打开简版
 }
 function onAssignSuccess() { fetchProjectList(); fetchMapProjects() }
 function onDetailPanelAction(payload) {
@@ -1123,10 +1182,11 @@ async function ensureShaanxiMask() {
       geojson: data,
       pattern: MASK_PATTERN,
       color: props.maskColor,
-      opacity: props.maskMaxOpacity,
+      opacity: 0,                     // ★ 改为 0，由 syncMaskVisibility 后续渐变
       fadeDuration: props.maskFadeDuration,
     })
-    lastMaskOpacity = -1; syncMaskVisibility(true)
+    lastMaskOpacity = -1
+    syncMaskVisibility(true) 
   } catch (err) { console.warn('[mask] 陕西省遮罩加载失败:', err) }
 }
 function viewIntersectsShaanxi(map) {
@@ -1140,7 +1200,11 @@ function viewIntersectsShaanxi(map) {
 function smoothstep(e0, e1, x) { if (e1 <= e0) return x >= e1 ? 1 : 0; const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t) }
 function computeMaskOpacity() {
   if (!props.enableShaanxiMask) return 0
-  return props.maskMaxOpacity
+  const map = mapRef.value?.getMap?.()
+  if (!map) return 0
+  const z = map.getZoom()
+  // 与 overview 同款：用 smoothstep 做"底图 → 星空"的渐变
+  return smoothstep(STARFIELD_FADE_START, STARFIELD_FADE_END, z) * props.maskMaxOpacity
 }
 function syncMaskVisibility(force = false) {
   if (!props.enableShaanxiMask) return
@@ -1711,6 +1775,7 @@ function clearPopover() {
   clearHoverState()
   showVerifyPanel.value = false
   showDetailPanel.value = false
+  showSiteMapDetailPanel.value = false // ★ 加上这行
   renderAreaCenterIcons()
 }
 
@@ -2092,7 +2157,9 @@ async function onMapReady() {
   if (showCreateProject.value) nextTick(() => startCreateDrawing())
   const map = mapRef.value.getMap()
 
-  try { map.setProjection({ type: 'globe' }) } catch (e) { try { map.setProjection('globe') } catch (e2) {} }
+  // ★ 1. 使用平面投影（Mercator），这样底边不会被地球弧度裁切
+  try { map.setProjection({ type: 'mercator' }) } catch (e) {}
+
   try {
     map.dragRotate.enable()
     map.touchPitch.enable()
@@ -2104,26 +2171,22 @@ async function onMapReady() {
     console.warn('[site-map] 初始化俯仰设置失败:', e)
   }
 
-  const FLY_DELAY = 900
-  const shaanxiPadding = { top: 60, bottom: 60, left: 60, right: 60 }
-  let userInteracted = false
-  const markUserInteracted = () => { userInteracted = true }
-  map.once('dragstart', markUserInteracted)
-  map.once('zoomstart', markUserInteracted)
-  map.once('rotatestart', markUserInteracted)
+  // ★ 2. 先正常定位
+  map.fitBounds(SHAANXI_FIT_BOUNDS, {
+    padding: { top: 100, bottom: 100, left: 180, right: 180 }, // 左边留出大卡片的位置
+    pitch: 0,
+    bearing: 0,
+    duration: 0,
+  })
 
-  setTimeout(() => {
-    if (!map || userInteracted) return
-    map.fitBounds(SHAANXI_FIT_BOUNDS, {
-      padding: shaanxiPadding,
-      pitch: 0,
-      bearing: 0,
-      duration: 4000,
-      curve: 1.7,
-      essential: true,
-    })
-  }, FLY_DELAY)
+  // ★ 3. 核心：算完之后，强行把视野拉远 1.0 级！（让镜头退后，看到更大范围）
+  const fitZoom = map.getZoom()
+  map.setZoom(fitZoom)
+  map.setMaxBounds([[98.0, 28.0], [120.0, 43.0]])
+  // ★ 4. 解除缩小限制，允许用户自己继续往下滚轮看更大范围
+  map.setMinZoom(5.9) 
 
+  // ================= 下面是原有逻辑 =================
   map.on('click', handleMapBlankClick)
   map.on('click', handleCityFillClick)
   if (isAreaView.value) { hideCityStats(); renderProjectsByStage('area') } else await renderCityStats()
@@ -2144,12 +2207,14 @@ onMounted(() => {
   void loadShaanxiBoundary()
   void loadCityGeoJSON()
   fetchStageList(); fetchProjectList(); fetchMapProjects(); fetchOverviewStats(); fetchCityStats()
+  window.addEventListener('resize', handleWindowResize)   // ★ 新增
 })
 onUnmounted(() => {
   clearHoverHideTimer()
   removeRoadLineLayers()
   whlnPlugin?.destroy?.(); whlnPlugin = null
   unbindZoomListener()
+  window.removeEventListener('resize', handleWindowResize)   // ★ 新增
   const map = mapRef.value?.getMap?.()
   if (map) {
     map.off('click', handleMapBlankClick)

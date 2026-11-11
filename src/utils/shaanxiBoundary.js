@@ -29,6 +29,7 @@ export function loadShaanxiProvince() {
     provincePromise = fetchGeoJSON(buildUrl("code='610000'"), 'province')
       .catch((err) => { provincePromise = null; throw err })
   }
+  console.log(provincePromise,"ddddddddddddddddddddddddddddddddddddd")
   return provincePromise
 }
 

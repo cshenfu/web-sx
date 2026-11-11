@@ -16,24 +16,8 @@
                 </el-button>
             </div>
 
-            <!-- 主卡片：Tab + 搜索 + 列表 / 地图，整体白底 -->
+            <!-- 主卡片：搜索 + 列表 / 地图，整体白底 -->
             <div class="main-card">
-                <!-- 数据来源 Tab -->
-                <div class="geo-tabs">
-                    <ul class="geo-tabs-list">
-                        <li
-                            class="geo-tab"
-                            :class="{ active: activeKey == 2 }"
-                            @click="chooseTabs(2)"
-                        >用户数据</li>
-                        <li
-                            class="geo-tab"
-                            :class="{ active: activeKey == 1 }"
-                            @click="chooseTabs(1)"
-                        >公共数据</li>
-                    </ul>
-                </div>
-
                 <div class="filter-bar">
                     <searchCommon
                         ref="searchCommonRef"
@@ -98,24 +82,19 @@ export default {name: "geologyList"}
     import { getGeologyList } from '@/api/modules/geology';
     import mitt from '@/utils/eventBus';
     const router = useRouter();
-    let activeKey = ref(1);
+
+    // 陕西省区域编码（接口返回为字符串）
+    const SHANXI_REGION_CODE = '610000';
+
+    // 固定公共数据，不再提供用户/公共切换
+    const activeKey = ref(1);
     // 1：地图，2：列表。地质数据库默认显示列表。
-    let viewTypes = ref(2);
-    let totalNum = ref(0);
+    const viewTypes = ref(2);
+    const totalNum = ref(0);
     const searchCommonRef = ref();
     const geologyListRef = ref();
     const dataTypeDialogVisible = ref(false);
-    const chooseTabs = (value) => {
-        activeKey.value = value;
-        if (geologyListRef.value?.page) {
-            geologyListRef.value.page.current = 1;
-        }
-        nextTick(() => {
-            if (viewTypes.value == 2) {
-                onInitAreaListData();
-            }
-        });
-    };
+
     const getViewType = (value) => {
         const nextViewType = Number(value);
         if (nextViewType !== 1 && nextViewType !== 2) {
@@ -142,7 +121,7 @@ export default {name: "geologyList"}
         router.push({
             path: '/hucang/geology/import',
             query: {
-                source: activeKey.value,
+                source: activeKey.value, // 固定 1，公共数据
                 dataType,
             },
         });
@@ -150,16 +129,13 @@ export default {name: "geologyList"}
     // 搜索数据信息
     const searchCont = ref();
     watch(
-        [viewTypes, activeKey],
-        ([newType, oldType]) => {
-            if (newType == 2) {
-                // 加载列表数据
+        [viewTypes],
+        () => {
+            if (viewTypes.value == 2) {
                 nextTick(() => onInitAreaListData());
             }
         },
-        {
-            deep: true,
-        },
+        { deep: true },
     );
     onMounted(async() => {
         initMitt()
@@ -179,6 +155,7 @@ export default {name: "geologyList"}
         deletMitt()
     })
     const initMitt =()=> {
+        mitt.off('reGetListData'); // 防重复注册
         if (sessionStorage.getItem('reGetListData')) {
             sessionStorage.removeItem('reGetListData');
             onInitAreaListData();
@@ -200,18 +177,21 @@ export default {name: "geologyList"}
         let params = {
             pageNo: listPage.current ?? listPage.pageNo ?? 1,
             pageSize: listPage.pageSize ?? 10,
-            source: activeKey.value, // 数据来源 1后台数据 2用户数据
-            rangeType: searchCont.value?.rangeType, // 数据范围 1省 2市 3区
+            source: activeKey.value, // 固定 1 公共数据
+            rangeType: searchCont.value?.rangeType, // 数据范围 0全部 1省 2市 3区
             projectCode: searchCont.value?.projectCode, // 关联项目编号
             geologyCode: searchCont.value?.geologyCode, // 数据编号
         };
-        console.log(params);
+
+        // 区域兜底：geo 为空时永远带陕西，保证只查陕西
+        const geoArr = searchCont.value?.geo;
+        const lastGeo = (geoArr && geoArr.length > 0)
+            ? geoArr[geoArr.length - 1]
+            : null;
+
         params = Object.assign(params, {
             status: searchCont.value?.status,
-            cityCode:
-                searchCont.value && searchCont.value.geo
-                    ? searchCont.value.geo[searchCont.value.geo.length - 1]
-                    : '0',
+            cityCode: lastGeo ?? SHANXI_REGION_CODE,
         });
         if (activeKey.value == 1) {
             params.isDisable = params.status;
@@ -226,9 +206,7 @@ export default {name: "geologyList"}
     };
     // 搜索事件
     const handleSearchEvent = (searchInfo) => {
-        console.log(searchInfo);
         searchCont.value = searchInfo;
-        console.log('搜索事件', searchInfo);
         if (geologyListRef.value?.page) {
             geologyListRef.value.page.current = 1;
         }
@@ -344,56 +322,12 @@ export default {name: "geologyList"}
         min-height: 0;
         display: flex;
         flex-direction: column;
-        margin: 0 12px 30px;        /* 底部 30px 留白 */
+        margin: 0 12px 30px;
         background: #FFFFFF;
         border: 1px solid #DFE5EC;
         border-radius: 12px;
         box-shadow: 0 4px 16px rgba(11, 28, 44, 0.04);
         overflow: hidden;
-    }
-
-    /* 数据来源 Tab */
-    .geo-tabs {
-        flex-shrink: 0;
-        padding: 0 20px;
-        border-bottom: 1px solid #E2E9F0;
-    }
-    .geo-tabs-list {
-        display: flex;
-        align-items: center;
-        gap: 32px;
-        margin: 0;
-        padding: 0;
-        list-style: none;
-    }
-    .geo-tab {
-        position: relative;
-        height: 48px;
-        line-height: 48px;
-        font-size: 14px;
-        color: #667383;
-        cursor: pointer;
-        white-space: nowrap;
-        transition: color 0.15s ease;
-
-        &:hover {
-            color: #0B1C2C;
-        }
-        &.active {
-            color: #0278E7;
-            font-weight: 500;
-
-            &::after {
-                content: '';
-                position: absolute;
-                left: 0;
-                right: 0;
-                bottom: -1px;
-                height: 2px;
-                border-radius: 2px;
-                background: #0278E7;
-            }
-        }
     }
 
     .filter-bar {

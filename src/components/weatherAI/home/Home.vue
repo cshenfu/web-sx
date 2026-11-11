@@ -707,7 +707,7 @@
                 console.log(lon, lat);
                 const isInChinaland = isInChinaMainlandPrecise(lon, lat);
                 if (!isInChinaland) {
-                    message.error(`目前暂不支持当前区域数据查询！`);
+                    message.error(`目前暂不支持当前区域数据查询2！`);
                     mapSearchValue.value = '';
                     return false;
                 }

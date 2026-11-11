@@ -1,19 +1,6 @@
 <template>
     <!-- 唯一根节点 -->
     <div class="wind-tower-search-bar">
-        <!-- 数据来源 Tab -->
-        <div class="wt-tabs">
-            <ul class="wt-tabs-list">
-                <li
-                    class="wt-tab"
-                    v-for="item in sourceTabs"
-                    :key="item.value"
-                    @click="chooseTabs(item.value)"
-                    :class="{ active: searchKey.source == item.value }"
-                >{{ item.label }}</li>
-            </ul>
-        </div>
-
         <!-- 筛选行：筛选项之后紧跟 重置 / 搜索，窄屏自动换行 -->
         <div class="filter-row">
             <!-- 地图 / 列表模式切换（需要时放开）
@@ -125,29 +112,31 @@
 
 <script setup>
     import SelectSearch from '@/components/selectSearch/SelectSearch.vue';
-    import { computed, reactive, ref, onBeforeMount } from 'vue';
+    import { reactive, ref, onBeforeMount } from 'vue';
     import mitt from '@/utils/eventBus';
     import { getProvince } from '@/api/modules/public';
-    import { USER_COMMON_DATA_STATUS, PUBLIC_COMMON_STATUS, filterAreaInfo } from '../../commonData'
+    import { PUBLIC_COMMON_STATUS, filterAreaInfo } from '../../commonData';
+
+    // 陕西省区域编码（接口返回为字符串）
+    const SHANXI_REGION_CODE = '610000';
 
     const emit = defineEmits(['getModeType']);
     const props = defineProps({});
 
     const areaCodeData = ref([]);
     const areaCodeOptions = ref([]);
+
+    // source 固定为 1（公共数据），UI 不再提供切换
     const searchKey = ref({
         source: 1,
         modeType: 'b',
-        areaCode: [],
+        areaCode: [],          // UI 保持空，不回显陕西
         status: null,
         projectCode: '',
         windTowerCode: '',
         windTowerSeq: '',
     });
-    const sourceTabs = [
-        { label: '用户数据', value: 2 },
-        { label: '公共数据', value: 1 },
-    ];
+
     const rangeTypeOptions = reactive([
         {
             label: '省数据',
@@ -163,24 +152,28 @@
         },
     ]);
 
-    const chooseTabs = (index) => {
-        searchKey.value.source = index;
-        mitt.emit('handleSearch', searchKey.value)
-    }
+    // source 固定为 1，状态选项直接使用公共库常量（顺带去掉原 computed 的副作用）
+    const analysisStatusOptons = PUBLIC_COMMON_STATUS;
 
-    const analysisStatusOptons = computed(() => {
-        searchKey.value.analysisStatus = null
-        return searchKey.value.source === 2 ? USER_COMMON_DATA_STATUS : PUBLIC_COMMON_STATUS
-    })
-
-    // 与 searchKey.modeType 的初始值保持一致（原来是 'a'，重置后会被改成地图模式）
+    // 与 searchKey.modeType 的初始值保持一致
     const defaultModeType = ref('b');
+
+    // 构造发请求的 payload：areaCode 为空时兜底陕西，保证请求永远带 610000
+    const buildSearchPayload = () => {
+        const codes = searchKey.value.areaCode;
+        return {
+            ...searchKey.value,
+            source: 1,
+            areaCode: (codes && codes.length > 0) ? [...codes] : [SHANXI_REGION_CODE],
+        };
+    };
 
     // 搜索
     const handleSearch = () => {
-        mitt.emit('handleSearch', searchKey.value)
+        mitt.emit('handleSearch', buildSearchPayload());
     };
-    // 重置：清空所有筛选项（保留当前 Tab）
+
+    // 重置：清空所有筛选项（areaCode 在 UI 上保持空，请求时由 helper 兜底陕西）
     const resetSearch = () => {
         Object.assign(searchKey.value, {
             rangeType: undefined,
@@ -193,8 +186,9 @@
             modeType: defaultModeType.value,
         });
         areaCodeOptions.value = filterAreaInfo(1, areaCodeData.value);
-        mitt.emit('resetSearch', searchKey.value);
+        mitt.emit('resetSearch', buildSearchPayload());
     };
+
     const isSelectOpen = ref({
         first: false,
     });
@@ -204,25 +198,32 @@
     const changeMode = async (e) => {
         defaultModeType.value = e.target.value;
         emit('getModeType', e.target.value);
-        await mitt.all.clear()
-        resetSearch()
+        await mitt.all.clear();
+        resetSearch();
     };
     const changeAreaData = (val) => {
         areaCodeOptions.value = filterAreaInfo(val, areaCodeData.value);
-        searchKey.value.areaCode = []
+        searchKey.value.areaCode = [];
     };
+
     onBeforeMount(async () => {
         try {
             const res = await getProvince();
             if (res.code === 200) {
-                areaCodeData.value = res.data?.subList;
-                areaCodeOptions.value = filterAreaInfo(1, areaCodeData.value);
+                const all = res.data?.subList || [];
+                const shanxi = all.filter(
+                    (item) => item.regionCode === SHANXI_REGION_CODE
+                );
+                areaCodeData.value = shanxi;
+                areaCodeOptions.value = filterAreaInfo(1, shanxi);
+                // 注意：不设置 searchKey.areaCode，保持 UI 空
             }
         } catch (e) {
             console.log(e);
         }
-        handleSearch()
-    })
+        handleSearch(); // 首次请求：areaCode 走兜底 = ['610000']
+    });
+
     defineExpose({
         searchKey,
     });
@@ -233,49 +234,6 @@
 
 .wind-tower-search-bar {
     background: #FFFFFF;
-}
-
-/* ========== 数据来源 Tab ========== */
-.wt-tabs {
-    padding: 0 20px;
-    border-bottom: 1px solid #E2E9F0;
-}
-.wt-tabs-list {
-    display: flex;
-    align-items: center;
-    gap: 32px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-.wt-tab {
-    position: relative;
-    height: 48px;
-    line-height: 48px;
-    font-size: 14px;
-    color: #667383;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: color 0.15s ease;
-
-    &:hover {
-        color: #0B1C2C;
-    }
-    &.active {
-        color: #0278E7;
-        font-weight: 500;
-
-        &::after {
-            content: '';
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: -1px;
-            height: 2px;
-            border-radius: 2px;
-            background: #0278E7;
-        }
-    }
 }
 
 /* ========== 筛选行 ========== */

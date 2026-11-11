@@ -166,9 +166,8 @@ const createObjectKey = (file, storePath, bucket) => {
 };
 
 
-// ★ 新增：根据 credentials + usePublicBucket 决定实际使用的桶名
-// usePublicBucket 默认 false，即所有旧调用不传该参数时行为完全不变（私有桶）
-const resolveBucket = (credentials, usePublicBucket = true) => {
+// ★ 修复：默认私有桶，只有显式传 true 才走公有桶
+const resolveBucket = (credentials, usePublicBucket = false) => {
     if (!usePublicBucket) {
         return credentials.privateBucket;
     }
@@ -177,7 +176,7 @@ const resolveBucket = (credentials, usePublicBucket = true) => {
         throw new Error('后端未返回 publicBucket，无法使用公有桶');
     }
 
-    return credentials.privateBucket;
+    return credentials.publicBucket; // ★ 之前写成了 privateBucket
 };
 
 
@@ -340,7 +339,7 @@ export function useOssUpload() {
      * 创建华为云 OBS 客户端
      * ★ usePublicBucket 默认 false，不传即为原来的私有桶逻辑
      */
-    const createHuaweiObsClient = (credentials, usePublicBucket = true) => {
+    const createHuaweiObsClient = (credentials, usePublicBucket = false) => {
         const {
             access,
             secret,

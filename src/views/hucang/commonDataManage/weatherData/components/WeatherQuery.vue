@@ -528,7 +528,7 @@ const searchFlyTo = () => {
         const [lon, lat] = mapSearchValue.value.split(',');
         const isInChinaland = isInChinaMainlandPrecise(lon, lat);
         if (!isInChinaland) {
-            ElMessage.error(`目前暂不支持当前区域数据查询！`);
+            ElMessage.error(`目前暂不支持当前区域数据查询3！`);
             mapSearchValue.value = '';
             return false;
         }
