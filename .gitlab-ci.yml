@@ -3,10 +3,10 @@ include:
     ref: main
     file: '/.gitlab-ci.yml'
 
-# 测试 / 生产宿主机端口不一致，按环境覆盖 HOST_PORT（写入部署机 .env）
-deploy_test:
-  variables:
-    HOST_PORT: "30009"
+# 测试环境部署到 test-web 上的 k3s。入口域名与 proxy 上 t-sx.wh-ge.com 一致。
+# 生产 tag 仍按 HOST_PORT 做 compose 部署。
+variables:
+  INGRESS_HOST: "t-sx.wh-ge.com"
 
 deploy_prod:
   variables:
