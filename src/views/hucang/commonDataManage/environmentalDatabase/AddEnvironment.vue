@@ -264,7 +264,7 @@
     const resetForm = () => {
         currentPowerFormRef.value.resetFields();
         router.push({
-            path: '/environment/list',
+            path: '/hucang/environment/list',
         });
     };
     // 新增保存

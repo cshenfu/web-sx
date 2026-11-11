@@ -229,7 +229,7 @@
         waterConservationFormRef.value.resetFields();
         // powerEditor.value.editorRef.clear()
         router.push({
-            path: '/waterConservayion/list',
+            path: '/hucang/waterConservayion/list',
         });
     };
     // 新增保存
@@ -270,7 +270,7 @@
                         let msg = route.query.id ? '修改成功' : '新增成功';
                         ElMessage.success(msg);
                         router.push({
-                            path: '/waterConservayion/list',
+                            path: '/hucang/waterConservayion/list',
                         });
                     }
                 } catch (err) {

@@ -216,7 +216,7 @@ const updateFIleData = async (file) => {
   if (file.fileType === 'wtg') {
     await handleFileUpload(file.fileList[0].originFileObj);
     router.push({
-      path: '/windEquipment/add',
+      path: '/hucang/windEquipment/add',
       query: {
         type: 'wtg',
       },
@@ -289,7 +289,7 @@ const getTableData = (val) => {
 
 const getRowData = (row) => {
   router.push({
-    path: '/windEquipment/detail',
+    path: '/hucang/windEquipment/detail',
     query: { id: row.id },
   });
 };
@@ -297,7 +297,7 @@ const getRowData = (row) => {
 const goDetail = (id, type) => {
   sessionStorage.setItem('detailType', type);
   router.push({
-    path: '/windEquipment/detail',
+    path: '/hucang/windEquipment/detail',
     query: { id: id },
   });
 };
@@ -320,7 +320,7 @@ const handleChangeClose = (val) => {
 
 const editFile = (val) => {
   router.push({
-    path: '/windEquipment/add',
+    path: '/hucang/windEquipment/add',
     query: { id: val.id, type: 'edit' },
   });
 };
