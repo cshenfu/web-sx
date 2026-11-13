@@ -89,6 +89,7 @@
             :project="project"
             :initial-sub-tab="activeTabConfig.subTab"
             :hide-sub-tabs="true"
+            :refresh-key="refreshKey"
             @row-action="handleReportRowAction"
             @create="handleReportCreate"
           />
@@ -140,6 +141,8 @@ const props = defineProps({
   project: { type: Object, default: null },
   stage: { type: String, default: '' },
   initialTab: { type: String, default: 'main' },
+  // ★ 新增：父级在报告/材料生成成功后自增，触发内部刷新
+  refreshKey: { type: Number, default: 0 },
 })
 
 const emit = defineEmits(['close', 'action', 'generate-report'])
@@ -295,7 +298,9 @@ watch(
   () => [props.visible, props.project?.id, props.initialTab],
   ([visible, , tab]) => {
     if (visible) {
-      activeTab.value = tab || 'main'
+      // ★ 兜底：initialTab 不在当前阶段的 tabs 里就回退到 main
+      const valid = tabs.value.some(t => t.key === tab)
+      activeTab.value = valid ? tab : 'main'
       showSettingPanel.value = false
       showUploadDialog.value = false
       showMeetingUpload.value = false
@@ -347,8 +352,9 @@ function handleFileDeleted() {
 }
 
 function handleMeetingAction(payload) {
-   console.log('[ProjectDetailPanel] handleMeetingAction=', payload)   // ★ 加这行
-  console.log('[ProjectDetailPanel] has action?', GENERATE_REPORT_ACTIONS.has(payload.key)) 
+  console.log('[ProjectDetailPanel] handleMeetingAction=', payload)
+  console.log('[ProjectDetailPanel] has action?', GENERATE_REPORT_ACTIONS.has(payload.key))
+
   // 拦截智能审查
   if (payload.key === 'intelligent-review') {
     emit('action', { 
@@ -368,19 +374,18 @@ function handleMeetingAction(payload) {
 
   // 拦截所有生成操作
   if (GENERATE_REPORT_ACTIONS.has(payload.key)) {
-  emit('action', {
-    type: 'generate-report',
-    actionKey: payload.key,
-    subCode: payload.subCode,
-    step: payload.step,
-    project: props.project,
-    // ★ 新增：归档层级参数
-    firstBusinessTitle: activeTabConfig.value.fileCode || '',   // PROJECT_INITIATION_MEETING_MATERIALS
-    secondaryBusinessTitle: payload.subCode || '',              // PIM_TO_SHAANXI_COMPANY
-    fileTypeTag: payload.fileTypeTag || '',                     // 立项申请
-  })
-  return
-}
+    emit('action', {
+      type: 'generate-report',
+      actionKey: payload.key,
+      subCode: payload.subCode,
+      step: payload.step,
+      project: props.project,
+      firstBusinessTitle: activeTabConfig.value.fileCode || '',
+      secondaryBusinessTitle: payload.subCode || '',
+      fileTypeTag: payload.fileTypeTag || '',
+    })
+    return
+  }
 
   // 拦截所有上传操作
   if (MEETING_UPLOAD_ACTIONS.has(payload.key)) {
@@ -406,6 +411,24 @@ function handleMeetingUploadSaved() {
 function handleMeetingFileDeleted() {
   loadNecessaryFiles()
 }
+
+// ★ 新增：refreshKey 变化时按当前 tab 刷新
+watch(
+  () => props.refreshKey,
+  (val, old) => {
+    if (val === old) return
+    if (!props.visible) return
+
+    if (activeTab.value === 'meeting') {
+      meetingTabRef.value?.loadMeeting?.()
+    } else if (activeTab.value === 'material' || activeTab.value === 'invest-material') {
+      materialTabRef.value?.loadFiles?.()
+    }
+    // report tab 的刷新由 ProjectReportTab 内部 watch refreshKey 处理，此处不重复
+    // 顺带刷新"必要性文件是否齐全"（阶段推进按钮可用性）
+    loadNecessaryFiles()
+  }
+)
 </script>
 
 <style scoped>

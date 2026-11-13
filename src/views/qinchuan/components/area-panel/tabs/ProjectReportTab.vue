@@ -148,7 +148,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { pageReport, terminateCalculation } from '@/api/modules/aiProject'
 import { getTempUrlSX } from '@/api/modules/upload'
@@ -213,6 +213,48 @@ function handleClickConfirm(row) {
 }
 
 // ============================================================
+// ★ 列表轮询（所有状态、所有 tab 都轮询，3 秒一次）
+// ============================================================
+const POLL_INTERVAL = 3000
+
+let pollTimer = null
+let fetchSeq = 0          // 请求序号：丢弃过期响应
+let destroyed = false     // 组件是否已卸载
+
+function stopPolling() {
+  if (pollTimer) {
+    clearTimeout(pollTimer)
+    pollTimer = null
+  }
+}
+
+/**
+ * 无条件排下一次轮询。
+ * 采用 setTimeout 链：上一次请求返回后才排下一次，不会请求堆积。
+ */
+function schedulePolling() {
+  stopPolling()
+  if (destroyed) return
+  if (!props.project?.id) return
+  if (typeof document !== 'undefined' && document.hidden) return // 页面隐藏时暂停
+
+  pollTimer = setTimeout(() => {
+    pollTimer = null
+    fetchList(true) // 静默轮询
+  }, POLL_INTERVAL)
+}
+
+// 页面从后台切回前台：立即刷新一次并恢复轮询
+function handleVisibilityChange() {
+  if (typeof document === 'undefined') return
+  if (document.hidden) {
+    stopPolling()
+  } else {
+    fetchList(true)
+  }
+}
+
+// ============================================================
 // ★ 预览相关
 // ============================================================
 
@@ -266,16 +308,12 @@ function getFileExt(row) {
 
 /**
  * 通过 getTempUrlSX 拿临时地址，失败回退 row.fileUrl
- * ★ 改动：现在把 fileUrl 传给接口
  */
 async function resolvePreviewUrl(row) {
   const fileUrl = row.fileUrl
   if (fileUrl) {
     try {
-      // ★ 方案 A：接口入参为对象 { fileUrl }（最常见）
       const res = await getTempUrlSX(fileUrl)
-      // ★ 若你的 getTempUrlSX 签名是直接收字符串，把上面一行换成：
-      // const res = await getTempUrlSX(fileUrl)
       const url = pickTempUrl(res)
       if (url) return url
     } catch (e) {
@@ -352,11 +390,10 @@ async function openPdfPreview(url, title) {
     if (!resp.ok) throw new Error(`文件下载失败 (${resp.status})`)
     const rawBlob = await resp.blob()
 
-    // ★ 关键：强制 type=application/pdf，绕开 attachment 导致的下载
+    // ★ 强制 type=application/pdf，绕开 attachment 导致的下载
     const pdfBlob = new Blob([rawBlob], { type: 'application/pdf' })
     const blobUrl = URL.createObjectURL(pdfBlob)
 
-    // 旧 blob 先回收
     if (pdfIframeSrc.value) URL.revokeObjectURL(pdfIframeSrc.value)
     pdfIframeSrc.value = blobUrl
   } catch (e) {
@@ -406,7 +443,7 @@ async function handlePreview(row) {
 }
 
 // ============================================================
-// 列表加载
+// 列表加载（含轮询调度）
 // ============================================================
 
 watch(() => props.initialSubTab, (val) => {
@@ -417,9 +454,23 @@ watch(() => props.initialSubTab, (val) => {
   }
 }, { immediate: true })
 
-async function fetchList() {
-  if (!props.project?.id) return
-  loading.value = true
+/**
+ * @param {boolean} silent 静默刷新（轮询用）：不显示 loading、不打断轮询链
+ */
+async function fetchList(silent = false) {
+  if (!props.project?.id || destroyed) return
+
+  // 非静默刷新（切 tab / 切项目 / 分页 / 手动刷新）先停掉旧轮询
+  if (!silent) {
+    stopPolling()
+    loading.value = true
+  }
+
+  // 记录滚动位置，轮询替换 list 后恢复，避免表格跳动
+  const wrapEl = silent ? document.querySelector('.project-report-tab .table-wrap') : null
+  const scrollTop = wrapEl ? wrapEl.scrollTop : 0
+
+  const seq = ++fetchSeq
   try {
     const params = {
       aiProjectId: props.project.id,
@@ -428,6 +479,10 @@ async function fetchList() {
       pageSize: pageSize.value,
     }
     const res = await pageReport(params)
+
+    // 过期响应（切换 tab / 切换项目 / 重复触发 / 已卸载）直接丢弃
+    if (seq !== fetchSeq || destroyed) return
+
     if (res?.code === 0 || res?.code === 200) {
       list.value = res.data?.list || []
       total.value = Number(res.data?.total) || 0
@@ -438,7 +493,12 @@ async function fetchList() {
   } catch (err) {
     console.error('获取报告列表失败:', err)
   } finally {
-    loading.value = false
+    // 只有最新一次请求才负责收尾 & 调度下一轮
+    if (seq === fetchSeq && !destroyed) {
+      if (!silent) loading.value = false
+      if (wrapEl) wrapEl.scrollTop = scrollTop
+      schedulePolling()
+    }
   }
 }
 
@@ -531,6 +591,9 @@ function getStatusColor(status, desc, sourceType) {
 }
 
 onMounted(async () => {
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+  }
   await fetchAllTabCounts()
   fetchList()
 })
@@ -540,6 +603,15 @@ watch(() => props.project?.id, async (newId) => {
     pageNo.value = 1
     await fetchAllTabCounts()
     fetchList()
+  }
+})
+
+// ★ 组件卸载：标记销毁 + 清定时器 + 移除监听，避免请求回来又续排
+onUnmounted(() => {
+  destroyed = true
+  stopPolling()
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
   }
 })
 </script>

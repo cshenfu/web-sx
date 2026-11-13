@@ -134,6 +134,7 @@
                 :is-fullscreen="isDetailFullscreen"
                 :stage="activeProjectDetail?.projectStage || activeProjectDetail?.stage || ''"
                 :initial-tab="detailPanelTab"
+                :refresh-key="detailRefreshKey"
                 @toggle-fullscreen="isDetailFullscreen = !isDetailFullscreen"
                 @back="handleBackToList"
                 @generate-report="reportModalVisible = true"
@@ -357,6 +358,7 @@
       :project="actionProject"
       :stage="actionProject?.projectStage || ''"
       :initial-tab="detailPanelTab"
+      :refresh-key="detailRefreshKey"
       @close="showSiteMapDetailPanel = false"
       @action="onSiteMapDetailAction"
       @generate-report="handleGenerateReportFromHeader"
@@ -573,7 +575,13 @@ const mapRef = ref(null)
 // ============================================================
 const BASE_IMAGERY_LAYER_ID = 'sx-base-imagery-layer'
 const LOW_BASE_LAYER_ID = 'sx-world-preview-layer'
+// 加
+const detailRefreshKey = ref(0)
 
+function onReportGenerated() {
+  ElMessage.success('报告已生成并提交，可在右侧预览或下载')
+  window.setTimeout(() => { detailRefreshKey.value++ }, 300)
+}
 function syncLowLevelBase() {
   const map = mapRef.value?.getMap?.()
   if (!map) return
@@ -1178,11 +1186,6 @@ function handleGenerateReportFromHeader(proj) {
   reportModalVisible.value = true
 }
 
-// 2. 修复生成完面板闪退的问题（不要写 showGeneratePanel.value = false）
-function onReportGenerated() {
-  // showGeneratePanel.value = false   // ★ 删掉或者注释掉这行！
-  ElMessage.success('报告已生成并提交，可在右侧预览或下载')
-}
 
 function startGeometryEdit(project, mode = 'area') {
   const item = resolveMapProject(project)

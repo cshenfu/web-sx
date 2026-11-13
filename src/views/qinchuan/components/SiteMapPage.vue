@@ -253,6 +253,7 @@
       :project="selectedProject"
       :is-fullscreen="true"
       :initial-tab="detailTabMapped"
+      :refresh-key="detailRefreshKey"
       @back="showDetailPanel = false"
       @toggle-fullscreen="() => {}"
       @generate-report="handleGenerateReportFromHeader"
@@ -272,6 +273,7 @@
       :project="selectedProject"
       :stage="props.stage || selectedProject?.projectStage || ''"
       :initial-tab="detailPanelTab"
+      :refresh-key="detailRefreshKey"
       @close="showSiteMapDetailPanel = false"
       @action="onDetailPanelAction"
       @generate-report="handleGenerateReportFromHeader"
@@ -500,12 +502,8 @@ const SUB_TAB_REPORT_CONFIG = {
   PROJECT_INITIATION:     { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成请示文件' },
   POST_EVALUATION:        { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成后评价报告' },
 }
-
-// ★ 处理头部“报告/函件生成”按钮
-function handleGenerateReportFromHeader(proj) {
-  if (proj) selectedProject.value = proj
-  showGenerateModal.value = true
-}
+// 顶部加
+const detailRefreshKey = ref(0)
 function handleOpenCompetitivePanel(project) {
   showGenerateModal.value = false
   generatePanelProject.value = project || selectedProject.value
@@ -1118,7 +1116,13 @@ function handleCreateReportFromDetail(payload) {
   }
 }
 
-function onReportGenerated() { console.log('[site-map] 报告已生成') }
+
+
+function onReportGenerated() {
+  console.log('[site-map] 报告已生成')
+  // ★ 等后端落库再刷，避免接口抢先返回旧数据
+  window.setTimeout(() => { detailRefreshKey.value++ }, 300)
+}
 
 async function fetchOverviewStats() {
   try {
