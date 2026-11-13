@@ -632,6 +632,31 @@ const AREA_STYLE = {
 }
 
 const mapRef = ref(null)
+// ============================================================
+// ★ 低层级底图：跟随 sx-base-imagery-layer 的可见性
+//   (whln 插件接管 sx-base-imagery-layer 的显隐，我们不介入)
+//   - sx-base-imagery-layer 在 → 低层级底图在
+//   - sx-base-imagery-layer 关 → 低层级底图跟着关
+// ============================================================
+const BASE_IMAGERY_LAYER_ID = 'sx-base-imagery-layer'
+const LOW_BASE_LAYER_ID = 'sx-world-preview-layer'
+
+function syncLowLevelBase() {
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+  if (!map.getLayer(BASE_IMAGERY_LAYER_ID) || !map.getLayer(LOW_BASE_LAYER_ID)) return
+
+  // MapLibre: 未显式设置 layout 时 getLayoutProperty 返回 undefined，按 visible 处理
+  const baseVisible =
+    map.getLayoutProperty(BASE_IMAGERY_LAYER_ID, 'visibility') !== 'none'
+  const target = baseVisible ? 'visible' : 'none'
+
+  const current =
+    map.getLayoutProperty(LOW_BASE_LAYER_ID, 'visibility') ?? 'visible'
+  if (current === target) return    // ★ short-circuit，避免 styledata 递归触发
+
+  map.setLayoutProperty(LOW_BASE_LAYER_ID, 'visibility', target)
+}
 const mapReady = ref(false)
 const route = useRoute()
 const viewMode = ref(route.query.view === 'list' ? 'list' : 'map')
@@ -2201,6 +2226,9 @@ async function onMapReady() {
     whlnPlugin = attachSxLayers(map, { initialVisibleIds: layerVisibleIds.value.filter((id) => WHLN_LAYER_IDS.includes(id)) })
     whlnPlugin.subscribe?.((ids) => { layerVisibleIds.value = [...layerVisibleIds.value.filter((id) => !WHLN_LAYER_IDS.includes(id)), ...ids]; emits('featureVisibleChange', ids); syncMaskVisibility() })
   } catch (err) { console.warn('[whln] 图层控制挂载失败:', err) }
+    // ★ 初始化 + 监听 whln 对 base imagery 的 visibility 切换
+  syncLowLevelBase()
+  map.on('styledata', syncLowLevelBase)
 }
 
 onMounted(() => {
@@ -2217,6 +2245,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleWindowResize)   // ★ 新增
   const map = mapRef.value?.getMap?.()
   if (map) {
+    map.off('styledata', syncLowLevelBase)
     map.off('click', handleMapBlankClick)
     map.off('click', handleCityFillClick)
     map.off('zoom', syncMaskVisibility)

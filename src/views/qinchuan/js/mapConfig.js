@@ -52,18 +52,17 @@ export const emptyBaseStyle = {
       },
     },
     {
-      // 永远留在高清影像下面，作为加载期间的兜底
-      id: 'sx-world-preview-layer',
-      type: 'raster',
-      source: 'sx-world-preview-src',
-      paint: {
-        'raster-resampling': 'linear',
-      },
-    },
+  id: 'sx-world-preview-layer',
+  type: 'raster',
+  source: 'sx-world-preview-src',
+  layout: { visibility: 'none' },          // ★ 加这行
+  paint: { 'raster-resampling': 'linear' },
+},
     {
       id: 'sx-base-imagery-layer',
       type: 'raster',
       source: 'sx-base-imagery-src',
+       layout: { visibility: 'none' },  
       paint: {
         'raster-resampling': 'linear',
         'raster-fade-duration': 200,

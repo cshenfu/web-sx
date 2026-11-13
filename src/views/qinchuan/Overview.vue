@@ -65,220 +65,253 @@
     </template>
 
     <template v-else>
-      <div class="area-top-toolbar">
-        <div class="view-tabs">
-          <button
-            class="view-tab"
-            :class="{ active: viewMode === 'map' }"
-            @click="viewMode = 'map'"
-          >
-            <el-icon><MapLocation /></el-icon>
-            地图模式
-          </button>
-          <button
-            class="view-tab"
-            :class="{ active: viewMode === 'list' }"
-            @click="viewMode = 'list'"
-          >
-            <el-icon><List /></el-icon>
-            项目列表
-          </button>
+      <!-- ★ 创建项目期间，隐藏区域视图所有面板 -->
+      <template v-if="!showCreateProject">
+        <div class="area-top-toolbar">
+          <div class="view-tabs">
+            <button
+              class="view-tab"
+              :class="{ active: viewMode === 'map' }"
+              @click="viewMode = 'map'"
+            >
+              <el-icon><MapLocation /></el-icon>
+              地图模式
+            </button>
+            <button
+              class="view-tab"
+              :class="{ active: viewMode === 'list' }"
+              @click="viewMode = 'list'"
+            >
+              <el-icon><List /></el-icon>
+              项目列表
+            </button>
+          </div>
         </div>
-      </div>
 
-      <template v-if="viewMode === 'map'">
-        <aside v-if="!wizardVisible" class="area-summary">
-          <ProjectOverview
-            v-model="selectedStage"
-            :rows="projectOverviewRows"
-            @select="onProjectStageSelect"
+        <template v-if="viewMode === 'map'">
+          <aside v-if="!wizardVisible" class="area-summary">
+            <ProjectOverview
+              v-model="selectedStage"
+              :rows="projectOverviewRows"
+              @select="onProjectStageSelect"
+            />
+          </aside>
+
+          <ReportWizard
+            v-else
+            class="area-summary wizard-layer"
+            :create-project-mode="wizardMode"
+            :project-name="activeProjectDetail?.name || activeProjectDetail?.projectName || ''"
+            :project="activeProjectDetail"
+            @close="wizardVisible = false"
+            @save-draft="handleWizardSaveDraft"
+            @submit="handleWizardSubmit"
           />
-        </aside>
 
-        <ReportWizard
-          v-else
-          class="area-summary wizard-layer"
-          :create-project-mode="wizardMode"
-          :project-name="activeProjectDetail?.name || activeProjectDetail?.projectName || ''"
-          :project="activeProjectDetail"
-          @close="wizardVisible = false"
-          @save-draft="handleWizardSaveDraft"
-          @submit="handleWizardSubmit"
-        />
-
-        <div class="area-view-layer" v-show="!popoverProject && !isEditing && !isActionPanelOpen">
-          <template v-if="!selectedProject">
-            <ProjectListPanel
-              class="panel-below"
-              v-model:model-value-expanded="listExpanded"
-              v-model:stage-filter="filters.stage"
-              :list="projectList"
-              :total="pagination.total"
-              :page="pagination.page"
-              :page-size="pagination.pageSize"
-              :active-id="activeAreaId"
-              :loading="listLoading"
-              :stage-options="stageOptions"
-              @update:page="handlePageChange"
-              @select="handleProjectSelect"
-              @add="handleAddProject"
-            />
-          </template>
-
-          <template v-else>
-            <ProjectDetailPanel
-              class="panel-below"
-              :project="activeProjectDetail"
-              :is-fullscreen="isDetailFullscreen"
-              :stage="activeProjectDetail?.projectStage || activeProjectDetail?.stage || ''"
-              :initial-tab="detailPanelTab"
-              @toggle-fullscreen="isDetailFullscreen = !isDetailFullscreen"
-              @back="handleBackToList"
-              @generate-report="reportModalVisible = true"
-              @action="onDetailPanelAction"
-              @open-confirm="handleOpenConfirm"
-              @create-report="handleCreateReport"
-            />
-          </template>
-        </div>
-
-        <!-- ★ 点击选中：右上角固定卡片 -->
-        <ProjectActionCard
-          v-if="popoverProject && !isDetailFullscreen && !selectedProject && !isEditing && !isActionPanelOpen"
-          :project="popoverProject"
-          :stage-map="stageMap"
-          :actions="popoverActions"
-          @open-detail="handleOpenDetailPanel"
-          @action="executeProjectAction"
-        />
-
-        <!-- ★ hover：首次进入位置固定弹窗 -->
-        <ProjectActionCard
-          v-if="hoveredProject && isAreaView && viewMode === 'map' && !popoverProject && !selectedProject && !isEditing && !isActionPanelOpen && !isDetailFullscreen"
-          :project="hoveredProject"
-          hover-mode
-          :position="hoveredPos"
-          :stage-map="stageMap"
-          :actions="popoverActions"
-          @open-detail="handleOpenDetailPanel"
-          @action="executeProjectAction"
-          @mouseenter="onHoverCardEnter"
-          @mouseleave="onHoverCardLeave"
-        />
-
-        <div
-          v-if="isAreaView && (isEditing || (popoverProject && !isDetailFullscreen && !selectedProject && !isActionPanelOpen))"
-          class="geometry-edit-toolbar"
-        >
-          <button
-            v-for="item in editTools"
-            :key="item.key"
-            type="button"
-            class="edit-tool-button"
-            :class="{ active: editMode === item.key }"
-            @click="isEditing ? enterEditMode(item.key) : startGeometryEdit(popoverProject, item.key)"
-          >
-            <el-icon><component :is="item.icon" /></el-icon>{{ item.label }}
-          </button>
-          <template v-if="editMode === 'wind' || editMode === 'booster'">
-            <span class="edit-divider" />
-            <template v-if="editMode === 'wind'">
-              <button class="edit-tool-button" :class="{ active: drawingNewPoint }" @click="startAddWindPoint">添加风机</button>
-              <button class="edit-tool-button" :class="{ active: isBoxSelecting }" @click="startBoxSelection">框选</button>
-              <button class="edit-tool-button danger" @click="deleteSelectedPoints">删除选中</button>
-              <button class="edit-tool-button" @click="markReserve(true)">标记备选</button>
-              <button class="edit-tool-button" @click="markReserve(false)">取消备选</button>
+          <div class="area-view-layer" v-show="!popoverProject && !isEditing && !isActionPanelOpen">
+            <template v-if="!selectedProject">
+              <ProjectListPanel
+                class="panel-below"
+                v-model:model-value-expanded="listExpanded"
+                v-model:stage-filter="filters.stage"
+                :list="projectList"
+                :total="pagination.total"
+                :page="pagination.page"
+                :page-size="pagination.pageSize"
+                :active-id="activeAreaId"
+                :loading="listLoading"
+                :stage-options="stageOptions"
+                @update:page="handlePageChange"
+                @select="handleProjectSelect"
+                @add="handleAddProject"
+              />
             </template>
+
             <template v-else>
-              <button class="edit-tool-button" :class="{ active: drawingNewPoint }" @click="toggleAddPoint">{{ drawingNewPoint ? '退出新增' : '新增点' }}</button>
-              <button class="edit-tool-button" :class="{ active: isBoxSelecting }" @click="startBoxSelection">框选</button>
-              <button class="edit-tool-button danger" @click="deleteSelectedPoints">删除选中</button>
+              <ProjectDetailPanel
+                class="panel-below"
+                :project="activeProjectDetail"
+                :is-fullscreen="isDetailFullscreen"
+                :stage="activeProjectDetail?.projectStage || activeProjectDetail?.stage || ''"
+                :initial-tab="detailPanelTab"
+                @toggle-fullscreen="isDetailFullscreen = !isDetailFullscreen"
+                @back="handleBackToList"
+                @generate-report="reportModalVisible = true"
+                @action="onDetailPanelAction"
+                @open-confirm="handleOpenConfirm"
+                @create-report="handleCreateReport"
+              />
             </template>
-          </template>
-          <span class="edit-divider" />
-          <button v-if="isDirty" class="edit-tool-button save" :disabled="saving" @click="saveEdit">{{ saving ? '保存中…' : '保存' }}</button>
-          <button v-if="isDirty" class="edit-tool-button" :disabled="saving" @click="cancelEdit">取消修改</button>
-          <button v-if="hasSaved && !isDirty" class="edit-tool-button recalculate" :disabled="recalculating" @click="handleRecalculate">{{ recalculating ? '计算中…' : '重新计算' }}</button>
-          <button v-if="!isDirty" class="edit-tool-button" :disabled="saving" @click="exitEditMode">完成编辑</button>
-        </div>
+          </div>
+
+          <!-- ★ 点击选中：右上角固定卡片 -->
+          <ProjectActionCard
+            v-if="popoverProject && !isDetailFullscreen && !selectedProject && !isEditing && !isActionPanelOpen"
+            :project="popoverProject"
+            :stage-map="stageMap"
+            :actions="popoverActions"
+            @open-detail="handleOpenDetailPanel"
+            @action="executeProjectAction"
+          />
+
+          <!-- ★ hover：首次进入位置固定弹窗 -->
+          <ProjectActionCard
+            v-if="hoveredProject && isAreaView && viewMode === 'map' && !popoverProject && !selectedProject && !isEditing && !isActionPanelOpen && !isDetailFullscreen"
+            :project="hoveredProject"
+            hover-mode
+            :position="hoveredPos"
+            :stage-map="stageMap"
+            :actions="popoverActions"
+            @open-detail="handleOpenDetailPanel"
+            @action="executeProjectAction"
+            @mouseenter="onHoverCardEnter"
+            @mouseleave="onHoverCardLeave"
+          />
+
+          <div
+            v-if="isAreaView && (isEditing || (popoverProject && !isDetailFullscreen && !selectedProject && !isActionPanelOpen))"
+            class="geometry-edit-toolbar"
+          >
+            <button
+              v-for="item in editTools"
+              :key="item.key"
+              type="button"
+              class="edit-tool-button"
+              :class="{ active: editMode === item.key }"
+              @click="isEditing ? enterEditMode(item.key) : startGeometryEdit(popoverProject, item.key)"
+            >
+              <el-icon><component :is="item.icon" /></el-icon>{{ item.label }}
+            </button>
+            <template v-if="editMode === 'wind' || editMode === 'booster'">
+              <span class="edit-divider" />
+              <template v-if="editMode === 'wind'">
+                <button class="edit-tool-button" :class="{ active: drawingNewPoint }" @click="startAddWindPoint">添加风机</button>
+                <button class="edit-tool-button" :class="{ active: isBoxSelecting }" @click="startBoxSelection">框选</button>
+                <button class="edit-tool-button danger" @click="deleteSelectedPoints">删除选中</button>
+                <button class="edit-tool-button" @click="markReserve(true)">标记备选</button>
+                <button class="edit-tool-button" @click="markReserve(false)">取消备选</button>
+              </template>
+              <template v-else>
+                <button class="edit-tool-button" :class="{ active: drawingNewPoint }" @click="toggleAddPoint">{{ drawingNewPoint ? '退出新增' : '新增点' }}</button>
+                <button class="edit-tool-button" :class="{ active: isBoxSelecting }" @click="startBoxSelection">框选</button>
+                <button class="edit-tool-button danger" @click="deleteSelectedPoints">删除选中</button>
+              </template>
+            </template>
+            <span class="edit-divider" />
+            <button v-if="isDirty" class="edit-tool-button save" :disabled="saving" @click="saveEdit">{{ saving ? '保存中…' : '保存' }}</button>
+            <button v-if="isDirty" class="edit-tool-button" :disabled="saving" @click="cancelEdit">取消修改</button>
+            <button v-if="hasSaved && !isDirty" class="edit-tool-button recalculate" :disabled="recalculating" @click="handleRecalculate">{{ recalculating ? '计算中…' : '重新计算' }}</button>
+            <button v-if="!isDirty" class="edit-tool-button" :disabled="saving" @click="exitEditMode">完成编辑</button>
+          </div>
+        </template>
+
+        <section v-else class="area-list-view">
+          <div class="list-heading">
+            <div class="list-title">
+              <el-icon><List /></el-icon>
+              项目列表
+            </div>
+            <el-button type="primary" size="small" @click="handleAddProject">
+              <el-icon><Plus /></el-icon>
+              添加项目
+            </el-button>
+          </div>
+
+          <div class="list-search-bar">
+            <el-select v-model="filters.itemType" placeholder="项目类型" size="small" clearable style="width: 120px">
+              <el-option label="风电" value="FD" />
+              <el-option label="光伏" value="GF" />
+            </el-select>
+            <el-select v-model="filters.city" placeholder="市/区" size="small" clearable style="width: 120px">
+              <el-option v-for="c in CITY_OPTIONS" :key="c.value" :label="c.label" :value="c.value" />
+            </el-select>
+            <el-select v-model="filters.managerCompany" placeholder="项目所属" size="small" clearable style="width: 150px">
+              <el-option label="XX能源有限公司" value="XX能源有限公司" />
+            </el-select>
+            <el-select v-model="filters.stage" placeholder="项目阶段" size="small" clearable style="width: 140px">
+              <el-option v-for="opt in stageOptions" :key="opt.code" :label="opt.desc" :value="opt.code" />
+            </el-select>
+            <el-input v-model="filters.projectName" placeholder="项目名称" size="small" clearable style="width: 200px" @keyup.enter="handleSearch">
+              <template #suffix>
+                <el-icon @click="handleSearch"><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-button size="small" type="primary" @click="handleSearch">查询</el-button>
+          </div>
+
+          <el-table v-loading="listLoading" :data="projectList" size="small" stripe class="project-table" @sort-change="handleTableSortChange">
+            <el-table-column label="项目编号" min-width="140">
+              <template #default="{ row }">{{ row.projectCode || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="项目名称" min-width="240" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.projectName || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="装机容量MW" width="140" prop="currentProjectCapacity" sortable="custom">
+              <template #default="{ row }">{{ row.currentProjectCapacity ?? '-' }}</template>
+            </el-table-column>
+            <el-table-column label="资本金财务内部收益率%" width="200" prop="capitalFinancialRate" sortable="custom">
+              <template #default="{ row }">
+                {{ row.capitalFinancialRate != null ? row.capitalFinancialRate + '%' : '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="阶段" width="120">
+              <template #default="{ row }">{{ stageMap[row.projectStage] || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="所属" min-width="140" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.managerCompany || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="负责人" width="100">
+              <template #default="{ row }">{{ row.managerName || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="创建时间" width="170">
+              <template #default="{ row }">{{ row.createTime || '-' }}</template>
+            </el-table-column>
+          </el-table>
+
+          <div class="pagination-row">
+            <el-pagination
+              v-model:current-page="pagination.page"
+              v-model:page-size="pagination.pageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              small
+              background
+              layout="total, sizes, prev, pager, next, jumper"
+              :total="pagination.total"
+              @current-change="handlePageChange"
+              @size-change="handleSizeChange"
+            />
+          </div>
+        </section>
       </template>
 
-      <section v-else class="area-list-view">
-        <div class="list-heading">
-          <div class="list-title">
-            <el-icon><List /></el-icon>
-            项目列表
+      <!-- ★ 新增：创建项目全屏层（与 sitemap 一致） -->
+      <section v-if="showCreateProject" class="create-project-fullpage">
+        <div class="cp-map-overlay">
+          <div class="cp-search-box">
+            <el-input
+              v-model="placeSearchKeyword"
+              placeholder="请输入行政区划地名"
+              size="small"
+              @keyup.enter="handlePlaceSearch"
+            >
+              <template #suffix>
+                <el-icon class="cp-search-icon" @click="handlePlaceSearch"><ArrowRight /></el-icon>
+              </template>
+            </el-input>
           </div>
-          <el-button type="primary" size="small" @click="handleAddProject">
-            <el-icon><Plus /></el-icon>
-            添加项目
-          </el-button>
+          <div class="cp-draw-actions">
+            <el-button size="small" @click="startCreateDrawing">开始绘制</el-button>
+            <el-button size="small" @click="saveCreateDrawing">保存</el-button>
+            <el-button size="small" @click="clearCreateDrawing">清空</el-button>
+          </div>
         </div>
-
-        <div class="list-search-bar">
-          <el-select v-model="filters.itemType" placeholder="项目类型" size="small" clearable style="width: 120px">
-            <el-option label="风电" value="FD" />
-            <el-option label="光伏" value="GF" />
-          </el-select>
-          <el-select v-model="filters.city" placeholder="市/区" size="small" clearable style="width: 120px">
-            <el-option v-for="c in CITY_OPTIONS" :key="c.value" :label="c.label" :value="c.value" />
-          </el-select>
-          <el-select v-model="filters.managerCompany" placeholder="项目所属" size="small" clearable style="width: 150px">
-            <el-option label="XX能源有限公司" value="XX能源有限公司" />
-          </el-select>
-          <el-select v-model="filters.stage" placeholder="项目阶段" size="small" clearable style="width: 140px">
-            <el-option v-for="opt in stageOptions" :key="opt.code" :label="opt.desc" :value="opt.code" />
-          </el-select>
-          <el-input v-model="filters.projectName" placeholder="项目名称" size="small" clearable style="width: 200px" @keyup.enter="handleSearch">
-            <template #suffix>
-              <el-icon @click="handleSearch"><Search /></el-icon>
-            </template>
-          </el-input>
-          <el-button size="small" type="primary" @click="handleSearch">查询</el-button>
-        </div>
-
-        <el-table v-loading="listLoading" :data="projectList" size="small" stripe class="project-table" @sort-change="handleTableSortChange">
-          <el-table-column label="项目编号" min-width="140">
-            <template #default="{ row }">{{ row.projectCode || '-' }}</template>
-          </el-table-column>
-          <el-table-column label="项目名称" min-width="240" show-overflow-tooltip>
-            <template #default="{ row }">{{ row.projectName || '-' }}</template>
-          </el-table-column>
-          <el-table-column label="装机容量MW" width="140" prop="currentProjectCapacity" sortable="custom">
-            <template #default="{ row }">{{ row.currentProjectCapacity ?? '-' }}</template>
-          </el-table-column>
-          <el-table-column label="资本金财务内部收益率%" width="200" prop="capitalFinancialRate" sortable="custom">
-            <template #default="{ row }">
-              {{ row.capitalFinancialRate != null ? row.capitalFinancialRate + '%' : '-' }}
-            </template>
-          </el-table-column>
-          <el-table-column label="阶段" width="120">
-            <template #default="{ row }">{{ stageMap[row.projectStage] || '-' }}</template>
-          </el-table-column>
-          <el-table-column label="所属" min-width="140" show-overflow-tooltip>
-            <template #default="{ row }">{{ row.managerCompany || '-' }}</template>
-          </el-table-column>
-          <el-table-column label="负责人" width="100">
-            <template #default="{ row }">{{ row.managerName || '-' }}</template>
-          </el-table-column>
-          <el-table-column label="创建时间" width="170">
-            <template #default="{ row }">{{ row.createTime || '-' }}</template>
-          </el-table-column>
-        </el-table>
-
-        <div class="pagination-row">
-          <el-pagination
-            v-model:current-page="pagination.page"
-            v-model:page-size="pagination.pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            small
-            background
-            layout="total, sizes, prev, pager, next, jumper"
-            :total="pagination.total"
-            @current-change="handlePageChange"
-            @size-change="handleSizeChange"
-          />
-        </div>
+        <CreateProjectForm
+          ref="createProjectFormRef"
+          :map-ref="mapRef"
+          :panel-width="550"
+          @cancel="closeCreateProject"
+          @saved="onProjectCreated"
+        />
       </section>
     </template>
 
@@ -326,10 +359,9 @@
       :initial-tab="detailPanelTab"
       @close="showSiteMapDetailPanel = false"
       @action="onSiteMapDetailAction"
-      @generate-report="handleGenerateReportFromHeader"   
+      @generate-report="handleGenerateReportFromHeader"
       @open-confirm="handleOpenConfirm"
     />
-
 
     <SiteMapGenerateReportPanel
       :visible="showGeneratePanel"
@@ -362,7 +394,7 @@ import {
 } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { List, MapLocation, Plus, Search, MoreFilled, Location, CircleCheck, CircleClose } from '@element-plus/icons-vue'
-
+import { searchPlaceName } from './js/useTiandituGeocode'
 import MapGL from '@/components/MapGL.vue'
 import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
 import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPanelConfig'
@@ -533,6 +565,31 @@ const ACTION_LABELS = {
 }
 
 const mapRef = ref(null)
+// ============================================================
+// ★ 低层级底图：跟随 sx-base-imagery-layer 的可见性
+//   (whln 插件接管 sx-base-imagery-layer 的显隐，我们不介入)
+//   - sx-base-imagery-layer 在 → 低层级底图在
+//   - sx-base-imagery-layer 关 → 低层级底图跟着关
+// ============================================================
+const BASE_IMAGERY_LAYER_ID = 'sx-base-imagery-layer'
+const LOW_BASE_LAYER_ID = 'sx-world-preview-layer'
+
+function syncLowLevelBase() {
+  const map = mapRef.value?.getMap?.()
+  if (!map) return
+  if (!map.getLayer(BASE_IMAGERY_LAYER_ID) || !map.getLayer(LOW_BASE_LAYER_ID)) return
+
+  // MapLibre: 未显式设置 layout 时 getLayoutProperty 返回 undefined，按 visible 处理
+  const baseVisible =
+    map.getLayoutProperty(BASE_IMAGERY_LAYER_ID, 'visibility') !== 'none'
+  const target = baseVisible ? 'visible' : 'none'
+
+  const current =
+    map.getLayoutProperty(LOW_BASE_LAYER_ID, 'visibility') ?? 'visible'
+  if (current === target) return    // ★ short-circuit，避免 styledata 递归触发
+
+  map.setLayoutProperty(LOW_BASE_LAYER_ID, 'visibility', target)
+}
 const selectedStage = ref(null)
 const activeProject = ref(null)
 const mapReady = ref(false)
@@ -624,13 +681,16 @@ const editProjectFormRef = ref(null)
 const refreshingActionProject = ref(false)
 const deleteConfirmOpen = ref(false)
 const wizardVisible = ref(false)
-
+const showCreateProject = ref(false)
+const createProjectFormRef = ref(null)
+const placeSearchKeyword = ref('')
 const showAddReportPanel = ref(false)
 const showConfirmPanel = ref(false)
 const confirmReportId = ref(null)
 
 const isActionPanelOpen = computed(() => (
   showEditProject.value ||
+  showCreateProject.value ||   // ★ 新增：创建项目期间也视为面板打开
   showVerifyPanel.value ||
   showSiteMapDetailPanel.value ||
   showGeneratePanel.value ||
@@ -1588,7 +1648,61 @@ function toggleCustomLayer(id, visible) {
   }
 }
 
-function handleAddProject() { ElMessage.info('添加项目功能已停用') }
+function openCreateProject() {
+  if (isEditing.value && isDirty.value) {
+    ElMessage.warning('请先保存或取消地图上的修改')
+    return
+  }
+  // 关掉当前的项目卡片 / 选中态，避免创建表单关闭后残留
+  clearHoverState()
+  popoverProject.value = null
+  selectedProject.value = null
+  isDetailFullscreen.value = false
+  showCreateProject.value = true
+  if (mapReady.value) nextTick(() => startCreateDrawing())
+}
+
+function closeCreateProject() {
+  showCreateProject.value = false
+  placeSearchKeyword.value = ''
+}
+
+function startCreateDrawing() {
+  createProjectFormRef.value?.startPolygonDrawing?.()
+}
+function saveCreateDrawing() {
+  createProjectFormRef.value?.handleMapDrawSave?.()
+}
+function clearCreateDrawing() {
+  createProjectFormRef.value?.handleMapDrawClear?.()
+}
+
+async function onProjectCreated() {
+  showCreateProject.value = false
+  placeSearchKeyword.value = ''
+  // ★ overview 特有：省级容量色阶是缓存的，创建后必须清掉，否则新项目容量不反映到省界上
+  stageCityCapacityCache.value = {}
+  await Promise.all([fetchMapProjects(), fetchProjectList()])
+  if (mapReady.value && !isAreaView.value) {
+    renderSelectedProject(activeProject.value || null)
+  }
+}
+
+async function handlePlaceSearch() {
+  const kw = placeSearchKeyword.value.trim()
+  if (!kw) return
+  try {
+    const { lng, lat } = await searchPlaceName(kw)
+    mapRef.value?.getMap?.()?.flyTo({ center: [lng, lat], zoom: 11, duration: 1500 })
+  } catch (err) {
+    ElMessage.warning(err?.message || '未找到匹配的地名')
+  }
+}
+
+// 保留原有入口名，模板里 @add / @click 不用改
+function handleAddProject() {
+  openCreateProject()
+}
 
 function toggleTerrain(shouldEnable) {
   const map = mapRef.value?.getMap?.()
@@ -2937,6 +3051,9 @@ async function onMapReady() {
   } catch (err) {
     console.warn('[whln] 图层控制挂载失败:', err)
   }
+   // ★ 初始化 + 监听 whln 对 base imagery 的 visibility 切换
+  syncLowLevelBase()
+  map.on('styledata', syncLowLevelBase)
 }
 watch(isAreaView, (val) => {
   const el = document.querySelector('.maplibregl-ctrl-bottom-left')
@@ -2960,6 +3077,7 @@ onUnmounted(() => {
   whlnPlugin = null
   const map = mapRef.value?.getMap?.()
   if (map) {
+    map.off('styledata', syncLowLevelBase)
     map.off('click', handleMapBlankClick)
     map.off('zoom', syncMaskVisibility)
     map.off('move', syncMaskVisibility)

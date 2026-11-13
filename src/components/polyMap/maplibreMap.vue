@@ -49,7 +49,7 @@ const isDrawing = ref(false)
 
 let lastMoveTime = 0
 
-const BASE_LAYER_ID = 'tdt-imagery'
+const BASE_LAYER_ID = 'hd-imagery'
 
 const WIND_SOURCE_ID = 'wind-res'
 const WIND_LAYER_ID = 'layer-wind-res'
@@ -124,7 +124,7 @@ function onInitMap() {
 
 
 const TDT_ANNOTATION_PREFIX = 'eng-r-tdt-annotation-'
-const TDT_IMAGERY_PREFIX = 'eng-r-tdt-imagery-'
+const TDT_IMAGERY_PREFIX = 'eng-r-hd-imagery-'
 const HD_IMAGERY_PREFIX = 'eng-r-hd-imagery-'
 
 function getRasterOverlayBeforeId() {
@@ -252,7 +252,7 @@ function updateWhlnLayers(ids = []) {
   if (!map) return
 
   const selectedIds = new Set(ids)
-  const pluginIds = ['tdt-imagery']
+  const pluginIds = ['hd-imagery']
 
   if (selectedIds.has('road-network')) {
     pluginIds.push('road-network')
