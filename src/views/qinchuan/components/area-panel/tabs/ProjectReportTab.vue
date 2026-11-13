@@ -161,7 +161,7 @@ const props = defineProps({
   initialSubTab: { type: String, default: '' },
   hideSubTabs: { type: Boolean, default: false }
 })
-const fake_data = ref(null)
+
 // ============================================================
 // 报告列表
 // ============================================================
