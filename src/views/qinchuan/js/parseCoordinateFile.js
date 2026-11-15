@@ -1,117 +1,303 @@
 // js/parseCoordinateFile.js
-// 在你现成的 parseKml / parseKmz / parseXlsx / autoParseFile 基础上，
-// 统一转换成场区范围 / 风机点位需要的 { lng, lat } 数组。
 //
-// ⚠️ 请把下面这行 import 路径改成你实际存放解析函数的路径
-import { parseKml, parseKmz, parseXlsx } from '@/utils/parseCoordinate'
+// 坐标文件统一入口：把 KML / KMZ / OVKML / XLSX / JSON 解析成
+// 场区范围 / 风机点位 / 升压站 三类业务需要的结构。
+//
+// 依赖 @/utils/parseCoordinate 导出的 parseKml / parseKmz / parseXlsx
+// （可选 parseOvkml / parseJson）；本文件对它们的返回结构做了兼容适配。
 
-// 假设：ovkml 是天地图/自研格式的 kml 变种，结构与标准 kml 一致，
-// 复用 parseKml 的 DOM 解析逻辑即可。如果实际格式不同，请单独实现 parseOvkml。
-async function parseOvkml(file) {
-  return parseKml(file)
-}
+import * as coord from '@/utils/parseCoordinate'
+
+const parseKmlImpl   = coord.parseKml
+const parseKmzImpl   = coord.parseKmz
+const parseXlsxImpl  = coord.parseXlsx
+const parseOvkmlImpl = coord.parseOvkml || coord.parseKml
+const parseJsonImpl  = coord.parseJson
+
+/* ==================== 基础工具 ==================== */
 
 function getExt(file) {
-  return file.name.split('.').pop().toLowerCase()
+  const name = file?.name || ''
+  if (!name) {
+    const type = file?.type || ''
+    if (/kml/i.test(type)) return 'kml'
+    if (/kmz|zip/i.test(type)) return 'kmz'
+    if (/spreadsheet|excel/i.test(type)) return 'xlsx'
+    if (/json/i.test(type)) return 'json'
+    throw new Error('无法判断文件格式，请检查文件名后缀')
+  }
+  const i = name.lastIndexOf('.')
+  if (i < 0) throw new Error('文件缺少扩展名，无法判断格式')
+  return name.slice(i + 1).toLowerCase()
 }
 
-// xlsx 表头做模糊匹配：兼容中文/英文列名
-const LNG_KEYS = ['经度', 'lng', 'longitude', 'lon']
-const LAT_KEYS = ['纬度', 'lat', 'latitude']
-const ALT_KEYS = ['是否备选', 'isAlternative', '备选']
+function toNum(v) {
+  if (v === null || v === undefined) return null
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  const s = String(v).trim()
+  if (s === '') return null
+  const n = Number(s)
+  return Number.isFinite(n) ? n : null
+}
+
+/* ==================== KML 结果归一化 ==================== */
+
+function normalizePoint(p) {
+  if (!p) return null
+  const c = p.coordinates ?? p
+  const lng = toNum(c?.lng ?? c?.longitude)
+  const lat = toNum(c?.lat ?? c?.latitude)
+  if (lng === null || lat === null) return null
+  return { name: p.name || '', coordinates: { lng, lat } }
+}
+
+function normalizePoints(list) {
+  if (!Array.isArray(list)) return []
+  return list.map(normalizePoint).filter(Boolean)
+}
+
+function normalizeRingFromObjects(ring) {
+  if (!Array.isArray(ring)) return null
+  const coords = ring
+    .map((item) => {
+      if (!item) return null
+      const lng = toNum(item.lng ?? item.longitude)
+      const lat = toNum(item.lat ?? item.latitude)
+      return lng !== null && lat !== null ? { lng, lat } : null
+    })
+    .filter(Boolean)
+  return coords.length >= 3 ? coords : null
+}
+
+function normalizePolygon(poly) {
+  if (!poly) return null
+  const coordinates = normalizeRingFromObjects(poly.coordinates)
+  if (!coordinates) return null
+  const holes = Array.isArray(poly.holes)
+    ? poly.holes.map(normalizeRingFromObjects).filter(Boolean)
+    : []
+  return { name: poly.name || '', coordinates, holes }
+}
+
+function normalizePolygons(list) {
+  if (!Array.isArray(list)) return []
+  return list.map(normalizePolygon).filter(Boolean)
+}
+
+function normalizeLine(line) {
+  if (!line || !Array.isArray(line.coordinates)) return null
+  const coordinates = line.coordinates
+    .map((item) => {
+      const lng = toNum(item?.lng ?? item?.longitude ?? item?.[0])
+      const lat = toNum(item?.lat ?? item?.latitude ?? item?.[1])
+      return lng !== null && lat !== null ? { lng, lat } : null
+    })
+    .filter(Boolean)
+  return coordinates.length >= 2 ? { name: line.name || '', coordinates } : null
+}
+
+function normalizeLines(list) {
+  if (!Array.isArray(list)) return []
+  return list.map(normalizeLine).filter(Boolean)
+}
+
+// formatKMLFileEvent 输出兜底适配
+//   pointData:   [{ longitude, latitude }]      字符串 [lng,lat]
+//   polygonData: [[[lat, lng], ...]]            字符串 [lat,lng] ⚠️ 反的
+function normalizeFromFormatKmlEvent(raw) {
+  const points = (raw.pointData || [])
+    .map((p) => {
+      const lng = toNum(p?.longitude ?? p?.lng)
+      const lat = toNum(p?.latitude ?? p?.lat)
+      return lng !== null && lat !== null ? { name: '', coordinates: { lng, lat } } : null
+    })
+    .filter(Boolean)
+
+  const polygons = (raw.polygonData || [])
+    .map((ring) => {
+      if (!Array.isArray(ring)) return null
+      const coordinates = ring
+        .map((pair) => {
+          if (!Array.isArray(pair) || pair.length < 2) return null
+          // formatKMLFileEvent 的 polygonData 是 [lat, lng]，翻回 [lng, lat]
+          const lng = toNum(pair[1])
+          const lat = toNum(pair[0])
+          return lng !== null && lat !== null ? { lng, lat } : null
+        })
+        .filter(Boolean)
+      return coordinates.length >= 3 ? { name: '', coordinates, holes: [] } : null
+    })
+    .filter(Boolean)
+
+  return { points, polygons, lines: [] }
+}
+
+function normalizeKmlResult(raw) {
+  if (!raw || typeof raw !== 'object') return { points: [], polygons: [], lines: [] }
+  // 老链路：formatKMLFileEvent 直接当 parseKml 用
+  if (
+    Array.isArray(raw.pointData) ||
+    Array.isArray(raw.polygonData) ||
+    Array.isArray(raw.lineData)
+  ) {
+    return normalizeFromFormatKmlEvent(raw)
+  }
+  // 标准链路：parseKml 输出 { points, polygons, lines }
+  return {
+    points: normalizePoints(raw.points),
+    polygons: normalizePolygons(raw.polygons),
+    lines: normalizeLines(raw.lines),
+  }
+}
+
+/* ==================== xlsx 表头匹配 ==================== */
+
+const LNG_ALIASES = [
+  '经度', '经度/x', '经度x', '经度(°)', '经度（度）',
+  'lng', 'lon', 'longitude', 'x', '东经', '位置经度', 'x坐标',
+]
+const LAT_ALIASES = [
+  '纬度', '纬度/y', '纬度y', '纬度(°)', '纬度（度）',
+  'lat', 'latitude', 'y', '北纬', '位置纬度', 'y坐标',
+]
+const ALT_ALIASES = [
+  '是否备选', '备选', 'isalternative', 'alternate', 'reserve', '是否备用',
+]
+
+function normalizeHeader(h) {
+  return String(h ?? '').trim().toLowerCase().replace(/\s+/g, '')
+}
+
+function stripUnit(h) {
+  return String(h ?? '').replace(/[\(（].*?[\)）]/g, '').trim()
+}
 
 function matchKey(headers, candidates) {
-  const lowerHeaders = headers.map((h) => String(h).trim().toLowerCase())
-  for (const candidate of candidates) {
-    const idx = lowerHeaders.indexOf(candidate.toLowerCase())
-    if (idx !== -1) return headers[idx]
+  if (!Array.isArray(headers) || !headers.length) return null
+  const norm = headers.map((h) => normalizeHeader(stripUnit(h)))
+  const alias = candidates.map(normalizeHeader)
+
+  // 1. 精确匹配
+  for (let i = 0; i < norm.length; i++) {
+    if (norm[i] && alias.includes(norm[i])) return headers[i]
+  }
+  // 2. 前后缀匹配（alias 长度 >= 2，避免 'x'/'y' 误匹配）
+  for (let i = 0; i < norm.length; i++) {
+    const h = norm[i]
+    if (!h) continue
+    if (alias.some((a) => a.length >= 2 && (h.startsWith(a) || h.endsWith(a)))) {
+      return headers[i]
+    }
+  }
+  // 3. 包含匹配（兜底）
+  for (let i = 0; i < norm.length; i++) {
+    const h = norm[i]
+    if (!h) continue
+    if (alias.some((a) => a.length >= 2 && h.includes(a))) return headers[i]
   }
   return null
 }
 
-/**
- * 把 parseXlsx 返回的 rows 转成 [{lng, lat, isAlternative}]
- */
 function xlsxRowsToPoints(xlsxResult) {
-  const { headers, rows } = xlsxResult
-  const lngKey = matchKey(headers, LNG_KEYS)
-  const latKey = matchKey(headers, LAT_KEYS)
-  const altKey = matchKey(headers, ALT_KEYS)
+  const { headers, rows, lngKey, latKey, altKey } = xlsxResult || {}
+  // 兼容 parseXlsx 返回 lngKey/latKey（新版）和不返回（老版）
+  const lngK = lngKey || matchKey(headers || [], LNG_ALIASES)
+  const latK = latKey || matchKey(headers || [], LAT_ALIASES)
+  const altK = altKey || matchKey(headers || [], ALT_ALIASES)
 
-  if (!lngKey || !latKey) {
+  if (!lngK || !latK) {
     throw new Error('xlsx 文件缺少经度/纬度列，请使用提供的模板')
   }
 
-  return rows
-    .map((row) => ({
-      lng: Number(row[lngKey]),
-      lat: Number(row[latKey]),
-      isAlternative: altKey ? (Number(row[altKey]) ? 1 : 0) : 0
-    }))
-    .filter((p) => !isNaN(p.lng) && !isNaN(p.lat))
+  return (rows || [])
+    .map((row) => {
+      const lng = toNum(row?.[lngK])
+      const lat = toNum(row?.[latK])
+      if (lng === null || lat === null) return null
+      return {
+        lng,
+        lat,
+        isAlternative: altK ? (toNum(row?.[altK]) ? 1 : 0) : 0,
+      }
+    })
+    .filter(Boolean)
 }
 
-/**
- * 从 kml/kmz 解析结果里取第一个多边形的外环坐标（场区范围用）
- */
-function kmlResultToPolygonPoints(kmlResult) {
-  const polygon = kmlResult.polygons?.[0]
-  if (!polygon) {
-    throw new Error('文件中未找到面（Polygon）数据，请检查场区范围文件')
-  }
-  return polygon.coordinates.map((c) => ({ lng: c.lng, lat: c.lat }))
-}
-
-/**
- * 从 kml/kmz 解析结果里取所有点（风机点位用）
- */
-function kmlResultToPoints(kmlResult) {
-  return (kmlResult.points || []).map((p) => ({
-    lng: p.coordinates.lng,
-    lat: p.coordinates.lat,
-    isAlternative: 0
-  }))
-}
+/* ==================== 按扩展名分派 ==================== */
 
 async function parseByExt(file) {
   const ext = getExt(file)
-  if (ext === 'kml') return { ext, data: await parseKml(file) }
-  if (ext === 'kmz') return { ext, data: await parseKmz(file) }
-  if (ext === 'ovkml') return { ext, data: await parseOvkml(file) }
-  if (ext === 'xlsx') return { ext, data: await parseXlsx(file) }
+  if (ext === 'kml') {
+    if (typeof parseKmlImpl !== 'function') throw new Error('parseKml 未导出')
+    return { ext, data: await parseKmlImpl(file) }
+  }
+  if (ext === 'kmz') {
+    if (typeof parseKmzImpl !== 'function') throw new Error('parseKmz 未导出')
+    return { ext, data: await parseKmzImpl(file) }
+  }
+  if (ext === 'ovkml') {
+    if (typeof parseOvkmlImpl !== 'function') throw new Error('当前不支持 OVKML')
+    return { ext, data: await parseOvkmlImpl(file) }
+  }
+  if (ext === 'json') {
+    if (typeof parseJsonImpl !== 'function') throw new Error('当前不支持 JSON 格式')
+    return { ext, data: await parseJsonImpl(file) }
+  }
+  if (ext === 'xlsx') {
+    if (typeof parseXlsxImpl !== 'function') throw new Error('parseXlsx 未导出')
+    return { ext, data: await parseXlsxImpl(file) }
+  }
   throw new Error(`不支持的文件格式：.${ext}`)
 }
 
+/* ==================== 业务解析入口 ==================== */
+
 /**
- * 解析“场区范围”上传文件，返回 [{lng, lat}] 多边形坐标点（按文件中原始顺序）
- * @param {File} file
+ * 场区范围：返回 [{ lng, lat }]
  */
 export async function parseSiteRangeFile(file) {
   const { ext, data } = await parseByExt(file)
+
   if (ext === 'xlsx') {
-    return xlsxRowsToPoints(data).map(({ lng, lat }) => ({ lng, lat }))
+    const pts = xlsxRowsToPoints(data).map(({ lng, lat }) => ({ lng, lat }))
+    if (pts.length < 3) {
+      throw new Error('场区范围坐标点不足 3 个，无法构成多边形')
+    }
+    return pts
   }
-  return kmlResultToPolygonPoints(data)
+
+  const { polygons } = normalizeKmlResult(data)
+  if (!polygons.length) {
+    throw new Error('文件中未找到面（Polygon/闭环 LineString）数据，请检查场区范围文件')
+  }
+  if (polygons.length > 1) {
+    console.warn(`[场区] 文件含 ${polygons.length} 个面，取第一个`)
+  }
+  return polygons[0].coordinates.map((c) => ({ lng: c.lng, lat: c.lat }))
 }
 
 /**
- * 解析“风机点位”上传文件，返回 [{lng, lat, isAlternative}]
- * @param {File} file
+ * 风机点位：返回 [{ lng, lat, isAlternative }]
  */
 export async function parseWindTurbineFile(file) {
   const { ext, data } = await parseByExt(file)
+
   if (ext === 'xlsx') {
     return xlsxRowsToPoints(data)
   }
-  return kmlResultToPoints(data)
+
+  const { points } = normalizeKmlResult(data)
+  return points.map((p) => ({
+    lng: p.coordinates.lng,
+    lat: p.coordinates.lat,
+    isAlternative: 0,
+  }))
 }
 
-
 /**
- * 解析“升压站”上传文件，返回结构化结果，由调用方决定渲染成面还是点
- * 返回：
- *   { type: 'polygon', rings: number[][][] }  // 面
- *   { type: 'points',  points: {lng,lat}[] }   // 点
+ * 升压站：返回
+ *   { type: 'polygon', rings: [[[lng,lat], ...]] }
+ *   { type: 'points',  points: [{lng,lat}] }
  */
 export async function parseBoosterFile(file) {
   const { ext, data } = await parseByExt(file)
@@ -122,8 +308,8 @@ export async function parseBoosterFile(file) {
     return { type: 'points', points: pts }
   }
 
-  // kml / kmz / ovkml：优先面，其次点
-  const polygons = data?.polygons || []
+  const { polygons, points } = normalizeKmlResult(data)
+
   if (polygons.length) {
     const ring = polygons[0].coordinates
       .map((c) => [Number(c.lng), Number(c.lat)])
@@ -131,14 +317,10 @@ export async function parseBoosterFile(file) {
     if (ring.length >= 3) return { type: 'polygon', rings: [ring] }
   }
 
-  const pts = (data?.points || [])
-    .map((p) => {
-      const c = p?.coordinates ?? p
-      const lng = Number(c?.lng ?? c?.longitude)
-      const lat = Number(c?.lat ?? c?.latitude)
-      return Number.isFinite(lng) && Number.isFinite(lat) ? { lng, lat } : null
-    })
-    .filter(Boolean)
+  const pts = points.map((p) => ({
+    lng: p.coordinates.lng,
+    lat: p.coordinates.lat,
+  }))
   if (pts.length) return { type: 'points', points: pts }
 
   throw new Error('文件内无坐标数据')

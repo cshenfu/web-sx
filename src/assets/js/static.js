@@ -476,7 +476,20 @@ const ALL_SERVICE_TYPE_OPTIONS = [
 ];
 // 模板地址源
 const templatePath = {
-    'geologyRegion': 'https://whln-prod-public.oss-cn-beijing.aliyuncs.com/template/%E5%9C%BA%E5%8C%BA%E5%9D%90%E6%A0%87%E6%A8%A1%E6%9D%BF.xlsx'
+  // 场区点位模板
+  point: 'https://rustfs.wh-ge.com/whln-prod-public/template/%E5%9C%BA%E5%8C%BA%E5%9D%90%E6%A0%87%E6%A8%A1%E6%9D%BF.xlsx',
+  // 风机点位模板
+  fan: 'https://rustfs.wh-ge.com/whln-prod-public/template/%E9%A3%8E%E6%9C%BA%E5%9D%90%E6%A0%87%E6%A8%A1%E6%9D%BF.xlsx',
+  // 升压站、开关站点位模板
+  boosterStation: 'https://rustfs.wh-ge.com/whln-prod-public/template/%E5%8D%87%E5%8E%8B%E7%AB%99%28%E5%BC%80%E5%85%B3%E7%AB%99%29%E5%9D%90%E6%A0%87%E6%A8%A1%E6%9D%BF.xlsx',
+  // 气象数据导入模板
+  weather: 'https://rustfs.wh-ge.com/whln-prod-public/template/%E6%B0%94%E8%B1%A1%E6%95%B0%E6%8D%AE%E5%AF%BC%E5%85%A5%E6%A8%A1%E6%9D%BF.xlsx',
+  // 设备导入模板
+  device: 'https://rustfs.wh-ge.com/whln-prod-public/template/%E9%A3%8E%E6%9C%BA%E8%AE%BE%E5%A4%87%E5%BD%95%E5%85%A5%E6%A8%A1%E6%9D%BF-2025-08-19.xlsx',
+  // 测风塔导入模板
+  anemometerTower: 'https://rustfs.wh-ge.com/whln-prod-public/template/%E6%B5%8B%E9%A3%8E%E5%A1%94%E5%AF%BC%E5%85%A5%E6%A8%A1%E6%9D%BF.csv',
+  // 中尺度导入模板
+  windMesoscale: 'https://rustfs.wh-ge.com/whln-prod-public/template/%E4%B8%AD%E5%B0%BA%E5%BA%A6%E6%95%B0%E6%8D%AE%E6%A8%A1%E6%9D%BF.txt'
 }
 // pdfview插件配置文件
 const pdfViewConfigurationPath = `https://whln-prod-public.${ossClientInfo.endPointShort}/configuration/viewer.properties`;

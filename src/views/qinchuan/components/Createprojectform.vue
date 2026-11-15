@@ -274,13 +274,17 @@ import { resolveRegionByPoints, isPolygonWithinRadius } from '../js/useTiandituG
 
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
 import shengyazhanIcon from '@/assets/img/mapIcon/syz.png'
+// 删除
+// function downloadTemplate(type) { ElMessage.info(`下载 ${type} 数据模板`) }
 
+// 新增
+import { downloadTemplate } from '@/utils/downloadTemplate'
 
 // turf
 // turf 7.x（推荐，按需引入，tree-shaking 友好）
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon'
 import pointToLineDistance from '@turf/point-to-line-distance'
-import { point as turfPoint, polygon as turfPolygon } from '@turf/helpers'
+import { point as turfPoint, polygon as turfPolygon, lineString as turfLineString } from '@turf/helpers'
 
 const MAX_SITE_RANGE_RADIUS_KM = 25
 
@@ -294,14 +298,20 @@ function buildSitePolygon() {
   return turfPolygon([ring])
 }
 
-// 点是否在场区内（边界算内 + 容差兜底）
 function isPointInSiteRange(poly, lng, lat) {
-  if (!poly) return true            // 没有场区时不做拦截（与原逻辑一致）
+  if (!poly) return true
   if (!Number.isFinite(lng) || !Number.isFinite(lat)) return false
+
   const pt = turfPoint([lng, lat])
   if (booleanPointInPolygon(pt, poly, { ignoreBoundary: false })) return true
-  // 浮点误差兜底：距边界 0.5m 内也算在内
-  return pointToLineDistance(pt, poly, { units: 'meters' }) <= BOUNDARY_EPS_METERS
+
+  // pointToLineDistance 只接受 LineString/MultiLineString，
+  // Polygon 必须先取外环构造成 LineString
+  const ring = poly.geometry?.coordinates?.[0]
+  if (!Array.isArray(ring) || ring.length < 2) return false
+
+  const boundary = turfLineString(ring)
+  return pointToLineDistance(pt, boundary, { units: 'meters' }) <= BOUNDARY_EPS_METERS
 }
 
 // ★ 改动：新增 mode / project
@@ -868,7 +878,6 @@ function handleBoosterUploadRemove() {
 }
 
 function handleUploadError(err) { ElMessage.error(`上传失败：${err?.message || '请稍后重试'}`) }
-function downloadTemplate(type) { ElMessage.info(`下载 ${type} 数据模板`) }
 
 /* ==================== 监听 & 生命周期 ==================== */
 // ★ 改动：去掉 immediate，避免初始化时冲掉编辑回显；仅在用户切换时触发
