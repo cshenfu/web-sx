@@ -190,7 +190,17 @@
         <SearchBar :filters="filters" :stage-options="stageOptions" @search="handleSearch" @reset="handleReset" />
         <el-table v-loading="listLoading" :data="projectList" size="small" stripe class="project-table">
           <el-table-column label="项目编号" min-width="130"><template #default="{ row }">{{ row.projectCode || '-' }}</template></el-table-column>
-          <el-table-column label="项目名称" min-width="220" show-overflow-tooltip><template #default="{ row }">{{ row.projectName || '-' }}</template></el-table-column>
+          <el-table-column label="项目名称" min-width="220" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span
+                class="project-name-link"
+                :title="row.projectName"
+                @click.stop="locateProjectFromList(row)"
+              >
+                {{ row.projectName || '-' }}
+              </span>
+            </template>
+          </el-table-column>
           <el-table-column label="项目区域" min-width="180" show-overflow-tooltip><template #default="{ row }">{{ formatRegion(row) }}</template></el-table-column>
           <el-table-column label="装机容量MW" width="120" sortable><template #default="{ row }">{{ row.currentProjectCapacity ?? '-' }}</template></el-table-column>
           <el-table-column label="资本金财务内部收益率%" width="180" sortable>
@@ -1971,7 +1981,16 @@ async function focusProject(project) {
 }
 function handleDrawerAction({ type, project }) { executeAction(type, allMapProjects.value.find((item) => item.id === project.id) || project) }
 function handleDrawerSortChange({ key, dir }) { drawerSort.key = key; drawerSort.dir = dir; pagination.page = 1; fetchProjectList() }
-
+// 列表模式点击项目名称：切回地图模式并定位到该项目
+// 复用 focusProject → onProjectClick，与 ProjectDrawer 卡片点击、地图点场区行为一致
+function locateProjectFromList(row) {
+  if (!row) return
+  // 详情面板互斥，避免切到地图后残留遮挡
+  showDetailPanel.value = false
+  showSiteMapDetailPanel.value = false
+  viewMode.value = 'map'
+  nextTick(() => focusProject(row))
+}
 watch(viewMode, (val) => {
   if (val === 'list' && showProjectDrawer.value) showProjectDrawer.value = false
   if (val === 'list') clearHoverState()
@@ -2486,5 +2505,12 @@ function handleGenerateRequest(payload) {
     grid-auto-rows: minmax(540px, auto);
     padding: 0 8px 8px;
   }
+}
+.project-name-link {
+  color: #1677ff;
+  cursor: pointer;
+}
+.project-name-link:hover {
+  text-decoration: underline;
 }
 </style>

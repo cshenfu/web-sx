@@ -95,7 +95,7 @@ import {
   powerGridOptions
 } from '@/views/qinchuan/js/Reportwizardmockdata'
 import * as newApi from '@/api/modules/project'
-import { getDataById } from '@/api/modules/newApi'   // 👈 新增
+import { getDataById } from '@/api/modules/newAPI'   // 👈 新增
 
 const props = defineProps({
   createProjectMode: { type: Number, default: PACKAGE_TYPE.default },

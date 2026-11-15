@@ -245,7 +245,15 @@
               <template #default="{ row }">{{ row.projectCode || '-' }}</template>
             </el-table-column>
             <el-table-column label="项目名称" min-width="240" show-overflow-tooltip>
-              <template #default="{ row }">{{ row.projectName || '-' }}</template>
+              <template #default="{ row }">
+                <span
+                  class="project-name-link"
+                  :title="row.projectName"
+                  @click="handleLocateProject(row)"
+                >
+                  {{ row.projectName || '-' }}
+                </span>
+              </template>
             </el-table-column>
             <el-table-column label="装机容量MW" width="140" prop="currentProjectCapacity" sortable="custom">
               <template #default="{ row }">{{ row.currentProjectCapacity ?? '-' }}</template>
@@ -919,7 +927,16 @@ function getProjectBounds(project) {
   if (minLng === maxLng && minLat === maxLat) return null
   return [[minLng, minLat], [maxLng, maxLat]]
 }
-
+// 列表模式点击项目名称：切回地图模式并定位到该项目
+// 复用 handleProjectSelect，和 ProjectListPanel 的 @select 行为完全一致
+function handleLocateProject(row) {
+  if (!row) return
+  const p = resolveMapProject(row)   // 优先用 mapProjects 里的完整数据（含 coordinate / 风机点等）
+  viewMode.value = 'map'
+  nextTick(() => {
+    handleProjectSelect(p)
+  })
+}
 function handleProjectSelect(item) {
   const popoverId = popoverProject.value?.id
   const selectedId = selectedProject.value?.id
@@ -3334,5 +3351,14 @@ onUnmounted(() => {
 @media (max-width: 760px) {
   .geometry-edit-toolbar { top: 6px; right: 8px; left: auto; max-width: calc(100vw - 16px); gap: 4px; padding: 5px; }
   .edit-tool-button { gap: 3px; padding: 0 7px; font-size: 11px; }
+}
+
+.project-name-link {
+  color: #409eff;
+  cursor: pointer;
+}
+
+.project-name-link:hover {
+  text-decoration: underline;
 }
 </style>
