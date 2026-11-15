@@ -7,7 +7,7 @@
 // （可选 parseOvkml / parseJson）；本文件对它们的返回结构做了兼容适配。
 
 import * as coord from '@/utils/parseCoordinate'
-
+import { normalizeCoords } from '@/utils/coordTransform'
 const parseKmlImpl   = coord.parseKml
 const parseKmzImpl   = coord.parseKmz
 const parseXlsxImpl  = coord.parseXlsx
@@ -258,22 +258,25 @@ async function parseByExt(file) {
 export async function parseSiteRangeFile(file) {
   const { ext, data } = await parseByExt(file)
 
+  let pts
   if (ext === 'xlsx') {
-    const pts = xlsxRowsToPoints(data).map(({ lng, lat }) => ({ lng, lat }))
-    if (pts.length < 3) {
-      throw new Error('场区范围坐标点不足 3 个，无法构成多边形')
+    pts = xlsxRowsToPoints(data).map(({ lng, lat }) => ({ lng, lat }))
+  } else {
+    const { polygons } = normalizeKmlResult(data)
+    if (!polygons.length) {
+      throw new Error('文件中未找到面（Polygon/闭环 LineString）数据，请检查场区范围文件')
     }
-    return pts
+    if (polygons.length > 1) console.warn(`[场区] 文件含 ${polygons.length} 个面，取第一个`)
+    pts = polygons[0].coordinates.map((c) => ({ lng: c.lng, lat: c.lat }))
   }
 
-  const { polygons } = normalizeKmlResult(data)
-  if (!polygons.length) {
-    throw new Error('文件中未找到面（Polygon/闭环 LineString）数据，请检查场区范围文件')
+  // ✅ 统一坐标类型
+  const normalized = normalizeCoords(pts, { fieldName: '场区范围' })
+
+  if (normalized.length < 3) {
+    throw new Error('场区范围坐标点不足 3 个，无法构成多边形')
   }
-  if (polygons.length > 1) {
-    console.warn(`[场区] 文件含 ${polygons.length} 个面，取第一个`)
-  }
-  return polygons[0].coordinates.map((c) => ({ lng: c.lng, lat: c.lat }))
+  return normalized
 }
 
 /**
@@ -282,16 +285,24 @@ export async function parseSiteRangeFile(file) {
 export async function parseWindTurbineFile(file) {
   const { ext, data } = await parseByExt(file)
 
+  let pts
   if (ext === 'xlsx') {
-    return xlsxRowsToPoints(data)
+    pts = xlsxRowsToPoints(data)
+  } else {
+    const { points } = normalizeKmlResult(data)
+    pts = points.map((p) => ({
+      lng: p.coordinates.lng,
+      lat: p.coordinates.lat,
+      isAlternative: 0,
+    }))
   }
 
-  const { points } = normalizeKmlResult(data)
-  return points.map((p) => ({
-    lng: p.coordinates.lng,
-    lat: p.coordinates.lat,
-    isAlternative: 0,
-  }))
+  // 👇 诊断 log
+  console.log('[风机] 转换前', ext, pts.slice(0, 2))
+  const result = normalizeCoords(pts, { fieldName: '风机点位' })
+  console.log('[风机] 转换后', result.slice(0, 2))
+
+  return result
 }
 
 /**
@@ -303,7 +314,7 @@ export async function parseBoosterFile(file) {
   const { ext, data } = await parseByExt(file)
 
   if (ext === 'xlsx') {
-    const pts = xlsxRowsToPoints(data)
+    const pts = normalizeCoords(xlsxRowsToPoints(data), { fieldName: '升压站' })
     if (!pts.length) throw new Error('文件内无坐标数据')
     return { type: 'points', points: pts }
   }
@@ -311,16 +322,17 @@ export async function parseBoosterFile(file) {
   const { polygons, points } = normalizeKmlResult(data)
 
   if (polygons.length) {
-    const ring = polygons[0].coordinates
-      .map((c) => [Number(c.lng), Number(c.lat)])
-      .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))
+    const rawRing = polygons[0].coordinates.map((c) => ({ lng: c.lng, lat: c.lat }))
+    // ✅ 环也要统一坐标类型
+    const ring = normalizeCoords(rawRing, { fieldName: '升压站范围' })
+      .map((c) => [c.lng, c.lat])
     if (ring.length >= 3) return { type: 'polygon', rings: [ring] }
   }
 
-  const pts = points.map((p) => ({
-    lng: p.coordinates.lng,
-    lat: p.coordinates.lat,
-  }))
+  const pts = normalizeCoords(
+    points.map((p) => ({ lng: p.coordinates.lng, lat: p.coordinates.lat })),
+    { fieldName: '升压站' }
+  )
   if (pts.length) return { type: 'points', points: pts }
 
   throw new Error('文件内无坐标数据')

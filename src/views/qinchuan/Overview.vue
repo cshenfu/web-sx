@@ -140,7 +140,7 @@
                 @generate-report="reportModalVisible = true"
                 @action="onDetailPanelAction"
                 @open-confirm="handleOpenConfirm"
-                @create-report="handleCreateReport"
+                @create-report="dispatchCreateReport"
               />
             </template>
           </div>
@@ -984,10 +984,26 @@ function resolveMapProject(project) {
   return mapProjects.value.find((item) => String(item.id) === String(project?.id)) || project
 }
 
-function openSiteMapDetailPanel(project, tab = 'main') {
-  actionProject.value = resolveMapProject(project)
-  detailPanelTab.value = tab
+async function openSiteMapDetailPanel(project, tab = 'main') {
+  if (!project) return
+  clearHoverState()
   actionMenuOpen.value = false
+
+  const p = resolveMapProject(project)
+
+  // ① 先走完整"选中场区"流程：flyTo + 高亮场区 + 渲染风机/升压站 + 加载道路
+  //    handleProjectSelect 内部有同 id 短路保护，重复点不会重复 flyTo
+  handleProjectSelect(p)
+
+  // ② 同步选中态，保证组件内部拿到的 project 与地图选中一致
+  selectedProject.value = p
+  activeAreaId.value = p.id
+  rightPanelMode.value = 'detail'
+  isDetailFullscreen.value = false
+
+  // ③ 设置面板数据
+  actionProject.value = p
+  detailPanelTab.value = tab
   showSiteMapDetailPanel.value = true
 }
 
@@ -1591,7 +1607,7 @@ async function fetchStageList() {
 async function fetchProjectList() {
   listLoading.value = true
   try {
-    const params = { pageNo: pagination.page, pageSize: pagination.pageSize, province: '610000' }
+    const params = { pageNo: pagination.page, pageSize: pagination.pageSize}
     if (filters.itemType) params.itemType = filters.itemType
     if (filters.city) params.city = filters.city
     if (filters.managerCompany) params.managerCompany = filters.managerCompany

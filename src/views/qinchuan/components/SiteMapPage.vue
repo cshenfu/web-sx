@@ -604,7 +604,11 @@ function handleOpenConfirm(id) {
   confirmReportId.value = id
   showConfirmPanel.value = true
 }
-
+// 报告/函件生成 —— header 按钮 emit 过来
+function handleGenerateReportFromHeader(proj) {
+  if (proj) selectedProject.value = proj
+  showGenerateModal.value = true
+}
 function handleConfirmSuccess() {
   fetchMapProjects()
   fetchProjectList()

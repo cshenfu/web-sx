@@ -12,7 +12,12 @@
 
         <el-form-item label="选择可研报告" required>
           <el-select v-model="selectedReportId" placeholder="请选择可研报告" :disabled="!selectedProjectId" :loading="loadingReport" style="width: 100%">
-            <el-option v-for="item in reportList" :key="item.reportProjectId" :label="`${item.reportProjectName} (${item.reportProjectCode})`" :value="item.reportProjectId" />
+            <el-option
+              v-for="item in reportList"
+              :key="item.id"
+              :label="item.fileName"
+              :value="item.id"
+            />
           </el-select>
         </el-form-item>
       </el-form>
@@ -272,7 +277,7 @@ const selectedReportInfo = ref(null)
 const fetchProjects = async (keyword = '') => {
   loadingProject.value = true
   try {
-    const res = await getPageList({ pageNo: 1, pageSize: 20, province: '610000', projectName: keyword })
+    const res = await getPageList({ pageNo: 1, pageSize: 20,  projectName: keyword })
     if (res.code === 200) projectList.value = res.data.list || []
   } catch (e) { console.error(e) } finally { loadingProject.value = false }
 }
@@ -298,7 +303,7 @@ const handleProjectChange = async (projectId) => {
 const handleConfirmSelect = async () => {
   if (!selectedProjectId.value || !selectedReportId.value) return
   selectedProjectInfo.value = projectList.value.find(item => item.id === selectedProjectId.value)
-  selectedReportInfo.value = reportList.value.find(item => item.reportProjectId === selectedReportId.value)
+  selectedReportInfo.value = reportList.value.find(item => item.id === selectedReportId.value)
 
   if (selectedProjectInfo.value) {
     form.projectName = selectedProjectInfo.value.projectName
