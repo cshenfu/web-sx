@@ -80,26 +80,27 @@
 </template>
 
 <script setup>
-import { computed, h, reactive, ref, watch } from 'vue'
+import { computed, h, reactive, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import RadioOptionGroup from '@/views/qinchuan/components/shared/RadioOptionGroup.vue'
 import ReferenceBox from '@/views/qinchuan/components/shared/ReferenceBox.vue'
-import { 
-  PACKAGE_TYPE, 
-  voltageLevelOptionsByMode, 
-  referenceToggleOptions, 
-  stepTwoReferenceBlocks, 
-  stepTwoAdvancedBlocks, 
-  cableLayingMethodOptions, 
-  iceThicknessOptions, 
-  powerGridOptions 
+import {
+  PACKAGE_TYPE,
+  voltageLevelOptionsByMode,
+  referenceToggleOptions,
+  stepTwoReferenceBlocks,
+  stepTwoAdvancedBlocks,
+  cableLayingMethodOptions,
+  iceThicknessOptions,
+  powerGridOptions
 } from '@/views/qinchuan/js/Reportwizardmockdata'
 import * as newApi from '@/api/modules/project'
+import { getDataById } from '@/api/modules/newApi'   // 👈 新增
 
 const props = defineProps({
   createProjectMode: { type: Number, default: PACKAGE_TYPE.default },
   project: { type: Object, default: () => null },
-  aiReportData: { type: Object, default: () => null } // 接收第一步传过来的 AI 报告数据
+  aiReportData: { type: Object, default: () => null } // 保留兼容父组件传参，不再消费
 })
 
 const emit = defineEmits(['save-draft', 'next', 'prev'])
@@ -172,64 +173,12 @@ const form = reactive({
   obsPath: props.project?.obsPath ?? '',
 })
 
-// ================= 监听传入的 AI 数据，进行回填和提取 =================
-watch(
-  () => props.aiReportData,
-  (newData) => {
-    if (!newData) return
-    const result = newData.reportParamResult || {}
-    const geoFiles = newData.geoFiles || []
-
-    // 1. 填充基础字段
-    if (result.substationVoltage) {
-      const v = Number(String(result.substationVoltage).replace(/[^0-9]/g, ''))
-      if ([110, 220, 35, 10].includes(v)) form.substationRatedVoltage = v
-    }
-    
-    if (result.lineLayingMethod) {
-      if (result.lineLayingMethod.includes('架空')) form.cableLayingMethod = 1
-      else if (result.lineLayingMethod.includes('电缆')) form.cableLayingMethod = 2
-    }
-
-    // 2. 辅助函数
-    const hasFile = (type) => geoFiles.some(f => f.fileBusinessType.includes(type))
-    const getFileRows = (type) => {
-      const files = geoFiles.filter(f => f.fileBusinessType.includes(type))
-      return files.length ? files.map(f => ({ label: '引用文件', value: f.fileName })) : [{ label: '引用文件', value: '暂无数据' }]
-    }
-
-    // 3. 映射引用块 (有数据则启用并填充，无数据则禁用并重置为 0)
-    const applyBlockData = (blockObj, formKey, hasData, rows) => {
-      if (!blockObj) return // 加上保护，防止 undefined
-      blockObj.disabled = !hasData
-      blockObj.rows = rows
-      if (!hasData) form[formKey] = 0 // 没数据强制切回暂无
-    }
-
-    // === 基础项映射 ===
-    applyBlockData(referenceBlocks.topographic, 'isTopographicMap', hasFile('场区范围'), getFileRows('场区范围'))
-    applyBlockData(referenceBlocks.system, 'isSystemReport', hasFile('升压站'), getFileRows('升压站'))
-    applyBlockData(referenceBlocks.windTower, 'isAnemometerTowerData', hasFile('测风塔'), getFileRows('测风塔'))
-    applyBlockData(referenceBlocks.geological, 'isGeologicalSurveyReport', hasFile('地质'), getFileRows('地质'))
-    
-    // === 高级项映射 ===
-    applyBlockData(advancedBlocks.weather, 'isWeatherStationData', hasFile('气象'), getFileRows('气象'))
-    applyBlockData(advancedBlocks.avoid, 'isAvoidAreasData', hasFile('避让'), getFileRows('避让'))
-    applyBlockData(advancedBlocks.deployable, 'isCanDeployableAreaData', hasFile('可布机'), getFileRows('可布机'))
-    applyBlockData(advancedBlocks.eia, 'isEiaReport', hasFile('环评'), getFileRows('环评'))
-    applyBlockData(advancedBlocks.water, 'isWaterConservationReport', hasFile('水保'), getFileRows('水保'))
-    applyBlockData(advancedBlocks.mesoscale, 'isMesoscaleFile', hasFile('中尺度'), getFileRows('中尺度'))
-  },
-  { deep: true, immediate: true }
-)
-
 // 内联 ReferenceBlock 组件 (加入拦截逻辑与样式微调)
 const ReferenceBlock = {
   props: { modelValue: [Number, String], block: Object },
   emits: ['update:modelValue'],
   setup(props, { emit }) {
     const handleUpdate = (val) => {
-      // 如果尝试选中 1（引用项目），但数据被禁用，则提示并阻止
       if (Number(val) === 1 && props.block?.disabled) {
         ElMessage.warning(`${props.block.title || '该数据'}暂无数据可引用`)
         return
@@ -256,6 +205,117 @@ const ReferenceBlock = {
       ])
   },
 }
+
+// ================= 用 getDataById 填充引用块 =================
+const dataByIdList = ref([])
+const dataLoading = ref(false)
+let unmounted = false
+
+onUnmounted(() => { unmounted = true })
+
+// 引用块 ↔ 接口 dataCategory + form 字段映射
+// 后端如果有新 dataCategory，只需要在这里补一条
+function matchCategoryByTitle(title) {
+  const text = String(title || '')
+  if (/测风|风塔/.test(text)) return 'WIND'
+  if (/地形/.test(text)) return 'TERRAIN'
+  if (/地质/.test(text)) return 'GEOLOGY'
+  if (/接入|升压/.test(text)) return 'ACCESS_REPORT_INFO'
+  if (/环评|环保/.test(text)) return 'ENVIRONMENT'
+  if (/水保/.test(text)) return 'WATER_CONSERVANCY'
+  if (/气象/.test(text)) return 'METEOROLOGY'
+  if (/避让/.test(text)) return 'AVOID'
+  if (/可布机/.test(text)) return 'DEPLOYABLE'
+  if (/中尺度/.test(text)) return 'MESOSCALE'
+  return null
+}
+
+const ALL_BLOCKS = [
+  { blockKey: 'topographic',  group: 'reference', formKey: 'isTopographicMap',          fileKey: 'topographicMapFile' },
+  { blockKey: 'system',       group: 'reference', formKey: 'isSystemReport',            fileKey: 'systemReportFile' },
+  { blockKey: 'windTower',    group: 'reference', formKey: 'isAnemometerTowerData',     fileKey: 'anemometerTowerFile' },
+  { blockKey: 'geological',   group: 'reference', formKey: 'isGeologicalSurveyReport',  fileKey: 'geologicalReportFile' },
+
+  { blockKey: 'weather',      group: 'advanced',  formKey: 'isWeatherStationData',      fileKey: 'weatherStationFile' },
+  { blockKey: 'avoid',        group: 'advanced',  formKey: 'isAvoidAreasData',          fileKey: 'avoidAreasDataJson' },
+  { blockKey: 'deployable',   group: 'advanced',  formKey: 'isCanDeployableAreaData',   fileKey: 'canDeployableAreaDataJson' },
+  { blockKey: 'eia',          group: 'advanced',  formKey: 'isEiaReport',               fileKey: 'eiaReportFile' },
+  { blockKey: 'water',        group: 'advanced',  formKey: 'isWaterConservationReport', fileKey: 'waterConservationReportFile' },
+  { blockKey: 'mesoscale',    group: 'advanced',  formKey: 'isMesoscaleFile',           fileKey: 'mesoscaleFilePath' },
+]
+
+function applyDataBlocks() {
+  const categoryFiles = {}
+  dataByIdList.value.forEach((item) => {
+    categoryFiles[item.dataCategory] = item.fileList || []
+  })
+
+  ALL_BLOCKS.forEach(({ blockKey, group, formKey, fileKey }) => {
+    const block = group === 'reference' ? referenceBlocks[blockKey] : advancedBlocks[blockKey]
+    if (!block) return
+
+    const category = matchCategoryByTitle(block.title)
+    const files = category ? (categoryFiles[category] || []) : []
+    const hasData = files.length > 0
+
+    block.disabled = !hasData
+    // 显示用 fileName
+    block.rows = hasData
+      ? files.map((f) => ({ label: '引用文件', value: f.fileName, filePath: f.filePath }))
+      : [{ label: '引用文件', value: '暂无数据' }]
+
+    if (hasData) {
+      form[formKey] = 1
+      // 存储用 filePath（中尺度是纯字符串，其它是 JSON 数组）
+      if (fileKey === 'mesoscaleFilePath') {
+        form[fileKey] = files[0]?.filePath || ''
+      } else {
+        form[fileKey] = JSON.stringify(
+          files.map((f) => ({
+            fileName: f.fileName,
+            filePath: f.filePath,
+            suffix: f.fileSuffix || '',
+          }))
+        )
+      }
+    } else {
+      form[formKey] = 0
+      form[fileKey] = fileKey === 'mesoscaleFilePath' ? '' : '[]'
+    }
+  })
+}
+
+async function loadDataById() {
+  const aiProjectId = props.project?.aiProjectId ?? props.project?.id
+  if (!aiProjectId) return
+
+  dataLoading.value = true
+  try {
+    const res = await getDataById(aiProjectId)
+    if (unmounted) return
+    if (res?.code === 200) {
+      dataByIdList.value = res.data || []
+      await nextTick()
+      if (unmounted) return
+      applyDataBlocks()
+    }
+  } catch (e) {
+    console.error('获取项目数据失败:', e)
+  } finally {
+    if (!unmounted) dataLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadDataById()
+})
+
+watch(
+  () => props.project?.aiProjectId ?? props.project?.id,
+  (id, oldId) => {
+    if (id && id !== oldId) loadDataById()
+  }
+)
 
 // ================= 工具函数 =================
 function toNumber(value, fallback = 0) {

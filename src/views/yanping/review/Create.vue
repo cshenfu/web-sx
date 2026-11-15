@@ -265,6 +265,7 @@ const handleProjectSelected = (project) => {
     ...workingProject.value,
     ...project,
     // 💡 关键：把第一步选中的项目 id 同步为 sxProjectId
+    aiProjectId: project.id,
     sxProjectId: project.sxProjectId ?? project.id ?? workingProject.value.sxProjectId,
   }
   renderMapLayers({

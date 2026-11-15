@@ -346,7 +346,15 @@ const boosterImportedIsBest = ref(1)
 const processing = reactive({ field: false, fan: false, booster: false, terrain: false })
 const anyUploadProcessing = computed(() => Object.values(processing).some(Boolean))
 const ossUpload = useOssUpload()
-
+const referenceData = computed(() => {
+  const project = props.project || {}
+  const source = project.rawProject || project
+  return {
+    field: { points: toArray(source.coordinate || source.fieldArea), files: findProjectFiles(source, 'field'), polygons: [] },
+    fan: { points: toArray(source.windTurbinePoints || source.devicePoints), files: findProjectFiles(source, 'fan'), polygons: toArray(source.devicePointsPlane) },
+    booster: { points: toArray(source.boosterStationLocations), files: findProjectFiles(source, 'booster'), polygons: toArray(source.userBoosterStationAreaPoint) },
+  }
+})
 const errors = reactive({ projectName: '', totalProjectCapacity: '', currentProjectCapacity: '', energyStorage: '', rentalUnitPrice: '', storage: '', field: '', fan: '', booster: '' })
 
 const form = reactive({
@@ -395,15 +403,7 @@ const preferHubHeightOptions = [100, 110, 120, 130, 140, 150, 160].map(v => ({ l
 const isDistributedMode = computed(() => props.createProjectMode === PACKAGE_TYPE.distributedDefault)
 const isBaseMode = computed(() => props.createProjectMode === PACKAGE_TYPE.baseDefault)
 
-const referenceData = computed(() => {
-  const project = props.project || {}
-  const source = project.rawProject || project
-  return {
-    field: { points: toArray(source.coordinate || source.fieldArea), files: findProjectFiles(source, 'field'), polygons: [] },
-    fan: { points: toArray(source.windTurbinePoints || source.devicePoints), files: findProjectFiles(source, 'fan'), polygons: toArray(source.devicePointsPlane) },
-    booster: { points: toArray(source.boosterStationLocations), files: findProjectFiles(source, 'booster'), polygons: toArray(source.userBoosterStationAreaPoint) },
-  }
-})
+
 
 watch(
   () => [props.initialProjectName, props.project?.name, props.project?.projectName],
@@ -1226,6 +1226,15 @@ const syncMapDataToParent = () => {
 watch(() => form.fieldAreaSource, (value, previous) => {
   if (value !== previous) clearCustomUpload('field')
 })
+// 放在 watch(() => form.fieldAreaSource, ...) 这一组旁边
+watch(
+  () => props.project?.id,
+  () => {
+    if (!hasReferenceData('booster') && form.boosterLocationSource === 'reference') {
+      form.boosterLocationSource = 'auto'
+    }
+  }
+)
 watch(() => form.fanLocationSource, (value, previous) => {
   if (value !== previous) clearCustomUpload('fan')
 })
