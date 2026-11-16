@@ -334,7 +334,11 @@ watch(() => props.project?.id, (id) => { if (id) refreshSurveyData() })
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 25px;
+  margin: 0 16px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.5);
 }
 .header-left { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 
