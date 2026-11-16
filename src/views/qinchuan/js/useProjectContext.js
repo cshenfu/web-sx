@@ -37,7 +37,7 @@ export function useProjectContext() {
   }
 
   function syncProject(project, slots = PROJECT_SLOTS) {
-    if (!project?.id) return
+    if (project?.id == null) return
     const targets = {
       focused: focusedProject,
       selected: selectedProject,
