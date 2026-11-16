@@ -374,8 +374,8 @@
       :create-project-mode="wizardMode"
       :title="wizardTitleLabel"
       :max-step="wizardMaxStep"
-      :project-name="selectedProject?.name || selectedProject?.projectName || ''"
-      :project="selectedProject"
+      :project-name="(wizardProject || selectedProject)?.name || (wizardProject || selectedProject)?.projectName || ''"
+      :project="wizardProject || selectedProject"
       @close="closeWizard"
       @save-draft="handleWizardSaveDraft"
       @submit="handleWizardSubmit"
@@ -568,7 +568,7 @@ const {
   showGeneratePanel, generatePanelProject, generatePanelActionKey, generatePanelSubCode,
   generatePanelSource, generatePanelFirstBusinessTitle, generatePanelSecondaryBusinessTitle,
   generatePanelFileTypeTag, showAddReportPanel, showConfirmPanel, confirmReportId,
-  wizardVisible, wizardMode, wizardTitleLabel, wizardMaxStep, wizardReportSubTab,
+  wizardVisible, wizardProject, wizardMode, wizardTitleLabel, wizardMaxStep, wizardReportSubTab,
 } = reportPanels
   // ============================================================
   // ★ 计算并应用"当前容器下完整看到陕西"对应的最小 zoom
@@ -2005,6 +2005,13 @@ function handleReportConfirm(payload) {
   const project = payload?.project || selectedProject.value
   if (project) selectedProject.value = { ...selectedProject.value, ...project }
   showGenerateModal.value = false
+
+  // 与项目报告列表为空时的“创建项目建议书”使用完全相同的向导入口。
+  if (option?.key === 'proposal') {
+    reportPanels.openWizard('PROJECT_PROPOSAL', project)
+    showDetailPanel.value = false
+    return
+  }
 
   if (reportKeyToWizardMode[option?.key] !== undefined) {
     wizardMode.value = reportKeyToWizardMode[option.key]
