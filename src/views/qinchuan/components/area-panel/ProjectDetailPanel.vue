@@ -434,6 +434,33 @@ watch(() => props.project?.id, (id) => { if (id) refreshSurveyData() })
 }
 
 /* ================= 内容区 ================= */
+
+/* 详情面板内的文件条目统一使用半透明卡片，避免深色文字与底色冲突 */
+.detail-panel :deep(.file-item) {
+  box-sizing: border-box;
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  color: #374151;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.detail-panel :deep(.file-item:hover) { background: rgba(255, 255, 255, 0.62); }
+.detail-panel :deep(.file-item-name) { color: #1f2937; }
+.detail-panel :deep(.file-item-desc) { color: #6b7280; }
+.detail-panel :deep(.meta-inline),
+.detail-panel :deep(.footer-meta) { color: #6b7280; }
+.detail-panel :deep(.meta-inline.muted) { color: #9ca3af; }
+.detail-panel :deep(.tag) {
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.1);
+}
+.detail-panel :deep(.tag-secondary) {
+  color: #64748b;
+  background: rgba(148, 163, 184, 0.14);
+}
+
 .tab-content {
   flex: 1;
   min-height: 0;
