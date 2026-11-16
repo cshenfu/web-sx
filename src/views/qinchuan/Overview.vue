@@ -636,7 +636,8 @@ const hoveredProject = ref(null)
 const hoveredPos = reactive({ x: 0, y: 0 })
 
 const { clearHoverHideTimer, clearHoverState, scheduleHoverHide, onHoverCardEnter, onHoverCardLeave } = useProjectHover(hoveredProject)
-\nconst generatePanelSource = ref('')
+
+const generatePanelSource = ref('')
 const generatePanelFirstBusinessTitle = ref('')
 const generatePanelSecondaryBusinessTitle = ref('')
 const generatePanelFileTypeTag = ref('')
