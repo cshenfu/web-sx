@@ -743,6 +743,7 @@ const editTools = [
 const reportKeyToWizardMode = {
   'feasibility-centralized': PACKAGE_TYPE.default,
   'feasibility-distributed': PACKAGE_TYPE.distributedDefault,
+  'feasibility-base': PACKAGE_TYPE.baseDefault,
 }
 
 
@@ -2702,15 +2703,23 @@ function handleReportConfirm(payload) {
   if (project) activeProjectDetail.value = { ...activeProjectDetail.value, ...project }
   reportModalVisible.value = false
 
-  // 项目建议书与项目报告列表的“创建项目建议书”共用同一向导入口。
+  // 每次从报告类型弹窗进入时显式设置模式和标题，避免沿用上一次向导状态。
   if (option?.key === 'proposal') {
-    reportPanels.openWizard('PROJECT_PROPOSAL', project)
+    reportPanels.openWizard('PROJECT_PROPOSAL', project, {
+      packageType: PACKAGE_TYPE.default,
+      title: '一键生成项目建议书',
+      maxStep: 1,
+    })
     return
   }
 
-  if (reportKeyToWizardMode[option?.key] !== undefined) {
-    wizardMode.value = reportKeyToWizardMode[option.key]
-    wizardVisible.value = true
+  const packageType = reportKeyToWizardMode[option?.key]
+  if (packageType !== undefined) {
+    reportPanels.openWizard('FEASIBILITY_STUDY', project, {
+      packageType,
+      title: '',
+      maxStep: 2,
+    })
   }
 }
 function handleWizardSaveDraft(payload) {
