@@ -33,9 +33,9 @@
           fixed="right"
         >
           <template #default="scope">
-            <div class="table-actions">
+            <ActionOverflow class="table-actions">
               <slot name="actions" v-bind="scope" />
-            </div>
+            </ActionOverflow>
           </template>
         </el-table-column>
       </el-table>
@@ -61,6 +61,7 @@
 
 <script setup>
 import { computed, useSlots } from 'vue'
+import ActionOverflow from '@/components/ActionOverflow.vue'
 
 const props = defineProps({
   data: { type: Array, default: () => [] },
