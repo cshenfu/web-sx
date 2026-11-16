@@ -29,11 +29,10 @@
               <el-option label="光伏" value="solar" />
             </el-select>
             <!-- 全部状态 -->
-            <el-select v-model="searchForm.status" placeholder="全部状态" clearable class="filter-select">
-              <el-option label="计划中" value="planning" />
-              <el-option label="排队中" value="queueing" />
-              <el-option label="已完成" value="completed" />
+            <el-select v-if="!isDraft" v-model="searchForm.status" placeholder="全部状态" clearable class="filter-select">
+              <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
+            <el-tag v-else type="info" effect="plain">仅显示草稿</el-tag>
             <!-- 创建时间 -->
             <el-date-picker
               v-model="searchForm.dateRange"
@@ -98,13 +97,19 @@
             <!-- 操作列 -->
             <template #actions="{ row }">
               <div @click.stop>
-                <template v-if="row.status === 'completed'">
-                  <el-button link type="primary" class="action-btn" @click="handleView(row)">查看</el-button>
+                <template v-if="isDraft">
+                  <el-button link type="primary" class="action-btn" @click="handleEdit(row)">编辑</el-button>
+                  <el-button link type="danger" class="action-btn btn-delete" @click="handleDelete(row)">删除</el-button>
                 </template>
                 <template v-else>
-                  <el-button link type="primary" class="action-btn" @click="handleCancel(row)">取消</el-button>
+                  <template v-if="row.status === 'completed'">
+                    <el-button link type="primary" class="action-btn" @click="handleView(row)">查看</el-button>
+                  </template>
+                  <template v-else>
+                    <el-button link type="primary" class="action-btn" @click="handleCancel(row)">取消</el-button>
+                  </template>
+                  <el-button link type="danger" class="action-btn btn-delete" @click="handleDelete(row)">删除</el-button>
                 </template>
-                <el-button link type="danger" class="action-btn btn-delete" @click="handleDelete(row)">删除</el-button>
               </div>
             </template>
           </CommonTable>
@@ -129,7 +134,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import CommonTable from '@/views/guizhi/components/CommonTable.vue'
 import ReviewReportPreview from './components/ReviewReportPreview.vue'
 // 💡 引入智能评审分页接口
-import { getZNPSPage } from '@/api/modules/report'
+import { getZNPSPage, deleteZNPSReport } from '@/api/modules/report'
 
 const router = useRouter()
 const route = useRoute()
@@ -176,15 +181,33 @@ const formatTimestamp = (ts) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-/** 后端状态 -> 前端状态映射（请根据实际枚举调整） */
+// 智能评审后端状态枚举：数值与文案严格对应后端定义。
+const statusOptions = [
+  { value: '1', label: '草稿' },
+  { value: '2', label: '初始化' },
+  { value: '3', label: '排队中' },
+  { value: '4', label: '计算中' },
+  { value: '5', label: '异常暂停' },
+  { value: '6', label: '计算终止' },
+  { value: '7', label: '计算完成' },
+  { value: '8', label: '文件待解析' },
+  { value: '9', label: '审核完成' },
+]
 const mapStatus = (reportProjectStatus) => {
-  const map = {
-    '1': { status: 'planning', statusText: '计划中' },
-    '2': { status: 'queueing', statusText: '排队中' },
-    '3': { status: 'queueing', statusText: '排队中' },
-    '4': { status: 'completed', statusText: '已完成' }
-  }
-  return map[reportProjectStatus] || { status: 'planning', statusText: '计划中' }
+  const value = String(reportProjectStatus ?? '')
+  const found = statusOptions.find((item) => item.value === value)
+  const statusClass = {
+    '1': 'draft',
+    '2': 'calculating',
+    '3': 'queueing',
+    '4': 'in-progress',
+    '5': 'paused',
+    '6': 'terminated',
+    '7': 'calculation-completed',
+    '8': 'file-parsed',
+    '9': 'completed',
+  }[value] || 'unknown'
+  return { status: statusClass, statusText: found?.label || '未知状态' }
 }
 
 /** 后端项目类型 -> 前端项目类型（1 风电 / 2 光伏，请根据实际枚举调整） */
@@ -208,9 +231,10 @@ const fetchTableData = async () => {
     if (searchForm.projectType) {
       params.reportItemType = searchForm.projectType === 'wind' ? 1 : 2
     }
-    if (searchForm.status) {
-      const statusMap = { planning: '1', queueing: '2', completed: '4' }
-      params.reportProjectStatus = statusMap[searchForm.status]
+    if (isDraft.value) {
+      params.reportProjectStatus = '1'
+    } else if (searchForm.status) {
+      params.reportProjectStatus = searchForm.status
     }
     if (searchForm.dateRange?.length) {
       params.startTime = searchForm.dateRange[0]
@@ -265,6 +289,10 @@ const showReportPreview = ref(false)
 const currentSelectedRow = ref({})
 
 const handleRowClick = (row) => {
+  if (isDraft.value) {
+    handleEdit(row)
+    return
+  }
   currentSelectedRow.value = row
   showReportPreview.value = true
 }
@@ -309,11 +337,37 @@ const handleCancel = (row) => {
   }).catch(() => {})
 }
 
-const handleDelete = (row) => {
-  ElMessageBox.confirm('确定要删除该项目吗？', '提示', { type: 'warning' }).then(() => {
+const handleEdit = (row) => {
+  if (!row?.id) {
+    ElMessage.warning('未获取到草稿记录ID，无法编辑')
+    return
+  }
+  router.push({
+    path: '/yanping/review/create',
+    query: {
+      draftId: String(row.id),
+      reviewProjectId: row.reviewProjectId ? String(row.reviewProjectId) : undefined,
+    },
+  })
+}
+
+const handleDelete = async (row) => {
+  if (!row?.id) {
+    ElMessage.warning('未获取到报告关联ID，无法删除')
+    return
+  }
+  try {
+    await ElMessageBox.confirm('确定要删除该智能评审草稿吗？删除后不可恢复。', '提示', { type: 'warning' })
+    const response = await deleteZNPSReport(row.id)
+    if (response?.code !== undefined && response.code !== 200 && response.code !== 0) {
+      throw new Error(response.msg || '删除失败')
+    }
     ElMessage.success('删除成功')
-    fetchTableData()
-  }).catch(() => {})
+    await fetchTableData()
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    ElMessage.error(error?.message || '删除失败')
+  }
 }
 </script>
 
