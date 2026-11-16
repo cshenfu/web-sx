@@ -42,8 +42,15 @@
           </template>
   
           <template #default="{ row, $index }">
+            <ActionOverflow v-if="column.scopedSlots && isActionColumn(column)">
+              <slot
+                :name="column.scopedSlots"
+                :record="row"
+                :index="$index"
+              />
+            </ActionOverflow>
             <slot
-              v-if="column.scopedSlots"
+              v-else-if="column.scopedSlots"
               :name="column.scopedSlots"
               :record="row"
               :index="$index"
@@ -73,6 +80,7 @@
   
   <script setup>
   import { computed, reactive, watch } from 'vue'
+  import ActionOverflow from '@/components/ActionOverflow.vue'
   
   defineOptions({
     inheritAttrs: false,
@@ -172,6 +180,12 @@
   
   function getColumnTitle(column = {}) {
     return String(column.label ?? column.title ?? '')
+  }
+
+  function isActionColumn(column = {}) {
+    const label = getColumnTitle(column).trim()
+    const key = String(column.key || column.dataIndex || column.prop || '').toLowerCase()
+    return label.includes('操作') || key === 'action' || key === 'actions' || key === 'operation'
   }
   
   function getColumnWidth(column = {}) {
