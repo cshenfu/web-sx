@@ -68,7 +68,7 @@ const props = defineProps({
   columns: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
   rowKey: { type: [String, Function], default: 'id' },
-  actionWidth: { type: [String, Number], default: 100 },
+  actionWidth: { type: [String, Number], default: 260 },
   showPagination: { type: Boolean, default: true },
   total: { type: Number, default: 0 },
   currentPage: { type: Number, default: 1 },
