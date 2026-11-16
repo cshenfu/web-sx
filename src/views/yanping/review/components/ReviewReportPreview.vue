@@ -178,51 +178,62 @@ const fetchAndRenderReport = async () => {
 
   } catch (error) {
     console.error('获取或渲染报告失败:', error)
-    ElMessage.error('获取报告数据失败')
+    ElMessage.error(error?.message || '获取报告数据失败')
   } finally {
     loading.value = false
   }
 }
 
-const renderTemplate = async (data) => {
-  try {
-    // 读取 public 目录下的模板文件
-    const res = await fetch('/templates/feasibility-review.docx')
-    if (!res.ok) throw new Error('模板加载失败')
-    const buf = await res.arrayBuffer()
-    const zip = new PizZip(buf)
-    const doc = new Docxtemplater(zip, {
-      paragraphLoop: true,
-      linebreaks: true,
-      delimiters: { start: '${', end: '}' },
-      nullGetter: () => '', // 如果没数据，替换为空字符串
-    })
-    
-    // 渲染数据
-    doc.render(JSON.parse(JSON.stringify(data)))
-    
-    // 生成 blob
-    generatedBlob = doc.getZip().generate({
-      type: 'blob',
-      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    })
+// 接口返回的键名形如 "${reportName}"，而 docxtemplater 的 tag 名为 "reportName"。
+// 因此在渲染前去掉接口键名外围的模板分隔符，避免键名不匹配导致占位符原样显示。
+const normalizeTemplateData = (data = {}) => {
+  return Object.entries(data).reduce((result, [key, value]) => {
+    const normalizedKey = key.startsWith('${') && key.endsWith('}')
+      ? key.slice(2, -1)
+      : key
 
-    // 预览
-    await nextTick()
-    if (wordContainer.value) {
-      wordContainer.value.innerHTML = ''
-      await renderAsync(generatedBlob, wordContainer.value, null, {
-        className: 'docx-preview',
-        inWrapper: true,
-        ignoreWidth: false,
-        breakPages: true,
-      })
-      hasGenerated.value = true
-    }
-  } catch (error) {
-    console.error('模板渲染失败:', error)
-    ElMessage.error('模板渲染失败')
-  }
+    result[normalizedKey] = value ?? ''
+    return result
+  }, {})
+}
+
+const renderTemplate = async (data) => {
+  // 读取 public 目录下的模板文件
+  const res = await fetch('/templates/feasibility-review.docx')
+  if (!res.ok) throw new Error('报告模板加载失败，请检查 feasibility-review.docx 是否存在')
+
+  const buf = await res.arrayBuffer()
+  const zip = new PizZip(buf)
+  const doc = new Docxtemplater(zip, {
+    paragraphLoop: true,
+    linebreaks: true,
+    delimiters: { start: '${', end: '}' },
+    nullGetter: () => '',
+  })
+
+  // 将接口的 "${变量名}" 转成 docxtemplater 实际使用的变量名
+  const templateData = normalizeTemplateData(data)
+  console.log('[智能评审报告] 模板填充字段：', Object.keys(templateData))
+  doc.render(templateData)
+
+  // 生成 blob
+  generatedBlob = doc.getZip().generate({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  })
+
+  // 预览
+  await nextTick()
+  if (!wordContainer.value) throw new Error('报告预览容器尚未准备完成')
+
+  wordContainer.value.innerHTML = ''
+  await renderAsync(generatedBlob, wordContainer.value, null, {
+    className: 'docx-preview',
+    inWrapper: true,
+    ignoreWidth: false,
+    breakPages: true,
+  })
+  hasGenerated.value = true
 }
 
 // ================== 监听与交互 ==================
