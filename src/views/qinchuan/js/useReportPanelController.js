@@ -78,12 +78,14 @@ export function useReportPanelController(packageType) {
     showConfirmPanel.value = true
   }
 
-  function openWizard(subTab, project = null) {
-    const config = getReportConfig(subTab)
+  function openWizard(subTab, project = null, overrides = {}) {
+    const config = { ...getReportConfig(subTab), ...overrides }
     wizardProject.value = project || null
-    wizardMode.value = packageType[config.packageType] || packageType.default
-    wizardTitleLabel.value = config.title
-    wizardMaxStep.value = config.maxStep
+    wizardMode.value = typeof config.packageType === 'number'
+      ? config.packageType
+      : packageType[config.packageType] || packageType.default
+    wizardTitleLabel.value = config.title || ''
+    wizardMaxStep.value = Number.isFinite(Number(config.maxStep)) ? Number(config.maxStep) : 2
     wizardReportSubTab.value = subTab
     wizardVisible.value = true
   }
