@@ -108,7 +108,7 @@
     };
     const isActionColumn = (column = {}) => {
         const title = String(column.title || column.label || '').trim();
-        const key = String(column.key || column.dataIndex || '').toLowerCase();
+        const key = String(column.key || column.dataIndex || column.scopedSlots || '').toLowerCase();
         return title.includes('操作') || key === 'action' || key === 'actions' || key === 'operation';
     };
     const normalizedColumns = computed(() => (props.tableColumn || []).map((column) => {
