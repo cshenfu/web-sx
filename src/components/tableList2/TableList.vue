@@ -25,7 +25,14 @@
             </template>
             <template #bodyCell="{ column, text, record, index }">
                 <template v-if="column.scopedSlots">
+                    <ActionOverflow v-if="isActionColumn(column)">
+                        <slot
+                            :name="column.scopedSlots"
+                            v-bind="{ record, index }"
+                        ></slot>
+                    </ActionOverflow>
                     <slot
+                        v-else
                         :name="column.scopedSlots"
                         v-bind="{ record, index }"
                     ></slot>
@@ -47,6 +54,7 @@
 
 <script setup>
     import { ref, reactive, toRefs, onBeforeMount, onMounted, watch, computed } from 'vue';
+    import ActionOverflow from '@/components/ActionOverflow.vue';
     const props = defineProps({
         loading: {
             type: Boolean,
@@ -97,6 +105,11 @@
     //改变页码
     const changePage = (page, pageSize) => {
         emit('changePage', { page, pageSize });
+    };
+    const isActionColumn = (column = {}) => {
+        const title = String(column.title || column.label || '').trim();
+        const key = String(column.key || column.dataIndex || '').toLowerCase();
+        return title.includes('操作') || key === 'action' || key === 'actions' || key === 'operation';
     };
     const rowClick = (record, index) => {
         return {
