@@ -54,8 +54,8 @@
         :create-project-mode="wizardMode"
         :title="wizardTitleLabel"
         :max-step="wizardMaxStep"
-        :project-name="activeProjectDetail?.name || activeProjectDetail?.projectName || ''"
-        :project="activeProjectDetail"
+        :project-name="(wizardProject || activeProjectDetail)?.name || (wizardProject || activeProjectDetail)?.projectName || ''"
+        :project="wizardProject || activeProjectDetail"
         @close="wizardVisible = false"
         @save-draft="handleWizardSaveDraft"
         @submit="handleWizardSubmit"
@@ -101,8 +101,8 @@
             v-else
             class="area-summary wizard-layer"
             :create-project-mode="wizardMode"
-            :project-name="activeProjectDetail?.name || activeProjectDetail?.projectName || ''"
-            :project="activeProjectDetail"
+            :project-name="(wizardProject || activeProjectDetail)?.name || (wizardProject || activeProjectDetail)?.projectName || ''"
+            :project="wizardProject || activeProjectDetail"
             @close="wizardVisible = false"
             @save-draft="handleWizardSaveDraft"
             @submit="handleWizardSubmit"
@@ -651,7 +651,7 @@ const {
   showGeneratePanel, generatePanelProject, generatePanelActionKey, generatePanelSubCode,
   generatePanelSource, generatePanelFirstBusinessTitle, generatePanelSecondaryBusinessTitle,
   generatePanelFileTypeTag, showAddReportPanel, showConfirmPanel, confirmReportId,
-  wizardVisible, wizardMode, wizardTitleLabel, wizardMaxStep, wizardReportSubTab,
+  wizardVisible, wizardProject, wizardMode, wizardTitleLabel, wizardMaxStep, wizardReportSubTab,
 } = reportPanels
 
 const popoverActions = computed(() => {
@@ -2675,6 +2675,13 @@ function handleReportConfirm(payload) {
   const project = payload?.project || activeProjectDetail.value
   if (project) activeProjectDetail.value = { ...activeProjectDetail.value, ...project }
   reportModalVisible.value = false
+
+  // 项目建议书与项目报告列表的“创建项目建议书”共用同一向导入口。
+  if (option?.key === 'proposal') {
+    reportPanels.openWizard('PROJECT_PROPOSAL', project)
+    return
+  }
+
   if (reportKeyToWizardMode[option?.key] !== undefined) {
     wizardMode.value = reportKeyToWizardMode[option.key]
     wizardVisible.value = true
