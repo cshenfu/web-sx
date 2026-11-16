@@ -284,6 +284,13 @@ watch([currentPage, pageSize], () => {
   fetchTableData()
 })
 
+// 项目列表与草稿列表共用组件时，路由切换需要重新请求对应状态的数据。
+watch(isDraft, () => {
+  searchForm.status = ''
+  if (currentPage.value === 1) fetchTableData()
+  else currentPage.value = 1
+})
+
 // ================= 💡 行点击预览逻辑 =================
 const showReportPreview = ref(false)
 const currentSelectedRow = ref({})
