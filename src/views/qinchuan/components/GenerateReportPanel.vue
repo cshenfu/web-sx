@@ -676,7 +676,10 @@ async function uploadGeneratedFile(blob, fileName) {
 async function submitReport({ fileUrl, fileName, resData }) {
   const selectedItem = reportOptions.value.find(r => r.id === selectedReportId.value) || {}
   
-  const finalReportType = REPORT_TYPE_MAP[props.actionKey] || 'PROJECT_INITIATION'
+  const finalReportType = REPORT_TYPE_MAP[props.actionKey]
+  if (!finalReportType) {
+    throw new Error(`当前报告类型未配置归档分类：${props.actionKey || '未知类型'}`)
+  }
 
   const payload = {
     aiProjectId: aiProjectId.value,
