@@ -387,6 +387,7 @@
 
 <script setup>
 import { ensureOuterCCW, ensureHoleCW, smoothstep } from '../js/mapGeometry'
+import { getProjectCoords, getProjectCentroid, buildWindFC, buildBoosterFC } from '../js/projectGeoUtils'
 import { useProjectHover } from '../js/useProjectHover'
 
 import ProjectWorkflowDialogs from './ProjectWorkflowDialogs.vue'
@@ -1279,19 +1280,6 @@ function syncMaskVisibility(force = false) {
   map.setPaintProperty(MASK_LAYER_ID, 'fill-opacity', target)
 }
 
-function getProjectCoords(project) { return (project.coordinate || []).map((c) => [Number(c.longitude), Number(c.latitude)]).filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat)) }
-function getProjectCentroid(project) {
-  let coords = getProjectCoords(project)
-  if (coords.length > 1) {
-    const [firstLng, firstLat] = coords[0]
-    const [lastLng, lastLat] = coords[coords.length - 1]
-    if (firstLng === lastLng && firstLat === lastLat) coords = coords.slice(0, -1)
-  }
-  if (!coords.length) return null
-  let sx = 0, sy = 0; for (const [lng, lat] of coords) { sx += lng; sy += lat }
-  return [sx / coords.length, sy / coords.length]
-}
-
 function buildAreaCenterFC(projects = allMapProjects.value, naturalWidthMap = {}) {
   const hiddenIds = new Set(
     [popoverProject.value?.id, selectedProject.value?.id]
@@ -1375,31 +1363,6 @@ function buildAreaFeature(project) {
   const coords = getProjectCoords(project); if (coords.length < 3) return null
   const f = coords[0], l = coords[coords.length - 1]; if (f[0] !== l[0] || f[1] !== l[1]) coords.push([f[0], f[1]])
   return { type: 'Feature', properties: { projectId: project.id, projectCode: project.projectCode, projectName: project.projectName, itemType: project.itemType }, geometry: { type: 'Polygon', coordinates: [coords] } }
-}
-function buildWindFC(project) {
-  const normal = [], reserve = []
-  for (const [index, p] of (project.windTurbinePoints || []).entries()) {
-    const lng = Number(p.longitude), lat = Number(p.latitude)
-    if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue
-    const isReserve = Number(p.isReserve) === 1
-    const feature = { type: 'Feature', properties: { projectId: project.id, index, isReserve: isReserve ? 1 : 0 }, geometry: { type: 'Point', coordinates: [lng, lat] } }
-    ;(isReserve ? reserve : normal).push(feature)
-  }
-  return { normal: { type: 'FeatureCollection', features: normal }, reserve: { type: 'FeatureCollection', features: reserve } }
-}
-function buildBoosterFC(project) {
-  return {
-    type: 'FeatureCollection',
-    features: (project.boosterStationLocations || [])
-      .map((p, index) => {
-        if (!(p.isBest === true || Number(p.isBest) === 1)) return null
-        const lng = Number(p.lng), lat = Number(p.lat)
-        return Number.isFinite(lng) && Number.isFinite(lat)
-          ? { type: 'Feature', properties: { projectId: project.id, index, isBest: true }, geometry: { type: 'Point', coordinates: [lng, lat] } }
-          : null
-      })
-      .filter(Boolean),
-  }
 }
 function clearProjectLayers() {
   if (!mapRef.value) return
