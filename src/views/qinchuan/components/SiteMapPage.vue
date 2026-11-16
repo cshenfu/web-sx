@@ -391,6 +391,7 @@ import { getProjectCoords, getProjectCentroid, buildWindFC, buildBoosterFC } fro
 import { unwrapRoadResponse, buildRoadLineFeatures } from '../js/roadGeoUtils'
 import { useProjectHover } from '../js/useProjectHover'
 import { useReportPanelController } from '../js/useReportPanelController'
+import { useProjectContext } from '../js/useProjectContext'
 
 import ProjectWorkflowDialogs from './ProjectWorkflowDialogs.vue'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
@@ -631,12 +632,7 @@ function handleConfirmSuccess() {
   fetchProjectList()
   if (selectedProject.value?.id) {
     const fresh = allMapProjects.value.find(p => p.id === selectedProject.value.id)
-    if (fresh) {
-      selectedProject.value = fresh
-      if (popoverProject.value && String(popoverProject.value.id) === String(fresh.id)) {
-        popoverProject.value = fresh
-      }
-    }
+    if (fresh) projectContext.syncProject(fresh)
   }
 }
 
@@ -686,15 +682,17 @@ const showAssignDialog = ref(false)
 const assignTargetProject = ref(null)
 const renderedLayerIds = new Set()
 const allMapProjects = ref([])
-const popoverProject = ref(null)
+const projectContext = useProjectContext()
+const {
+  focusedProject: popoverProject,
+  selectedProject,
+  activeProject: currentProjectContext,
+} = projectContext
 const hoveredProject = ref(null)
 const hoveredPos = reactive({ x: 0, y: 0 })
 
 const { clearHoverHideTimer, clearHoverState, scheduleHoverHide, onHoverCardEnter, onHoverCardLeave } = useProjectHover(hoveredProject)
 
-
-
-const selectedProject = ref(null)
 
 const editMode = ref(null)
 const drawingNewPoint = ref(false)
@@ -847,10 +845,7 @@ async function onProjectUpdated() {
   await Promise.all([fetchMapProjects(), fetchProjectList(), fetchOverviewStats(), fetchCityStats()])
   const fresh = allMapProjects.value.find((p) => p.id === popoverProject.value?.id)
   if (fresh) {
-    popoverProject.value = fresh
-    if (selectedProject.value && String(selectedProject.value.id) === String(fresh.id)) {
-      selectedProject.value = fresh
-    }
+    projectContext.syncProject(fresh)
     initEditBuffer(fresh)
     await renderProjectsByStage('area')
   }
@@ -1692,10 +1687,7 @@ async function onVerifySaved() {
   await fetchMapProjects()
   const fresh = allMapProjects.value.find(p => p.id === popoverProject.value?.id)
   if (fresh) {
-    popoverProject.value = fresh
-    if (selectedProject.value && String(selectedProject.value.id) === String(fresh.id)) {
-      selectedProject.value = fresh
-    }
+    projectContext.syncProject(fresh)
     initEditBuffer(fresh)
   }
   fetchProjectList()
