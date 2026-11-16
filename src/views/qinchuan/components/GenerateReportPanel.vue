@@ -782,7 +782,6 @@ async function handleGenerate() {
     const fillData = mergeFillData(resData.params || {}, props.aiDetail)
     const blob = await renderTemplateToBlob(fillData)
 
-    generating.value = false
     generated.value = true
     await nextTick()
 
@@ -856,6 +855,7 @@ async function handleGenerate() {
     // ========== ⑦ 同步上会流程（占位） ==========
     await syncToMeetingTab(fileUrl, fileName, 'docx')
 
+    generating.value = false
     ElMessage.success('报告已生成并同步至上会流程')
     const createdData = createRes?.data
     const createdReportId = createdData == null
