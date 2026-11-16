@@ -101,7 +101,7 @@ import ReviewInfoTab from './tabs/ReviewInfoTab.vue'
 import AddDataDialog from './AddDataDialog.vue'
 import AddImageDialog from './AddImageDialog.vue'
 import { getDataById, delItem } from '@/api/modules/newAPI'
-import { useProjectMainInfo } from '../js/useProjectMainInfo'
+import { useProjectMainInfo } from '../../js/useProjectMainInfo'
 import { useRouter } from 'vue-router'
 
 const props = defineProps({
