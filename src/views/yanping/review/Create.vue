@@ -5,7 +5,7 @@
       <div class="panel-header">
         <div class="title-area" v-show="!isCollapsed">
           <el-icon class="back-btn" @click="handleClose"><Back /></el-icon>
-          <span class="title">一键生成风电场可行性研究报告（{{ modeLabel }}）</span>
+          <span class="title">{{ draftId ? '编辑智能评审草稿' : `一键生成风电场可行性研究报告（${modeLabel}）` }}</span>
         </div>
       </div>
 
@@ -707,4 +707,6 @@ onUnmounted(() => {
 }
 .layer-legend-point.wind { background: #E6A23C; }
 .layer-legend-point.booster { background: #67C23A; }
+
+.draft-loading-tip { padding: 48px 20px; color: #909399; text-align: center; font-size: 14px; }
 </style>
