@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div class="queue-list-page">
         <queue-list-search-bar ref="queueListRef" @handleSearch="handleSearch" @resetSearch="resetSearch" />
         <table-list class="user-table" :loading="loading" :tableData="tableData" :tableColumn="QUEUE_MANAGE_LIST"
             :page="page" @changePage="changePage">
@@ -217,6 +217,18 @@ watchEffect(() => {
 
 </script>
 <style scoped lang='scss'>
+.queue-list-page {
+    background:
+        radial-gradient(circle at 8% 8%, rgba(255, 205, 220, 0.34), transparent 30%),
+        radial-gradient(circle at 92% 10%, rgba(184, 219, 255, 0.4), transparent 32%),
+        radial-gradient(circle at 90% 100%, rgba(172, 216, 255, 0.34), transparent 36%),
+        linear-gradient(122deg, #eef3fa 0%, #f7f8fc 48%, #eaf2fb 100%);
+    border-radius: 6px;
+    padding: 10px 12px;
+    box-sizing: border-box;
+    min-height: 100%;
+}
+
 .status-tag {
     // min-width: 52px;
     width: 80px;
