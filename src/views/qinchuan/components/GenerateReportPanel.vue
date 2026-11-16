@@ -799,14 +799,9 @@ async function handleGenerate() {
     generatedFilePath.value = fileUrl
 
     // ========== ⑤ createReport 落库 ==========
-    let createRes = null
-    try {
-      createRes = await submitReport({ fileUrl, fileName, resData })
-      if (createRes?.code !== 200) {
-        console.warn('[createReport] 返回非 200:', createRes)
-      }
-    } catch (e) {
-      console.warn('[createReport] 提交失败', e)
+    const createRes = await submitReport({ fileUrl, fileName, resData })
+    if (Number(createRes?.code) !== 200) {
+      throw new Error(createRes?.msg || '报告记录保存失败，请稍后重试')
     }
 
     // ========== ⑥ 仅 sitemap-detail 来源：create 后调 updateFile 补全归档 ==========
@@ -862,7 +857,19 @@ async function handleGenerate() {
     await syncToMeetingTab(fileUrl, fileName, 'docx')
 
     ElMessage.success('报告已生成并同步至上会流程')
-    emit('generated', { actionKey: props.actionKey, subCode: props.subCode })
+    const createdData = createRes?.data
+    const createdReportId = createdData == null
+      ? null
+      : typeof createdData === 'number' || typeof createdData === 'string'
+        ? createdData
+        : (createdData.id ?? createdData.reportId ?? createdData.recordId ?? null)
+    emit('generated', {
+      actionKey: props.actionKey,
+      subCode: props.subCode,
+      reportType: REPORT_TYPE_MAP[props.actionKey] || 'PROJECT_INITIATION',
+      reportId: createdReportId,
+      project: props.project,
+    })
   } catch (err) {
     console.error('[生成失败]', err)
     ElMessage.error(err.message || '生成报告失败')
