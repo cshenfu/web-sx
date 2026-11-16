@@ -189,7 +189,7 @@
   }
   
   function getColumnWidth(column = {}) {
-    if (isActionColumn(column)) return Math.max(Number.parseInt(column.width, 10) || 0, 260)
+    if (isActionColumn(column)) return Math.max(Number.parseInt(column.width, 10) || 0, 280)
     return column.width || undefined
   }
   
