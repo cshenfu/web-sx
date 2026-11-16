@@ -649,4 +649,23 @@ watch(
   background: rgba(0, 0, 0, 0.06);
 }
 .close-panel-btn svg { width: 16px; height: 16px; }
+
+/* 文件、会议步骤、报告表格等子页面内容统一为半透明白色卡片 */
+.detail-panel :deep(.file-card),
+.detail-panel :deep(.step-card),
+.detail-panel :deep(.table-wrap) {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.detail-panel :deep(.step-card.locked) {
+  background: rgba(255, 255, 255, 0.38);
+}
+.detail-panel :deep(.sticky-col),
+.detail-panel :deep(.report-table tbody tr:nth-child(even) td.sticky-col),
+.detail-panel :deep(.report-table tbody tr:hover td.sticky-col) {
+  background: rgba(255, 255, 255, 0.5) !important;
+}
+
 </style>
