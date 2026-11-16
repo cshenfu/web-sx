@@ -638,8 +638,7 @@ const {
   focusedProject: popoverProject,
   selectedProject,
   actionProject,
-  geometryProject,
-  activeProject: currentProjectContext,
+  geometryProject
 } = projectContext
 
 const hoveredProject = ref(null)
