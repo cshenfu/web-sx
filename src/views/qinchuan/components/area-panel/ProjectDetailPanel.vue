@@ -61,6 +61,8 @@
 <ProjectReportTab
   v-else-if="activeTab === 'report'"
   :project="project"
+  :initial-sub-tab="initialReportSubTab"
+  :refresh-key="refreshKey"
   @row-action="(row) => $emit('report-row-action', row)"
   @open-confirm="(id) => $emit('open-confirm', id)"
   @create="(payload) => $emit('create-report', payload)"
@@ -103,7 +105,10 @@ import { useRouter } from 'vue-router'
 
 const props = defineProps({
   project: { type: Object, required: true },
-  isFullscreen: { type: Boolean, default: false }
+  isFullscreen: { type: Boolean, default: false },
+  initialTab: { type: String, default: 'main' },
+  initialReportSubTab: { type: String, default: '' },
+  refreshKey: { type: Number, default: 0 },
 })
 
 defineEmits([
@@ -124,7 +129,13 @@ const mainTabs = [
   { key: 'review', label: '审查信息' },
 ]
 
-const activeTab = ref('main')
+const activeTab = ref(props.initialTab || 'main')
+
+watch(() => props.initialTab, (tab) => {
+  if (mainTabs.some((item) => item.key === tab)) {
+    activeTab.value = tab
+  }
+}, { immediate: true })
 
 const SURVEY_SECTIONS = [
   { key: 'terrain', title: '地形信息', dataCategory: 'TERRAIN' },
