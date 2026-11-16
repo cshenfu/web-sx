@@ -125,11 +125,48 @@
 </script>
 <style scoped lang="scss">
     .table-list {
-        // margin-top: 16px;
+        width: 100%;
+        min-width: 0;
     }
+
+    .table-list :deep(.ant-table-wrapper) {
+        overflow: hidden;
+        border: 1px solid #e1e7ef;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.96);
+    }
+
+    .table-list :deep(.ant-table) {
+        color: #304153;
+        font-size: 14px;
+        background: transparent;
+    }
+
+    .table-list :deep(.ant-table-thead > tr > th) {
+        height: 40px;
+        padding: 0 14px;
+        color: #637285;
+        font-size: 14px;
+        font-weight: 600;
+        background: #f2f5f9;
+        border-bottom: 1px solid #e0e7ef;
+    }
+
+    .table-list :deep(.ant-table-tbody > tr > td) {
+        height: 40px;
+        padding: 0 14px;
+        color: #304153;
+        font-size: 14px;
+        border-bottom: 1px solid #e8edf3;
+    }
+
+    .table-list :deep(.ant-table-tbody > tr:hover > td) {
+        background: #f8fbff;
+    }
+
     .table-pagination {
         display: flex;
         justify-content: flex-end;
-        margin-top: 20px;
+        margin-top: 8px;
     }
 </style>
