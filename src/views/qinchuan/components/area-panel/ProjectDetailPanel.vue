@@ -131,7 +131,7 @@ const mainTabs = [
 
 const activeTab = ref(props.initialTab || 'main')
 
-watch(() => props.initialTab, (tab) => {
+watch(() => [props.initialTab, props.refreshKey], ([tab]) => {
   if (mainTabs.some((item) => item.key === tab)) {
     activeTab.value = tab
   }
