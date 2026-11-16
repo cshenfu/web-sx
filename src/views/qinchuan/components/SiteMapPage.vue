@@ -720,7 +720,6 @@ const hoveredProject = ref(null)
 const hoveredPos = reactive({ x: 0, y: 0 })
 
 const { clearHoverHideTimer, clearHoverState, scheduleHoverHide, onHoverCardEnter, onHoverCardLeave } = useProjectHover(hoveredProject)
-\n
 
 
 
