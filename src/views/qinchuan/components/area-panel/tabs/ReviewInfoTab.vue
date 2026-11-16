@@ -22,7 +22,7 @@
         </div>
 
         <div class="group-content" :class="{ active: group.active }">
-          <div class="group-meta">{{ group.date }} {{ group.to }}</div>
+          <div v-if="group.date || group.to" class="group-meta">{{ group.date }} {{ group.to }}</div>
           <div v-for="(item, idx) in group.items || []" :key="idx" class="group-item">
             <div class="item-top">
               <span class="tag">{{ item.tag }}</span>
@@ -36,6 +36,7 @@
               <span>{{ item.updatedAt }}</span>
             </div>
           </div>
+          <div v-if="!group.items || !group.items.length" class="group-empty">暂无</div>
         </div>
       </div>
 
@@ -183,6 +184,13 @@ const safeData = computed(() => {
   color: #1F2937;
   font-size: 14px;
   font-weight: 700;
+}
+
+.group-empty {
+  padding: 16px 0 4px;
+  color: #9CA3AF;
+  font-size: 12px;
+  text-align: center;
 }
 
 .group-item {
