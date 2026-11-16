@@ -34,6 +34,7 @@ export function useReportPanelController(packageType) {
   const confirmReportId = ref(null)
 
   const wizardVisible = ref(false)
+  const wizardProject = ref(null)
   const wizardMode = ref(packageType.default)
   const wizardTitleLabel = ref('')
   const wizardMaxStep = ref(2)
@@ -77,8 +78,9 @@ export function useReportPanelController(packageType) {
     showConfirmPanel.value = true
   }
 
-  function openWizard(subTab) {
+  function openWizard(subTab, project = null) {
     const config = getReportConfig(subTab)
+    wizardProject.value = project || null
     wizardMode.value = packageType[config.packageType] || packageType.default
     wizardTitleLabel.value = config.title
     wizardMaxStep.value = config.maxStep
@@ -121,14 +123,15 @@ export function useReportPanelController(packageType) {
 
     if (WIZARD_KEYS.has(subTab)) {
       beforeOpen?.('wizard')
-      return openWizard(subTab)
+      return openWizard(subTab, project)
     }
     beforeOpen?.('wizard')
-    return openWizard(subTab)
+    return openWizard(subTab, project)
   }
 
   function closeWizard() {
     wizardVisible.value = false
+    wizardProject.value = null
     wizardTitleLabel.value = ''
     wizardMaxStep.value = 2
     wizardReportSubTab.value = ''
@@ -147,6 +150,7 @@ export function useReportPanelController(packageType) {
     showConfirmPanel,
     confirmReportId,
     wizardVisible,
+    wizardProject,
     wizardMode,
     wizardTitleLabel,
     wizardMaxStep,
