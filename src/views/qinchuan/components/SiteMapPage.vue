@@ -1069,11 +1069,30 @@ function handleCreateReportFromDetail(payload) {
 
 
 
+// 项目报告列表只维护这六种报告类型；其他函件生成成功后不跳转报告列表。
+const PROJECT_REPORT_TYPE_KEYS = new Set([
+  'PROJECT_PROPOSAL',
+  'WIND_RESOURCE_ASSESSMENT',
+  'FEASIBILITY_STUDY',
+  'PROJECT_INITIATION',
+  'COMPETITIVE_ALLOCATION',
+  'POST_EVALUATION',
+])
+
 function onReportGenerated(payload = {}) {
+  const reportType = String(payload.reportType || '').trim()
+  if (!PROJECT_REPORT_TYPE_KEYS.has(reportType)) {
+    pendingGeneratedReport.value = null
+    return
+  }
+
   pendingGeneratedReport.value = {
     project: payload.project || generatePanelProject.value || selectedProject.value,
-    reportType: payload.reportType || 'PROJECT_INITIATION',
+    reportType,
   }
+
+  // 创建成功后立即打开对应项目的报告分类。
+  handleGeneratePanelClose()
 }
 
 function handleGeneratePanelClose() {
