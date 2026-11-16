@@ -866,7 +866,7 @@ async function handleGenerate() {
     emit('generated', {
       actionKey: props.actionKey,
       subCode: props.subCode,
-      reportType: REPORT_TYPE_MAP[props.actionKey] || 'PROJECT_INITIATION',
+      reportType: REPORT_TYPE_MAP[props.actionKey] || '',
       reportId: createdReportId,
       project: props.project,
     })
