@@ -59,7 +59,8 @@
         <div class="panel-body">
           <MainInfoTab
             v-if="activeTab === 'main'"
-            :data="project?.mainInfo || project"
+            v-loading="mainInfoLoading"
+            :data="mainInfoData"
           />
           
           <DetailMaterialTab
@@ -126,7 +127,8 @@ import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 
-import MainInfoTab from './area-panel/tabs/MainInfoTab.vue' 
+import MainInfoTab from './area-panel/tabs/MainInfoTab.vue'
+import { useProjectMainInfo } from '../js/useProjectMainInfo'
 import ProjectReportTab from './area-panel/tabs/ProjectReportTab.vue'
 import DetailMaterialTab from './DetailMaterialTab.vue'
 import DetailMeetingTab from './DetailMeetingTab.vue'
@@ -147,6 +149,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'action', 'generate-report'])
 const router = useRouter()
+const { mainInfo: mainInfoData, loading: mainInfoLoading } = useProjectMainInfo(computed(() => props.project))
 
 const activeTab = ref('main')
 const showSettingPanel = ref(false)
