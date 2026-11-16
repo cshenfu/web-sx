@@ -144,6 +144,7 @@ import FileUploadDialog from './FileUploadDialog.vue'
 import MeetingMinutesUploadDialog from './MeetingMinutesUploadDialog.vue'
 import * as api from '@/api/modules/project'
 import * as fileApi from '@/api/modules/projectFile'
+import { buildSupportDocsData } from '../js/supportDocsAdapter'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -309,33 +310,7 @@ const STAGE_TABS_CONFIG = {
 const tabs = computed(() => STAGE_TABS_CONFIG[props.stage] || STAGE_TABS_CONFIG.PROJECT_RESERVE)
 const activeTabConfig = computed(() => tabs.value.find(t => t.key === activeTab.value) || {})
 
-const supportDocsData = computed(() => {
-  const provided = props.project?.supportDocs
-  if (provided && typeof provided === 'object') return provided
-
-  const rawFiles = Array.isArray(props.project?.fileCollection)
-    ? props.project.fileCollection
-    : []
-  const files = rawFiles.map((item) => ({
-    ...item,
-    tag: item.tag || item.fileTypeTag || item.fileBusinessType || '其他文件',
-    name: item.name || item.fileName || '未命名文件',
-    filePath: item.filePath || item.url || '',
-    updatedAt: item.updatedAt || item.updateTime || item.createTime || '',
-    operator: item.operator || item.creator || item.updater || '',
-  }))
-  const tags = [...new Set(files.map((item) => item.tag).filter(Boolean))]
-  return {
-    stages: ['全部'],
-    activeStage: '全部',
-    typeFilters: tags.map((tag, index) => ({
-      key: `support-type-${index}`,
-      label: tag,
-      color: index % 2 ? 'green' : 'pink',
-    })),
-    files,
-  }
-})
+const supportDocsData = computed(() => buildSupportDocsData(props.project || {}))
 
 watch(
   () => [props.visible, props.project?.id, props.initialTab],
@@ -508,9 +483,9 @@ watch(
   gap: 12px;
   margin: 0 16px;
   padding: 10px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.5);
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 .panel-title {
   flex: 1;
