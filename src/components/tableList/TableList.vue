@@ -42,7 +42,7 @@
           </template>
   
           <template #default="{ row, $index }">
-            <ActionOverflow v-if="column.scopedSlots && isActionColumn(column)">
+            <ActionOverflow v-if="column.scopedSlots && isActionColumn(column)" class="operation-btn">
               <slot
                 :name="column.scopedSlots"
                 :record="row"
