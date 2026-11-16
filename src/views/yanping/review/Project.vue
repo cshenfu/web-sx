@@ -232,9 +232,9 @@ const fetchTableData = async () => {
       params.reportItemType = searchForm.projectType === 'wind' ? 1 : 2
     }
     if (isDraft.value) {
-      params.reportProjectStatus = '1'
+      params.reportProjectStatus = 1
     } else if (searchForm.status) {
-      params.reportProjectStatus = searchForm.status
+      params.reportProjectStatus = Number(searchForm.status)
     }
     if (searchForm.dateRange?.length) {
       params.startTime = searchForm.dateRange[0]
