@@ -249,9 +249,9 @@
           <el-table-column label="创建时间" width="170"><template #default="{ row }">{{ row.createTime || '-' }}</template></el-table-column>
           <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
-              <div class="row-actions">
+              <ActionOverflow class="row-actions">
                 <el-button v-for="action in rowActions" :key="action" link :type="action === 'delete' ? 'danger' : 'primary'" size="small" @click="executeAction(action, row)">{{ ACTION_LABELS[action] || action }}</el-button>
-              </div>
+              </ActionOverflow>
             </template>
           </el-table-column>
         </el-table>
@@ -438,6 +438,7 @@ import {
 import { loadShaanxiProvince, loadShaanxiCities } from '@/utils/shaanxiBoundary'
 import { buildMainInfoFromAi } from '../js/aiProjectAdapter'
 import ProjectActionCard from './area-panel/ProjectActionCard.vue'
+import ActionOverflow from '@/components/ActionOverflow.vue'
 
 const props = defineProps({
   stage: { type: String, default: '' },
@@ -2176,20 +2177,37 @@ function handleGenerateRequest(payload) {
 
 .expand-button { position: absolute; top: 50%; right: 0; z-index: 3; width: 25px; height: 54px; color: #fff; background: rgba(30,30,30,0.4); border: 0; border-radius: 5px 0 0 5px; cursor: pointer; transition: right 0.25s ease, background 0.15s ease; }
 .expand-button:hover { background: rgba(30, 30, 30, 0.65); }
-.project-list-view { position: absolute; inset: 0; z-index: 4; height: 100%; padding: 60px 20px 12px; overflow: auto; box-sizing: border-box; background: #fff; }
-.list-heading { display: flex; align-items: center; justify-content: space-between; }
-.list-title { display: flex; align-items: center; gap: 6px; color: #333; font-size: 14px; font-weight: 600; }
-.project-table { width: 100%; margin-top: 2px; }
-.project-table :deep(.el-table__row) { height: 56px; }
-.project-table :deep(.el-table__cell) { padding: 10px 0; }
-.project-table :deep(.el-table__header-wrapper th) { background: #f7f8fa; color: #606266; font-weight: 500; }
-.project-table :deep(.el-table__body tr.el-table__row--striped td) { background: #fafbfc; }
-.project-table :deep(.el-table__body tr:hover > td) { background: #f5f8ff; }
+.project-list-view {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  height: 100%;
+  padding: 60px 20px 12px;
+  overflow: auto;
+  box-sizing: border-box;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(255, 205, 220, 0.34), transparent 30%),
+    radial-gradient(circle at 92% 10%, rgba(184, 219, 255, 0.4), transparent 32%),
+    radial-gradient(circle at 90% 100%, rgba(172, 216, 255, 0.34), transparent 36%),
+    linear-gradient(122deg, #eef3fa 0%, #f7f8fc 48%, #eaf2fb 100%);
+}
+.list-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.list-title { display: flex; align-items: center; gap: 6px; color: #152536; font-size: 14px; font-weight: 600; }
+.project-list-view :deep(.search-bar) { background: rgba(255, 255, 255, 0.72); border: 1px solid rgba(225, 231, 239, 0.9); border-radius: 6px; }
+.project-table { width: 100%; margin-top: 10px; border: 1px solid #e1e7ef; border-radius: 6px; overflow: hidden; background: rgba(255, 255, 255, 0.96); }
+.project-table :deep(.el-table) { --el-table-border-color: #e6ebf1; --el-table-header-bg-color: #f2f5f9; --el-table-row-hover-bg-color: #f7faff; background: transparent; }
+.project-table :deep(.el-table__row) { height: 40px; }
+.project-table :deep(.el-table__cell) { padding: 0; }
+.project-table :deep(.el-table__header-wrapper th) { height: 40px; padding: 0; background: #f2f5f9; color: #637285; font-size: 14px; font-weight: 600; border-bottom: 1px solid #e0e7ef; }
+.project-table :deep(.el-table th .cell), .project-table :deep(.el-table td .cell) { padding: 0 14px; line-height: 40px; }
+.project-table :deep(.el-table td.el-table__cell) { height: 40px; color: #304153; font-size: 14px; border-bottom: 1px solid #e8edf3; }
+.project-table :deep(.el-table__body tr:hover > td) { background: #f8fbff !important; }
+.project-table :deep(.el-table__inner-wrapper::before) { display: none; }
 .status-text.passed { color: #24b26b; }
 .status-text.pending { color: #e6a23c; }
 .status-text.rejected { color: #f56c6c; }
 .pagination-row { display: flex; align-items: center; justify-content: flex-end; gap: 18px; padding-top: 14px; color: #666; font-size: 14px; }
-.row-actions { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+ .row-actions { display: inline-flex; align-items: center; gap: 8px; }
 .row-actions .el-button { margin: 0; padding: 0; }
 .rate-cell { display: inline-flex; flex-direction: column; line-height: 1.2; vertical-align: middle; margin-right: 8px; }
 .rate-line { font-size: 11px; white-space: nowrap; }
