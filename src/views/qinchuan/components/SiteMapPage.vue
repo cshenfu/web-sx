@@ -716,30 +716,10 @@ const popoverProject = ref(null)
 const hoveredProject = ref(null)
 const hoveredPos = reactive({ x: 0, y: 0 })
 
-let hoverHideTimer = null
-const HOVER_HIDE_DELAY = 800
+const { clearHoverHideTimer, clearHoverState, scheduleHoverHide, onHoverCardEnter, onHoverCardLeave } = useProjectHover(hoveredProject)
+\n
 
-function clearHoverHideTimer() {
-  if (hoverHideTimer) {
-    clearTimeout(hoverHideTimer)
-    hoverHideTimer = null
-  }
-}
 
-function scheduleHoverHide() {
-  clearHoverHideTimer()
-  hoverHideTimer = setTimeout(() => {
-    hoveredProject.value = null
-    hoverHideTimer = null
-  }, HOVER_HIDE_DELAY)
-}
-
-function onHoverCardEnter() { clearHoverHideTimer() }
-function onHoverCardLeave() { scheduleHoverHide() }
-function clearHoverState() {
-  clearHoverHideTimer()
-  hoveredProject.value = null
-}
 
 const selectedProject = ref(null)
 
@@ -1239,10 +1219,6 @@ const MASK_PATTERN = 'shaanxi-starfield-mask'
 const MASK_SOURCE_ID = 'shaanxi-mask-src'
 const SHAANXI_BOUNDS = [[105.4, 31.7], [111.2, 39.6]]
 let lastMaskOpacity = -1
-function ensureClosed(ring) { if (!ring || ring.length < 3) return ring; const f = ring[0], l = ring[ring.length - 1]; return (f[0] === l[0] && f[1] === l[1]) ? ring : [...ring, [f[0], f[1]]] }
-function ringSignedArea(ring) { if (!ring || ring.length < 3) return 0; let a = 0; for (let i = 0; i < ring.length - 1; i++) { a += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1] } return a / 2 }
-function ensureOuterCCW(ring) { const r = ensureClosed(ring); return ringSignedArea(r) >= 0 ? r : r.slice().reverse() }
-function ensureHoleCW(ring) { const r = ensureClosed(ring); return ringSignedArea(r) <= 0 ? r : r.slice().reverse() }
 const WORLD_OUTER = ensureOuterCCW([[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]])
 function buildMaskGeoJSON(boundary) {
   const holes = []
@@ -1282,7 +1258,6 @@ function viewIntersectsShaanxi(map) {
   const [[sw, ss], [ne, nn]] = SHAANXI_BOUNDS
   return !(e < sw || w > ne || n < ss || s > nn)
 }
-function smoothstep(e0, e1, x) { if (e1 <= e0) return x >= e1 ? 1 : 0; const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t) }
 function computeMaskOpacity() {
   if (!props.enableShaanxiMask) return 0
   const map = mapRef.value?.getMap?.()
