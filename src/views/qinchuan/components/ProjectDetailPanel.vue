@@ -276,7 +276,7 @@ const STAGE_TABS_CONFIG = {
   ],
   PROJECT_RESERVE: [
     { key: 'main', label: '主要信息' },
-    { key: 'support', label: '支持性文件' }
+    { key: 'support', label: '支持性文件' },
     { key: 'project-proposal', label: '项目建议书', type: 'report', subTab: 'PROJECT_PROPOSAL' },
     { key: 'request-file', label: '请示文件', type: 'report', subTab: 'PROJECT_INITIATION' },
     { key: 'competitive-allocation', label: '竞配申请报告', type: 'report', subTab: 'COMPETITIVE_ALLOCATION' },
@@ -284,14 +284,14 @@ const STAGE_TABS_CONFIG = {
   ],
   PROJECT_INITIATION: [
     { key: 'main', label: '主要信息' },
-    { key: 'support', label: '支持性文件' }
+    { key: 'support', label: '支持性文件' },
     { key: 'request-file', label: '请示文件', type: 'report', subTab: 'PROJECT_INITIATION' },
     { key: 'material', label: '立项材料', stageCode: 'PROJECT_INITIATION', fileCode: 'PROJECT_INITIATION_MATERIALS' },
     { key: 'meeting', label: '立项上会', stageCode: 'PROJECT_INITIATION', fileCode: 'PROJECT_INITIATION_MEETING_MATERIALS' },
   ],
   FEASIBILITY_REVIEW: [
     { key: 'main', label: '主要信息' },
-    { key: 'support', label: '支持性文件' }
+    { key: 'support', label: '支持性文件' },
     { key: 'request-file', label: '请示文件', type: 'report', subTab: 'PROJECT_INITIATION' },
     { key: 'material', label: '可研材料', stageCode: 'FEASIBILITY_REVIEW', fileCode: 'PROJECT_FEASIBILITY_MATERIALS' },
     { key: 'meeting', label: '可研审查', stageCode: 'FEASIBILITY_REVIEW', fileCode: 'FEASIBILITY_REVIEW' },
@@ -299,7 +299,7 @@ const STAGE_TABS_CONFIG = {
   ],
   INVESTMENT_DECISION: [
     { key: 'main', label: '主要信息' },
-    { key: 'support', label: '支持性文件' }
+    { key: 'support', label: '支持性文件' },
     { key: 'request-file', label: '请示文件', type: 'report', subTab: 'PROJECT_INITIATION' },
     { key: 'material', label: '投决材料', stageCode: 'INVESTMENT_DECISION', fileCode: 'INVESTMENT_DECISION_MATERIALS' },
     { key: 'meeting', label: '投决上会', stageCode: 'INVESTMENT_DECISION', fileCode: 'INVESTMENT_DECISION_MEETING_MATERIALS' },
