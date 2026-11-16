@@ -1,0 +1,67 @@
+:root {
+  --app-font-size-body: 14px;
+  --app-font-size-tip: 12px;
+}
+
+html,
+body,
+#app {
+  font-size: var(--app-font-size-body);
+  line-height: 1.5;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+/* Keep common form, list, and navigation controls consistent across pages. */
+.el-button,
+.el-input__wrapper,
+.el-input__inner,
+.el-select__wrapper,
+.el-select__placeholder,
+.el-date-editor,
+.el-textarea__inner,
+.el-form-item__label,
+.el-table,
+.el-table th.el-table__cell,
+.el-table td.el-table__cell,
+.el-pagination,
+.el-tabs__item,
+.el-dialog__body,
+.ant-btn,
+.ant-input,
+.ant-select,
+.ant-picker,
+.ant-table,
+.ant-pagination,
+.ant-form-item {
+  font-size: var(--app-font-size-body);
+}
+
+/* Hints, placeholders, validation copy, and hover tooltips use the compact size. */
+input::placeholder,
+textarea::placeholder,
+.el-input__inner::placeholder,
+.el-textarea__inner::placeholder,
+.el-form-item__error,
+.el-input__count,
+.el-tooltip__popper,
+.el-popper .el-tooltip__content,
+.ant-tooltip,
+.ant-tooltip-inner,
+.tip-text,
+.tips-text,
+.form-tip,
+.form-hint,
+.field-hint {
+  font-size: var(--app-font-size-tip);
+}
+
+:where(a, button, [role='button'], input, select, textarea):focus-visible {
+  outline: 2px solid rgba(22, 119, 255, 0.75);
+  outline-offset: 2px;
+}

@@ -39,10 +39,14 @@
           size="small"
           :style="{ width: field.width || '150px' }"
           clearable
+          @keyup.enter="handleSearch"
         />
       </template>
+
+      <!-- 允许页面传入专属筛选项，同时复用统一的布局与操作按钮 -->
+      <slot />
   
-      <el-button type="primary" size="small" @click="emit('search', model)">查询</el-button>
+      <el-button type="primary" size="small" @click="handleSearch">查询</el-button>
       <el-button size="small" @click="handleReset">重置</el-button>
     </div>
   </template>
@@ -55,10 +59,28 @@
   })
   const emit = defineEmits(['search', 'reset'])
   
-  // 根据 fields 初始化 model
-  const model = reactive(
-    Object.fromEntries(props.fields.map(f => [f.key, f.default ?? null]))
+  const model = reactive({})
+
+  // 字段配置可能由异步数据生成；新增字段取默认值，已有输入保持不变。
+  watch(
+    () => props.fields,
+    (fields = []) => {
+      const keys = new Set(fields.map(field => field.key))
+      Object.keys(model).forEach(key => {
+        if (!keys.has(key)) delete model[key]
+      })
+      fields.forEach(field => {
+        if (!Object.prototype.hasOwnProperty.call(model, field.key)) {
+          model[field.key] = field.default ?? null
+        }
+      })
+    },
+    { immediate: true, deep: true }
   )
+
+  function handleSearch() {
+    emit('search', model)
+  }
   
   function handleReset() {
     props.fields.forEach(f => { model[f.key] = f.default ?? null })

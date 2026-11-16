@@ -110,7 +110,7 @@ async function handleUserCommand(command) {
   justify-content: flex-end;
   gap: 9px;
   color: #1677ff;
-  font-size: 12px;
+  font-size: 14px;
   white-space: nowrap;
   z-index: 2;
 }
@@ -189,7 +189,7 @@ async function handleUserCommand(command) {
   justify-content: flex-end;
   gap: 9px;
   color: #1677ff;
-  font-size: 12px;
+  font-size: 14px;
   white-space: nowrap;
 }
 

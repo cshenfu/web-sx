@@ -187,7 +187,40 @@
           <div class="list-title"><el-icon><List /></el-icon>项目列表</div>
           <el-button type="primary" size="small" @click="openCreateProject"><el-icon><Plus /></el-icon>添加项目</el-button>
         </div>
-        <SearchBar :filters="filters" :stage-options="stageOptions" @search="handleSearch" @reset="handleReset" />
+        <SearchBar @search="handleSearch" @reset="handleReset">
+          <el-select v-model="filters.city" placeholder="所属市/区" size="small" clearable style="width: 120px">
+            <el-option v-for="city in CITY_OPTIONS" :key="city.value" :label="city.label" :value="city.value" />
+          </el-select>
+          <el-select v-model="filters.itemType" placeholder="项目类型" size="small" clearable style="width: 120px">
+            <el-option label="风电" value="FD" />
+            <el-option label="光伏" value="GF" />
+          </el-select>
+          <el-select v-model="filters.projectStage" placeholder="项目阶段" size="small" clearable style="width: 140px">
+            <el-option v-for="stage in stageOptions" :key="stage.code" :label="stage.desc" :value="stage.code" />
+          </el-select>
+          <el-select v-model="filters.approvalStatus" placeholder="审批状态" size="small" clearable style="width: 130px">
+            <el-option label="未审批" value="NO_APPROVAL" />
+            <el-option label="审批通过" value="APPROVED" />
+            <el-option label="审批不通过" value="REJECTED" />
+          </el-select>
+          <el-select v-model="filters.isVerified" placeholder="核查状态" size="small" clearable style="width: 120px">
+            <el-option label="未核查" value="0" />
+            <el-option label="已核查" value="1" />
+          </el-select>
+          <el-input v-model="filters.managerCompany" placeholder="所属公司" size="small" clearable style="width: 150px" @keyup.enter="handleSearch" />
+          <el-input v-model="filters.managerName" placeholder="负责人" size="small" clearable style="width: 120px" @keyup.enter="handleSearch" />
+          <el-date-picker
+            v-model="listCreateTimeRange"
+            type="daterange"
+            size="small"
+            value-format="YYYY-MM-DD"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            style="width: 240px"
+          />
+          <el-input v-model="filters.projectCode" placeholder="项目编号" size="small" clearable style="width: 150px" @keyup.enter="handleSearch" />
+          <el-input v-model="filters.projectName" placeholder="项目名称" size="small" clearable style="width: 150px" @keyup.enter="handleSearch" />
+        </SearchBar>
         <el-table v-loading="listLoading" :data="projectList" size="small" stripe class="project-table">
           <el-table-column label="项目编号" min-width="130"><template #default="{ row }">{{ row.projectCode || '-' }}</template></el-table-column>
           <el-table-column label="项目名称" min-width="220" show-overflow-tooltip>
@@ -877,6 +910,15 @@ function onEditProjectCancel() {
 function onReserveSaved() { fetchMapProjects(); fetchProjectList() }
 
 const filters = reactive({ province: '610000', city: '', district: '', itemType: '', projectStage: '', approvalStatus: '', managerCompany: '', managerName: '', createTimeStart: '', createTimeEnd: '', projectCode: '', projectName: '', isVerified: '' })
+const listCreateTimeRange = computed({
+  get: () => (filters.createTimeStart || filters.createTimeEnd)
+    ? [filters.createTimeStart || '', filters.createTimeEnd || '']
+    : null,
+  set: (value) => {
+    filters.createTimeStart = value?.[0] || ''
+    filters.createTimeEnd = value?.[1] || ''
+  },
+})
 const projectList = ref([])
 const listLoading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
@@ -924,7 +966,7 @@ async function fetchProjectList() {
 }
 
 function handleSearch() { pagination.page = 1; fetchProjectList() }
-function handleReset() { Object.assign(filters, { city: '', district: '', itemType: '', projectStage: '', approvalStatus: '', managerCompany: '', managerName: '', createTimeStart: '', createTimeEnd: '', projectCode: '', projectName: '', isVerified: '' }); drawerSort.key = ''; drawerSort.dir = 'desc'; pagination.page = 1; fetchProjectList() }
+function handleReset() { Object.assign(filters, { city: '', district: '', itemType: '', projectStage: '', approvalStatus: '', managerCompany: '', managerName: '', createTimeStart: '', createTimeEnd: '', projectCode: '', projectName: '', isVerified: '' }); drawerSort.key = ''; drawerSort.dir = 'desc'; pagination.page = 1 }
 function handlePageChange(page) { pagination.page = page; fetchProjectList() }
 function handleSizeChange(size) { pagination.pageSize = size; pagination.page = 1; fetchProjectList() }
 
@@ -2411,7 +2453,7 @@ function handleGenerateRequest(payload) {
 .expand-button:hover { background: rgba(30, 30, 30, 0.65); }
 .project-list-view { position: absolute; inset: 0; z-index: 4; height: 100%; padding: 60px 20px 12px; overflow: auto; box-sizing: border-box; background: #fff; }
 .list-heading { display: flex; align-items: center; justify-content: space-between; }
-.list-title { display: flex; align-items: center; gap: 6px; color: #333; font-size: 13px; font-weight: 600; }
+.list-title { display: flex; align-items: center; gap: 6px; color: #333; font-size: 14px; font-weight: 600; }
 .project-table { width: 100%; margin-top: 2px; }
 .project-table :deep(.el-table__row) { height: 56px; }
 .project-table :deep(.el-table__cell) { padding: 10px 0; }
@@ -2421,7 +2463,7 @@ function handleGenerateRequest(payload) {
 .status-text.passed { color: #24b26b; }
 .status-text.pending { color: #e6a23c; }
 .status-text.rejected { color: #f56c6c; }
-.pagination-row { display: flex; align-items: center; justify-content: flex-end; gap: 18px; padding-top: 14px; color: #666; font-size: 12px; }
+.pagination-row { display: flex; align-items: center; justify-content: flex-end; gap: 18px; padding-top: 14px; color: #666; font-size: 14px; }
 .row-actions { display: flex; flex-wrap: wrap; gap: 4px 8px; }
 .row-actions .el-button { margin: 0; padding: 0; }
 .rate-cell { display: inline-flex; flex-direction: column; line-height: 1.2; vertical-align: middle; margin-right: 8px; }

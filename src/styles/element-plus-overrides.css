@@ -24,14 +24,14 @@
 
 .global-delete-confirm-question {
   color: #303133;
-  font-size: 17px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
 .global-delete-confirm-note {
   margin-top: 12px;
   color: #999;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .global-delete-confirm-box .el-message-box__btns {
@@ -46,7 +46,7 @@
   height: 42px;
   margin-left: 0;
   border-radius: 5px;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .global-delete-confirm-box .global-delete-confirm-cancel {
