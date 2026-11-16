@@ -352,6 +352,8 @@ const handleEdit = (row) => {
       totalProjectCapacity: row.totalCapacity ?? '',
       currentProjectCapacity: row.currentCapacity ?? '',
       itemType: row.reportItemType ?? '',
+      aiProjectId: row.aiProjectId ? String(row.aiProjectId) : undefined,
+      originalProjectId: row.originalProjectId ? String(row.originalProjectId) : undefined,
     },
   })
 }
