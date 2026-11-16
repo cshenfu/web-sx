@@ -27,7 +27,10 @@ export default {
       const visibleActions = actions.slice(0, Math.max(0, props.maxVisible))
       const overflowActions = actions.slice(Math.max(0, props.maxVisible))
 
-      return h('div', { class: ['action-overflow', attrs.class] }, [
+      return h('div', {
+        class: ['action-overflow', attrs.class],
+        style: { minWidth: overflowActions.length ? '260px' : '0' },
+      }, [
         ...visibleActions,
         ...(overflowActions.length
           ? [
