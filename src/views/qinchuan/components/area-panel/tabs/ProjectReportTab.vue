@@ -168,13 +168,11 @@ const fake_data = ref(null)
 // ============================================================
 const tabs = ref([
   { key: 'PROJECT_PROPOSAL', label: '项目建议书', count: 0 },
+  { key: 'WIND_RESOURCE_ASSESSMENT', label: '风资源评估报告', count: 0 },
   { key: 'FEASIBILITY_STUDY', label: '可研报告', count: 0 },
-  { key: 'COMPETITIVE_ALLOCATION', label: '竞配申报报告', count: 0 },
   { key: 'PROJECT_INITIATION', label: '请示文件', count: 0 },
+  { key: 'COMPETITIVE_ALLOCATION', label: '竞配申请报告', count: 0 },
   { key: 'POST_EVALUATION', label: '后评价报告', count: 0 },
-  { key: 'INVESTMENT_DECISION', label: '投资决策报告/函件', count: 0 },
-  { key: 'PROJECT_COMMITMENT', label: '投资承诺文件', count: 0 },
-  { key: 'INVESTMENT_REVIEW_NOTICE', label: '投决审查函件', count: 0 },
 ])
 
 const activeSubTab = ref(tabs.value[0].key)
