@@ -159,7 +159,8 @@ const emit = defineEmits(['row-action', 'open-confirm', 'create'])
 const props = defineProps({
   project: { type: Object, required: true },
   initialSubTab: { type: String, default: '' },
-  hideSubTabs: { type: Boolean, default: false }
+  hideSubTabs: { type: Boolean, default: false },
+  refreshKey: { type: Number, default: 0 },
 })
 const fake_data = ref(null)
 // ============================================================
@@ -171,6 +172,9 @@ const tabs = ref([
   { key: 'COMPETITIVE_ALLOCATION', label: '竞配申报报告', count: 0 },
   { key: 'PROJECT_INITIATION', label: '请示文件', count: 0 },
   { key: 'POST_EVALUATION', label: '后评价报告', count: 0 },
+  { key: 'INVESTMENT_DECISION', label: '投资决策报告/函件', count: 0 },
+  { key: 'PROJECT_COMMITMENT', label: '投资承诺文件', count: 0 },
+  { key: 'INVESTMENT_REVIEW_NOTICE', label: '投决审查函件', count: 0 },
 ])
 
 const activeSubTab = ref(tabs.value[0].key)
@@ -453,6 +457,12 @@ watch(() => props.initialSubTab, (val) => {
     fetchList()
   }
 }, { immediate: true })
+
+watch(() => props.refreshKey, async () => {
+  pageNo.value = 1
+  await fetchAllTabCounts()
+  fetchList()
+})
 
 /**
  * @param {boolean} silent 静默刷新（轮询用）：不显示 loading、不打断轮询链
