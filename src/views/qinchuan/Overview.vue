@@ -411,6 +411,7 @@ import { useProjectHover } from './js/useProjectHover'
 
 import ProjectWorkflowDialogs from './components/ProjectWorkflowDialogs.vue'
 import { useReportPanelController } from './js/useReportPanelController'
+import { useProjectContext } from './js/useProjectContext'
 import {
   ref, computed, reactive, watch, onMounted, onUnmounted, nextTick
 } from 'vue'
@@ -632,8 +633,14 @@ const reportModalVisible = ref(false)
 const detailLoading = ref(false)
 const detailPanelTab = ref('main')
 
-const popoverProject = ref(null)
-const selectedProject = ref(null)
+const projectContext = useProjectContext()
+const {
+  focusedProject: popoverProject,
+  selectedProject,
+  actionProject,
+  geometryProject,
+  activeProject: currentProjectContext,
+} = projectContext
 
 const hoveredProject = ref(null)
 const hoveredPos = reactive({ x: 0, y: 0 })
@@ -663,7 +670,6 @@ const popoverActions = computed(() => {
 })
 
 const actionMenuOpen = ref(false)
-const actionProject = ref(null)
 const showVerifyPanel = ref(false)
 const showSiteMapDetailPanel = ref(false)
 const showAssignDialog = ref(false)
@@ -692,7 +698,6 @@ const isActionPanelOpen = computed(() => (
   showConfirmPanel.value
 ))
 
-const geometryProject = ref(null)
 const editBuffer = ref(null)
 const isEditing = ref(false)
 const editMode = ref(null)
@@ -1006,10 +1011,7 @@ async function refreshActionProjectData() {
     if (projectId == null) return
     const fresh = mapProjects.value.find((item) => String(item.id) === String(projectId))
     if (!fresh) return
-    actionProject.value = fresh
-    if (popoverProject.value && String(popoverProject.value.id) === String(projectId)) {
-      popoverProject.value = fresh
-    }
+    projectContext.syncProject(fresh)
     if (mapReady.value && isAreaView.value) await renderProjectsByStage('area')
   } finally {
     refreshingActionProject.value = false
@@ -1417,7 +1419,7 @@ async function saveEdit() {
     const target = mapProjects.value.find((item) => String(item.id) === String(projectId))
     if (target) Object.assign(target, { coordinate, windTurbinePoints, boosterStationLocations })
     geometryProject.value = target || project
-    actionProject.value = geometryProject.value
+    projectContext.syncProject(geometryProject.value)
     await renderProjectsByStage('area')
     initEditBuffer(geometryProject.value)
     editMode.value = null
