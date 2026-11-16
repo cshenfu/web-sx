@@ -599,11 +599,30 @@ const detailRefreshKey = ref(0)
 const generatedReportSubTab = ref('')
 const pendingGeneratedReport = ref(null)
 
+// 只有这六类报告属于“项目报告”列表；其他函件生成成功后不切换到项目报告页。
+const PROJECT_REPORT_TYPE_KEYS = new Set([
+  'PROJECT_PROPOSAL',
+  'WIND_RESOURCE_ASSESSMENT',
+  'FEASIBILITY_STUDY',
+  'PROJECT_INITIATION',
+  'COMPETITIVE_ALLOCATION',
+  'POST_EVALUATION',
+])
+
 function onReportGenerated(payload = {}) {
+  const reportType = String(payload.reportType || '').trim()
+  if (!PROJECT_REPORT_TYPE_KEYS.has(reportType)) {
+    pendingGeneratedReport.value = null
+    return
+  }
+
   pendingGeneratedReport.value = {
     project: payload.project || generatePanelProject.value || activeProjectDetail.value,
-    reportType: payload.reportType || 'PROJECT_INITIATION',
+    reportType,
   }
+
+  // 生成成功即自动关闭生成面板并切换到对应报告分类，不再要求用户手动关闭。
+  handleGeneratePanelClose()
 }
 
 function handleGeneratePanelClose() {
