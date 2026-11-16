@@ -506,7 +506,11 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 25px;
+  margin: 0 16px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.5);
 }
 .panel-title {
   flex: 1;
