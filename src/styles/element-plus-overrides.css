@@ -83,3 +83,19 @@ body.is-fullscreen-active .page-content {
 
 /* 如果左侧还有侧边栏，也需要全屏时隐藏，可以一并加上 */
 /* body.is-fullscreen-active .app-sidebar { display: none !important; } */
+
+/* 统一所有基于共享 TableList 的数据列表页面背景 */
+.user-list:has(.table-list),
+.water-conservation-list:has(.table-list),
+.wind-tower-list:has(.table-list),
+.queue-list-page {
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(255, 205, 220, 0.34), transparent 30%),
+    radial-gradient(circle at 92% 10%, rgba(184, 219, 255, 0.4), transparent 32%),
+    radial-gradient(circle at 90% 100%, rgba(172, 216, 255, 0.34), transparent 36%),
+    linear-gradient(122deg, #eef3fa 0%, #f7f8fc 48%, #eaf2fb 100%) !important;
+}
