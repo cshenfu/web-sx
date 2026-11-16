@@ -71,8 +71,8 @@ export default {
   display: inline-flex;
   align-items: center;
   flex-wrap: nowrap;
-  gap: 8px;
-  min-width: 0;
+  gap: 6px;
+  min-width: 260px;
 }
 
 .action-overflow-trigger {
