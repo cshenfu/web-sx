@@ -101,6 +101,8 @@
             v-else
             class="area-summary wizard-layer"
             :create-project-mode="wizardMode"
+            :title="wizardTitleLabel"
+            :max-step="wizardMaxStep"
             :project-name="(wizardProject || activeProjectDetail)?.name || (wizardProject || activeProjectDetail)?.projectName || ''"
             :project="wizardProject || activeProjectDetail"
             @close="wizardVisible = false"
