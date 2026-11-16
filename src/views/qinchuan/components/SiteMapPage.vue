@@ -228,7 +228,7 @@
               <span
                 class="project-name-link"
                 :title="row.projectName"
-                @click.stop="locateProjectFromList(row)"
+                @click.stop="openDetailPanel(row, 'main')"
               >
                 {{ row.projectName || '-' }}
               </span>
