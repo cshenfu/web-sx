@@ -34,7 +34,7 @@ export default {
 
       return h('div', {
         class: ['action-overflow', attrs.class],
-        style: { minWidth: overflowActions.length ? '260px' : '0' },
+        style: { minWidth: overflowActions.length ? '280px' : '0' },
       }, [
         ...visibleActions,
         ...(overflowActions.length
@@ -80,7 +80,7 @@ export default {
   align-items: center;
   flex-wrap: nowrap;
   gap: 6px;
-  min-width: 260px;
+  min-width: 280px;
 }
 
 .action-overflow-trigger {
