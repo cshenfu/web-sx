@@ -404,7 +404,7 @@
 </template>
 
 <script setup>
-import { ensureClosed, ringSignedArea, ensureOuterCCW, ensureHoleCW, smoothstep } from './js/mapGeometry'
+import { ensureOuterCCW, ensureHoleCW, smoothstep } from './js/mapGeometry'
 import { useProjectHover } from './js/useProjectHover'
 
 import ProjectWorkflowDialogs from './components/ProjectWorkflowDialogs.vue'
