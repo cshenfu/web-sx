@@ -2030,10 +2030,7 @@ function handleReportConfirm(payload) {
 }
 
 function closeWizard() {
-  wizardVisible.value = false
-  wizardTitleLabel.value = ''
-  wizardMaxStep.value = 2
-  wizardReportSubTab.value = ''
+  reportPanels.closeWizard()
   showDetailPanel.value = true
 }
 
