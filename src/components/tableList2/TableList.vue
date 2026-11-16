@@ -114,7 +114,7 @@
     const normalizedColumns = computed(() => (props.tableColumn || []).map((column) => {
         if (!isActionColumn(column)) return column;
         const width = Number.parseInt(column.width, 10) || 0;
-        return { ...column, width: Math.max(width, 260) };
+        return { ...column, width: Math.max(width, 280) };
     }));
     const rowClick = (record, index) => {
         return {
