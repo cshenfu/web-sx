@@ -406,6 +406,7 @@
 <script setup>
 import { ensureOuterCCW, ensureHoleCW, smoothstep } from './js/mapGeometry'
 import { getProjectCoords, getProjectCentroid, buildWindFC, buildBoosterFC } from './js/projectGeoUtils'
+import { unwrapRoadResponse, buildRoadLineFeatures } from './js/roadGeoUtils'
 import { useProjectHover } from './js/useProjectHover'
 
 import ProjectWorkflowDialogs from './components/ProjectWorkflowDialogs.vue'
@@ -1790,160 +1791,6 @@ async function loadAiProjectDetail(aiProjectId) {
 const mapProjects = ref([])
 const renderedMapLayerIds = new Set()
 
-function unwrapOverviewRoadResponse(response) {
-  let value = response
-  for (let i = 0; i < 4; i += 1) {
-    if (
-      value &&
-      typeof value === 'object' &&
-      value.data != null &&
-      !Object.prototype.hasOwnProperty.call(value, 'roadMap') &&
-      !Object.prototype.hasOwnProperty.call(value, 'line') &&
-      !Object.prototype.hasOwnProperty.call(value, 'CNKJ')
-    ) {
-      value = value.data
-      continue
-    }
-    break
-  }
-  return value
-}
-
-function toOverviewMapCoordinate(point) {
-  const lng = Number(Array.isArray(point) ? point[0] : (point?.lon ?? point?.lng ?? point?.longitude))
-  const lat = Number(Array.isArray(point) ? point[1] : (point?.lat ?? point?.latitude))
-  return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null
-}
-
-function pushOverviewLineFeatures(target, rows, baseProps) {
-  if (!Array.isArray(rows) || rows.length === 0) return 0
-  const groups = Array.isArray(rows[0]) ? rows : [rows]
-  let count = 0
-  groups.forEach((group) => {
-    if (!Array.isArray(group)) return
-    const coords = group.map(toOverviewMapCoordinate).filter(Boolean)
-    if (coords.length < 2) return
-    target.push({
-      type: 'Feature',
-      properties: { ...baseProps },
-      geometry: { type: 'LineString', coordinates: coords },
-    })
-    count += 1
-  })
-  return count
-}
-
-function buildRoadLineFeatures(data) {
-  const roadFeatures = []
-  const lineFeatures = []
-
-  const roadMap = data?.roadMap ?? data?.data?.roadMap ?? {}
-  for (const type of ['CNKJ', 'CNXJ', 'JZXJ']) {
-    pushOverviewLineFeatures(
-      roadFeatures,
-      roadMap?.[type]?.roadpoint,
-      { category: 'road', sourceType: type, label: '道路' }
-    )
-  }
-
-  const line35Kv =
-    data?.line35Kv ??
-    data?.line35KV ??
-    data?.data?.line35Kv ??
-    data?.data?.line35KV ??
-    null
-
-  const mapGeoJson =
-    line35Kv?.mapGeoJson ??
-    line35Kv?.mapGeojson ??
-    line35Kv?.mapGeoJSON ??
-    data?.mapGeoJson ??
-    null
-
-  const loops = line35Kv?.line?.loops ?? data?.line?.loops ?? []
-  const loopMeta = new Map()
-  if (Array.isArray(loops)) {
-    loops.forEach((loop, index) => {
-      const name = loop?.loopname || String(index + 1)
-      loopMeta.set(String(name), {
-        fanCount: Number(loop?.fan) || (loop?.fanidarr?.length ?? 0),
-        loopLength: loop?.looplength || '',
-      })
-    })
-  }
-
-  if (mapGeoJson?.features?.length) {
-    const sorted = [...mapGeoJson.features].sort((a, b) => {
-      const ai = Number(a?.properties?.edge_index)
-      const bi = Number(b?.properties?.edge_index)
-      if (Number.isFinite(ai) && Number.isFinite(bi)) return ai - bi
-      return 0
-    })
-
-    sorted.forEach((feature) => {
-      const geom = feature?.geometry
-      if (!geom) return
-      const props = feature?.properties || {}
-      const loopName = props.loopname || ''
-      const meta = loopMeta.get(String(loopName)) || {}
-      const lengthM = Number(props.length_m) || 0
-      const lengthKm = lengthM > 0
-        ? (lengthM / 1000).toFixed(2)
-        : (meta.loopLength || '')
-      const typeText =
-        props.type === 'underground' ? '地埋'
-          : props.type === 'trunk' ? '主干'
-            : props.type === 'branch' ? '分支'
-              : ''
-
-      const coordsList =
-        geom.type === 'LineString'
-          ? [geom.coordinates]
-          : geom.type === 'MultiLineString'
-            ? (geom.coordinates || [])
-            : []
-
-      coordsList.forEach((coords) => {
-        const points = (coords || []).map(toOverviewMapCoordinate).filter(Boolean)
-        if (points.length < 2) return
-        lineFeatures.push({
-          type: 'Feature',
-          properties: {
-            category: 'line',
-            loopIndex: props.edge_index ?? null,
-            loopName,
-            lineType: props.type || '',
-            lineTypeText: typeText,
-            segmentName: props.name || '',
-            loopLength: lengthKm,
-            fanCount: meta.fanCount || 0,
-            label: loopName ? `35kV 线路 ${loopName}` : `35kV 线路 ${props.name || ''}`,
-          },
-          geometry: { type: 'LineString', coordinates: points },
-        })
-      })
-    })
-  } else if (Array.isArray(loops)) {
-    loops.forEach((loop, loopIndex) => {
-      const loopName = loop?.loopname || String(loopIndex + 1)
-      pushOverviewLineFeatures(
-        lineFeatures,
-        loop?.cablepoletower,
-        {
-          category: 'line',
-          loopIndex,
-          loopName,
-          loopLength: loop?.looplength || '',
-          fanCount: Number(loop?.fan) || (loop?.fanidarr?.length ?? 0),
-          label: `35kV 线路 ${loopName}`,
-        }
-      )
-    })
-  }
-
-  return { roadFeatures, lineFeatures }
-}
-
 function upsertLineLayer(layerId, geojson, paint) {
   const map = mapRef.value?.getMap?.()
   if (!map) return
@@ -2071,8 +1918,8 @@ async function loadOverviewRoadData(projectId) {
     const res = await newApi.getRoadData(projectId)
     if (requestVersion !== overviewRoadRequestVersion || !isActive()) return
 
-    const data = unwrapOverviewRoadResponse(res)
-    const { roadFeatures, lineFeatures } = buildRoadLineFeatures(data)
+    const data = unwrapRoadResponse(res)
+    const { roadFeatures, lineFeatures } = buildRoadLineFeatures(data, { includeLegacyLoopFallback: true })
     overviewRoadCache.set(projectId, { roadFeatures, lineFeatures })
     currentOverviewRoadProjectId = String(projectId)
     syncRoadLineVisibility()
