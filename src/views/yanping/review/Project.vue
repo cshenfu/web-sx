@@ -212,7 +212,7 @@ const mapStatus = (reportProjectStatus) => {
 
 /** 后端项目类型 -> 前端项目类型（1 风电 / 2 光伏，请根据实际枚举调整） */
 const mapProjectType = (reportItemType) => {
-  return reportItemType === 1 ? 'wind' : 'solar'
+  return Number(reportItemType) === 1 ? 'wind' : 'solar'
 }
 
 // ================= 获取列表数据 =================
@@ -347,6 +347,11 @@ const handleEdit = (row) => {
     query: {
       draftId: String(row.id),
       reviewProjectId: row.reviewProjectId ? String(row.reviewProjectId) : undefined,
+      projectName: row.projectName || '',
+      projectCode: row.projectCode || '',
+      totalProjectCapacity: row.totalCapacity ?? '',
+      currentProjectCapacity: row.currentCapacity ?? '',
+      itemType: row.reportItemType ?? '',
     },
   })
 }
@@ -499,4 +504,16 @@ const handleDelete = async (row) => {
 .btn-delete {
   color: #ff4d4f;
 }
+
+
+/* 智能评审状态颜色 */
+.status-text.draft { color: #909399; }
+.status-text.calculating,
+.status-text.queueing,
+.status-text.in-progress { color: #409eff; }
+.status-text.paused { color: #e6a23c; }
+.status-text.terminated { color: #f56c6c; }
+.status-text.calculation-completed,
+.status-text.completed { color: #67c23a; }
+.status-text.file-parsed { color: #8b5cf6; }
 </style>
