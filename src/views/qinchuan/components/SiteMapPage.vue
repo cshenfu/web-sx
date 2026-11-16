@@ -390,6 +390,7 @@ import { ensureOuterCCW, ensureHoleCW, smoothstep } from '../js/mapGeometry'
 import { getProjectCoords, getProjectCentroid, buildWindFC, buildBoosterFC } from '../js/projectGeoUtils'
 import { unwrapRoadResponse, buildRoadLineFeatures } from '../js/roadGeoUtils'
 import { useProjectHover } from '../js/useProjectHover'
+import { useReportPanelController } from '../js/useReportPanelController'
 
 import ProjectWorkflowDialogs from './ProjectWorkflowDialogs.vue'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
@@ -533,16 +534,10 @@ const SMART_SITE_STAGES = ['PRELIMINARY_SELECTION']
 
 // 报告与面板状态
 const showGenerateModal = ref(false)
-const wizardVisible = ref(false)
-const wizardMode = ref(PACKAGE_TYPE.default)
-const wizardTitleLabel = ref('')
-const wizardMaxStep = ref(2)
-const wizardReportSubTab = ref('')
 const reportKeyToWizardMode = {
   'feasibility-centralized': PACKAGE_TYPE.default,
   'feasibility-distributed': PACKAGE_TYPE.distributedDefault,
 }
-
 const SUB_TAB_REPORT_CONFIG = {
   PROJECT_PROPOSAL:       { packageType: PACKAGE_TYPE.default, maxStep: 1, title: '一键生成项目建议书' },
   FEASIBILITY_STUDY:      { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成风电场可行性研究报告' },
@@ -554,17 +549,7 @@ const SUB_TAB_REPORT_CONFIG = {
 const detailRefreshKey = ref(0)
 function handleOpenCompetitivePanel(project) {
   showGenerateModal.value = false
-  generatePanelProject.value = project || selectedProject.value
-  generatePanelActionKey.value = 'bidding'
-  generatePanelSubCode.value = ''
-  generatePanelSource.value = 'competitive-modal'
-  generatePanelFirstBusinessTitle.value = ''
-  generatePanelSecondaryBusinessTitle.value = ''
-  generatePanelFileTypeTag.value = ''
-  showGeneratePanel.value = true
-}
-function getReportConfigBySubTab(subTab) {
-  return SUB_TAB_REPORT_CONFIG[subTab] || SUB_TAB_REPORT_CONFIG.FEASIBILITY_STUDY
+  reportPanels.openCompetitivePanel(project, selectedProject.value)
 }
 const showDetailPanel = ref(false)
 const showSiteMapDetailPanel = ref(false) // ★ 新增：专门控制简版面板
@@ -584,19 +569,13 @@ const isSmartSite = computed(() => {
   return SMART_SITE_STAGES.includes(code)
 })
 
-const showGeneratePanel = ref(false)
-const generatePanelProject = ref(null)
-const generatePanelActionKey = ref('')
-const generatePanelSubCode = ref('')
-// ★ 新增
-const generatePanelSource = ref('')
-const generatePanelFirstBusinessTitle = ref('')
-const generatePanelSecondaryBusinessTitle = ref('')
-const generatePanelFileTypeTag = ref('')
-
-const showAddReportPanel = ref(false)
-const showConfirmPanel = ref(false)
-const confirmReportId = ref(null)
+const reportPanels = useReportPanelController(PACKAGE_TYPE)
+const {
+  showGeneratePanel, generatePanelProject, generatePanelActionKey, generatePanelSubCode,
+  generatePanelSource, generatePanelFirstBusinessTitle, generatePanelSecondaryBusinessTitle,
+  generatePanelFileTypeTag, showAddReportPanel, showConfirmPanel, confirmReportId,
+  wizardVisible, wizardMode, wizardTitleLabel, wizardMaxStep, wizardReportSubTab,
+} = reportPanels
   // ============================================================
   // ★ 计算并应用"当前容器下完整看到陕西"对应的最小 zoom
   //   用户不能再缩小到超过陕西范围
@@ -637,10 +616,10 @@ const confirmReportId = ref(null)
   }
 
 function handleOpenAddReport() {
-   showGenerateModal.value = false
-   showProjectDrawer.value = false
-   showDetailPanel.value = false
-   showAddReportPanel.value = true
+  showGenerateModal.value = false
+  showProjectDrawer.value = false
+  showDetailPanel.value = false
+  reportPanels.openAddReport()
 }
 
 function handleReportPanelSuccess() {
@@ -648,10 +627,7 @@ function handleReportPanelSuccess() {
   fetchProjectList()
 }
 
-function handleOpenConfirm(id) {
-  confirmReportId.value = id
-  showConfirmPanel.value = true
-}
+function handleOpenConfirm(id) { reportPanels.openConfirm(id) }
 // 报告/函件生成 —— header 按钮 emit 过来
 function handleGenerateReportFromHeader(proj) {
   if (proj) selectedProject.value = proj
@@ -1075,14 +1051,15 @@ function onDetailPanelAction(payload) {
     return
   }
   if (payload?.type === 'generate-report') {
-    generatePanelProject.value = payload.project || selectedProject.value
-    generatePanelActionKey.value = payload.actionKey || ''
-    generatePanelSubCode.value = payload.subCode || ''
-    generatePanelSource.value = 'sitemap-detail'   // ★ 触发 updateFile
-    generatePanelFirstBusinessTitle.value = payload.firstBusinessTitle || ''
-    generatePanelSecondaryBusinessTitle.value = payload.secondaryBusinessTitle || ''
-    generatePanelFileTypeTag.value = payload.fileTypeTag || ''
-    showGeneratePanel.value = true
+    reportPanels.openGeneratePanel({
+      project: payload.project || selectedProject.value,
+      actionKey: payload.actionKey,
+      subCode: payload.subCode,
+      source: 'sitemap-detail',
+      firstBusinessTitle: payload.firstBusinessTitle,
+      secondaryBusinessTitle: payload.secondaryBusinessTitle,
+      fileTypeTag: payload.fileTypeTag,
+    })
     return
   }
   if (payload?.type === 'create-report') {
@@ -1093,67 +1070,10 @@ function onDetailPanelAction(payload) {
 
 // ★ 全量面板 / 简版面板共用的 "create-report" 处理
 // 打开 GeneratePanel（用于 report-tab 的各种 subTab）
-function openGeneratePanelFromReportTab(payload, { actionKey, fileTypeTag, firstBusinessTitle }) {
-  generatePanelProject.value = payload.project || selectedProject.value
-  generatePanelActionKey.value = actionKey
-  generatePanelSubCode.value = ''
-  generatePanelSource.value = 'report-tab'
-  generatePanelFirstBusinessTitle.value = firstBusinessTitle || ''
-  generatePanelSecondaryBusinessTitle.value = ''
-  generatePanelFileTypeTag.value = fileTypeTag || ''
-  showGeneratePanel.value = true
-  showDetailPanel.value = false
-}
-
 function handleCreateReportFromDetail(payload) {
-  if (!payload?.subTab) return
-  const subTab = payload.subTab
-  const project = payload.project || selectedProject.value
-  const stage =
-    project?.projectStage ||
-    project?.stage ||
-    selectedProject.value?.projectStage ||
-    selectedProject.value?.stage ||
-    ''
-
-  switch (subTab) {
-    case 'COMPETITIVE_ALLOCATION':
-      return openGeneratePanelFromReportTab(payload, { actionKey: 'bidding' })
-
-    case 'FEASIBILITY_STUDY':
-      return openGeneratePanelFromReportTab(payload, {
-        actionKey: 'gen-report',
-        fileTypeTag: '可研审查报告',
-        firstBusinessTitle: 'PROJECT_FEASIBILITY_MATERIALS',
-      })
-
-    case 'PROJECT_INITIATION':
-      if (stage === 'INVESTMENT_DECISION') {
-        return openGeneratePanelFromReportTab(payload, {
-          actionKey: 'gen-invest-letter',
-          fileTypeTag: '投资决策请示函',
-          firstBusinessTitle: 'INVESTMENT_DECISION_MATERIALS',
-        })
-      }
-      return openGeneratePanelFromReportTab(payload, {
-        actionKey: 'gen-letter',
-        fileTypeTag: '立项请示函',
-        firstBusinessTitle: 'PROJECT_INITIATION_MATERIALS',
-      })
-
-    case 'PROJECT_PROPOSAL':
-    case 'POST_EVALUATION':
-    default: {
-      const config = getReportConfigBySubTab(subTab)
-      wizardMode.value = config.packageType
-      wizardTitleLabel.value = config.title
-      wizardMaxStep.value = config.maxStep
-      wizardReportSubTab.value = subTab
-      wizardVisible.value = true
-      showDetailPanel.value = false
-      return
-    }
-  }
+  return reportPanels.dispatchCreateReport(payload, selectedProject.value, (target) => {
+    if (target === 'generate' || target === 'wizard') showDetailPanel.value = false
+  })
 }
 
 
