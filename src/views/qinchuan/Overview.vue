@@ -324,6 +324,26 @@
       </section>
     </template>
 
+    <ProjectWorkflowDialogs
+      :visibility="{ verify: showVerifyPanel, assign: showAssignDialog, reserve: showReserveDialog, addReport: showAddReportPanel, confirm: showConfirmPanel }"
+      :verify-project="actionProject"
+      :assign-project="actionProject"
+      :reserve-project="actionProject"
+      :report-project="activeProjectDetail"
+      :report-id="confirmReportId"
+      :verify-mounted="true"
+      @close-verify="showVerifyPanel = false"
+      @verify-saved="onVerifySaved"
+      @update:assign="showAssignDialog = $event"
+      @assign-success="onAssignSuccess"
+      @update:reserve="showReserveDialog = $event"
+      @reserve-saved="onReserveSaved"
+      @close-add-report="showAddReportPanel = false"
+      @report-success="handleReportPanelSuccess"
+      @close-confirm="showConfirmPanel = false"
+      @confirm-success="handleConfirmSuccess"
+    />
+
     <ReportGenerateModal
       :visible="reportModalVisible"
       :project="activeProjectDetail"
@@ -334,12 +354,7 @@
       @open-add-report="handleOpenAddReport"
     />
 
-    <AddReportPanel
-      :visible="showAddReportPanel"
-      :project="activeProjectDetail"
-      @close="showAddReportPanel = false"
-      @success="handleReportPanelSuccess"
-    />
+    
 
     <section v-if="showEditProject" class="create-project-fullpage">
       <CreateProjectForm
@@ -353,12 +368,7 @@
       />
     </section>
 
-    <VerifyPanel
-      :visible="showVerifyPanel"
-      :project="actionProject"
-      @close="showVerifyPanel = false"
-      @saved="onVerifySaved"
-    />
+    
 
     <!-- 修复头部按钮绑定 -->
     <SiteMapProjectDetailPanel
@@ -386,24 +396,20 @@
       @close="showGeneratePanel = false"
       @generated="onReportGenerated"
     />
-    <AssignDialog v-model="showAssignDialog" :project="actionProject" @success="onAssignSuccess" />
-    <ReserveApprovalDialog v-model="showReserveDialog" :project="actionProject" @saved="onReserveSaved" />
+    
+    
 
-    <ConfirmReportPanel
-      :visible="showConfirmPanel"
-      :report-id="confirmReportId"
-      @close="showConfirmPanel = false"
-      @success="handleConfirmSuccess"
-    />
+    
   </main>
 </template>
 
 <script setup>
+import ProjectWorkflowDialogs from './components/ProjectWorkflowDialogs.vue'
 import {
   ref, computed, reactive, watch, onMounted, onUnmounted, nextTick
 } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { List, MapLocation, Plus, Search, MoreFilled, Location, CircleCheck, CircleClose } from '@element-plus/icons-vue'
+import { List, MapLocation, Plus, Search, Location, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import { searchPlaceName } from './js/useTiandituGeocode'
 import MapGL from '@/components/MapGL.vue'
 import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
@@ -418,11 +424,8 @@ import ProjectListPanel from './components/area-panel/ProjectListPanel.vue'
 import ProjectDetailPanel from './components/area-panel/ProjectDetailPanel.vue'
 import ReportGenerateModal from './components/area-panel/ReportGenerateModal.vue'
 import CreateProjectForm from './components/Createprojectform.vue'
-import VerifyPanel from './components/VerifyPanel.vue'
 import SiteMapProjectDetailPanel from './components/ProjectDetailPanel.vue'
 import SiteMapGenerateReportPanel from './components/GenerateReportPanel.vue'
-import AssignDialog from './components/AssignDialog.vue'
-import ReserveApprovalDialog from './components/ReserveApprovalDialog.vue'
 import ReportWizard from './components/report-wizard/ReportWizard.vue'
 import { PACKAGE_TYPE } from './js/Reportwizardmockdata'
 import { projectOverviewRows } from './js/dashboardMcokData'
@@ -453,8 +456,6 @@ import {
   calcIconSizeAtRef,
   buildIconSizeExpression,
 } from '@/components/site-map/areaCenterIcon'
-import AddReportPanel from './components/area-panel/AddReportPanel.vue'
-import ConfirmReportPanel from './components/area-panel/ConfirmReportPanel.vue'
 import ProjectActionCard from './components/area-panel/ProjectActionCard.vue'
 
 const CITY_OPTIONS = [
