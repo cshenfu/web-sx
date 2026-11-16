@@ -184,7 +184,7 @@
 
   function isActionColumn(column = {}) {
     const label = getColumnTitle(column).trim()
-    const key = String(column.key || column.dataIndex || column.prop || '').toLowerCase()
+    const key = String(column.key || column.dataIndex || column.prop || column.scopedSlots || '').toLowerCase()
     return label.includes('操作') || key === 'action' || key === 'actions' || key === 'operation'
   }
   
