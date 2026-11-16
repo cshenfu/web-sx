@@ -217,22 +217,55 @@
   <style scoped lang="scss">
   .table-list {
     width: 100%;
+    min-width: 0;
   }
-  
+
+  :deep(.el-table) {
+    --el-table-border-color: #e6ebf1;
+    --el-table-header-bg-color: #f2f5f9;
+    --el-table-row-hover-bg-color: #f7faff;
+    border: 1px solid #e1e7ef;
+    border-radius: 6px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.96);
+  }
+
+  :deep(.el-table th.el-table__cell) {
+    height: 40px;
+    padding: 0;
+    color: #637285;
+    font-size: 14px;
+    font-weight: 600;
+    background: #f2f5f9 !important;
+    border-bottom: 1px solid #e0e7ef;
+  }
+
+  :deep(.el-table th .cell),
+  :deep(.el-table td .cell) {
+    padding: 0 14px;
+    line-height: 40px;
+  }
+
+  :deep(.el-table td.el-table__cell) {
+    height: 40px;
+    padding: 0;
+    color: #304153;
+    font-size: 14px;
+    border-bottom: 1px solid #e8edf3;
+  }
+
+  :deep(.el-table__body tr:hover > td.el-table__cell) {
+    background: #f8fbff !important;
+  }
+
+  :deep(.el-table__inner-wrapper::before) {
+    display: none;
+  }
+
   .table-pagination {
     display: flex;
     justify-content: flex-end;
-    margin-top: 20px;
-  }
-  
-  :deep(.el-table th.el-table__cell) {
-    color: #1f2937;
-    font-weight: 600;
-    background: #f2f8f7;
-  }
-  
-  :deep(.el-table .cell) {
-    line-height: 20px;
+    margin-top: 8px;
   }
   
   .second-title {
