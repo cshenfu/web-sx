@@ -63,6 +63,12 @@
             :data="mainInfoData"
           />
           
+          <SupportDocsTab
+            v-else-if="activeTab === 'support'"
+            :data="supportDocsData"
+            readonly
+          />
+
           <DetailMaterialTab
             v-else-if="activeTab === 'material' || activeTab === 'invest-material'"
             ref="materialTabRef"
@@ -128,6 +134,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 
 import MainInfoTab from './area-panel/tabs/MainInfoTab.vue'
+import SupportDocsTab from './area-panel/tabs/SupportDocsTab.vue'
 import { useProjectMainInfo } from '../js/useProjectMainInfo'
 import ProjectReportTab from './area-panel/tabs/ProjectReportTab.vue'
 import DetailMaterialTab from './DetailMaterialTab.vue'
@@ -265,6 +272,7 @@ async function handleHeaderAction() {
 const STAGE_TABS_CONFIG = {
   PRELIMINARY_SELECTION: [
     { key: 'main', label: '主要信息' },
+    { key: 'support', label: '支持性文件' },
   ],
   PROJECT_RESERVE: [
     { key: 'main', label: '主要信息' },
@@ -296,6 +304,34 @@ const STAGE_TABS_CONFIG = {
 
 const tabs = computed(() => STAGE_TABS_CONFIG[props.stage] || STAGE_TABS_CONFIG.PROJECT_RESERVE)
 const activeTabConfig = computed(() => tabs.value.find(t => t.key === activeTab.value) || {})
+
+const supportDocsData = computed(() => {
+  const provided = props.project?.supportDocs
+  if (provided && typeof provided === 'object') return provided
+
+  const rawFiles = Array.isArray(props.project?.fileCollection)
+    ? props.project.fileCollection
+    : []
+  const files = rawFiles.map((item) => ({
+    ...item,
+    tag: item.tag || item.fileTypeTag || item.fileBusinessType || '其他文件',
+    name: item.name || item.fileName || '未命名文件',
+    filePath: item.filePath || item.url || '',
+    updatedAt: item.updatedAt || item.updateTime || item.createTime || '',
+    operator: item.operator || item.creator || item.updater || '',
+  }))
+  const tags = [...new Set(files.map((item) => item.tag).filter(Boolean))]
+  return {
+    stages: ['全部'],
+    activeStage: '全部',
+    typeFilters: tags.map((tag, index) => ({
+      key: `support-type-${index}`,
+      label: tag,
+      color: index % 2 ? 'green' : 'pink',
+    })),
+    files,
+  }
+})
 
 watch(
   () => [props.visible, props.project?.id, props.initialTab],
