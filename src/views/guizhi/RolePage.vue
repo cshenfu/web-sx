@@ -71,6 +71,7 @@
         <template v-if="viewMode === 'table'">
           <div class="admin-table-area">
             <CommonTable
+              :action-width="120"
               :data="pagedTableData"
               :columns="columns"
               :total="filteredData.length"
