@@ -2,7 +2,7 @@
     <el-table
       ref="tableRef"
       :data="data"
-      :loading="loading"
+      v-loading="loading"
       border
       stripe
       :height="height"
@@ -66,7 +66,7 @@
   </template>
   
   <script setup>
-  import { ref, onMounted, nextTick } from 'vue'
+  import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
   import Sortable from 'sortablejs'
   
   const props = defineProps({
@@ -85,14 +85,23 @@
   const innerColumns = ref([...props.columns])
   const currentPage  = ref(1)
   const pageSize     = ref(20)
-  
+  let sortableInstance = null
+
+  watch(
+    () => props.columns,
+    (columns) => {
+      innerColumns.value = [...(columns || [])]
+    },
+    { deep: true }
+  )
+
   // ─── 列拖拽 ───────────────────────────────────────
   onMounted(() => {
     if (!props.draggable) return
     nextTick(() => {
       const tr = tableRef.value?.$el?.querySelector('.el-table__header-wrapper thead tr')
       if (!tr) return
-      Sortable.create(tr, {
+      sortableInstance = Sortable.create(tr, {
         animation: 200,
         filter: '.is-fixed',
         onEnd({ oldIndex, newIndex }) {
@@ -104,5 +113,10 @@
         }
       })
     })
+  })
+
+  onBeforeUnmount(() => {
+    sortableInstance?.destroy()
+    sortableInstance = null
   })
   </script>
