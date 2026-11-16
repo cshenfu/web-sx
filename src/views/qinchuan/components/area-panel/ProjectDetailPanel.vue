@@ -136,6 +136,138 @@ const mainTabs = [
 
 const activeTab = ref(props.initialTab || 'main')
 
+const reviewData = ref({ timeline: [], groups: [] })
+const reviewLoading = ref(false)
+let reviewRequestSeq = 0
+
+// 审查信息只展示当前项目阶段已经到达的阶段，不展示尚未发生的后续阶段。
+const REVIEW_STAGE_CONFIG = [
+  { stageCode: 'PROJECT_INITIATION', label: '立项', fileCode: 'PROJECT_INITIATION_MEETING_MATERIALS' },
+  { stageCode: 'FEASIBILITY_REVIEW', label: '可研审查', fileCode: 'FEASIBILITY_REVIEW' },
+  { stageCode: 'INVESTMENT_DECISION', label: '投资决策', fileCode: 'INVESTMENT_DECISION_MEETING_MATERIALS' },
+]
+const PROJECT_STAGE_ORDER = [
+  'PRELIMINARY_SELECTION',
+  'PROJECT_RESERVE',
+  'PROJECT_INITIATION',
+  'FEASIBILITY_REVIEW',
+  'INVESTMENT_DECISION',
+  'PROJECT_CONSTRUCTION',
+  'PROJECT_OPERATION',
+]
+
+function normalizeReviewFiles(record) {
+  let files = record?.fileUrlList
+  if (typeof files === 'string') {
+    try { files = JSON.parse(files) } catch { files = [] }
+  }
+  if (Array.isArray(files) && files.length) return files
+  if (record?.fileName || record?.filePath) {
+    return [{ fileName: record.fileName, filePath: record.filePath }]
+  }
+  return []
+}
+
+function formatReviewDate(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+async function loadReviewInfo() {
+  const projectId = props.project?.id
+  const currentStage = props.project?.projectStage || props.project?.stage || ''
+  const requestSeq = ++reviewRequestSeq
+
+  if (!projectId || !currentStage) {
+    reviewData.value = { timeline: [], groups: [] }
+    return
+  }
+
+  const currentIndex = PROJECT_STAGE_ORDER.indexOf(currentStage)
+  if (currentIndex < 0) {
+    reviewData.value = { timeline: [], groups: [] }
+    return
+  }
+
+  const completedReviewStages = REVIEW_STAGE_CONFIG.filter(
+    (item) => PROJECT_STAGE_ORDER.indexOf(item.stageCode) <= currentIndex
+  )
+
+  if (!completedReviewStages.length) {
+    reviewData.value = { timeline: [], groups: [] }
+    return
+  }
+
+  reviewLoading.value = true
+  try {
+    const results = await Promise.all(completedReviewStages.map(async (stage) => {
+      const res = await fileApi.getFileListByProjectid({
+        aiProjectId: projectId,
+        firstBusinessTitle: stage.fileCode,
+      })
+      const records = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res?.data?.list) ? res.data.list : []
+
+      const items = records.flatMap((record) => normalizeReviewFiles(record).map((file) => ({
+        tag: record.fileTypeTag || '审查文件',
+        org: record.organizationName || record.orgName || record.uploaderName || record.assignedUploaderName || '',
+        docNo: record.documentNo || record.docNo || '',
+        date: formatReviewDate(record.updateTime || record.createTime),
+        name: file.fileName || file.name || '未命名文件',
+        operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
+        updatedAt: formatReviewDate(record.updateTime || record.createTime),
+        filePath: file.filePath || file.url || '',
+      })))
+
+      const latestRecord = records.reduce((latest, record) => {
+        const time = new Date(record.updateTime || record.createTime || 0).getTime() || 0
+        const latestTime = latest ? new Date(latest.updateTime || latest.createTime || 0).getTime() || 0 : -1
+        return time > latestTime ? record : latest
+      }, null)
+
+      return {
+        key: stage.stageCode,
+        stage: stage.label,
+        date: formatReviewDate(latestRecord?.updateTime || latestRecord?.createTime),
+        items,
+      }
+    }))
+
+    if (requestSeq !== reviewRequestSeq) return
+    reviewData.value = {
+      timeline: results.map((group) => ({
+        key: group.key,
+        label: group.stage,
+        date: group.date || (group.items.length ? '已归档' : ''),
+      })),
+      groups: results,
+    }
+  } catch (err) {
+    if (requestSeq === reviewRequestSeq) {
+      console.error('[review] 加载审查信息失败:', err)
+      reviewData.value = {
+        timeline: completedReviewStages.map((stage) => ({ key: stage.stageCode, label: stage.label, date: '' })),
+        groups: completedReviewStages.map((stage) => ({ key: stage.stageCode, stage: stage.label, date: '', items: [] })),
+      }
+    }
+  } finally {
+    if (requestSeq === reviewRequestSeq) reviewLoading.value = false
+  }
+}
+
+watch(
+  () => [props.project?.id, props.project?.projectStage, props.project?.stage, activeTab.value, props.refreshKey],
+  ([, , , tab]) => {
+    if (tab === 'review') loadReviewInfo()
+  },
+  { immediate: true }
+)
+
+
 watch(() => [props.initialTab, props.refreshKey], ([tab]) => {
   if (mainTabs.some((item) => item.key === tab)) {
     activeTab.value = tab
