@@ -90,7 +90,7 @@ export function useReportPanelController(packageType) {
     if (!payload?.subTab) return
     const subTab = payload.subTab
     const project = payload.project || fallbackProject
-    const stage = project?.projectStage || project?.stage || ''
+    const stage = project?.projectStage || project?.stage || fallbackProject?.projectStage || fallbackProject?.stage || ''
 
     if (subTab === 'COMPETITIVE_ALLOCATION') {
       beforeOpen?.('generate')
