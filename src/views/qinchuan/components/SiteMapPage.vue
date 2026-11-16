@@ -290,6 +290,7 @@
       :project="selectedProject"
       :is-fullscreen="true"
       :initial-tab="detailTabMapped"
+      :initial-report-sub-tab="generatedReportSubTab"
       :refresh-key="detailRefreshKey"
       @back="showDetailPanel = false"
       @toggle-fullscreen="() => {}"
@@ -327,7 +328,7 @@
       :secondary-business-title="generatePanelSecondaryBusinessTitle"
       :file-type-tag="generatePanelFileTypeTag"
       :ai-detail="selectedProject"
-      @close="showGeneratePanel = false"
+      @close="handleGeneratePanelClose"
       @generated="onReportGenerated"
     />    
     
@@ -541,6 +542,9 @@ const reportKeyToWizardMode = {
 }
 // 顶部加
 const detailRefreshKey = ref(0)
+const generatedReportSubTab = ref('')
+const pendingGeneratedReport = ref(null)
+
 function handleOpenCompetitivePanel(project) {
   showGenerateModal.value = false
   reportPanels.openCompetitivePanel(project, selectedProject.value)
@@ -555,7 +559,7 @@ const TAB_KEY_MAP = {
   material: 'support',
   meeting:  'review',
 }
-const detailTabMapped = computed(() => TAB_KEY_MAP[detailPanelTab.value] || 'main')
+const detailTabMapped = computed(() => TAB_KEY_MAP[detailPanelTab.value] || (detailPanelTab.value === 'report' ? 'report' : 'main'))
 
 // ★ 当前项目 / 页面级 stage 是否为智能选址
 const isSmartSite = computed(() => {
@@ -1065,10 +1069,31 @@ function handleCreateReportFromDetail(payload) {
 
 
 
-function onReportGenerated() {
-  console.log('[site-map] 报告已生成')
-  // ★ 等后端落库再刷，避免接口抢先返回旧数据
-  window.setTimeout(() => { detailRefreshKey.value++ }, 300)
+function onReportGenerated(payload = {}) {
+  pendingGeneratedReport.value = {
+    project: payload.project || generatePanelProject.value || selectedProject.value,
+    reportType: payload.reportType || 'PROJECT_INITIATION',
+  }
+}
+
+function handleGeneratePanelClose() {
+  showGeneratePanel.value = false
+  const pending = pendingGeneratedReport.value
+  if (!pending) return
+
+  pendingGeneratedReport.value = null
+  const project = pending.project
+  if (project) {
+    selectedProject.value = allMapProjects.value.find(
+      (item) => String(item.id) === String(project.id)
+    ) || project
+  }
+
+  generatedReportSubTab.value = pending.reportType
+  detailPanelTab.value = 'report'
+  showSiteMapDetailPanel.value = false
+  showDetailPanel.value = true
+  nextTick(() => { detailRefreshKey.value++ })
 }
 
 async function fetchOverviewStats() {
