@@ -410,6 +410,7 @@ import { unwrapRoadResponse, buildRoadLineFeatures } from './js/roadGeoUtils'
 import { useProjectHover } from './js/useProjectHover'
 
 import ProjectWorkflowDialogs from './components/ProjectWorkflowDialogs.vue'
+import { useReportPanelController } from './js/useReportPanelController'
 import {
   ref, computed, reactive, watch, onMounted, onUnmounted, nextTick
 } from 'vue'
@@ -639,14 +640,13 @@ const hoveredPos = reactive({ x: 0, y: 0 })
 
 const { clearHoverHideTimer, clearHoverState, scheduleHoverHide, onHoverCardEnter, onHoverCardLeave } = useProjectHover(hoveredProject)
 
-const generatePanelSource = ref('')
-const generatePanelFirstBusinessTitle = ref('')
-const generatePanelSecondaryBusinessTitle = ref('')
-const generatePanelFileTypeTag = ref('')
-
-
-
-
+const reportPanels = useReportPanelController(PACKAGE_TYPE)
+const {
+  showGeneratePanel, generatePanelProject, generatePanelActionKey, generatePanelSubCode,
+  generatePanelSource, generatePanelFirstBusinessTitle, generatePanelSecondaryBusinessTitle,
+  generatePanelFileTypeTag, showAddReportPanel, showConfirmPanel, confirmReportId,
+  wizardVisible, wizardMode, wizardTitleLabel, wizardMaxStep, wizardReportSubTab,
+} = reportPanels
 
 const popoverActions = computed(() => {
   const actions = STAGE_ACTIONS[popoverProject.value?.projectStage] || STAGE_ACTIONS.PRELIMINARY_SELECTION
@@ -666,12 +666,6 @@ const actionMenuOpen = ref(false)
 const actionProject = ref(null)
 const showVerifyPanel = ref(false)
 const showSiteMapDetailPanel = ref(false)
-const showGeneratePanel = ref(false)
-const generatePanelProject = ref(null)
-const generatePanelActionKey = ref('')
-const generatePanelSubCode = ref('')
-// ★ 新增
-
 const showAssignDialog = ref(false)
 const showReserveDialog = ref(false)
 const showEditProject = ref(false)
@@ -679,14 +673,9 @@ const editProjectTarget = ref(null)
 const editProjectFormRef = ref(null)
 const refreshingActionProject = ref(false)
 const deleteConfirmOpen = ref(false)
-const wizardVisible = ref(false)
 const showCreateProject = ref(false)
 const createProjectFormRef = ref(null)
 const placeSearchKeyword = ref('')
-const showAddReportPanel = ref(false)
-const showConfirmPanel = ref(false)
-const confirmReportId = ref(null)
-
 const isActionPanelOpen = computed(() => (
   showEditProject.value ||
   showCreateProject.value ||   // ★ 新增：创建项目期间也视为面板打开
@@ -721,10 +710,6 @@ const editTools = [
   { key: 'unavailable', label: '设置不可用区域', icon: CircleClose },
 ]
 
-const wizardMode = ref(PACKAGE_TYPE.default)
-const wizardTitleLabel = ref('')
-const wizardMaxStep = ref(2)
-const wizardReportSubTab = ref('')
 const reportKeyToWizardMode = {
   'feasibility-centralized': PACKAGE_TYPE.default,
   'feasibility-distributed': PACKAGE_TYPE.distributedDefault,
@@ -762,98 +747,26 @@ const popoverAltCount = computed(() => {
 
 function handleOpenAddReport() {
   reportModalVisible.value = false
-  showAddReportPanel.value = true
+  reportPanels.openAddReport()
 }
 
 function handleOpenCompetitivePanel(project) {
   reportModalVisible.value = false
-  generatePanelProject.value = project
-  generatePanelActionKey.value = 'bidding'
-  generatePanelSubCode.value = ''
-  generatePanelSource.value = 'competitive-modal'
-  generatePanelFirstBusinessTitle.value = ''
-  generatePanelSecondaryBusinessTitle.value = ''
-  generatePanelFileTypeTag.value = ''
-  showGeneratePanel.value = true
+  reportPanels.openCompetitivePanel(project, activeProjectDetail.value)
 }
 
-
-// 打开 GenerateReportPanel（report-tab 的 subTab 都走这里）
-function openGeneratePanelFromReportTab(payload, { actionKey, fileTypeTag = '', firstBusinessTitle = '' }) {
-  generatePanelProject.value = payload.project || activeProjectDetail.value
-  generatePanelActionKey.value = actionKey
-  generatePanelSubCode.value = ''
-  generatePanelSource.value = 'report-tab'
-  generatePanelFirstBusinessTitle.value = firstBusinessTitle
-  generatePanelSecondaryBusinessTitle.value = ''
-  generatePanelFileTypeTag.value = fileTypeTag
-  showGeneratePanel.value = true
-  isDetailFullscreen.value = false
-}
-
-// 打开 ReportWizard（项目建议书 / 后评价）
-function openReportWizard(payload) {
-  const config = getReportConfigBySubTab(payload.subTab)
-  wizardMode.value = config.packageType
-  wizardTitleLabel.value = config.title
-  wizardMaxStep.value = config.maxStep
-  wizardReportSubTab.value = payload.subTab
-  wizardVisible.value = true
-  isDetailFullscreen.value = false
-}
-
-// ★ 统一分发：onSiteMapDetailAction / onDetailPanelAction 都调它
 function dispatchCreateReport(payload) {
-  if (!payload?.subTab) return
-  const subTab = payload.subTab
-  const project = payload.project || activeProjectDetail.value
-  const stage =
-    project?.projectStage ||
-    project?.stage ||
-    activeProjectDetail.value?.projectStage ||
-    activeProjectDetail.value?.stage ||
-    ''
-
-  switch (subTab) {
-    case 'COMPETITIVE_ALLOCATION':
-      return openGeneratePanelFromReportTab(payload, { actionKey: 'bidding' })
-
-    case 'FEASIBILITY_STUDY':
-      return openGeneratePanelFromReportTab(payload, {
-        actionKey: 'gen-report',
-        fileTypeTag: '可研审查报告',
-        firstBusinessTitle: 'PROJECT_FEASIBILITY_MATERIALS',
-      })
-
-    case 'PROJECT_INITIATION':
-      if (stage === 'INVESTMENT_DECISION') {
-        return openGeneratePanelFromReportTab(payload, {
-          actionKey: 'gen-invest-letter',
-          fileTypeTag: '投资决策请示函',
-          firstBusinessTitle: 'INVESTMENT_DECISION_MATERIALS',
-        })
-      }
-      return openGeneratePanelFromReportTab(payload, {
-        actionKey: 'gen-letter',
-        fileTypeTag: '立项请示函',
-        firstBusinessTitle: 'PROJECT_INITIATION_MATERIALS',
-      })
-
-    case 'PROJECT_PROPOSAL':
-    case 'POST_EVALUATION':
-    default:
-      return openReportWizard(payload)
-  }
+  return reportPanels.dispatchCreateReport(payload, activeProjectDetail.value, () => {
+    isDetailFullscreen.value = false
+  })
 }
+
 function handleReportPanelSuccess() {
   fetchMapProjects()
   fetchProjectList()
 }
 
-function handleOpenConfirm(reportId) {
-  confirmReportId.value = reportId
-  showConfirmPanel.value = true
-}
+function handleOpenConfirm(reportId) { reportPanels.openConfirm(reportId) }
 
 function handleConfirmSuccess() {
   fetchMapProjects()
@@ -1121,15 +1034,15 @@ async function onSiteMapDetailAction(payload) {
   }
 
   if (payload?.type === 'generate-report') {
-    generatePanelProject.value = payload.project || actionProject.value
-    generatePanelActionKey.value = payload.actionKey || ''
-    generatePanelSubCode.value = payload.subCode || ''
-    // ★ 新增：带上归档层级信息 + 来源标记
-    generatePanelSource.value = 'sitemap-detail'
-    generatePanelFirstBusinessTitle.value = payload.firstBusinessTitle || ''
-    generatePanelSecondaryBusinessTitle.value = payload.secondaryBusinessTitle || ''
-    generatePanelFileTypeTag.value = payload.fileTypeTag || ''
-    showGeneratePanel.value = true
+    reportPanels.openGeneratePanel({
+      project: payload.project || actionProject.value,
+      actionKey: payload.actionKey,
+      subCode: payload.subCode,
+      source: 'sitemap-detail',
+      firstBusinessTitle: payload.firstBusinessTitle,
+      secondaryBusinessTitle: payload.secondaryBusinessTitle,
+      fileTypeTag: payload.fileTypeTag,
+    })
     return
   }
 
@@ -1152,14 +1065,15 @@ async function onDetailPanelAction(payload) {
 
   // ============ 会议 tab 里点「生成 XXX 报告」 ============
   if (payload.type === 'generate-report') {
-    generatePanelProject.value = payload.project || activeProjectDetail.value
-    generatePanelActionKey.value = payload.actionKey || ''
-    generatePanelSubCode.value = payload.subCode || ''
-    generatePanelSource.value = 'sitemap-detail'
-    generatePanelFirstBusinessTitle.value = payload.firstBusinessTitle || ''
-    generatePanelSecondaryBusinessTitle.value = payload.secondaryBusinessTitle || ''
-    generatePanelFileTypeTag.value = payload.fileTypeTag || ''
-    showGeneratePanel.value = true
+    reportPanels.openGeneratePanel({
+      project: payload.project || activeProjectDetail.value,
+      actionKey: payload.actionKey,
+      subCode: payload.subCode,
+      source: 'sitemap-detail',
+      firstBusinessTitle: payload.firstBusinessTitle,
+      secondaryBusinessTitle: payload.secondaryBusinessTitle,
+      fileTypeTag: payload.fileTypeTag,
+    })
     return
   }
 
