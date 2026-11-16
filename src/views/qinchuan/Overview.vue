@@ -252,7 +252,7 @@
                 <span
                   class="project-name-link"
                   :title="row.projectName"
-                  @click="handleLocateProject(row)"
+                  @click="handleOpenDetailPanel(row)"
                 >
                   {{ row.projectName || '-' }}
                 </span>
