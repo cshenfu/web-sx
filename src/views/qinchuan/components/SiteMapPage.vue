@@ -685,8 +685,7 @@ const allMapProjects = ref([])
 const projectContext = useProjectContext()
 const {
   focusedProject: popoverProject,
-  selectedProject,
-  activeProject: currentProjectContext,
+  selectedProject
 } = projectContext
 const hoveredProject = ref(null)
 const hoveredPos = reactive({ x: 0, y: 0 })
