@@ -183,12 +183,14 @@ async function loadReviewInfo() {
 
   if (!projectId || !currentStage) {
     reviewData.value = { timeline: [], groups: [] }
+    reviewLoading.value = false
     return
   }
 
   const currentIndex = PROJECT_STAGE_ORDER.indexOf(currentStage)
   if (currentIndex < 0) {
     reviewData.value = { timeline: [], groups: [] }
+    reviewLoading.value = false
     return
   }
 
@@ -198,6 +200,7 @@ async function loadReviewInfo() {
 
   if (!completedReviewStages.length) {
     reviewData.value = { timeline: [], groups: [] }
+    reviewLoading.value = false
     return
   }
 
