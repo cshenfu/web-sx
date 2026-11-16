@@ -134,6 +134,7 @@
                 :is-fullscreen="isDetailFullscreen"
                 :stage="activeProjectDetail?.projectStage || activeProjectDetail?.stage || ''"
                 :initial-tab="detailPanelTab"
+                :initial-report-sub-tab="generatedReportSubTab"
                 :refresh-key="detailRefreshKey"
                 @toggle-fullscreen="isDetailFullscreen = !isDetailFullscreen"
                 @back="handleBackToList"
@@ -393,7 +394,7 @@
       :first-business-title="generatePanelFirstBusinessTitle"
       :secondary-business-title="generatePanelSecondaryBusinessTitle"
       :file-type-tag="generatePanelFileTypeTag"
-      @close="showGeneratePanel = false"
+      @close="handleGeneratePanelClose"
       @generated="onReportGenerated"
     />
     
@@ -593,10 +594,35 @@ const BASE_IMAGERY_LAYER_ID = 'sx-base-imagery-layer'
 const LOW_BASE_LAYER_ID = 'sx-world-preview-layer'
 // 加
 const detailRefreshKey = ref(0)
+const generatedReportSubTab = ref('')
+const pendingGeneratedReport = ref(null)
 
-function onReportGenerated() {
-  ElMessage.success('报告已生成并提交，可在右侧预览或下载')
-  window.setTimeout(() => { detailRefreshKey.value++ }, 300)
+function onReportGenerated(payload = {}) {
+  pendingGeneratedReport.value = {
+    project: payload.project || generatePanelProject.value || activeProjectDetail.value,
+    reportType: payload.reportType || 'PROJECT_INITIATION',
+  }
+}
+
+function handleGeneratePanelClose() {
+  showGeneratePanel.value = false
+  const pending = pendingGeneratedReport.value
+  if (!pending) return
+
+  pendingGeneratedReport.value = null
+  const project = pending.project
+  if (project) {
+    const resolvedProject = resolveMapProject(project)
+    selectedProject.value = resolvedProject
+    actionProject.value = resolvedProject
+    activeProjectDetail.value = { ...(activeProjectDetail.value || {}), ...resolvedProject }
+  }
+
+  generatedReportSubTab.value = pending.reportType
+  detailPanelTab.value = 'report'
+  showSiteMapDetailPanel.value = false
+  isDetailFullscreen.value = false
+  nextTick(() => { detailRefreshKey.value++ })
 }
 function syncLowLevelBase() {
   const map = mapRef.value?.getMap?.()
