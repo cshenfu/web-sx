@@ -281,13 +281,7 @@
       <CreateProjectForm ref="editProjectFormRef" :map-ref="mapRef" :panel-width="550" mode="edit" :project="editProjectTarget" @cancel="onEditProjectCancel" @saved="onProjectUpdated" />
     </section>
 
-    <VerifyPanel
-      v-if="showVerifyPanelFlag"
-      :visible="showVerifyPanel"
-      :project="selectedProject"
-      @close="showVerifyPanel = false"
-      @saved="onVerifySaved"
-    />
+    
     <ProjectDrawer :visible="showProjectDrawer" :list="projectList" :total="pagination.total" :page="pagination.page" :page-size="pagination.pageSize" :selected-id="popoverProject?.id ?? null" :loading="listLoading" :row-actions="rowActions" @close="showProjectDrawer = false" @select="focusProject" @action="handleDrawerAction" @page-change="handlePageChange" @size-change="handleSizeChange" @sort-change="handleDrawerSortChange" />
 
         <!-- ★ 1. 点击“项目名称”进的全量面板 -->
@@ -336,8 +330,28 @@
       @close="showGeneratePanel = false"
       @generated="onReportGenerated"
     />    
-    <AssignDialog v-model="showAssignDialog" :project="assignTargetProject" @success="onAssignSuccess" />
-    <ReserveApprovalDialog v-model="showReserveDialog" :project="selectedProject" @saved="onReserveSaved" />
+    
+    
+
+    <ProjectWorkflowDialogs
+      :visibility="{ verify: showVerifyPanel, assign: showAssignDialog, reserve: showReserveDialog, addReport: showAddReportPanel, confirm: showConfirmPanel }"
+      :verify-project="selectedProject"
+      :assign-project="assignTargetProject"
+      :reserve-project="selectedProject"
+      :report-project="selectedProject"
+      :report-id="confirmReportId"
+      :verify-mounted="showVerifyPanelFlag"
+      @close-verify="showVerifyPanel = false"
+      @verify-saved="onVerifySaved"
+      @update:assign="showAssignDialog = $event"
+      @assign-success="onAssignSuccess"
+      @update:reserve="showReserveDialog = $event"
+      @reserve-saved="onReserveSaved"
+      @close-add-report="showAddReportPanel = false"
+      @report-success="handleReportPanelSuccess"
+      @close-confirm="showConfirmPanel = false"
+      @confirm-success="handleConfirmSuccess"
+    />
 
     <ReportGenerateModal
       :visible="showGenerateModal"
@@ -350,19 +364,9 @@
       @open-add-report="handleOpenAddReport"
     />
 
-    <AddReportPanel
-      :visible="showAddReportPanel"
-      :project="selectedProject"
-      @close="showAddReportPanel = false"
-      @success="handleReportPanelSuccess"
-    />
+    
 
-    <ConfirmReportPanel
-      :visible="showConfirmPanel"
-      :report-id="confirmReportId"
-      @close="showConfirmPanel = false"
-      @success="handleConfirmSuccess"
-    />
+    
 
     <ReportWizard
       v-if="wizardVisible"
@@ -382,23 +386,21 @@
 </template>
 
 <script setup>
+import ProjectWorkflowDialogs from './ProjectWorkflowDialogs.vue'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, ArrowRight, CircleCheck, Edit, Files, Fold, InfoFilled, List, Location, LocationFilled, MapLocation, Plus, Search, Setting } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, CircleCheck, Fold, InfoFilled, List, Location, LocationFilled, MapLocation, Plus, Search, Setting } from '@element-plus/icons-vue'
 import MapGL from '@/components/MapGL.vue'
 import SearchBar from '@/components/common/SearchBar.vue'
 import CreateProjectForm from './Createprojectform.vue'
 import ConfigForm from './ConfigForm.vue'
 import TaskPanel from './TaskPanel.vue'
-import VerifyPanel from './VerifyPanel.vue'
 import ProjectDrawer from './ProjectDrawer.vue'
 import ProjectDetailPanel from './ProjectDetailPanel.vue'                                        // 简版（其他阶段）
 // ★ 全量 overview 详情面板（路径按你项目实际调整）
 import ProjectDetailPanelFull from './area-panel/ProjectDetailPanel.vue'
-import AssignDialog from './AssignDialog.vue'
 import GenerateReportPanel from './GenerateReportPanel.vue'
-import ReserveApprovalDialog from './ReserveApprovalDialog.vue'
 import ReportGenerateModal from './area-panel/ReportGenerateModal.vue'
 import ReportWizard from './report-wizard/ReportWizard.vue'
 import { PACKAGE_TYPE } from '../js/Reportwizardmockdata'
@@ -417,7 +419,7 @@ import shengyazhanIcon from '@/assets/img/mapIcon/syz.png'
 import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
 import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPanelConfig'
 import { attachSxLayers } from '@/components/site-map/attachSxLayers'
-import { addGradientExtrusion } from '@/utils/gradientExtrusion'
+
 import {
   getIconNaturalWidth,
   getCoordsBounds,
@@ -427,8 +429,6 @@ import {
 
 import { loadShaanxiProvince, loadShaanxiCities } from '@/utils/shaanxiBoundary'
 import { buildMainInfoFromAi } from '../js/aiProjectAdapter'
-import AddReportPanel from './area-panel/AddReportPanel.vue'
-import ConfirmReportPanel from './area-panel/ConfirmReportPanel.vue'
 import ProjectActionCard from './area-panel/ProjectActionCard.vue'
 
 const props = defineProps({
