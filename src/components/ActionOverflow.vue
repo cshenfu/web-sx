@@ -6,7 +6,12 @@ import { MoreFilled } from '@element-plus/icons-vue'
 function flattenActionNodes(nodes, result = []) {
   for (const node of nodes || []) {
     if (!isVNode(node) || node.type === Comment || node.type === Text) continue
-    if (node.type === Fragment && Array.isArray(node.children)) {
+    if (
+      (node.type === Fragment || node.type === 'div') &&
+      Array.isArray(node.children)
+    ) {
+      // 操作列通常会用 .operation-btn 之类的 div 包住多个按钮；
+      // 展开这类容器，按真实按钮数量计算，而不是把整个 div 当成一个操作。
       flattenActionNodes(node.children, result)
     } else {
       result.push(node)
