@@ -265,14 +265,18 @@ const emit = defineEmits(['save-draft', 'next', 'project-selected', 'map-data-up
 const hasSelectedProject = ref(false)
 const projectList = ref([])
 const loadingProject = ref(false)
-const selectedProjectId = ref(null)
+const selectedProjectId = ref(props.project?.aiProjectId ?? null)
 
 const reportList = ref([])
 const loadingReport = ref(false)
-const selectedReportId = ref(null)
+const selectedReportId = ref(props.project?.originalProjectId ?? null)
 
-const selectedProjectInfo = ref(null)
-const selectedReportInfo = ref(null)
+const selectedProjectInfo = ref(props.project?.sourceProjectInfo ?? null)
+const selectedReportInfo = ref(
+  props.project?.originalProjectId
+    ? { reportProjectId: props.project.originalProjectId }
+    : null
+)
 
 const fetchProjects = async (keyword = '') => {
   loadingProject.value = true
@@ -1305,12 +1309,15 @@ async function submitStep(isDraft) {
       if (!savedProjectId) throw new Error('未获取到保存后的项目ID，无法生成报告')
       
       // 💡 兼容多种情况获取 aiProjectId 和 originalProjectId
-      const aiProjectId = selectedProjectId.value || selectedProjectInfo.value?.id || props.project?.id || props.project?.aiProjectId
-      const originalProjectId = selectedReportId.value || selectedReportInfo.value?.reportProjectId || props.project?.reportProjectId
+      const aiProjectId = selectedProjectId.value || selectedProjectInfo.value?.id || props.project?.aiProjectId
+      const originalProjectId = selectedReportId.value || selectedReportInfo.value?.reportProjectId || props.project?.originalProjectId || props.project?.reportProjectId
       
       console.log('准备调用生成报告接口，参数检查:', { aiProjectId, originalProjectId, reviewProjectId: savedProjectId })
 
-      if (aiProjectId && originalProjectId) {
+      if (props.project?.reviewRelationId) {
+        // 编辑已有草稿时沿用原关联记录，避免重复创建关联。
+        console.log('当前为已有草稿编辑，跳过重复创建智能评审关联')
+      } else if (aiProjectId && originalProjectId) {
         const znpsRes = await createZNPSReport({
           aiProjectId: Number(aiProjectId),
           originalProjectId: String(originalProjectId),
