@@ -247,7 +247,7 @@
           <el-table-column label="所属" min-width="120" show-overflow-tooltip><template #default="{ row }">{{ row.managerCompany || '-' }}</template></el-table-column>
           <el-table-column label="负责人" width="90"><template #default="{ row }">{{ row.managerName || '-' }}</template></el-table-column>
           <el-table-column label="创建时间" width="170"><template #default="{ row }">{{ row.createTime || '-' }}</template></el-table-column>
-          <el-table-column label="操作" width="240" fixed="right">
+          <el-table-column label="操作" width="280" fixed="right">
             <template #default="{ row }">
               <ActionOverflow class="row-actions">
                 <el-button v-for="action in rowActions" :key="action" link :type="action === 'delete' ? 'danger' : 'primary'" size="small" @click="executeAction(action, row)">{{ ACTION_LABELS[action] || action }}</el-button>
