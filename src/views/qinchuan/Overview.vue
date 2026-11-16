@@ -898,6 +898,11 @@ async function handleOpenDetailPanel(item) {
   if (!item) return
   actionMenuOpen.value = false
 
+  // 从列表模式进入详情时，先切回地图模式，避免全屏列表继续覆盖地图。
+  viewMode.value = 'map'
+  listExpanded.value = false
+  isActionPanelOpen.value = false
+
   const p = resolveMapProject(item)
 
   // ★ 走完整"选中场区"流程：flyTo + 高亮场区 + 渲染风机/升压站 + 加载道路
