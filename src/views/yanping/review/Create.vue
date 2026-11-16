@@ -1,5 +1,5 @@
 <template>
-  <div class="create-layout-container">
+  <div class="create-layout-container" v-loading="draftLoading">
     <!-- 左侧面板：支持展开/收起 -->
     <div class="left-panel" :class="{ 'is-collapsed': isCollapsed }">
       <div class="panel-header">
@@ -28,7 +28,7 @@
 
       <div class="panel-body" v-show="!isCollapsed">
         <el-scrollbar>
-          <div class="form-wrapper">
+          <div v-if="draftReady" class="form-wrapper">
             <!-- 在 template 里的 StepOne 加上监听 -->
               <StepOne
                 v-show="currentStep === 0"
@@ -60,6 +60,7 @@
               @submit="handleSubmit"
             />
           </div>
+          <div v-else class="draft-loading-tip">正在加载草稿数据...</div>
         </el-scrollbar>
       </div>
 
@@ -108,8 +109,8 @@
 
 <script setup>
 // 这里保留你之前的逻辑即可，不需要修改
-import { ref, computed, reactive, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, reactive, onMounted, onUnmounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Back, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import MapGL from '@/components/MapGL.vue' 
@@ -127,6 +128,7 @@ import StepOne from './components/StepOne.vue'
 import StepTwo from './components/StepTwo.vue'
 import StepThree from './components/StepThree.vue'
 import { PACKAGE_TYPE } from '@/views/qinchuan/js/Reportwizardmockdata'
+import { getZNPSReport } from '@/api/modules/report'
 
 const props = defineProps({
   createProjectMode: { type: Number, default: PACKAGE_TYPE.default },
@@ -137,6 +139,10 @@ const props = defineProps({
 })
 
 const router = useRouter()
+const route = useRoute()
+const draftId = computed(() => String(route.query.draftId || '').trim())
+const draftLoading = ref(Boolean(draftId.value))
+const draftReady = ref(!draftId.value)
 const currentStep = ref(0)
 const isCollapsed = ref(false)
 const mapRef = ref(null)
@@ -179,7 +185,61 @@ const modeLabel = computed(() => {
   return '集中式'
 })
 
-const handleClose = () => router.push('/yanping/review/project')
+const handleClose = () => router.push(draftId.value ? '/yanping/review/draft' : '/yanping/review/project')
+
+function parseDraftValue(value) {
+  if (typeof value !== 'string') return value
+  try { return JSON.parse(value) } catch { return value }
+}
+
+function buildDraftProject(response) {
+  const detail = response?.data?.data || response?.data || {}
+  const reportParams = parseDraftValue(detail.reportParamResult) || {}
+  const candidates = [
+    detail.reviewProjectDetail, detail.projectDetail, detail.reviewProject, detail.project,
+    reportParams?.reviewProject, reportParams?.project, reportParams?.form, reportParams,
+  ]
+  const projectData = candidates.find((item) => item && typeof item === 'object' && (
+    item.projectName || item.currentProjectCapacity != null || item.totalProjectCapacity != null || item.id != null
+  )) || {}
+  return {
+    ...projectData,
+    ...detail,
+    ...projectData,
+    id: detail.reviewProjectId || detail.reviewProject?.id || projectData.id || route.query.reviewProjectId || undefined,
+    projectName: projectData.projectName || detail.reportProjectName || route.query.projectName || '',
+    projectCode: projectData.projectCode || detail.reportProjectCode || route.query.projectCode || '',
+    totalProjectCapacity: projectData.totalProjectCapacity ?? route.query.totalProjectCapacity ?? '',
+    currentProjectCapacity: projectData.currentProjectCapacity ?? route.query.currentProjectCapacity ?? '',
+    itemType: projectData.itemType ?? route.query.itemType ?? detail.reportItemType,
+    aiProjectId: detail.aiProjectId || projectData.aiProjectId,
+    reviewRelationId: detail.id || draftId.value,
+    uniqueIdentification: projectData.uniqueIdentification || ('review-draft-' + (detail.reviewProjectId || route.query.reviewProjectId || draftId.value)),
+  }
+}
+
+async function loadDraftForEdit() {
+  if (!draftId.value) return
+  draftLoading.value = true
+  draftReady.value = false
+  try {
+    const response = await getZNPSReport(draftId.value)
+    if (response?.code !== undefined && response.code !== 200 && response.code !== 0) {
+      throw new Error(response.msg || '获取草稿详情失败')
+    }
+    workingProject.value = { ...(props.project || {}), ...buildDraftProject(response) }
+    if (!workingProject.value.id) throw new Error('草稿详情中未返回项目ID，无法回显编辑')
+    ElMessage.success('草稿数据加载成功')
+  } catch (error) {
+    console.error('加载智能评审草稿失败:', error)
+    ElMessage.error(error?.message || '加载草稿失败')
+  } finally {
+    draftLoading.value = false
+    draftReady.value = true
+  }
+}
+
+onMounted(() => { void loadDraftForEdit() })
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value
