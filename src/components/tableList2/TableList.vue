@@ -25,7 +25,7 @@
             </template>
             <template #bodyCell="{ column, text, record, index }">
                 <template v-if="column.scopedSlots">
-                    <ActionOverflow v-if="isActionColumn(column)">
+                    <ActionOverflow v-if="isActionColumn(column)" class="operation-btn">
                         <slot
                             :name="column.scopedSlots"
                             v-bind="{ record, index }"
