@@ -212,7 +212,8 @@ function buildDraftProject(response) {
     totalProjectCapacity: projectData.totalProjectCapacity ?? route.query.totalProjectCapacity ?? '',
     currentProjectCapacity: projectData.currentProjectCapacity ?? route.query.currentProjectCapacity ?? '',
     itemType: projectData.itemType ?? route.query.itemType ?? detail.reportItemType,
-    aiProjectId: detail.aiProjectId || projectData.aiProjectId,
+    aiProjectId: detail.aiProjectId || projectData.aiProjectId || route.query.aiProjectId,
+    originalProjectId: detail.originalProjectId || projectData.originalProjectId || route.query.originalProjectId,
     reviewRelationId: detail.id || draftId.value,
     uniqueIdentification: projectData.uniqueIdentification || ('review-draft-' + (detail.reviewProjectId || route.query.reviewProjectId || draftId.value)),
   }
