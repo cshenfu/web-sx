@@ -40,7 +40,7 @@
     </nav>
 
     <div class="tab-content">
-      <MainInfoTab v-if="activeTab === 'main'" :data="project.mainInfo" />
+      <MainInfoTab v-if="activeTab === 'main'" v-loading="mainInfoLoading" :data="mainInfoData" />
       
       <SurveyInfoTab
         v-else-if="activeTab === 'survey'"
@@ -101,6 +101,7 @@ import ReviewInfoTab from './tabs/ReviewInfoTab.vue'
 import AddDataDialog from './AddDataDialog.vue'
 import AddImageDialog from './AddImageDialog.vue'
 import { getDataById, delItem } from '@/api/modules/newAPI'
+import { useProjectMainInfo } from '../js/useProjectMainInfo'
 import { useRouter } from 'vue-router'
 
 const props = defineProps({
@@ -120,6 +121,7 @@ defineEmits([
 ])
 
 const router = useRouter()
+const { mainInfo: mainInfoData, loading: mainInfoLoading } = useProjectMainInfo(computed(() => props.project))
 
 const mainTabs = [
   { key: 'main', label: '主要信息' },
