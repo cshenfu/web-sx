@@ -405,6 +405,7 @@
 
 <script setup>
 import { ensureOuterCCW, ensureHoleCW, smoothstep } from './js/mapGeometry'
+import { getProjectCoords, getProjectCentroid, buildWindFC, buildBoosterFC } from './js/projectGeoUtils'
 import { useProjectHover } from './js/useProjectHover'
 
 import ProjectWorkflowDialogs from './components/ProjectWorkflowDialogs.vue'
@@ -874,25 +875,6 @@ function onCityClick(feature) {
 function formatRegion(row) {
   const names = [row.cityName, row.districtName].filter(Boolean)
   return names.length ? names.join('/') : (row.address || '未知区域')
-}
-
-function getProjectCoords(project) {
-  return (project?.coordinate || [])
-    .map((c) => [Number(c.longitude), Number(c.latitude)])
-    .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))
-}
-
-function getProjectCentroid(project) {
-  let coords = getProjectCoords(project)
-  if (coords.length >= 2) {
-    const [fx, fy] = coords[0]
-    const [lx, ly] = coords[coords.length - 1]
-    if (fx === lx && fy === ly) coords = coords.slice(0, -1)
-  }
-  if (!coords.length) return null
-  let sumLng = 0, sumLat = 0
-  for (const [lng, lat] of coords) { sumLng += lng; sumLat += lat }
-  return [sumLng / coords.length, sumLat / coords.length]
 }
 
 function getProjectBounds(project) {
@@ -2116,39 +2098,6 @@ function buildAreaFeature(project) {
   return {
     type: 'Feature', properties: { projectId: project.id, projectCode: project.projectCode, projectName: project.projectName, itemType: project.itemType, projectStage: project.projectStage },
     geometry: { type: 'Polygon', coordinates: [coords] }
-  }
-}
-
-function buildWindFC(project) {
-  const normal = []
-  const reserve = []
-  for (const [index, point] of (project.windTurbinePoints || []).entries()) {
-    const lng = Number(point.longitude)
-    const lat = Number(point.latitude)
-    if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue
-    const isReserve = Number(point.isReserve) === 1
-    const feature = {
-      type: 'Feature',
-      properties: { projectId: project.id, index, isReserve: isReserve ? 1 : 0 },
-      geometry: { type: 'Point', coordinates: [lng, lat] },
-    }
-    ;(isReserve ? reserve : normal).push(feature)
-  }
-  return {
-    normal: { type: 'FeatureCollection', features: normal },
-    reserve: { type: 'FeatureCollection', features: reserve },
-  }
-}
-
-function buildBoosterFC(project) {
-  return {
-    type: 'FeatureCollection',
-    features: (project.boosterStationLocations || []).map((p, index) => {
-      if (!(p.isBest === true || Number(p.isBest) === 1)) return null
-      const lng = Number(p.lng); const lat = Number(p.lat)
-      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
-      return { type: 'Feature', properties: { projectId: project.id, index, isBest: true }, geometry: { type: 'Point', coordinates: [lng, lat] } }
-    }).filter(Boolean)
   }
 }
 
