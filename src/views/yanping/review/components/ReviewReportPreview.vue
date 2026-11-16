@@ -75,7 +75,7 @@ import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPane
 import { attachSxLayers } from '@/components/site-map/attachSxLayers'
 
 // 💡 引入查询接口
-import { getZNPSReport } from '@/api/modules/report' 
+import { getIntelligentReviewReportCalc } from '@/api/modules/report' 
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -153,25 +153,27 @@ const fetchAndRenderReport = async () => {
   loading.value = true
   hasGenerated.value = false
   try {
-    // 1. 请求报告参数（写死 id 用于测试，实际用 row.id）
-    const targetId = props.projectRow.id || 1 
-    const res = await getZNPSReport(targetId)
-    
-    let fillData = {}
-    
-    // 2. 解析参数
-    if (res?.code === 200 || res?.code === 0) {
-      const resultStr = res.data?.reportParamResult
-      if (resultStr) {
-        try {
-          fillData = JSON.parse(resultStr)
-        } catch (e) {
-          console.warn('解析 reportParamResult 失败，将使用空数据', e)
-        }
-      }
+    // 使用列表原始数据中的两个业务 ID 获取报告模板填充参数
+    const aiProjectId = props.projectRow?.aiProjectId
+    const reviewProjectId = props.projectRow?.reviewProjectId
+
+    if (!aiProjectId || !reviewProjectId) {
+      throw new Error('缺少 aiProjectId 或 reviewProjectId，无法获取智能评审报告参数')
     }
 
-    // 3. 模板渲染
+    const res = await getIntelligentReviewReportCalc({
+      aiProjectId,
+      reviewProjectId,
+    })
+
+    if (res?.code !== 200 && res?.code !== 0) {
+      throw new Error(res?.msg || '获取智能评审报告参数失败')
+    }
+
+    // 新接口 data 本身就是模板变量对应的填充对象，无需再解析 reportParamResult
+    const fillData = res?.data && typeof res.data === 'object' ? res.data : {}
+
+    // 模板渲染
     await renderTemplate(fillData)
 
   } catch (error) {
