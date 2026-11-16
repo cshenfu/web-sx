@@ -27,7 +27,7 @@
 
     <div class="file-list-header">
       <span class="file-list-title">文件列表</span>
-      <button type="button" class="add-btn" @click="$emit('add-data')">
+      <button type="button" class="add-btn" v-if="!readonly" @click="$emit('add-data')">
         添加数据
         <svg viewBox="0 0 16 16" class="add-icon"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
       </button>
@@ -37,7 +37,7 @@
       <FileListItem
         v-for="(file, idx) in filteredFiles"
         :key="idx"
-        :file="{ ...file, actions: ['download', 'edit', 'delete'] }"
+        :file="{ ...file, actions: readonly ? ['download'] : ['download', 'edit', 'delete'] }"
         @action="(action, f) => $emit('file-action', action, f)"
       />
       <div v-if="!filteredFiles.length" class="empty-state">暂无数据~</div>
@@ -51,6 +51,7 @@ import FileListItem from '../../shared/FileListItem.vue'
 
 const props = defineProps({
   data: { type: Object, default: () => ({}) },
+  readonly: { type: Boolean, default: false },
 })
 
 defineEmits(['add-data', 'file-action'])
