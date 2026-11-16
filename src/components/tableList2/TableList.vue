@@ -6,7 +6,7 @@
             :scroll="scrollData"
             ref="tableList"
             :dataSource="tableData"
-            :columns="tableColumn"
+            :columns="normalizedColumns"
             :pagination="false"
             v-bind="$attrs"
             :customRow="rowClick"
@@ -111,6 +111,11 @@
         const key = String(column.key || column.dataIndex || '').toLowerCase();
         return title.includes('操作') || key === 'action' || key === 'actions' || key === 'operation';
     };
+    const normalizedColumns = computed(() => (props.tableColumn || []).map((column) => {
+        if (!isActionColumn(column)) return column;
+        const width = Number.parseInt(column.width, 10) || 0;
+        return { ...column, width: Math.max(width, 260) };
+    }));
     const rowClick = (record, index) => {
         return {
             onclick: () => {
