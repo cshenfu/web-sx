@@ -371,7 +371,7 @@ const handleDelete = async (row) => {
     return
   }
   try {
-    await ElMessageBox.confirm('确定要删除该智能评审草稿吗？删除后不可恢复。', '提示', { type: 'warning' })
+    await ElMessageBox.confirm(isDraft.value ? '确定要删除该智能评审草稿吗？删除后不可恢复。' : '确定要删除该智能评审项目吗？删除后不可恢复。', '提示', { type: 'warning' })
     const response = await deleteZNPSReport(row.id)
     if (response?.code !== undefined && response.code !== 200 && response.code !== 0) {
       throw new Error(response.msg || '删除失败')
