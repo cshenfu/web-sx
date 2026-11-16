@@ -53,7 +53,7 @@
       
       <SupportDocsTab
         v-else-if="activeTab === 'support'"
-        :data="project.supportDocs"
+        :data="supportDocsData"
         @add-data="$emit('support-add-data')"
         @file-action="(...args) => $emit('support-file-action', ...args)"
       />
@@ -68,7 +68,7 @@
   @create="(payload) => $emit('create-report', payload)"
 />
       
-      <ReviewInfoTab v-else-if="activeTab === 'review'" :data="project.reviewInfo" />
+      <ReviewInfoTab v-else-if="activeTab === 'review'" :data="reviewData" v-loading="reviewLoading" />
     </div>
 
     <AddDataDialog
@@ -101,6 +101,8 @@ import ReviewInfoTab from './tabs/ReviewInfoTab.vue'
 import AddDataDialog from './AddDataDialog.vue'
 import AddImageDialog from './AddImageDialog.vue'
 import { getDataById, delItem } from '@/api/modules/newAPI'
+import * as fileApi from '@/api/modules/projectFile'
+import { buildSupportDocsData } from '../../js/supportDocsAdapter'
 import { useProjectMainInfo } from '../../js/useProjectMainInfo'
 import { useRouter } from 'vue-router'
 
@@ -122,6 +124,7 @@ defineEmits([
 
 const router = useRouter()
 const { mainInfo: mainInfoData, loading: mainInfoLoading } = useProjectMainInfo(computed(() => props.project))
+const supportDocsData = computed(() => buildSupportDocsData(props.project || {}))
 
 const mainTabs = [
   { key: 'main', label: '主要信息' },
@@ -336,9 +339,9 @@ watch(() => props.project?.id, (id) => { if (id) refreshSurveyData() })
   justify-content: space-between;
   margin: 0 16px;
   padding: 10px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.5);
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 .header-left { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 
