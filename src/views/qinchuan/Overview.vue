@@ -641,7 +641,9 @@ function handleGeneratePanelClose() {
 
   generatedReportSubTab.value = pending.reportType
   detailPanelTab.value = 'report'
-  showSiteMapDetailPanel.value = false
+  // 阶段面板中的报告/函件生成完成后，切换到通用项目详情面板的项目报告列表。
+  actionProject.value = project || activeProjectDetail.value
+  showSiteMapDetailPanel.value = true
   isDetailFullscreen.value = false
   nextTick(() => { detailRefreshKey.value++ })
 }
@@ -792,9 +794,14 @@ function handleOpenAddReport(payload = {}) {
   if (payload.project) activeProjectDetail.value = { ...(activeProjectDetail.value || {}), ...payload.project }
   generatedReportSubTab.value = payload.subTab || 'FEASIBILITY_STUDY'
   detailPanelTab.value = 'report'
-  showSiteMapDetailPanel.value = false
+  const targetProject = payload.project || activeProjectDetail.value
+  if (targetProject) {
+    actionProject.value = targetProject
+    selectedProject.value = resolveMapProject(targetProject)
+  }
+  // 从阶段面板进入时，先打开通用项目详情面板并定位到项目报告列表。
+  showSiteMapDetailPanel.value = true
   isDetailFullscreen.value = false
-  // “添加项目报告”应打开实际的报告上传抽屉，而不是仅切换详情 Tab。
   reportPanels.openAddReport()
   nextTick(() => { detailRefreshKey.value++ })
 }
