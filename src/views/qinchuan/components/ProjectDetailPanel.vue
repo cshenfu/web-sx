@@ -26,6 +26,7 @@
             <!-- 阶段推进按钮 -->
             <el-button
               v-if="advanceConfig"
+              class="advance-btn"
               size="small"
               type="primary"
               :disabled="!necessaryFilesDone"
@@ -507,10 +508,14 @@ watch(
   flex-shrink: 0;
 }
 
-.report-btn {
+ .report-btn,
+.advance-btn {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  justify-content: center;
+  min-width: 112px;
   padding: 0 16px;
   height: 36px;
   border: 1px solid #2563EB;
@@ -523,7 +528,8 @@ watch(
   white-space: nowrap;
   transition: background 0.2s;
 }
-.report-btn:hover { background: #eff6ff; }
+ .report-btn:hover { background: #eff6ff; }
+.advance-btn { margin: 0; font-size: 13px; font-weight: 500; border-radius: 6px; }
 .report-icon { width: 14px; height: 14px; }
 
 /* ================= 主 Tab 栏 ================= */
