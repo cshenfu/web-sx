@@ -787,9 +787,10 @@ const popoverAltCount = computed(() => {
   return pts.filter((p) => Number(p.isReserve) === 1).length
 })
 
-function handleOpenAddReport() {
+function handleOpenAddReport(payload = {}) {
   reportModalVisible.value = false
-  generatedReportSubTab.value = 'FEASIBILITY_STUDY'
+  if (payload.project) activeProjectDetail.value = { ...(activeProjectDetail.value || {}), ...payload.project }
+  generatedReportSubTab.value = payload.subTab || 'FEASIBILITY_STUDY'
   detailPanelTab.value = 'report'
   showSiteMapDetailPanel.value = false
   isDetailFullscreen.value = false
