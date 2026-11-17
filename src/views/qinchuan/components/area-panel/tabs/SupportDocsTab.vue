@@ -27,7 +27,7 @@
 
     <div class="file-list-header">
       <span class="file-list-title">文件列表</span>
-      <button type="button" class="add-btn" v-if="!readonly" @click="$emit('add-data')">
+      <button type="button" class="add-btn" v-if="!readonly" @click="$emit('add-data', activeStage)">
         添加数据
         <svg viewBox="0 0 16 16" class="add-icon"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
       </button>
