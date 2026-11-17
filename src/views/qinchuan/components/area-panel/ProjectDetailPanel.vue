@@ -57,6 +57,8 @@
         v-loading="supportLoading"
         @add-data="handleSupportAddData"
         @file-action="handleSupportFileAction"
+        @file-preview="handleSupportFilePreview"
+        @stage-change="handleSupportStageChange"
       />
       
 <ProjectReportTab
@@ -123,6 +125,16 @@
       </template>
     </el-dialog>
 
+    <el-dialog v-model="supportPdfVisible" :title="supportPreviewTitle" width="80%" top="5vh" append-to-body destroy-on-close>
+      <div v-loading="supportPreviewLoading" class="support-pdf-body">
+        <iframe v-if="supportPdfSrc" :src="supportPdfSrc" class="support-pdf-iframe" frameborder="0" />
+      </div>
+      <template #footer><el-button @click="supportPdfVisible = false">关闭</el-button></template>
+    </el-dialog>
+    <el-dialog v-model="supportDocxVisible" :title="supportPreviewTitle" width="80%" top="5vh" append-to-body destroy-on-close>
+      <div v-loading="supportPreviewLoading" class="support-docx-body"><div ref="supportDocxRef" class="support-docx-container" /></div>
+      <template #footer><el-button @click="supportDocxVisible = false">关闭</el-button></template>
+    </el-dialog>
     <FileUploadDialog
       :visible="supportUploadVisible"
       :tag-name="supportUploadTag"
@@ -137,7 +149,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, watch, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import MainInfoTab from './tabs/MainInfoTab.vue'
 import SurveyInfoTab from './tabs/SurveyInfoTab.vue'
@@ -152,6 +164,8 @@ import * as fileApi from '@/api/modules/projectFile'
 import { useProjectMainInfo } from '../../js/useProjectMainInfo'
 import { useRouter } from 'vue-router'
 import { useOssUpload } from '@/components/ossClient/index'
+import * as configApi from '@/api/modules/configData'
+import { renderAsync } from 'docx-preview'
 
 const props = defineProps({
   project: { type: Object, required: true },
@@ -175,23 +189,23 @@ const { mainInfo: mainInfoData, loading: mainInfoLoading } = useProjectMainInfo(
 const SUPPORT_DISPLAY_STAGES = [
   '全部',
   '立项阶段',
-  '投资决策阶段',
-  '建设准备阶段',
-  '建设实施阶段',
-  '竣工验收阶段',
+  '可研审查',
+  '投资决策',
+  '建设准备',
+  '建设实施',
+  '竣工验收',
   '投产运营',
 ]
 
 function getSupportDisplayStage(stage = {}) {
-  const code = String(stage.stageCode || '').toUpperCase()
-  const name = String(stage.stageDesc || stage.stageName || '').replace(/\s/g, '')
-  if (code.includes('RESERVE') || name.includes('项目储备') || name.includes('立项准备')) return '立项阶段'
-  if (code.includes('INITIATION') || name.includes('立项')) return '立项阶段'
-  if (code.includes('FEASIBILITY') || code.includes('INVESTMENT') || name.includes('可研') || name.includes('投决') || name.includes('投资决策')) return '投资决策阶段'
-  if (name.includes('建设准备')) return '建设准备阶段'
-  if (name.includes('建设实施')) return '建设实施阶段'
-  if (name.includes('竣工验收')) return '竣工验收阶段'
-  if (name.includes('投产运营')) return '投产运营'
+  const name = String(stage.name || stage.stageDesc || stage.stageName || '').replace(/\\s/g, '')
+  if (name.includes('储备') || name.includes('立项')) return '立项阶段'
+  if (name.includes('可研')) return '可研审查'
+  if (name.includes('投资决策') || name.includes('投决')) return '投资决策'
+  if (name.includes('建设准备')) return '建设准备'
+  if (name.includes('建设实施')) return '建设实施'
+  if (name.includes('竣工验收')) return '竣工验收'
+  if (name.includes('投产运营') || name.includes('运营')) return '投产运营'
   return ''
 }
 
@@ -201,25 +215,133 @@ const supportUploadVisible = ref(false)
 const supportUploadRecord = ref(null)
 const supportUploadFileCode = ref('')
 const supportUploadTag = ref('')
-const supportStageConfigs = ref([])
+const supportStageNodes = ref([])
+const supportStageTypes = ref([])
 const supportFileRecords = ref({})
+const supportCurrentStageNode = ref(null)
 const supportAddDialogVisible = ref(false)
 const supportSelectedDisplayStage = ref('')
 const supportSelectedStageCode = ref('')
 const supportSelectedFileCode = ref('')
 const supportAddStageLocked = ref(false)
 const supportUploadAppendMode = ref(false)
-const supportSelectedTypeOptions = computed(() => supportStageConfigs.value
-  .filter((stage) => !supportSelectedDisplayStage.value || getSupportDisplayStage(stage) === supportSelectedDisplayStage.value)
-  .flatMap((stage) => {
-    const children = stage.firstBusinessTitle || stage.children || []
-    return children.filter((item) => item.fileCode).map((item) => ({
-      ...item,
-      _stageCode: stage.stageCode || '',
-      _stageLabel: stage.stageDesc || stage.stageName || stage.stageCode || '',
+const supportSelectedTypeOptions = computed(() => supportStageTypes.value.map((item) => ({
+  ...item,
+  fileCode: item.fileCode || item.name || item.detailName,
+  fileDesc: item.fileDesc || item.detailName || item.name,
+  _stageCode: String(supportCurrentStageNode.value?.id || ''),
+  _stageLabel: supportSelectedDisplayStage.value,
+})))
+
+async function ensureSupportStageNodes() {
+  if (supportStageNodes.value.length) return supportStageNodes.value
+  const res = await configApi.getStageList()
+  const list = Array.isArray(res?.data) ? res.data : Array.isArray(res?.data?.list) ? res.data.list : []
+  supportStageNodes.value = list
+  return list
+}
+
+function findSupportStageNode(stageName) {
+  return supportStageNodes.value.find((node) => getSupportDisplayStage(node) === stageName) || null
+}
+
+function normalizeSupportRecords(res) {
+  if (Array.isArray(res?.data)) return res.data
+  if (Array.isArray(res?.data?.list)) return res.data.list
+  return []
+}
+
+async function handleSupportStageChange(stageName) {
+  const requestStage = stageName || '全部'
+  supportLoading.value = true
+  supportDocsData.value = { ...supportDocsData.value, activeStage: requestStage, typeFilters: [], files: [] }
+  supportStageTypes.value = []
+  supportFileRecords.value = {}
+  try {
+    const stages = await ensureSupportStageNodes()
+    const selectedNodes = requestStage === '全部'
+      ? stages
+      : [findSupportStageNode(requestStage)].filter(Boolean)
+    if (!selectedNodes.length) {
+      supportCurrentStageNode.value = null
+      return
+    }
+
+    const stageTypeGroups = await Promise.all(selectedNodes.map(async (node) => {
+      const res = await configApi.listByParentId(node.id)
+      const types = Array.isArray(res?.data) ? res.data : Array.isArray(res?.data?.list) ? res.data.list : []
+      return { node, types }
     }))
-  })
-})
+    const flattenedTypes = stageTypeGroups.flatMap(({ node, types }) => types.map((item) => ({
+      ...item,
+      _stageNode: node,
+      _stageDisplayName: getSupportDisplayStage(node),
+      fileCode: item.fileCode || item.name || item.detailName,
+      fileDesc: item.fileDesc || item.detailName || item.name,
+    })))
+    supportStageTypes.value = flattenedTypes
+    supportCurrentStageNode.value = selectedNodes.length === 1 ? selectedNodes[0] : null
+
+    const queried = await Promise.all(flattenedTypes.map(async (type) => {
+      const fileCode = type.fileCode
+      if (!fileCode) return { type, records: [] }
+      const res = await fileApi.getFileListByProjectid({
+        aiProjectId: props.project.id,
+        firstBusinessTitle: fileCode,
+      })
+      return { type, records: normalizeSupportRecords(res) }
+    }))
+    const recordsByCode = {}
+    const files = queried.flatMap(({ type, records }) => {
+      recordsByCode[type.fileCode] = records
+      return records.flatMap((record) => {
+        let fileList = record.fileUrlList
+        if (typeof fileList === 'string') { try { fileList = JSON.parse(fileList) } catch { fileList = [] } }
+        if (!Array.isArray(fileList) || !fileList.length) {
+          fileList = record.fileName || record.filePath ? [{ fileName: record.fileName, filePath: record.filePath }] : []
+        }
+        return fileList.map((file) => ({
+          id: record.id,
+          stage: type._stageDisplayName || requestStage,
+          stageCode: String(type._stageNode?.id || ''),
+          fileCode: type.fileCode,
+          tag: record.fileTypeTag || type.fileDesc || '其他文件',
+          name: file.fileName || file.name || '未命名文件',
+          filePath: file.filePath || file.url || '',
+          updatedAt: record.updateTime || record.createTime || '',
+          operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
+          record,
+          rawFile: file,
+        }))
+      })
+    })
+    supportFileRecords.value = recordsByCode
+    supportDocsData.value = {
+      stages: SUPPORT_DISPLAY_STAGES,
+      activeStage: requestStage,
+      typeFilters: flattenedTypes.map((item) => ({
+        key: String(item.id ?? item.fileCode),
+        label: item.detailName || item.name || item.fileDesc || item.fileCode,
+        color: 'pink',
+      })),
+      files,
+    }
+  } catch (err) {
+    console.error('[support] 加载支持性文件失败:', err)
+    ElMessage.error('支持性文件加载失败')
+    supportDocsData.value = { stages: SUPPORT_DISPLAY_STAGES, activeStage: requestStage, typeFilters: [], files: [] }
+  } finally {
+    supportLoading.value = false
+  }
+}
+
+async function loadSupportDocs() {
+  if (!props.project?.id) {
+    supportDocsData.value = { stages: SUPPORT_DISPLAY_STAGES, activeStage: '全部', typeFilters: [], files: [] }
+    return
+  }
+  await handleSupportStageChange(supportDocsData.value.activeStage || '全部')
+}
 
 function resetSupportAddSelection() {
   supportSelectedDisplayStage.value = ''
@@ -232,21 +354,21 @@ function handleSupportAddData(stageName) {
   const selectedStage = SUPPORT_DISPLAY_STAGES.includes(stageName) && stageName !== '全部' ? stageName : ''
   supportSelectedDisplayStage.value = selectedStage
   supportSelectedStageCode.value = ''
-  supportAddStageLocked.value = Boolean(selectedStage)
   supportSelectedFileCode.value = ''
+  supportAddStageLocked.value = Boolean(selectedStage)
   supportAddDialogVisible.value = true
+  if (selectedStage) handleSupportStageChange(selectedStage)
 }
 
-function confirmSupportAddType() {
-  const [selectedFileCode, selectedEnumStageCode] = supportSelectedFileCode.value.split('::')
+async function confirmSupportAddType() {
+  const [selectedFileCode, selectedStageId] = supportSelectedFileCode.value.split('::')
   const type = supportSelectedTypeOptions.value.find((item) =>
-    item.fileCode === selectedFileCode && item._stageCode === selectedEnumStageCode
+    item.fileCode === selectedFileCode && item._stageCode === selectedStageId
   )
   if (!type) {
     ElMessage.warning('请选择支持性文件类型')
     return
   }
-
   const existingRecords = supportFileRecords.value[type.fileCode] || []
   supportUploadRecord.value = existingRecords[0] || null
   supportUploadFileCode.value = type.fileCode
@@ -451,12 +573,11 @@ function handleSupportFileAction(action, file) {
   if (action === 'download') {
     const path = file?.filePath
     if (!path) { ElMessage.warning('该文件缺少下载路径'); return }
-    Promise.resolve(ossUpload.getFileUrl(path)).then((url) => {
+    ossUpload.getFileUrl(path).then((url) => {
       if (!url) throw new Error('获取下载地址失败')
       const link = document.createElement('a')
       link.href = url
-      link.download = file.name || ''
-      link.target = '_blank'
+      link.download = file.name || '文件'
       link.rel = 'noopener'
       document.body.appendChild(link)
       link.click()
@@ -501,6 +622,64 @@ function handleSupportFileAction(action, file) {
       .catch(() => {})
   }
 }
+
+async function handleSupportFilePreview(file) {
+  const path = file?.filePath
+  if (!path) { ElMessage.warning('该文件缺少预览路径'); return }
+  try {
+    const url = await ossUpload.getFileUrl(path)
+    if (!url) throw new Error('获取预览地址失败')
+    const ext = String(file.name || path).split('?')[0].split('.').pop().toLowerCase()
+    supportPreviewTitle.value = file.name || '文件预览'
+    if (ext === 'pdf') {
+      supportPdfVisible.value = true
+      supportPreviewLoading.value = true
+      supportPdfSrc.value = ''
+      await nextTick()
+      const response = await fetch(url, { mode: 'cors' })
+      if (!response.ok) throw new Error('PDF 文件读取失败')
+      const blob = new Blob([await response.blob()], { type: 'application/pdf' })
+      supportPdfSrc.value = URL.createObjectURL(blob)
+    } else if (ext === 'docx') {
+      supportDocxVisible.value = true
+      supportPreviewLoading.value = true
+      await nextTick()
+      const response = await fetch(url, { mode: 'cors' })
+      if (!response.ok) throw new Error('DOCX 文件读取失败')
+      const blob = await response.blob()
+      if (supportDocxRef.value) {
+        supportDocxRef.value.innerHTML = ''
+        await renderAsync(blob, supportDocxRef.value, undefined, {
+          className: 'docx-preview', inWrapper: true,
+          ignoreLastRenderedPageBreak: true, experimental: true,
+          useBase64URL: true, breakPages: true,
+        })
+      }
+    } else if (ext === 'doc') {
+      window.open(`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`, '_blank')
+    } else {
+      window.open(url, '_blank')
+    }
+  } catch (err) {
+    console.error('[support] 文件预览失败:', err)
+    ElMessage.warning(err?.message || '文件预览失败')
+  } finally {
+    supportPreviewLoading.value = false
+  }
+}
+
+const supportPdfVisible = ref(false)
+const supportDocxVisible = ref(false)
+const supportPreviewTitle = ref('文件预览')
+const supportPreviewLoading = ref(false)
+const supportPdfSrc = ref('')
+const supportDocxRef = ref(null)
+watch(supportPdfVisible, (visible) => {
+  if (!visible && supportPdfSrc.value) {
+    URL.revokeObjectURL(supportPdfSrc.value)
+    supportPdfSrc.value = ''
+  }
+})
 
 async function handleReviewFileAction(action, item) {
   handleSupportFileAction(action, {
