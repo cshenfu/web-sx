@@ -157,7 +157,7 @@ const reviewData = ref({ timeline: [], groups: [] })
 const reviewLoading = ref(false)
 let reviewRequestSeq = 0
 
-// 审查信息只展示当前项目阶段已经到达的阶段，不展示尚未发生的后续阶段。
+// 审查信息始终展示完整阶段序列；未到达阶段保留节点，日期与文件内容为空。
 const REVIEW_STAGE_CONFIG = [
   { stageCode: 'PRELIMINARY_SELECTION', label: '初步选址', fileCode: '' },
   { stageCode: 'PROJECT_RESERVE', label: '项目储备', fileCode: '' },
