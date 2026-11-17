@@ -529,7 +529,8 @@ watch(
   transition: background 0.2s;
 }
  .report-btn:hover { background: #eff6ff; }
-.advance-btn { margin: 0; font-size: 13px; font-weight: 500; border-radius: 6px; }
+ .advance-btn { margin: 0; color: #fff; background: #2563EB; border-color: #2563EB; font-size: 13px; font-weight: 500; border-radius: 6px; }
+.advance-btn:hover { color: #fff; background: #1D4ED8; border-color: #1D4ED8; }
 .report-icon { width: 14px; height: 14px; }
 
 /* ================= 主 Tab 栏 ================= */
