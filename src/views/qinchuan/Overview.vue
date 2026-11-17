@@ -789,7 +789,11 @@ const popoverAltCount = computed(() => {
 
 function handleOpenAddReport() {
   reportModalVisible.value = false
-  reportPanels.openAddReport()
+  generatedReportSubTab.value = 'FEASIBILITY_STUDY'
+  detailPanelTab.value = 'report'
+  showSiteMapDetailPanel.value = false
+  isDetailFullscreen.value = false
+  nextTick(() => { detailRefreshKey.value++ })
 }
 
 function handleOpenCompetitivePanel(project) {
