@@ -55,7 +55,7 @@
         v-else-if="activeTab === 'support'"
         :data="supportDocsData"
         v-loading="supportLoading"
-        @add-data="$emit('support-add-data')"
+        @add-data="handleSupportAddData"
         @file-action="handleSupportFileAction"
       />
       
@@ -88,12 +88,48 @@
       :tower-file-name="addImageTowerFileName"
       @success="refreshSurveyData"
     />
+    <el-dialog
+      v-model="supportAddDialogVisible"
+      title="添加支持性文件"
+      width="460px"
+      :close-on-click-modal="false"
+      @closed="resetSupportAddSelection"
+    >
+      <el-form label-position="top">
+        <el-form-item label="项目阶段" required>
+          <el-select v-model="supportSelectedStageCode" placeholder="请选择项目阶段" style="width: 100%" :disabled="supportAddStageLocked">
+            <el-option
+              v-for="stage in supportStageConfigs"
+              :key="stage.stageCode"
+              :label="stage.stageDesc || stage.stageName || stage.stageCode"
+              :value="stage.stageCode"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="支持性文件类型" required>
+          <el-select v-model="supportSelectedFileCode" placeholder="请先选择项目阶段" style="width: 100%" :disabled="!supportSelectedStageCode">
+            <el-option
+              v-for="item in supportSelectedTypeOptions"
+              :key="item.fileCode"
+              :label="item.fileDesc || item.fileCode"
+              :value="item.fileCode"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="supportAddDialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!supportSelectedStageCode || !supportSelectedFileCode" @click="confirmSupportAddType">下一步</el-button>
+      </template>
+    </el-dialog>
+
     <FileUploadDialog
       :visible="supportUploadVisible"
       :tag-name="supportUploadTag"
       :project="project"
       :file-code="supportUploadFileCode"
       :record="supportUploadRecord"
+      :append-mode="supportUploadAppendMode"
       @close="supportUploadVisible = false"
       @saved="handleSupportUploadSaved"
     />
@@ -142,6 +178,50 @@ const supportUploadVisible = ref(false)
 const supportUploadRecord = ref(null)
 const supportUploadFileCode = ref('')
 const supportUploadTag = ref('')
+const supportStageConfigs = ref([])
+const supportFileRecords = ref({})
+const supportAddDialogVisible = ref(false)
+const supportSelectedStageCode = ref('')
+const supportSelectedFileCode = ref('')
+const supportAddStageLocked = ref(false)
+const supportUploadAppendMode = ref(false)
+const supportSelectedTypeOptions = computed(() => {
+  const stage = supportStageConfigs.value.find((item) => item.stageCode === supportSelectedStageCode.value)
+  const children = stage?.firstBusinessTitle || stage?.children || []
+  return children.filter((item) => item.fileCode)
+})
+
+function resetSupportAddSelection() {
+  supportSelectedStageCode.value = ''
+  supportSelectedFileCode.value = ''
+  supportAddStageLocked.value = false
+}
+
+function handleSupportAddData(stageName) {
+  const selectedStage = supportStageConfigs.value.find((item) =>
+    (item.stageDesc || item.stageName || item.stageCode) === stageName
+  )
+  supportSelectedStageCode.value = selectedStage?.stageCode || ''
+  supportAddStageLocked.value = Boolean(selectedStage)
+  supportSelectedFileCode.value = ''
+  supportAddDialogVisible.value = true
+}
+
+function confirmSupportAddType() {
+  const type = supportSelectedTypeOptions.value.find((item) => item.fileCode === supportSelectedFileCode.value)
+  if (!type) {
+    ElMessage.warning('请选择支持性文件类型')
+    return
+  }
+
+  const existingRecords = supportFileRecords.value[type.fileCode] || []
+  supportUploadRecord.value = existingRecords[0] || null
+  supportUploadFileCode.value = type.fileCode
+  supportUploadTag.value = type.fileDesc || '支持性文件'
+  supportUploadAppendMode.value = true
+  supportAddDialogVisible.value = false
+  supportUploadVisible.value = true
+}
 
 const mainTabs = [
   { key: 'main', label: '主要信息' },
@@ -278,6 +358,7 @@ async function loadSupportDocs() {
   try {
     const enumRes = await fileApi.getFileType()
     const stageConfigs = Array.isArray(enumRes?.data) ? enumRes.data : []
+    supportStageConfigs.value = stageConfigs
     const queryTasks = stageConfigs.flatMap((stage) => {
       const businessList = stage.firstBusinessTitle || stage.children || []
       return businessList.filter((business) => business.fileCode).map(async (business) => {
@@ -286,30 +367,35 @@ async function loadSupportDocs() {
           firstBusinessTitle: business.fileCode,
         })
         const records = Array.isArray(res?.data) ? res.data : Array.isArray(res?.data?.list) ? res.data.list : []
-        return records.flatMap((record) => {
-          let fileList = record.fileUrlList
-          if (typeof fileList === 'string') { try { fileList = JSON.parse(fileList) } catch { fileList = [] } }
-          if (!Array.isArray(fileList) || !fileList.length) {
-            fileList = record.fileName || record.filePath ? [{ fileName: record.fileName, filePath: record.filePath }] : []
-          }
-          return fileList.map((file) => ({
-            id: record.id,
-            stage: stage.stageDesc || stage.stageName || stage.stageCode || '其他阶段',
-            stageCode: stage.stageCode || '',
-            fileCode: business.fileCode,
-            tag: record.fileTypeTag || business.fileDesc || '其他文件',
-            name: file.fileName || file.name || '未命名文件',
-            filePath: file.filePath || file.url || '',
-            updatedAt: record.updateTime || record.createTime || '',
-            operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
-            record,
-            rawFile: file,
-          }))
-        })
+        return { fileCode: business.fileCode, records, stage, business }
       })
     })
-    const nested = await Promise.all(queryTasks)
-    const files = nested.flat()
+    const queried = await Promise.all(queryTasks)
+    const recordsByCode = {}
+    const files = queried.flatMap(({ fileCode, records, stage, business }) => {
+      recordsByCode[fileCode] = records
+      return records.flatMap((record) => {
+        let fileList = record.fileUrlList
+        if (typeof fileList === 'string') { try { fileList = JSON.parse(fileList) } catch { fileList = [] } }
+        if (!Array.isArray(fileList) || !fileList.length) {
+          fileList = record.fileName || record.filePath ? [{ fileName: record.fileName, filePath: record.filePath }] : []
+        }
+        return fileList.map((file) => ({
+          id: record.id,
+          stage: stage.stageDesc || stage.stageName || stage.stageCode || '其他阶段',
+          stageCode: stage.stageCode || '',
+          fileCode,
+          tag: record.fileTypeTag || business.fileDesc || '其他文件',
+          name: file.fileName || file.name || '未命名文件',
+          filePath: file.filePath || file.url || '',
+          updatedAt: record.updateTime || record.createTime || '',
+          operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
+          record,
+          rawFile: file,
+        }))
+      })
+    })
+    supportFileRecords.value = recordsByCode
     const stages = ['全部', ...new Set(stageConfigs.map((s) => s.stageDesc || s.stageName || s.stageCode).filter(Boolean))]
     const tags = [...new Set(files.map((file) => file.tag).filter(Boolean))]
     supportDocsData.value = {
@@ -346,6 +432,7 @@ function handleSupportFileAction(action, file) {
     return
   }
   if (action === 'edit') {
+    supportUploadAppendMode.value = false
     supportUploadRecord.value = { ...record }
     supportUploadFileCode.value = file.fileCode || record.firstBusinessTitle || ''
     supportUploadTag.value = file.tag || record.fileTypeTag || '文件'
@@ -392,6 +479,7 @@ async function handleReviewFileAction(action, item) {
 
 async function handleSupportUploadSaved() {
   supportUploadVisible.value = false
+  supportUploadAppendMode.value = false
   await loadSupportDocs()
 }
 
