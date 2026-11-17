@@ -199,7 +199,7 @@ const SUPPORT_DISPLAY_STAGES = [
 ]
 
 function getSupportDisplayStage(stage = {}) {
-  const name = String(stage.name || stage.stageDesc || stage.stageName || '').replace(/\\s/g, '')
+  const name = String(stage.name || stage.stageDesc || stage.stageName || '').replace(/\s/g, '')
   if (name.includes('储备') || name.includes('立项')) return '立项阶段'
   if (name.includes('可研')) return '可研审查'
   if (name.includes('投资决策') || name.includes('投决')) return '投资决策'
@@ -323,6 +323,7 @@ async function handleSupportStageChange(stageName) {
       typeFilters: flattenedTypes.map((item) => ({
         key: String(item.id ?? item.fileCode),
         label: item.detailName || item.name || item.fileDesc || item.fileCode,
+        fileCode: item.fileCode,
         color: 'pink',
       })),
       files,
