@@ -468,17 +468,24 @@ function normalizeBool(v) {
   return v === 1 || v === '1' || v === true || v === 'true'
 }
 
-function normalizeExistingFileList(value) {
-  if (Array.isArray(value)) return value
-  if (typeof value === 'string') {
+function normalizeExistingFileList(record) {
+  let files = record?.fileUrlList
+  if (typeof files === 'string') {
     try {
-      const parsed = JSON.parse(value)
-      return Array.isArray(parsed) ? parsed : []
+      files = JSON.parse(files)
     } catch {
-      return []
+      files = []
     }
   }
-  return []
+  if (Array.isArray(files) && files.length) return files
+  if (record?.fileName || record?.filePath) {
+    return [{
+      fileName: record.fileName || '',
+      filePath: record.filePath || '',
+      fileSuffix: record.fileSuffix || '',
+    }]
+  }
+  return Array.isArray(files) ? files : []
 }
 
 async function handleSave() {
@@ -520,7 +527,7 @@ async function handleSave() {
         notes: props.record.notes,
         recognitionContent, // ★ 记录级 AiProjectFileSaveReqVO.recognitionContent
         fileUrlList: props.appendMode
-          ? [...normalizeExistingFileList(props.record.fileUrlList), newFile]
+          ? [...normalizeExistingFileList(props.record), newFile]
           : [newFile],
       }
       res = await updateFile(payload)
