@@ -107,7 +107,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="支持性文件类型" required>
-          <el-select v-model="supportSelectedFileCode" placeholder="请先选择项目阶段" style="width: 100%" :disabled="!supportSelectedStageCode">
+          <el-select v-model="supportSelectedFileCode" placeholder="请先选择项目阶段" style="width: 100%" :disabled="!supportSelectedDisplayStage">
             <el-option
               v-for="item in supportSelectedTypeOptions"
               :key="`${item._stageCode}-${item.fileCode}`"
@@ -119,7 +119,7 @@
       </el-form>
       <template #footer>
         <el-button @click="supportAddDialogVisible = false">取消</el-button>
-        <el-button type="primary" :disabled="!supportSelectedStageCode || !supportSelectedFileCode" @click="confirmSupportAddType">下一步</el-button>
+        <el-button type="primary" :disabled="!supportSelectedDisplayStage || !supportSelectedFileCode" @click="confirmSupportAddType">下一步</el-button>
       </template>
     </el-dialog>
 
@@ -186,8 +186,8 @@ function getSupportDisplayStage(stage = {}) {
   const code = String(stage.stageCode || '').toUpperCase()
   const name = String(stage.stageDesc || stage.stageName || '').replace(/\s/g, '')
   if (code.includes('RESERVE') || name.includes('项目储备') || name.includes('立项准备')) return '立项阶段'
-  if (code.includes('INITIATION') || name === '立项' || name.includes('立项材料')) return '立项阶段'
-  if (code.includes('FEASIBILITY') || code.includes('INVESTMENT') || name.includes('可研') || name.includes('投决')) return '投资决策阶段'
+  if (code.includes('INITIATION') || name.includes('立项')) return '立项阶段'
+  if (code.includes('FEASIBILITY') || code.includes('INVESTMENT') || name.includes('可研') || name.includes('投决') || name.includes('投资决策')) return '投资决策阶段'
   if (name.includes('建设准备')) return '建设准备阶段'
   if (name.includes('建设实施')) return '建设实施阶段'
   if (name.includes('竣工验收')) return '竣工验收阶段'
