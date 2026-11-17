@@ -166,6 +166,7 @@ const requiredItems = computed(() =>
 const otherMaterials = computed(() =>
   fileList.value
     .filter(r => !isRequired(r))
+    .filter(r => !(isFeasibilityStage.value && String(r.fileTypeTag || '').includes('可研报告')))
     .map(r => ({
       key: r.id,
       label: r.fileTypeTag || '-',
