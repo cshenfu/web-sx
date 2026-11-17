@@ -59,7 +59,7 @@ const emit = defineEmits(['add-data', 'file-action', 'file-preview', 'stage-chan
 
 // ★ 归一化：无论父组件传不传 / 传什么，都保证 4 个字段有兜底
 const safeData = computed(() => ({
-  stages: ['全部', '立项阶段', '投资决策阶段', '建设准备阶段', '建设实施阶段', '竣工验收阶段', '投产运营'],
+  stages: ['全部', '立项阶段', '可研审查', '投资决策', '建设准备', '建设实施', '竣工验收', '投产运营'],
   activeStage: '全部',
   typeFilters: [],
   files: [],
@@ -89,8 +89,9 @@ const filteredFiles = computed(() => {
     files = files.filter((file) => file.stage === activeStage.value)
   }
   if (!activeFilter.value) return files
-  const label = (safeData.value.typeFilters || []).find((f) => f.key === activeFilter.value)?.label
-  return label ? files.filter((file) => file.tag === label) : files
+  const selectedType = (safeData.value.typeFilters || []).find((f) => f.key === activeFilter.value)
+  if (!selectedType) return files
+  return files.filter((file) => file.fileCode === selectedType.fileCode || file.tag === selectedType.label)
 })
 </script>
 
