@@ -27,7 +27,7 @@
 
       <div class="upload-section">
         <div class="upload-hint">
-          支持 docx 支持 doc、docx、pdf 格式数据导入，每次只能选择一种类型并导入最多1个文件（系统会自动解析文档，请确认解析的内容）
+          支持 docx 支持 doc、docx、pdf 格式数据导入，支持一次选择多个文件，系统会逐份上传并自动解析（系统会自动解析文档，请确认解析的内容）
         </div>
         
         <div class="upload-action">
@@ -147,7 +147,7 @@ async function handleSave() {
     if (typeof aiProjectApi.uploadReport !== 'function') throw new Error('找不到 uploadReport 接口')
     const reportType = props.reportType || activeReportTab.value
     let successCount = 0
-    for (const file of currentFiles.value) {
+    for (const file of [...currentFiles.value]) {
       const uploadRes = await ossUpload.uploadFile(file)
       const fileUrl = uploadRes?.obsPath || uploadRes?.url || ''
       if (!fileUrl) throw new Error('文件「' + file.name + '」上传后未获取到文件地址')
@@ -161,15 +161,19 @@ async function handleSave() {
         reportType,
       }
       const res = await aiProjectApi.uploadReport(payload)
-      if (res?.code === 200 || res?.code === '200' || res?.success) successCount++
-      else throw new Error(res?.msg || '「' + file.name + '」保存失败')
+      if (res?.code === 200 || res?.code === '200' || res?.success) {
+        successCount++
+        currentFiles.value = currentFiles.value.filter(item => item !== file)
+      } else {
+        throw new Error(res?.msg || '「' + file.name + '」保存失败')
+      }
     }
     ElMessage.success('成功添加 ' + successCount + ' 份报告')
     emit('success', { reportType, project: props.project, count: successCount })
-    currentFiles.value = []
-    emit('close')
+    if (!currentFiles.value.length) emit('close')
   } catch (err) {
     console.error('【AddReportPanel】异常详情:', err)
+    if (successCount > 0) emit('success', { reportType: props.reportType || activeReportTab.value, project: props.project, count: successCount })
     ElMessage.error(err?.message || '报告上传失败')
   } finally {
     saving.value = false
