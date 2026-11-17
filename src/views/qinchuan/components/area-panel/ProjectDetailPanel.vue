@@ -115,6 +115,7 @@ import FileUploadDialog from '../FileUploadDialog.vue'
 import * as fileApi from '@/api/modules/projectFile'
 import { useProjectMainInfo } from '../../js/useProjectMainInfo'
 import { useRouter } from 'vue-router'
+import { useOssUpload } from '@/components/ossClient/index'
 
 const props = defineProps({
   project: { type: Object, required: true },
@@ -133,6 +134,7 @@ defineEmits([
 ])
 
 const router = useRouter()
+const ossUpload = useOssUpload()
 const { mainInfo: mainInfoData, loading: mainInfoLoading } = useProjectMainInfo(computed(() => props.project))
 const supportDocsData = ref({ stages: ['全部'], activeStage: '全部', typeFilters: [], files: [] })
 const supportLoading = ref(false)
@@ -337,7 +339,17 @@ function handleSupportFileAction(action, file) {
   if (action === 'download') {
     const path = file?.filePath
     if (!path) { ElMessage.warning('该文件缺少下载路径'); return }
-    window.open(path, '_blank', 'noopener')
+    Promise.resolve(ossUpload.getFileUrl(path)).then((url) => {
+      if (!url) throw new Error('获取下载地址失败')
+      const link = document.createElement('a')
+      link.href = url
+      link.download = file.name || ''
+      link.target = '_blank'
+      link.rel = 'noopener'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }).catch((err) => ElMessage.error(err?.message || '文件下载失败'))
     return
   }
   if (action === 'edit') {
@@ -351,6 +363,14 @@ function handleSupportFileAction(action, file) {
     if (!record.id) { ElMessage.warning('缺少文件记录，无法删除'); return }
     ElMessageBox.confirm('确认删除该文件吗？', '提示', { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' })
       .then(async () => {
+        let currentFiles = record.fileUrlList
+        if (typeof currentFiles === 'string') { try { currentFiles = JSON.parse(currentFiles) } catch { currentFiles = [] } }
+        currentFiles = Array.isArray(currentFiles) ? currentFiles : []
+        const target = file.rawFile || {}
+        const remainingFiles = currentFiles.filter((item) =>
+          !((target.filePath && item.filePath === target.filePath) ||
+            (!target.filePath && target.fileName && item.fileName === target.fileName))
+        )
         await fileApi.updateFile({
           id: record.id,
           aiProjectId: record.aiProjectId ?? props.project?.id,
@@ -360,7 +380,7 @@ function handleSupportFileAction(action, file) {
           isRequiredUpload: record.isRequiredUpload === 1 || record.isRequiredUpload === '1' || record.isRequiredUpload === true,
           notes: record.notes,
           recognitionContent: {},
-          fileUrlList: [],
+          fileUrlList: remainingFiles,
         })
         ElMessage.success('删除成功')
         await loadSupportDocs()
