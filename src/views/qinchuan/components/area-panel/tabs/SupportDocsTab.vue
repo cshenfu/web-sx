@@ -58,8 +58,8 @@ defineEmits(['add-data', 'file-action'])
 
 // ★ 归一化：无论父组件传不传 / 传什么，都保证 4 个字段有兜底
 const safeData = computed(() => ({
-  stages: [],
-  activeStage: '',
+  stages: ['全部', '立项阶段', '投资决策阶段', '建设准备阶段', '建设实施阶段', '竣工验收阶段', '投产运营'],
+  activeStage: '全部',
   typeFilters: [],
   files: [],
   ...(props.data || {}),
