@@ -141,12 +141,12 @@ async function handleSave() {
     ElMessage.error('缺少项目 ID，无法上传报告')
     return
   }
+  let successCount = 0
+  const reportType = props.reportType || activeReportTab.value
   try {
     saving.value = true
     if (!ossUpload || typeof ossUpload.uploadFile !== 'function') throw new Error('OSS 上传组件未正确初始化')
     if (typeof aiProjectApi.uploadReport !== 'function') throw new Error('找不到 uploadReport 接口')
-    const reportType = props.reportType || activeReportTab.value
-    let successCount = 0
     for (const file of [...currentFiles.value]) {
       const uploadRes = await ossUpload.uploadFile(file)
       const fileUrl = uploadRes?.obsPath || uploadRes?.url || ''
