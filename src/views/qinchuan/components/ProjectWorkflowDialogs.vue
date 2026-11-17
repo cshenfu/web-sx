@@ -24,6 +24,7 @@
   <AddReportPanel
     :visible="visibility.addReport"
     :project="reportProject"
+    :report-type="reportType"
     @close="$emit('close-add-report')"
     @success="$emit('report-success', $event)"
   />
@@ -58,6 +59,7 @@ defineProps({
   assignProject: { type: Object, default: null },
   reserveProject: { type: Object, default: null },
   reportProject: { type: Object, default: null },
+  reportType: { type: String, default: '' },
   reportId: { type: [String, Number], default: null },
   verifyMounted: { type: Boolean, default: true },
 })
