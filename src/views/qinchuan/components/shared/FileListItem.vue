@@ -11,9 +11,15 @@
           <span v-if="file.date" class="meta-inline muted">| {{ file.date }}</span>
         </div>
     
-        <div v-if="file.name" class="file-item-name" :title="file.name">
+        <button
+          v-if="file.name"
+          type="button"
+          class="file-item-name file-name-preview"
+          :title="file.name"
+          @click.stop="$emit('preview', file)"
+        >
           {{ file.name }}
-        </div>
+        </button>
     
         <div v-if="file.description" class="file-item-desc">
           {{ file.description }}
@@ -80,7 +86,7 @@
       },
     })
     
-    const emit = defineEmits(['action', 'click'])
+    const emit = defineEmits(['action', 'click', 'preview'])
     
     const actionLabels = {
       download: '下载',
@@ -156,6 +162,12 @@
     }
     
     .file-item-name {
+      display: block;
+      width: 100%;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      text-align: left;
       overflow: hidden;
       margin-top: 6px;
       color: #effbff;
@@ -164,6 +176,8 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .file-name-preview { cursor: pointer; }
+    .file-name-preview:hover { color: #52c1ff; text-decoration: underline; }
     
     .file-item-desc {
       margin-top: 6px;
