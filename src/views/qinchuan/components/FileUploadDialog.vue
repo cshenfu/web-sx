@@ -521,7 +521,7 @@ async function handleSave() {
         id: props.record.id,
         aiProjectId: props.project?.id,
         firstBusinessTitle: props.record.firstBusinessTitle || props.fileCode,
-        secondaryBusinessTitle: props.record.secondaryBusinessTitle || props.secondaryBusinessTitle,
+        secondaryBusinessTitle: props.secondaryBusinessTitle || props.record.secondaryBusinessTitle || '',
         fileTypeTag: props.record.fileTypeTag || props.tagName,
         isRequiredUpload: normalizeBool(props.record.isRequiredUpload),
         notes: props.record.notes,
@@ -535,7 +535,7 @@ async function handleSave() {
       const payload = {
         aiProjectId: props.project?.id,
         firstBusinessTitle: props.fileCode,
-        secondaryBusinessTitle: props.secondaryBusinessTitle,
+        secondaryBusinessTitle: props.secondaryBusinessTitle || '',
         fileTypeTag: props.tagName,
         isRequiredUpload: false,
         recognitionContent, // ★ 记录级
