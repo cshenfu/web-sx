@@ -503,68 +503,6 @@ async function loadReviewInfo() {
   }
 }
 
-async function loadSupportDocs() {
-  if (!props.project?.id) {
-    supportDocsData.value = { stages: SUPPORT_DISPLAY_STAGES, activeStage: '全部', typeFilters: [], files: [] }
-    return
-  }
-  supportLoading.value = true
-  try {
-    const enumRes = await fileApi.getFileType()
-    const stageConfigs = Array.isArray(enumRes?.data) ? enumRes.data : []
-    supportStageConfigs.value = stageConfigs
-    const queryTasks = stageConfigs.flatMap((stage) => {
-      const businessList = stage.firstBusinessTitle || stage.children || []
-      return businessList.filter((business) => business.fileCode).map(async (business) => {
-        const res = await fileApi.getFileListByProjectid({
-          aiProjectId: props.project.id,
-          firstBusinessTitle: business.fileCode,
-        })
-        const records = Array.isArray(res?.data) ? res.data : Array.isArray(res?.data?.list) ? res.data.list : []
-        return { fileCode: business.fileCode, records, stage, business }
-      })
-    })
-    const queried = await Promise.all(queryTasks)
-    const recordsByCode = {}
-    const files = queried.flatMap(({ fileCode, records, stage, business }) => {
-      recordsByCode[fileCode] = records
-      return records.flatMap((record) => {
-        let fileList = record.fileUrlList
-        if (typeof fileList === 'string') { try { fileList = JSON.parse(fileList) } catch { fileList = [] } }
-        if (!Array.isArray(fileList) || !fileList.length) {
-          fileList = record.fileName || record.filePath ? [{ fileName: record.fileName, filePath: record.filePath }] : []
-        }
-        return fileList.map((file) => ({
-          id: record.id,
-          stage: getSupportDisplayStage(stage) || '其他阶段',
-          stageCode: stage.stageCode || '',
-          fileCode,
-          tag: record.fileTypeTag || business.fileDesc || '其他文件',
-          name: file.fileName || file.name || '未命名文件',
-          filePath: file.filePath || file.url || '',
-          updatedAt: record.updateTime || record.createTime || '',
-          operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
-          record,
-          rawFile: file,
-        }))
-      })
-    })
-    supportFileRecords.value = recordsByCode
-    const tags = [...new Set(files.map((file) => file.tag).filter(Boolean))]
-    supportDocsData.value = {
-      stages: SUPPORT_DISPLAY_STAGES,
-      activeStage: SUPPORT_DISPLAY_STAGES.includes(supportDocsData.value.activeStage) ? supportDocsData.value.activeStage : '全部',
-      typeFilters: tags.map((label, index) => ({ key: 'support-type-' + index, label, color: index % 2 ? 'green' : 'pink' })),
-      files,
-    }
-  } catch (err) {
-    console.error('[support] 加载支持性文件失败:', err)
-    ElMessage.error('支持性文件加载失败')
-    supportDocsData.value = { stages: SUPPORT_DISPLAY_STAGES, activeStage: '全部', typeFilters: [], files: [] }
-  } finally {
-    supportLoading.value = false
-  }
-}
 
 function handleSupportFileAction(action, file) {
   const record = file?.record || {}
