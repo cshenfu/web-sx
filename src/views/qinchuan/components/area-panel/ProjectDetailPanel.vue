@@ -642,10 +642,13 @@ watch(() => props.project?.id, (id) => { if (id) refreshSurveyData() })
 }
 .icon-btn:hover { color: #2563EB; border-color: #2563EB; background: #fff; }
 
-.report-btn {
+ .report-btn {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  justify-content: center;
+  min-width: 112px;
   padding: 0 16px;
   height: 36px;
   border: none;
