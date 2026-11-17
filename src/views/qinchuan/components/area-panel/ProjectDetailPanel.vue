@@ -151,7 +151,14 @@ const mainTabs = [
   { key: 'review', label: '审查信息' },
 ]
 
-const activeTab = ref(props.initialTab || 'main')
+const validMainTabKeys = new Set(mainTabs.map((tab) => tab.key))
+const activeTab = ref(validMainTabKeys.has(props.initialTab) ? props.initialTab : 'main')
+
+// 面板由地图弹窗切换打开时，父级可能仍保留上一次的 tab；
+// 每次收到新的初始 tab 都校验，非法/空值统一回到“主要信息”。
+watch(() => props.initialTab, (tab) => {
+  activeTab.value = validMainTabKeys.has(tab) ? tab : 'main'
+}, { immediate: true })
 
 const reviewData = ref({ timeline: [], groups: [] })
 const reviewLoading = ref(false)
