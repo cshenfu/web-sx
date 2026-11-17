@@ -1019,7 +1019,8 @@ async function openDetailPanel(project, tab) {
     console.warn('[site-map] AI 详情加载失败:', err)
   }
 
-  detailPanelTab.value = tab
+  detailPanelTab.value = TAB_KEY_MAP[tab] || (['main', 'survey', 'support', 'report', 'review'].includes(tab) ? tab : 'main')
+  generatedReportSubTab.value = ''
   showSiteMapDetailPanel.value = false // ★ 互斥
   showDetailPanel.value = true         // ★ 打开全量
 }
@@ -1031,7 +1032,8 @@ async function openSiteMapDetailPanel(project, tab = 'main') {
   await onProjectClick(p.id)
   
   selectedProject.value = p
-  detailPanelTab.value = tab
+  detailPanelTab.value = TAB_KEY_MAP[tab] || (['main', 'survey', 'support', 'report', 'review'].includes(tab) ? tab : 'main')
+  generatedReportSubTab.value = ''
   showDetailPanel.value = false        // ★ 互斥
   showSiteMapDetailPanel.value = true  // ★ 打开简版
 }
