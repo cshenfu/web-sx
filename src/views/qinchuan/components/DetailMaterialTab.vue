@@ -1,5 +1,16 @@
 <template>
   <div v-loading="loading" class="material-tab">
+    <!-- 可研报告固定入口，不依赖材料类型字典 -->
+    <div v-if="isFeasibilityStage" class="section">
+      <div class="section-header">
+        <span class="section-title">可研报告</span>
+        <div class="feasibility-report-actions">
+          <el-button link type="primary" size="small" @click="emit('generate-feasibility-report')">一键生成可研报告</el-button>
+          <el-button link type="primary" size="small" @click="emit('upload-feasibility-report')">选择可研报告</el-button>
+        </div>
+      </div>
+    </div>
+
     <!-- 必要材料 -->
     <div class="section">
       <div class="section-header">
@@ -113,9 +124,10 @@ const props = defineProps({
   stageCode: { type: String, default: '' },
 })
 
-const emit = defineEmits(['open-setting', 'upload', 'deleted'])
+const emit = defineEmits(['open-setting', 'upload', 'deleted', 'generate-feasibility-report', 'upload-feasibility-report'])
 
 const ossUpload = useOssUpload()
+const isFeasibilityStage = computed(() => props.stageCode === 'FEASIBILITY_REVIEW')
 
 const loading = ref(false)
 const fileList = ref([])
@@ -137,6 +149,7 @@ function normalizeRecord(r) {
 const requiredItems = computed(() =>
   fileList.value
     .filter(isRequired)
+    .filter(r => !(isFeasibilityStage.value && String(r.fileTypeTag || '').includes('可研报告')))
     .map(r => ({
       key: r.id,
       label: r.fileTypeTag || '-',
@@ -349,6 +362,8 @@ defineExpose({ loadFiles })
   color: #909399;
   font-size: 12px;
 }
+ .feasibility-report-actions { display: flex; align-items: center; gap: 12px; }
+
 .file-actions {
   display: flex;
   gap: 12px;
