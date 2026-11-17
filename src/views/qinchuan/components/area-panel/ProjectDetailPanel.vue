@@ -287,9 +287,8 @@ async function handleSupportStageChange(stageName) {
     supportStageTypes.value = allStageTypes
     supportCurrentStageNode.value = selectedNodes.length === 1 ? selectedNodes[0] : null
 
-    const queryTypes = requestStage === '全部'
-      ? flattenedTypes
-      : allStageTypes
+    // 文件记录仍按“阶段 + 类型”逐项查询；仅类型筛选列表做并集去重。
+    const queryTypes = allStageTypes
     const queried = await Promise.all(queryTypes.map(async (type) => {
       const fileCode = type.fileCode
       if (!fileCode) return { type, records: [] }
