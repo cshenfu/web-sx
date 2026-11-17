@@ -79,6 +79,8 @@
             @open-setting="openSetting"
             @upload="handleUpload"
             @deleted="handleFileDeleted"
+            @generate-feasibility-report="emit('action', { type: 'generate-feasibility-report', project })"
+            @upload-feasibility-report="emit('action', { type: 'upload-feasibility-report', project })"
           />
           
           <DetailMeetingTab
