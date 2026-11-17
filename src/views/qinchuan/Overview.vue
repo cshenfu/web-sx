@@ -333,6 +333,7 @@
       :assign-project="actionProject"
       :reserve-project="actionProject"
       :report-project="activeProjectDetail"
+      :report-type="addReportType"
       :report-id="confirmReportId"
       :verify-mounted="true"
       @close-verify="showVerifyPanel = false"
@@ -679,6 +680,7 @@ const listExpanded = ref(false)
 const activeAreaId = ref(null)
 const activeProjectDetail = ref(projectDetailMockData)
 const reportModalVisible = ref(false)
+const addReportType = ref('')
 const detailLoading = ref(false)
 const detailPanelTab = ref('main')
 
@@ -820,6 +822,8 @@ function dispatchCreateReport(payload) {
 function handleReportPanelSuccess() {
   fetchMapProjects()
   fetchProjectList()
+  detailRefreshKey.value++
+  addReportType.value = ''
 }
 
 function handleOpenConfirm(reportId) { reportPanels.openConfirm(reportId) }
@@ -1105,9 +1109,21 @@ async function onSiteMapDetailAction(payload) {
   }
 
   if (payload?.type === 'create-report') {
-    // ★ 不再直接 openWizard，改成分发
     dispatchCreateReport(payload)
     showSiteMapDetailPanel.value = false
+    return
+  }
+  if (payload?.type === 'generate-feasibility-report') {
+    reportPanels.openWizard('FEASIBILITY_STUDY', payload.project || actionProject.value || activeProjectDetail.value, {
+      packageType: 'default', title: '一键生成集中式可行性研究报告', maxStep: 2,
+    })
+    return
+  }
+  if (payload?.type === 'upload-feasibility-report') {
+    const project = payload.project || actionProject.value || activeProjectDetail.value
+    if (project) { activeProjectDetail.value = { ...(activeProjectDetail.value || {}), ...project }; actionProject.value = project }
+    addReportType.value = 'FEASIBILITY_STUDY'
+    reportPanels.openAddReport()
     return
   }
 }
@@ -1138,6 +1154,18 @@ async function onDetailPanelAction(payload) {
   // ============ 报告列表 tab 里点「创建 XXX」 ============
   if (payload.type === 'create-report') {
     dispatchCreateReport(payload)
+    return
+  }
+  if (payload.type === 'generate-feasibility-report') {
+    reportPanels.openWizard('FEASIBILITY_STUDY', payload.project || activeProjectDetail.value, {
+      packageType: 'default', title: '一键生成集中式可行性研究报告', maxStep: 2,
+    })
+    return
+  }
+  if (payload.type === 'upload-feasibility-report') {
+    if (payload.project) activeProjectDetail.value = { ...(activeProjectDetail.value || {}), ...payload.project }
+    addReportType.value = 'FEASIBILITY_STUDY'
+    reportPanels.openAddReport()
     return
   }
 
