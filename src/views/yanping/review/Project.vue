@@ -182,7 +182,8 @@ const mapStatus = (reportProjectStatus) => {
     '1': { status: 'planning', statusText: '计划中' },
     '2': { status: 'queueing', statusText: '排队中' },
     '3': { status: 'queueing', statusText: '排队中' },
-    '4': { status: 'completed', statusText: '已完成' }
+    '4': { status: 'completed', statusText: '已完成' },
+    '9': { status: 'completed', statusText: '计算完成' }
   }
   return map[reportProjectStatus] || { status: 'planning', statusText: '计划中' }
 }

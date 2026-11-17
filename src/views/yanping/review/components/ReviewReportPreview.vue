@@ -154,7 +154,8 @@ const fetchAndRenderReport = async () => {
   hasGenerated.value = false
   try {
     // 1. 请求报告参数（写死 id 用于测试，实际用 row.id）
-    const targetId = props.projectRow.id || 1 
+    const targetId = props.projectRow.reviewProjectId || ''
+    console.log(props.projectRow)
     const res = await getZNPSReport(targetId)
     
     let fillData = {}

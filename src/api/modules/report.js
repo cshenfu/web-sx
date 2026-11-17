@@ -65,3 +65,9 @@ export async function getZNPSPage(data) {
 export async function getCompanyData(id) {
     return await publicService4.post(`/api/shanxi/report/enterprise-info/calc?enterpriseId=${id}`);
 }
+
+
+// 项目评审参数获取
+export async function getZNPSReportData(data) {
+    return await publicService4.get(`/api/reviewRelation/get/${id}`);
+}
