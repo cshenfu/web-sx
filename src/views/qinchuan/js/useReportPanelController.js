@@ -101,12 +101,13 @@ export function useReportPanelController(packageType) {
       return openGenerateFromReportTab(payload, { actionKey: 'bidding' }, fallbackProject)
     }
     if (subTab === 'FEASIBILITY_STUDY') {
-      beforeOpen?.('generate')
-      return openGenerateFromReportTab(payload, {
-        actionKey: 'gen-report',
-        fileTypeTag: '可研审查报告',
-        firstBusinessTitle: 'PROJECT_FEASIBILITY_MATERIALS',
-      }, fallbackProject)
+      // 项目报告列表为空时，默认进入集中式可研报告向导。
+      beforeOpen?.('wizard')
+      return openWizard('FEASIBILITY_STUDY', project, {
+        packageType: 'default',
+        title: '一键生成集中式可行性研究报告',
+        maxStep: 2,
+      })
     }
     if (subTab === 'PROJECT_INITIATION') {
       beforeOpen?.('generate')
