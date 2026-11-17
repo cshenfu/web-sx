@@ -26,6 +26,7 @@
             <!-- 阶段推进按钮 -->
             <el-button
               v-if="advanceConfig"
+              class="advance-btn"
               size="small"
               type="primary"
               :disabled="!necessaryFilesDone"
@@ -59,9 +60,16 @@
         <div class="panel-body">
           <MainInfoTab
             v-if="activeTab === 'main'"
-            :data="project?.mainInfo || project"
+            v-loading="mainInfoLoading"
+            :data="mainInfoData"
           />
           
+          <SupportDocsTab
+            v-else-if="activeTab === 'support'"
+            :data="supportDocsData"
+            readonly
+          />
+
           <DetailMaterialTab
             v-else-if="activeTab === 'material' || activeTab === 'invest-material'"
             ref="materialTabRef"
@@ -126,7 +134,9 @@ import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 
-import MainInfoTab from './area-panel/tabs/MainInfoTab.vue' 
+import MainInfoTab from './area-panel/tabs/MainInfoTab.vue'
+import SupportDocsTab from './area-panel/tabs/SupportDocsTab.vue'
+import { useProjectMainInfo } from '../js/useProjectMainInfo'
 import ProjectReportTab from './area-panel/tabs/ProjectReportTab.vue'
 import DetailMaterialTab from './DetailMaterialTab.vue'
 import DetailMeetingTab from './DetailMeetingTab.vue'
@@ -135,6 +145,7 @@ import FileUploadDialog from './FileUploadDialog.vue'
 import MeetingMinutesUploadDialog from './MeetingMinutesUploadDialog.vue'
 import * as api from '@/api/modules/project'
 import * as fileApi from '@/api/modules/projectFile'
+import { buildSupportDocsData } from '../js/supportDocsAdapter'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -147,6 +158,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'action', 'generate-report'])
 const router = useRouter()
+const { mainInfo: mainInfoData, loading: mainInfoLoading } = useProjectMainInfo(computed(() => props.project))
 
 const activeTab = ref('main')
 const showSettingPanel = ref(false)
@@ -262,9 +274,11 @@ async function handleHeaderAction() {
 const STAGE_TABS_CONFIG = {
   PRELIMINARY_SELECTION: [
     { key: 'main', label: '主要信息' },
+    { key: 'support', label: '支持性文件' },
   ],
   PROJECT_RESERVE: [
     { key: 'main', label: '主要信息' },
+    { key: 'support', label: '支持性文件' },
     { key: 'project-proposal', label: '项目建议书', type: 'report', subTab: 'PROJECT_PROPOSAL' },
     { key: 'request-file', label: '请示文件', type: 'report', subTab: 'PROJECT_INITIATION' },
     { key: 'competitive-allocation', label: '竞配申请报告', type: 'report', subTab: 'COMPETITIVE_ALLOCATION' },
@@ -272,12 +286,14 @@ const STAGE_TABS_CONFIG = {
   ],
   PROJECT_INITIATION: [
     { key: 'main', label: '主要信息' },
+    { key: 'support', label: '支持性文件' },
     { key: 'request-file', label: '请示文件', type: 'report', subTab: 'PROJECT_INITIATION' },
     { key: 'material', label: '立项材料', stageCode: 'PROJECT_INITIATION', fileCode: 'PROJECT_INITIATION_MATERIALS' },
     { key: 'meeting', label: '立项上会', stageCode: 'PROJECT_INITIATION', fileCode: 'PROJECT_INITIATION_MEETING_MATERIALS' },
   ],
   FEASIBILITY_REVIEW: [
     { key: 'main', label: '主要信息' },
+    { key: 'support', label: '支持性文件' },
     { key: 'request-file', label: '请示文件', type: 'report', subTab: 'PROJECT_INITIATION' },
     { key: 'material', label: '可研材料', stageCode: 'FEASIBILITY_REVIEW', fileCode: 'PROJECT_FEASIBILITY_MATERIALS' },
     { key: 'meeting', label: '可研审查', stageCode: 'FEASIBILITY_REVIEW', fileCode: 'FEASIBILITY_REVIEW' },
@@ -285,6 +301,7 @@ const STAGE_TABS_CONFIG = {
   ],
   INVESTMENT_DECISION: [
     { key: 'main', label: '主要信息' },
+    { key: 'support', label: '支持性文件' },
     { key: 'request-file', label: '请示文件', type: 'report', subTab: 'PROJECT_INITIATION' },
     { key: 'material', label: '投决材料', stageCode: 'INVESTMENT_DECISION', fileCode: 'INVESTMENT_DECISION_MATERIALS' },
     { key: 'meeting', label: '投决上会', stageCode: 'INVESTMENT_DECISION', fileCode: 'INVESTMENT_DECISION_MEETING_MATERIALS' },
@@ -293,6 +310,8 @@ const STAGE_TABS_CONFIG = {
 
 const tabs = computed(() => STAGE_TABS_CONFIG[props.stage] || STAGE_TABS_CONFIG.PROJECT_RESERVE)
 const activeTabConfig = computed(() => tabs.value.find(t => t.key === activeTab.value) || {})
+
+const supportDocsData = computed(() => buildSupportDocsData(props.project || {}))
 
 watch(
   () => [props.visible, props.project?.id, props.initialTab],
@@ -463,7 +482,11 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 25px;
+  margin: 0 16px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 .panel-title {
   flex: 1;
@@ -485,10 +508,14 @@ watch(
   flex-shrink: 0;
 }
 
-.report-btn {
+ .report-btn,
+.advance-btn {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  justify-content: center;
+  min-width: 112px;
   padding: 0 16px;
   height: 36px;
   border: 1px solid #2563EB;
@@ -501,7 +528,9 @@ watch(
   white-space: nowrap;
   transition: background 0.2s;
 }
-.report-btn:hover { background: #eff6ff; }
+ .report-btn:hover { background: #eff6ff; }
+ .advance-btn { margin: 0; color: #fff; background: #2563EB; border-color: #2563EB; font-size: 13px; font-weight: 500; border-radius: 6px; }
+.advance-btn:hover { color: #fff; background: #1D4ED8; border-color: #1D4ED8; }
 .report-icon { width: 14px; height: 14px; }
 
 /* ================= 主 Tab 栏 ================= */
@@ -543,6 +572,33 @@ watch(
 }
 
 /* ================= 内容区 ================= */
+
+/* 详情面板内的文件条目统一使用半透明卡片，避免深色文字与底色冲突 */
+.detail-panel :deep(.file-item) {
+  box-sizing: border-box;
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  color: #374151;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.detail-panel :deep(.file-item:hover) { background: rgba(255, 255, 255, 0.62); }
+.detail-panel :deep(.file-item-name) { color: #1f2937; }
+.detail-panel :deep(.file-item-desc) { color: #6b7280; }
+.detail-panel :deep(.meta-inline),
+.detail-panel :deep(.footer-meta) { color: #6b7280; }
+.detail-panel :deep(.meta-inline.muted) { color: #9ca3af; }
+.detail-panel :deep(.tag) {
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.1);
+}
+.detail-panel :deep(.tag-secondary) {
+  color: #64748b;
+  background: rgba(148, 163, 184, 0.14);
+}
+
 .panel-body {
   flex: 1;
   min-height: 0;
@@ -579,4 +635,23 @@ watch(
   background: rgba(0, 0, 0, 0.06);
 }
 .close-panel-btn svg { width: 16px; height: 16px; }
+
+/* 文件、会议步骤、报告表格等子页面内容统一为半透明白色卡片 */
+.detail-panel :deep(.file-card),
+.detail-panel :deep(.step-card),
+.detail-panel :deep(.table-wrap) {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.detail-panel :deep(.step-card.locked) {
+  background: rgba(255, 255, 255, 0.38);
+}
+.detail-panel :deep(.sticky-col),
+.detail-panel :deep(.report-table tbody tr:nth-child(even) td.sticky-col),
+.detail-panel :deep(.report-table tbody tr:hover td.sticky-col) {
+  background: rgba(255, 255, 255, 0.5) !important;
+}
+
 </style>

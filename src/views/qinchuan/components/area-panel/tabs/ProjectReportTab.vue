@@ -159,7 +159,8 @@ const emit = defineEmits(['row-action', 'open-confirm', 'create'])
 const props = defineProps({
   project: { type: Object, required: true },
   initialSubTab: { type: String, default: '' },
-  hideSubTabs: { type: Boolean, default: false }
+  hideSubTabs: { type: Boolean, default: false },
+  refreshKey: { type: Number, default: 0 },
 })
 const fake_data = ref(null)
 // ============================================================
@@ -167,9 +168,10 @@ const fake_data = ref(null)
 // ============================================================
 const tabs = ref([
   { key: 'PROJECT_PROPOSAL', label: '项目建议书', count: 0 },
+  { key: 'WIND_RESOURCE_ASSESSMENT', label: '风资源评估报告', count: 0 },
   { key: 'FEASIBILITY_STUDY', label: '可研报告', count: 0 },
-  { key: 'COMPETITIVE_ALLOCATION', label: '竞配申报报告', count: 0 },
   { key: 'PROJECT_INITIATION', label: '请示文件', count: 0 },
+  { key: 'COMPETITIVE_ALLOCATION', label: '竞配申请报告', count: 0 },
   { key: 'POST_EVALUATION', label: '后评价报告', count: 0 },
 ])
 
@@ -454,6 +456,12 @@ watch(() => props.initialSubTab, (val) => {
   }
 }, { immediate: true })
 
+watch(() => props.refreshKey, async () => {
+  pageNo.value = 1
+  await fetchAllTabCounts()
+  fetchList()
+})
+
 /**
  * @param {boolean} silent 静默刷新（轮询用）：不显示 loading、不打断轮询链
  */
@@ -624,7 +632,7 @@ onUnmounted(() => {
 .sub-tab .count { margin-left: 4px; color: #6E8ADC; font-size: 12px; }
 .sub-tab.active { background: rgba(255, 255, 255, 0.8); border: 1px solid #1D4ED8; box-shadow: 0px 2px 4px rgba(29, 78, 216, 0.3); color: #1D4ED8; font-weight: 600; }
 .sub-tab.active .count { color: #1D4ED8; }
-.table-wrap { flex: 1; min-height: 0; overflow: auto; position: relative; background: rgba(255, 255, 255, 0.3); border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05); border-radius: 8px; }
+.table-wrap { flex: 1; min-height: 0; overflow: auto; position: relative; background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05); border-radius: 8px; }
 .table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
 .table-wrap::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
 .report-table { width: 100%; min-width: 1050px; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 12px; }
@@ -636,10 +644,10 @@ onUnmounted(() => {
 .report-table td.ellipsis { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
 .report-table td.font-bold { font-weight: 700; color: #111827; }
 .report-table td.text-gray { color: #374151; }
-.sticky-col { position: sticky !important; right: 0 !important; background: rgba(255, 255, 255, 0.85) !important; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); box-shadow: -6px 0 10px rgba(0, 0, 0, 0.05); z-index: 9 !important; }
+.sticky-col { position: sticky !important; right: 0 !important; background: rgba(255, 255, 255, 0.5) !important; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); box-shadow: -6px 0 10px rgba(0, 0, 0, 0.05); z-index: 9 !important; }
 .report-table th.sticky-col { background: rgba(241, 245, 249, 0.95) !important; z-index: 10 !important; }
-.report-table tbody tr:nth-child(even) td.sticky-col { background: rgba(255, 255, 255, 0.9) !important; }
-.report-table tbody tr:hover td.sticky-col { background: rgba(255, 255, 255, 0.95) !important; }
+.report-table tbody tr:nth-child(even) td.sticky-col { background: rgba(255, 255, 255, 0.5) !important; }
+.report-table tbody tr:hover td.sticky-col { background: rgba(255, 255, 255, 0.5) !important; }
 .status-tag { font-weight: 500; font-size: 12px; }
 .action-cell { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .action-btn { padding: 0; border: none; background: none; font-size: 12px; cursor: pointer; }

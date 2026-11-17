@@ -980,7 +980,13 @@ function validateForm() {
   const current = Number(form.currentProjectCapacity)
   if (!isDistributedMode.value) {
     if (!Number.isFinite(total)) { errors.totalProjectCapacity = '请输入总规划装机容量'; valid = false }
-    else { const min = isBaseMode.value ? 200 : 30; if (total < min || total > 500) { errors.totalProjectCapacity = `总规划装机容量范围为${min}~500MW`; valid = false } }
+    else {
+      const [min, max] = isBaseMode.value ? [200, 500] : [30, 200]
+      if (total < min || total > max) {
+        errors.totalProjectCapacity = `总规划装机容量范围为${min}~${max}MW`
+        valid = false
+      }
+    }
   }
   if (!Number.isFinite(current)) { errors.currentProjectCapacity = '请输入本期规划装机容量'; valid = false }
   else {

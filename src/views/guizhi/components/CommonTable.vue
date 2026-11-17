@@ -33,9 +33,9 @@
           fixed="right"
         >
           <template #default="scope">
-            <div class="table-actions">
+            <ActionOverflow class="table-actions">
               <slot name="actions" v-bind="scope" />
-            </div>
+            </ActionOverflow>
           </template>
         </el-table-column>
       </el-table>
@@ -61,13 +61,14 @@
 
 <script setup>
 import { computed, useSlots } from 'vue'
+import ActionOverflow from '@/components/ActionOverflow.vue'
 
 const props = defineProps({
   data: { type: Array, default: () => [] },
   columns: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
   rowKey: { type: [String, Function], default: 'id' },
-  actionWidth: { type: [String, Number], default: 100 },
+  actionWidth: { type: [String, Number], default: 280 },
   showPagination: { type: Boolean, default: true },
   total: { type: Number, default: 0 },
   currentPage: { type: Number, default: 1 },

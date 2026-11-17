@@ -432,7 +432,7 @@ function handleSelect(option) {
 }
 
 function handleAddReport() {
-  emit('open-add-report')
+  emit('open-add-report', { subTab: 'FEASIBILITY_STUDY', project: props.project })
 }
 
 function openRequestForm() {

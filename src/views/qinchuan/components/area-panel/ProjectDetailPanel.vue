@@ -40,7 +40,7 @@
     </nav>
 
     <div class="tab-content">
-      <MainInfoTab v-if="activeTab === 'main'" :data="project.mainInfo" />
+      <MainInfoTab v-if="activeTab === 'main'" v-loading="mainInfoLoading" :data="mainInfoData" />
       
       <SurveyInfoTab
         v-else-if="activeTab === 'survey'"
@@ -53,20 +53,25 @@
       
       <SupportDocsTab
         v-else-if="activeTab === 'support'"
-        :data="project.supportDocs"
-        @add-data="$emit('support-add-data')"
-        @file-action="(...args) => $emit('support-file-action', ...args)"
+        :data="supportDocsData"
+        v-loading="supportLoading"
+        @add-data="handleSupportAddData"
+        @file-action="handleSupportFileAction"
+        @file-preview="handleSupportFilePreview"
+        @stage-change="handleSupportStageChange"
       />
       
 <ProjectReportTab
   v-else-if="activeTab === 'report'"
   :project="project"
+  :initial-sub-tab="initialReportSubTab"
+  :refresh-key="refreshKey"
   @row-action="(row) => $emit('report-row-action', row)"
   @open-confirm="(id) => $emit('open-confirm', id)"
   @create="(payload) => $emit('create-report', payload)"
 />
       
-      <ReviewInfoTab v-else-if="activeTab === 'review'" :data="project.reviewInfo" />
+      <ReviewInfoTab v-else-if="activeTab === 'review'" :data="reviewData" v-loading="reviewLoading" @file-action="handleReviewFileAction" />
     </div>
 
     <AddDataDialog
@@ -85,11 +90,66 @@
       :tower-file-name="addImageTowerFileName"
       @success="refreshSurveyData"
     />
+    <el-dialog
+      v-model="supportAddDialogVisible"
+      title="添加支持性文件"
+      width="460px"
+      :close-on-click-modal="false"
+      @closed="resetSupportAddSelection"
+    >
+      <el-form label-position="top">
+        <el-form-item label="项目阶段" required>
+          <el-select v-model="supportSelectedDisplayStage" placeholder="请选择项目阶段" style="width: 100%" :disabled="supportAddStageLocked">
+            <el-option
+              v-for="stage in SUPPORT_DISPLAY_STAGES.filter((item) => item !== '全部')"
+              :key="stage"
+              :label="stage"
+              :value="stage"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="支持性文件类型" required>
+          <el-select v-model="supportSelectedFileCode" placeholder="请先选择项目阶段" style="width: 100%" :disabled="!supportSelectedDisplayStage">
+            <el-option
+              v-for="item in supportSelectedTypeOptions"
+              :key="`${item._stageCode}-${item.fileCode}`"
+              :label="item.fileDesc || item.fileCode"
+              :value="item.fileCode + '::' + item._stageCode"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="supportAddDialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!supportSelectedDisplayStage || !supportSelectedFileCode" @click="confirmSupportAddType">下一步</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="supportPdfVisible" :title="supportPreviewTitle" width="80%" top="5vh" append-to-body destroy-on-close>
+      <div v-loading="supportPreviewLoading" class="support-pdf-body">
+        <iframe v-if="supportPdfSrc" :src="supportPdfSrc" class="support-pdf-iframe" frameborder="0" />
+      </div>
+      <template #footer><el-button @click="supportPdfVisible = false">关闭</el-button></template>
+    </el-dialog>
+    <el-dialog v-model="supportDocxVisible" :title="supportPreviewTitle" width="80%" top="5vh" append-to-body destroy-on-close>
+      <div v-loading="supportPreviewLoading" class="support-docx-body"><div ref="supportDocxRef" class="support-docx-container" /></div>
+      <template #footer><el-button @click="supportDocxVisible = false">关闭</el-button></template>
+    </el-dialog>
+    <FileUploadDialog
+      :visible="supportUploadVisible"
+      :tag-name="supportUploadTag"
+      :project="project"
+      :file-code="supportUploadFileCode"
+      :record="supportUploadRecord"
+      :append-mode="supportUploadAppendMode"
+      @close="supportUploadVisible = false"
+      @saved="handleSupportUploadSaved"
+    />
   </section>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, watch, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import MainInfoTab from './tabs/MainInfoTab.vue'
 import SurveyInfoTab from './tabs/SurveyInfoTab.vue'
@@ -99,11 +159,21 @@ import ReviewInfoTab from './tabs/ReviewInfoTab.vue'
 import AddDataDialog from './AddDataDialog.vue'
 import AddImageDialog from './AddImageDialog.vue'
 import { getDataById, delItem } from '@/api/modules/newAPI'
+import FileUploadDialog from '../FileUploadDialog.vue'
+import * as fileApi from '@/api/modules/projectFile'
+import { useProjectMainInfo } from '../../js/useProjectMainInfo'
 import { useRouter } from 'vue-router'
+import { useOssUpload } from '@/components/ossClient/index'
+import * as configApi from '@/api/modules/configData'
+import { renderAsync } from 'docx-preview'
+import { getTempUrlSX } from '@/api/modules/upload'
 
 const props = defineProps({
   project: { type: Object, required: true },
-  isFullscreen: { type: Boolean, default: false }
+  isFullscreen: { type: Boolean, default: false },
+  initialTab: { type: String, default: 'main' },
+  initialReportSubTab: { type: String, default: '' },
+  refreshKey: { type: Number, default: 0 },
 })
 
 defineEmits([
@@ -115,6 +185,197 @@ defineEmits([
 ])
 
 const router = useRouter()
+const ossUpload = useOssUpload()
+const { mainInfo: mainInfoData, loading: mainInfoLoading } = useProjectMainInfo(computed(() => props.project))
+const SUPPORT_DISPLAY_STAGES = [
+  '全部',
+  '立项阶段',
+  '可研审查',
+  '投资决策',
+  '建设准备',
+  '建设实施',
+  '竣工验收',
+  '投产运营',
+]
+
+function getSupportDisplayStage(stage = {}) {
+  const name = String(stage.name || stage.stageDesc || stage.stageName || '').replace(/\s/g, '')
+  if (name.includes('储备') || name.includes('立项')) return '立项阶段'
+  if (name.includes('可研')) return '可研审查'
+  if (name.includes('投资决策') || name.includes('投决')) return '投资决策'
+  if (name.includes('建设准备')) return '建设准备'
+  if (name.includes('建设实施')) return '建设实施'
+  if (name.includes('竣工验收')) return '竣工验收'
+  if (name.includes('投产运营') || name.includes('运营')) return '投产运营'
+  return ''
+}
+
+const supportDocsData = ref({ stages: SUPPORT_DISPLAY_STAGES, activeStage: '全部', typeFilters: [], files: [] })
+const supportLoading = ref(false)
+const supportUploadVisible = ref(false)
+const supportUploadRecord = ref(null)
+const supportUploadFileCode = ref('')
+const supportUploadTag = ref('')
+const supportStageNodes = ref([])
+const supportStageTypes = ref([])
+const supportFileRecords = ref({})
+const supportCurrentStageNode = ref(null)
+const supportAddDialogVisible = ref(false)
+const supportSelectedDisplayStage = ref('')
+const supportSelectedStageCode = ref('')
+const supportSelectedFileCode = ref('')
+const supportAddStageLocked = ref(false)
+const supportUploadAppendMode = ref(false)
+const supportSelectedTypeOptions = computed(() => supportStageTypes.value.map((item) => ({
+  ...item,
+  fileCode: item.fileCode || item.name || item.detailName,
+  fileDesc: item.fileDesc || item.detailName || item.name,
+  _stageCode: String(item._stageNode?.id || supportCurrentStageNode.value?.id || ''),
+  _stageLabel: supportSelectedDisplayStage.value,
+})))
+
+async function ensureSupportStageNodes() {
+  if (supportStageNodes.value.length) return supportStageNodes.value
+  const res = await configApi.getStageList()
+  const list = Array.isArray(res?.data) ? res.data : Array.isArray(res?.data?.list) ? res.data.list : []
+  supportStageNodes.value = list
+  return list
+}
+
+function normalizeSupportRecords(res) {
+  if (Array.isArray(res?.data)) return res.data
+  if (Array.isArray(res?.data?.list)) return res.data.list
+  return []
+}
+
+async function handleSupportStageChange(stageName) {
+  const requestStage = stageName || '全部'
+  supportLoading.value = true
+  supportDocsData.value = { ...supportDocsData.value, activeStage: requestStage, typeFilters: [], files: [] }
+  supportStageTypes.value = []
+  supportFileRecords.value = {}
+  try {
+    const stages = await ensureSupportStageNodes()
+    const selectedNodes = requestStage === '全部'
+      ? stages
+      : stages.filter((node) => getSupportDisplayStage(node) === requestStage)
+    if (!selectedNodes.length) {
+      supportCurrentStageNode.value = null
+      return
+    }
+
+    const stageTypeGroups = await Promise.all(selectedNodes.map(async (node) => {
+      const res = await configApi.listByParentId(node.id)
+      const types = Array.isArray(res?.data) ? res.data : Array.isArray(res?.data?.list) ? res.data.list : []
+      return { node, types }
+    }))
+    const flattenedTypes = stageTypeGroups.flatMap(({ node, types }) => types.map((item) => ({
+      ...item,
+      _stageNode: node,
+      _stageDisplayName: getSupportDisplayStage(node),
+      fileCode: item.fileCode || item.name || item.detailName,
+      fileDesc: item.fileDesc || item.detailName || item.name,
+    })))
+    supportStageTypes.value = flattenedTypes
+    supportCurrentStageNode.value = selectedNodes.length === 1 ? selectedNodes[0] : null
+
+    const queried = await Promise.all(flattenedTypes.map(async (type) => {
+      const fileCode = type.fileCode
+      if (!fileCode) return { type, records: [] }
+      const res = await fileApi.getFileListByProjectid({
+        aiProjectId: props.project.id,
+        firstBusinessTitle: fileCode,
+      })
+      return { type, records: normalizeSupportRecords(res) }
+    }))
+    const recordsByCode = {}
+    const files = queried.flatMap(({ type, records }) => {
+      recordsByCode[type.fileCode] = records
+      return records.flatMap((record) => {
+        let fileList = record.fileUrlList
+        if (typeof fileList === 'string') { try { fileList = JSON.parse(fileList) } catch { fileList = [] } }
+        if (!Array.isArray(fileList) || !fileList.length) {
+          fileList = record.fileName || record.filePath ? [{ fileName: record.fileName, filePath: record.filePath }] : []
+        }
+        return fileList.map((file) => ({
+          id: record.id,
+          stage: type._stageDisplayName || requestStage,
+          stageCode: String(type._stageNode?.id || ''),
+          fileCode: type.fileCode,
+          tag: record.fileTypeTag || type.fileDesc || '其他文件',
+          name: file.fileName || file.name || '未命名文件',
+          filePath: file.filePath || file.url || '',
+          updatedAt: record.updateTime || record.createTime || '',
+          operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
+          record,
+          rawFile: file,
+        }))
+      })
+    })
+    supportFileRecords.value = recordsByCode
+    supportDocsData.value = {
+      stages: SUPPORT_DISPLAY_STAGES,
+      activeStage: requestStage,
+      typeFilters: flattenedTypes.map((item) => ({
+        key: String(item.id ?? item.fileCode),
+        label: item.detailName || item.name || item.fileDesc || item.fileCode,
+        fileCode: item.fileCode,
+        color: 'pink',
+      })),
+      files,
+    }
+  } catch (err) {
+    console.error('[support] 加载支持性文件失败:', err)
+    ElMessage.error('支持性文件加载失败')
+    supportDocsData.value = { stages: SUPPORT_DISPLAY_STAGES, activeStage: requestStage, typeFilters: [], files: [] }
+  } finally {
+    supportLoading.value = false
+  }
+}
+
+async function loadSupportDocs() {
+  if (!props.project?.id) {
+    supportDocsData.value = { stages: SUPPORT_DISPLAY_STAGES, activeStage: '全部', typeFilters: [], files: [] }
+    return
+  }
+  await handleSupportStageChange(supportDocsData.value.activeStage || '全部')
+}
+
+function resetSupportAddSelection() {
+  supportSelectedDisplayStage.value = ''
+  supportSelectedStageCode.value = ''
+  supportSelectedFileCode.value = ''
+  supportAddStageLocked.value = false
+}
+
+function handleSupportAddData(stageName) {
+  const selectedStage = SUPPORT_DISPLAY_STAGES.includes(stageName) && stageName !== '全部' ? stageName : ''
+  supportSelectedDisplayStage.value = selectedStage
+  supportSelectedStageCode.value = ''
+  supportSelectedFileCode.value = ''
+  supportAddStageLocked.value = Boolean(selectedStage)
+  supportAddDialogVisible.value = true
+  if (selectedStage) handleSupportStageChange(selectedStage)
+}
+
+async function confirmSupportAddType() {
+  const [selectedFileCode, selectedStageId] = supportSelectedFileCode.value.split('::')
+  const type = supportSelectedTypeOptions.value.find((item) =>
+    item.fileCode === selectedFileCode && item._stageCode === selectedStageId
+  )
+  if (!type) {
+    ElMessage.warning('请选择支持性文件类型')
+    return
+  }
+  const existingRecords = supportFileRecords.value[type.fileCode] || []
+  supportUploadRecord.value = existingRecords[0] || null
+  supportUploadFileCode.value = type.fileCode
+  supportSelectedStageCode.value = type._stageCode
+  supportUploadTag.value = type.fileDesc || '支持性文件'
+  supportUploadAppendMode.value = true
+  supportAddDialogVisible.value = false
+  supportUploadVisible.value = true
+}
 
 const mainTabs = [
   { key: 'main', label: '主要信息' },
@@ -124,7 +385,343 @@ const mainTabs = [
   { key: 'review', label: '审查信息' },
 ]
 
-const activeTab = ref('main')
+const validMainTabKeys = new Set(mainTabs.map((tab) => tab.key))
+const activeTab = ref(validMainTabKeys.has(props.initialTab) ? props.initialTab : 'main')
+
+// 面板由地图弹窗切换打开时，父级可能仍保留上一次的 tab；
+// 每次收到新的初始 tab 都校验，非法/空值统一回到“主要信息”。
+watch(() => props.initialTab, (tab) => {
+  activeTab.value = validMainTabKeys.has(tab) ? tab : 'main'
+}, { immediate: true })
+
+const reviewData = ref({ timeline: [], groups: [] })
+const reviewLoading = ref(false)
+let reviewRequestSeq = 0
+
+// 审查信息始终展示完整阶段序列；未到达阶段保留节点，日期与文件内容为空。
+const REVIEW_STAGE_CONFIG = [
+  { stageCode: 'PRELIMINARY_SELECTION', label: '初步选址', fileCode: '' },
+  { stageCode: 'PROJECT_RESERVE', label: '项目储备', fileCode: 'PROJECT_INITIATION_MATERIALS' },
+  { stageCode: 'PROJECT_INITIATION', label: '立项', fileCode: 'PROJECT_INITIATION_MEETING_MATERIALS' },
+  { stageCode: 'FEASIBILITY_REVIEW', label: '可研审查', fileCode: 'FEASIBILITY_REVIEW' },
+  { stageCode: 'INVESTMENT_DECISION', label: '投资决策', fileCode: 'INVESTMENT_DECISION_MEETING_MATERIALS' },
+]
+const PROJECT_STAGE_ORDER = REVIEW_STAGE_CONFIG.map((stage) => stage.stageCode)
+
+function normalizeReviewFiles(record) {
+  let files = record?.fileUrlList
+  if (typeof files === 'string') {
+    try { files = JSON.parse(files) } catch { files = [] }
+  }
+  if (Array.isArray(files) && files.length) return files
+  if (record?.fileName || record?.filePath) {
+    return [{ fileName: record.fileName, filePath: record.filePath }]
+  }
+  return []
+}
+
+function formatReviewDate(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+async function loadReviewInfo() {
+  const projectId = props.project?.id
+  const requestSeq = ++reviewRequestSeq
+  const displayStages = REVIEW_STAGE_CONFIG
+
+  if (!projectId) {
+    reviewData.value = {
+      timeline: displayStages.map((stage) => ({ key: stage.stageCode, label: stage.label, date: '' })),
+      groups: displayStages.map((stage) => ({ key: stage.stageCode, stage: stage.label, date: '', items: [] })),
+    }
+    reviewLoading.value = false
+    return
+  }
+
+  // 不按项目当前阶段截断：所有阶段都参与查询和展示，未创建的阶段自然为空。
+  const queryStages = displayStages.filter((item) => item.fileCode)
+
+  reviewLoading.value = true
+  try {
+    const queried = await Promise.all(queryStages.map(async (stage) => {
+      const res = await fileApi.getFileListByProjectid({
+        aiProjectId: projectId,
+        firstBusinessTitle: stage.fileCode,
+      })
+      const records = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res?.data?.list) ? res.data.list : []
+
+      const items = records.flatMap((record) => normalizeReviewFiles(record).map((file) => ({
+        tag: record.fileTypeTag || '审查文件',
+        org: record.organizationName || record.orgName || record.uploaderName || record.assignedUploaderName || '',
+        docNo: record.documentNo || record.docNo || '',
+        date: formatReviewDate(record.updateTime || record.createTime),
+        name: file.fileName || file.name || '未命名文件',
+        operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
+        updatedAt: formatReviewDate(record.updateTime || record.createTime),
+        filePath: file.filePath || file.url || '',
+        record,
+        rawFile: file,
+      })))
+
+      const latestRecord = records.reduce((latest, record) => {
+        const time = new Date(record.updateTime || record.createTime || 0).getTime() || 0
+        const latestTime = latest ? new Date(latest.updateTime || latest.createTime || 0).getTime() || 0 : -1
+        return time > latestTime ? record : latest
+      }, null)
+
+      return {
+        key: stage.stageCode,
+        stage: stage.label,
+        date: formatReviewDate(latestRecord?.updateTime || latestRecord?.createTime),
+        items,
+      }
+    }))
+
+    const resultMap = new Map(queried.map((item) => [item.key, item]))
+    const results = displayStages.map((stage) => resultMap.get(stage.stageCode) || ({ key: stage.stageCode, stage: stage.label, date: '', items: [] }))
+    if (requestSeq !== reviewRequestSeq) return
+    reviewData.value = {
+      timeline: results.map((group) => ({ key: group.key, label: group.stage, date: group.date || (group.items.length ? '已归档' : '') })),
+      groups: results,
+    }
+  } catch (err) {
+    if (requestSeq === reviewRequestSeq) {
+      console.error('[review] 加载审查信息失败:', err)
+      reviewData.value = {
+        timeline: displayStages.map((stage) => ({ key: stage.stageCode, label: stage.label, date: '' })),
+        groups: displayStages.map((stage) => ({ key: stage.stageCode, stage: stage.label, date: '', items: [] })),
+      }
+    }
+  } finally {
+    if (requestSeq === reviewRequestSeq) reviewLoading.value = false
+  }
+}
+
+async function loadSupportDocs() {
+  if (!props.project?.id) {
+    supportDocsData.value = { stages: SUPPORT_DISPLAY_STAGES, activeStage: '全部', typeFilters: [], files: [] }
+    return
+  }
+  supportLoading.value = true
+  try {
+    const enumRes = await fileApi.getFileType()
+    const stageConfigs = Array.isArray(enumRes?.data) ? enumRes.data : []
+    supportStageConfigs.value = stageConfigs
+    const queryTasks = stageConfigs.flatMap((stage) => {
+      const businessList = stage.firstBusinessTitle || stage.children || []
+      return businessList.filter((business) => business.fileCode).map(async (business) => {
+        const res = await fileApi.getFileListByProjectid({
+          aiProjectId: props.project.id,
+          firstBusinessTitle: business.fileCode,
+        })
+        const records = Array.isArray(res?.data) ? res.data : Array.isArray(res?.data?.list) ? res.data.list : []
+        return { fileCode: business.fileCode, records, stage, business }
+      })
+    })
+    const queried = await Promise.all(queryTasks)
+    const recordsByCode = {}
+    const files = queried.flatMap(({ fileCode, records, stage, business }) => {
+      recordsByCode[fileCode] = records
+      return records.flatMap((record) => {
+        let fileList = record.fileUrlList
+        if (typeof fileList === 'string') { try { fileList = JSON.parse(fileList) } catch { fileList = [] } }
+        if (!Array.isArray(fileList) || !fileList.length) {
+          fileList = record.fileName || record.filePath ? [{ fileName: record.fileName, filePath: record.filePath }] : []
+        }
+        return fileList.map((file) => ({
+          id: record.id,
+          stage: getSupportDisplayStage(stage) || '其他阶段',
+          stageCode: stage.stageCode || '',
+          fileCode,
+          tag: record.fileTypeTag || business.fileDesc || '其他文件',
+          name: file.fileName || file.name || '未命名文件',
+          filePath: file.filePath || file.url || '',
+          updatedAt: record.updateTime || record.createTime || '',
+          operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
+          record,
+          rawFile: file,
+        }))
+      })
+    })
+    supportFileRecords.value = recordsByCode
+    const tags = [...new Set(files.map((file) => file.tag).filter(Boolean))]
+    supportDocsData.value = {
+      stages: SUPPORT_DISPLAY_STAGES,
+      activeStage: SUPPORT_DISPLAY_STAGES.includes(supportDocsData.value.activeStage) ? supportDocsData.value.activeStage : '全部',
+      typeFilters: tags.map((label, index) => ({ key: 'support-type-' + index, label, color: index % 2 ? 'green' : 'pink' })),
+      files,
+    }
+  } catch (err) {
+    console.error('[support] 加载支持性文件失败:', err)
+    ElMessage.error('支持性文件加载失败')
+    supportDocsData.value = { stages: SUPPORT_DISPLAY_STAGES, activeStage: '全部', typeFilters: [], files: [] }
+  } finally {
+    supportLoading.value = false
+  }
+}
+
+function handleSupportFileAction(action, file) {
+  const record = file?.record || {}
+  if (action === 'download') {
+    const path = file?.filePath
+    if (!path) { ElMessage.warning('该文件缺少下载路径'); return }
+    ossUpload.getFileUrl(path).then(async (url) => {
+      if (!url) throw new Error('获取下载地址失败')
+      const response = await fetch(url)
+      if (!response.ok) throw new Error('文件下载失败')
+      const blobUrl = URL.createObjectURL(await response.blob())
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = file.name || '文件'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(blobUrl)
+    }).catch((err) => ElMessage.error(err?.message || '文件下载失败'))
+    return
+  }
+  if (action === 'edit') {
+    supportUploadAppendMode.value = false
+    supportUploadRecord.value = { ...record }
+    supportUploadFileCode.value = file.fileCode || record.firstBusinessTitle || ''
+    supportUploadTag.value = file.tag || record.fileTypeTag || '文件'
+    supportUploadVisible.value = true
+    return
+  }
+  if (action === 'delete') {
+    if (!record.id) { ElMessage.warning('缺少文件记录，无法删除'); return }
+    ElMessageBox.confirm('确认删除该文件吗？', '提示', { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' })
+      .then(async () => {
+        let currentFiles = record.fileUrlList
+        if (typeof currentFiles === 'string') { try { currentFiles = JSON.parse(currentFiles) } catch { currentFiles = [] } }
+        currentFiles = Array.isArray(currentFiles) ? currentFiles : []
+        const target = file.rawFile || {}
+        const remainingFiles = currentFiles.filter((item) =>
+          !((target.filePath && item.filePath === target.filePath) ||
+            (!target.filePath && target.fileName && item.fileName === target.fileName))
+        )
+        await fileApi.updateFile({
+          id: record.id,
+          aiProjectId: record.aiProjectId ?? props.project?.id,
+          firstBusinessTitle: record.firstBusinessTitle || file.fileCode,
+          secondaryBusinessTitle: record.secondaryBusinessTitle || '',
+          fileTypeTag: record.fileTypeTag,
+          isRequiredUpload: record.isRequiredUpload === 1 || record.isRequiredUpload === '1' || record.isRequiredUpload === true,
+          notes: record.notes,
+          recognitionContent: {},
+          fileUrlList: remainingFiles,
+        })
+        ElMessage.success('删除成功')
+        await loadSupportDocs()
+      })
+      .catch(() => {})
+  }
+}
+
+async function handleSupportFilePreview(file) {
+  const path = file?.filePath
+  if (!path) { ElMessage.warning('该文件缺少预览路径'); return }
+  try {
+    let url = ''
+    try {
+      const tempRes = await getTempUrlSX(path)
+      if (typeof tempRes === 'string') url = tempRes
+      else url = tempRes?.url || tempRes?.tempUrl || tempRes?.data?.url || tempRes?.data?.tempUrl || (typeof tempRes?.data === 'string' ? tempRes.data : '')
+    } catch (error) {
+      console.warn('[support] 获取临时预览地址失败，回退 OSS 签名地址:', error)
+    }
+    if (!url) url = await ossUpload.getFileUrl(path)
+    if (!url) throw new Error('获取预览地址失败')
+    const ext = String(file.name || path).split('?')[0].split('#')[0].split('.').pop().toLowerCase()
+    supportPreviewTitle.value = file.name || '文件预览'
+    if (ext === 'pdf') {
+      supportPdfVisible.value = true
+      supportPreviewLoading.value = true
+      supportPdfSrc.value = ''
+      await nextTick()
+      const response = await fetch(url, { mode: 'cors' })
+      if (!response.ok) throw new Error('PDF 文件读取失败')
+      const blob = new Blob([await response.blob()], { type: 'application/pdf' })
+      supportPdfSrc.value = URL.createObjectURL(blob)
+    } else if (ext === 'docx') {
+      supportDocxVisible.value = true
+      supportPreviewLoading.value = true
+      await nextTick()
+      const response = await fetch(url, { mode: 'cors' })
+      if (!response.ok) throw new Error('DOCX 文件读取失败')
+      const blob = await response.blob()
+      if (supportDocxRef.value) {
+        supportDocxRef.value.innerHTML = ''
+        await renderAsync(blob, supportDocxRef.value, undefined, {
+          className: 'docx-preview', inWrapper: true,
+          ignoreLastRenderedPageBreak: true, experimental: true,
+          useBase64URL: true, breakPages: true,
+        })
+      }
+    } else if (ext === 'doc') {
+      window.open(`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`, '_blank')
+    } else {
+      window.open(url, '_blank')
+    }
+  } catch (err) {
+    console.error('[support] 文件预览失败:', err)
+    ElMessage.warning(err?.message || '文件预览失败')
+  } finally {
+    supportPreviewLoading.value = false
+  }
+}
+
+const supportPdfVisible = ref(false)
+const supportDocxVisible = ref(false)
+const supportPreviewTitle = ref('文件预览')
+const supportPreviewLoading = ref(false)
+const supportPdfSrc = ref('')
+const supportDocxRef = ref(null)
+watch(supportPdfVisible, (visible) => {
+  if (!visible && supportPdfSrc.value) {
+    URL.revokeObjectURL(supportPdfSrc.value)
+    supportPdfSrc.value = ''
+  }
+})
+
+async function handleReviewFileAction(action, item) {
+  handleSupportFileAction(action, {
+    ...item,
+    fileCode: item?.record?.firstBusinessTitle || '',
+    record: item?.record,
+  })
+}
+
+async function handleSupportUploadSaved() {
+  supportUploadVisible.value = false
+  supportUploadAppendMode.value = false
+  await loadSupportDocs()
+}
+
+watch(() => [props.project?.id, activeTab.value, props.refreshKey], ([id, tab]) => {
+  if (id && tab === 'support') loadSupportDocs()
+}, { immediate: true })
+
+watch(
+  () => [props.project?.id, props.project?.projectStage, props.project?.stage, activeTab.value, props.refreshKey],
+  ([, , , tab]) => {
+    if (tab === 'review') loadReviewInfo()
+  },
+  { immediate: true }
+)
+
+
+watch(() => [props.initialTab, props.refreshKey], ([tab]) => {
+  if (mainTabs.some((item) => item.key === tab)) {
+    activeTab.value = tab
+  }
+}, { immediate: true })
 
 const SURVEY_SECTIONS = [
   { key: 'terrain', title: '地形信息', dataCategory: 'TERRAIN' },
@@ -321,7 +918,11 @@ watch(() => props.project?.id, (id) => { if (id) refreshSurveyData() })
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 25px;
+  margin: 0 16px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 .header-left { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 
@@ -363,10 +964,13 @@ watch(() => props.project?.id, (id) => { if (id) refreshSurveyData() })
 }
 .icon-btn:hover { color: #2563EB; border-color: #2563EB; background: #fff; }
 
-.report-btn {
+ .report-btn {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  justify-content: center;
+  min-width: 112px;
   padding: 0 16px;
   height: 36px;
   border: none;
@@ -421,6 +1025,33 @@ watch(() => props.project?.id, (id) => { if (id) refreshSurveyData() })
 }
 
 /* ================= 内容区 ================= */
+
+/* 详情面板内的文件条目统一使用半透明卡片，避免深色文字与底色冲突 */
+.detail-panel :deep(.file-item) {
+  box-sizing: border-box;
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  color: #374151;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.detail-panel :deep(.file-item:hover) { background: rgba(255, 255, 255, 0.62); }
+.detail-panel :deep(.file-item-name) { color: #1f2937; }
+.detail-panel :deep(.file-item-desc) { color: #6b7280; }
+.detail-panel :deep(.meta-inline),
+.detail-panel :deep(.footer-meta) { color: #6b7280; }
+.detail-panel :deep(.meta-inline.muted) { color: #9ca3af; }
+.detail-panel :deep(.tag) {
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.1);
+}
+.detail-panel :deep(.tag-secondary) {
+  color: #64748b;
+  background: rgba(148, 163, 184, 0.14);
+}
+
 .tab-content {
   flex: 1;
   min-height: 0;
@@ -449,4 +1080,28 @@ watch(() => props.project?.id, (id) => { if (id) refreshSurveyData() })
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
 }
+
+/* 文件、会议步骤、报告表格等子页面内容统一为半透明白色卡片 */
+.detail-panel :deep(.file-card),
+.detail-panel :deep(.step-card),
+.detail-panel :deep(.table-wrap) {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.detail-panel :deep(.step-card.locked) {
+  background: rgba(255, 255, 255, 0.38);
+}
+.detail-panel :deep(.sticky-col),
+.detail-panel :deep(.report-table tbody tr:nth-child(even) td.sticky-col),
+.detail-panel :deep(.report-table tbody tr:hover td.sticky-col) {
+  background: rgba(255, 255, 255, 0.5) !important;
+}
+
+
+.support-pdf-body { height: 70vh; min-height: 420px; }
+.support-pdf-iframe { width: 100%; height: 100%; border: 0; }
+.support-docx-body { height: 70vh; min-height: 420px; overflow: auto; }
+.support-docx-container { min-height: 100%; padding: 16px; background: #fff; color: #222; }
 </style>

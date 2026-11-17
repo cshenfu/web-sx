@@ -676,7 +676,10 @@ async function uploadGeneratedFile(blob, fileName) {
 async function submitReport({ fileUrl, fileName, resData }) {
   const selectedItem = reportOptions.value.find(r => r.id === selectedReportId.value) || {}
   
-  const finalReportType = REPORT_TYPE_MAP[props.actionKey] || 'PROJECT_INITIATION'
+  const finalReportType = REPORT_TYPE_MAP[props.actionKey]
+  if (!finalReportType) {
+    throw new Error(`当前报告类型未配置归档分类：${props.actionKey || '未知类型'}`)
+  }
 
   const payload = {
     aiProjectId: aiProjectId.value,
@@ -782,7 +785,6 @@ async function handleGenerate() {
     const fillData = mergeFillData(resData.params || {}, props.aiDetail)
     const blob = await renderTemplateToBlob(fillData)
 
-    generating.value = false
     generated.value = true
     await nextTick()
 
@@ -799,14 +801,9 @@ async function handleGenerate() {
     generatedFilePath.value = fileUrl
 
     // ========== ⑤ createReport 落库 ==========
-    let createRes = null
-    try {
-      createRes = await submitReport({ fileUrl, fileName, resData })
-      if (createRes?.code !== 200) {
-        console.warn('[createReport] 返回非 200:', createRes)
-      }
-    } catch (e) {
-      console.warn('[createReport] 提交失败', e)
+    const createRes = await submitReport({ fileUrl, fileName, resData })
+    if (Number(createRes?.code) !== 200) {
+      throw new Error(createRes?.msg || '报告记录保存失败，请稍后重试')
     }
 
     // ========== ⑥ 仅 sitemap-detail 来源：create 后调 updateFile 补全归档 ==========
@@ -861,8 +858,21 @@ async function handleGenerate() {
     // ========== ⑦ 同步上会流程（占位） ==========
     await syncToMeetingTab(fileUrl, fileName, 'docx')
 
+    generating.value = false
     ElMessage.success('报告已生成并同步至上会流程')
-    emit('generated', { actionKey: props.actionKey, subCode: props.subCode })
+    const createdData = createRes?.data
+    const createdReportId = createdData == null
+      ? null
+      : typeof createdData === 'number' || typeof createdData === 'string'
+        ? createdData
+        : (createdData.id ?? createdData.reportId ?? createdData.recordId ?? null)
+    emit('generated', {
+      actionKey: props.actionKey,
+      subCode: props.subCode,
+      reportType: REPORT_TYPE_MAP[props.actionKey] || '',
+      reportId: createdReportId,
+      project: props.project,
+    })
   } catch (err) {
     console.error('[生成失败]', err)
     ElMessage.error(err.message || '生成报告失败')

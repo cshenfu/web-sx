@@ -7,7 +7,7 @@
         type="button"
         class="stage-tab"
         :class="{ active: stage === activeStage }"
-        @click="activeStage = stage"
+        @click="handleStageChange(stage)"
       >
         {{ stage }}
       </button>
@@ -27,7 +27,7 @@
 
     <div class="file-list-header">
       <span class="file-list-title">文件列表</span>
-      <button type="button" class="add-btn" @click="$emit('add-data')">
+      <button type="button" class="add-btn" v-if="!readonly" @click="$emit('add-data', activeStage)">
         添加数据
         <svg viewBox="0 0 16 16" class="add-icon"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
       </button>
@@ -37,8 +37,9 @@
       <FileListItem
         v-for="(file, idx) in filteredFiles"
         :key="idx"
-        :file="{ ...file, actions: ['download', 'edit', 'delete'] }"
+        :file="{ ...file, actions: readonly ? ['download'] : ['download', 'edit', 'delete'] }"
         @action="(action, f) => $emit('file-action', action, f)"
+        @preview="(file) => $emit('file-preview', file)"
       />
       <div v-if="!filteredFiles.length" class="empty-state">暂无数据~</div>
     </div>
@@ -51,14 +52,15 @@ import FileListItem from '../../shared/FileListItem.vue'
 
 const props = defineProps({
   data: { type: Object, default: () => ({}) },
+  readonly: { type: Boolean, default: false },
 })
 
-defineEmits(['add-data', 'file-action'])
+const emit = defineEmits(['add-data', 'file-action', 'file-preview', 'stage-change'])
 
 // ★ 归一化：无论父组件传不传 / 传什么，都保证 4 个字段有兜底
 const safeData = computed(() => ({
-  stages: [],
-  activeStage: '',
+  stages: ['全部', '立项阶段', '可研审查', '投资决策', '建设准备', '建设实施', '竣工验收', '投产运营'],
+  activeStage: '全部',
   typeFilters: [],
   files: [],
   ...(props.data || {}),
@@ -66,6 +68,13 @@ const safeData = computed(() => ({
 
 const activeStage = ref(safeData.value.activeStage || safeData.value.stages[0] || '')
 const activeFilter = ref('')
+
+function handleStageChange(stage) {
+  if (activeStage.value === stage) return
+  activeStage.value = stage
+  activeFilter.value = ''
+  emit('stage-change', stage)
+}
 
 // ★ props.data 变化（切换项目）时同步当前选中的 stage
 watch(safeData, (v) => {
@@ -75,10 +84,14 @@ watch(safeData, (v) => {
 })
 
 const filteredFiles = computed(() => {
-  const files = safeData.value.files || []
+  let files = safeData.value.files || []
+  if (activeStage.value && activeStage.value !== '全部') {
+    files = files.filter((file) => file.stage === activeStage.value)
+  }
   if (!activeFilter.value) return files
-  const label = (safeData.value.typeFilters || []).find((f) => f.key === activeFilter.value)?.label
-  return label ? files.filter((file) => file.tag === label) : files
+  const selectedType = (safeData.value.typeFilters || []).find((f) => f.key === activeFilter.value)
+  if (!selectedType) return files
+  return files.filter((file) => file.fileCode === selectedType.fileCode || file.tag === selectedType.label)
 })
 </script>
 

@@ -186,7 +186,10 @@ async function handleSave() {
 
     if (res?.code === 200 || res?.code === '200' || res?.success) {
       ElMessage.success('报告添加成功');
-      emit('success');
+      emit('success', {
+        reportType: activeReportTab.value,
+        project: props.project,
+      });
       emit('close');
     } else {
     }

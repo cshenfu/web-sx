@@ -75,7 +75,7 @@ import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPane
 import { attachSxLayers } from '@/components/site-map/attachSxLayers'
 
 // 💡 引入查询接口
-import { getZNPSReport } from '@/api/modules/report' 
+import { getIntelligentReviewReportCalc } from '@/api/modules/report' 
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -153,75 +153,87 @@ const fetchAndRenderReport = async () => {
   loading.value = true
   hasGenerated.value = false
   try {
-    // 1. 请求报告参数（写死 id 用于测试，实际用 row.id）
-    const targetId = props.projectRow.reviewProjectId || ''
-    console.log(props.projectRow)
-    const res = await getZNPSReport(targetId)
-    
-    let fillData = {}
-    
-    // 2. 解析参数
-    if (res?.code === 200 || res?.code === 0) {
-      const resultStr = res.data?.reportParamResult
-      if (resultStr) {
-        try {
-          fillData = JSON.parse(resultStr)
-        } catch (e) {
-          console.warn('解析 reportParamResult 失败，将使用空数据', e)
-        }
-      }
+    // 使用列表原始数据中的两个业务 ID 获取报告模板填充参数
+    const aiProjectId = props.projectRow?.aiProjectId
+    const reviewProjectId = props.projectRow?.reviewProjectId
+
+    if (!aiProjectId || !reviewProjectId) {
+      throw new Error('缺少 aiProjectId 或 reviewProjectId，无法获取智能评审报告参数')
     }
 
-    // 3. 模板渲染
+    const res = await getIntelligentReviewReportCalc({
+      aiProjectId,
+      reviewProjectId,
+    })
+
+    if (res?.code !== 200 && res?.code !== 0) {
+      throw new Error(res?.msg || '获取智能评审报告参数失败')
+    }
+
+    // 新接口 data 本身就是模板变量对应的填充对象，无需再解析 reportParamResult
+    const fillData = res?.data && typeof res.data === 'object' ? res.data : {}
+
+    // 模板渲染
     await renderTemplate(fillData)
 
   } catch (error) {
     console.error('获取或渲染报告失败:', error)
-    ElMessage.error('获取报告数据失败')
+    ElMessage.error(error?.message || '获取报告数据失败')
   } finally {
     loading.value = false
   }
 }
 
-const renderTemplate = async (data) => {
-  try {
-    // 读取 public 目录下的模板文件
-    const res = await fetch('/templates/feasibility-review.docx')
-    if (!res.ok) throw new Error('模板加载失败')
-    const buf = await res.arrayBuffer()
-    const zip = new PizZip(buf)
-    const doc = new Docxtemplater(zip, {
-      paragraphLoop: true,
-      linebreaks: true,
-      delimiters: { start: '${', end: '}' },
-      nullGetter: () => '', // 如果没数据，替换为空字符串
-    })
-    
-    // 渲染数据
-    doc.render(JSON.parse(JSON.stringify(data)))
-    
-    // 生成 blob
-    generatedBlob = doc.getZip().generate({
-      type: 'blob',
-      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    })
+// 接口返回的键名形如 "${reportName}"，而 docxtemplater 的 tag 名为 "reportName"。
+// 因此在渲染前去掉接口键名外围的模板分隔符，避免键名不匹配导致占位符原样显示。
+const normalizeTemplateData = (data = {}) => {
+  return Object.entries(data).reduce((result, [key, value]) => {
+    const normalizedKey = key.startsWith('${') && key.endsWith('}')
+      ? key.slice(2, -1)
+      : key
 
-    // 预览
-    await nextTick()
-    if (wordContainer.value) {
-      wordContainer.value.innerHTML = ''
-      await renderAsync(generatedBlob, wordContainer.value, null, {
-        className: 'docx-preview',
-        inWrapper: true,
-        ignoreWidth: false,
-        breakPages: true,
-      })
-      hasGenerated.value = true
-    }
-  } catch (error) {
-    console.error('模板渲染失败:', error)
-    ElMessage.error('模板渲染失败')
-  }
+    result[normalizedKey] = value ?? ''
+    return result
+  }, {})
+}
+
+const renderTemplate = async (data) => {
+  // 读取 public 目录下的模板文件
+  const res = await fetch('/templates/feasibility-review.docx')
+  if (!res.ok) throw new Error('报告模板加载失败，请检查 feasibility-review.docx 是否存在')
+
+  const buf = await res.arrayBuffer()
+  const zip = new PizZip(buf)
+  const doc = new Docxtemplater(zip, {
+    paragraphLoop: true,
+    linebreaks: true,
+    delimiters: { start: '${', end: '}' },
+    nullGetter: () => '',
+  })
+
+  // 将接口的 "${变量名}" 转成 docxtemplater 实际使用的变量名
+  const templateData = normalizeTemplateData(data)
+  console.log('[智能评审报告] 模板填充字段：', Object.keys(templateData))
+  doc.render(templateData)
+
+  // 生成 blob
+  generatedBlob = doc.getZip().generate({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  })
+
+  // 预览
+  await nextTick()
+  if (!wordContainer.value) throw new Error('报告预览容器尚未准备完成')
+
+  wordContainer.value.innerHTML = ''
+  await renderAsync(generatedBlob, wordContainer.value, null, {
+    className: 'docx-preview',
+    inWrapper: true,
+    ignoreWidth: false,
+    breakPages: true,
+  })
+  hasGenerated.value = true
 }
 
 // ================== 监听与交互 ==================

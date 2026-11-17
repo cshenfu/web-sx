@@ -619,6 +619,15 @@
 </script>
 <style scoped lang="scss">
     .user-list {
+        background:
+            radial-gradient(circle at 8% 8%, rgba(255, 205, 220, 0.34), transparent 30%),
+            radial-gradient(circle at 92% 10%, rgba(184, 219, 255, 0.4), transparent 32%),
+            radial-gradient(circle at 90% 100%, rgba(172, 216, 255, 0.34), transparent 36%),
+            linear-gradient(122deg, #eef3fa 0%, #f7f8fc 48%, #eaf2fb 100%);
+        border-radius: 6px;
+        padding: 10px 12px;
+        box-sizing: border-box;
+        min-height: 100%;
         // padding: 0px 0px 48px 0 !important;
         .status-tag {
             // min-width: 52px;

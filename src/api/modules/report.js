@@ -50,6 +50,11 @@ export async function deleteZNPSReport(id) {
 }
 
 
+// 根据智能评审项目和关联项目 ID 计算智能评审报告填充参数
+export async function getIntelligentReviewReportCalc(params) {
+    return await publicService4.get('/api/IntelligentReview/report/calc', params);
+}
+
 // 根据智能评审ID获取智能评审报告关联详情
 export async function getZNPSReport(id) {
     return await publicService4.get(`/api/reviewRelation/get/${id}`);

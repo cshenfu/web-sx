@@ -11,6 +11,7 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'   // ★ 引入中文包
 
 import 'element-plus/dist/index.css'
 import './styles/element-plus-overrides.css'
+import './styles/app-typography.css'
 
 // 集中包装所有 Element Plus confirm：只统一删除/移除类提示
 const originalConfirm = ElMessageBox.confirm.bind(ElMessageBox)

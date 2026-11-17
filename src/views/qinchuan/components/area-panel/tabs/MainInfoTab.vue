@@ -311,14 +311,21 @@ function onFileClick(block) {
 }
 
 .sub-tab.active {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.5);
   border-color: rgba(255, 255, 255, 0.6);
   color: #1D4ED8;
   z-index: 1;
 }
 
 /* ============ 子内容 ============ */
-.sub-content { padding-top: 16px; }
+.sub-content {
+  padding: 16px;
+  margin-top: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
 
 .kv-line {
   padding: 4px 0;
@@ -396,7 +403,7 @@ function onFileClick(block) {
   color: #374151;
   text-align: left;
   white-space: nowrap;
-  background: rgba(255, 255, 255, 0.3); /* 默认行 30% 透明 */
+  background: rgba(255, 255, 255, 0.5); /* 与其他内容卡片统一 50% 透明 */
 }
 
 /* 处理最后一行的左右圆角与底边框 */

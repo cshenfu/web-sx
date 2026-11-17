@@ -42,7 +42,7 @@ const routes = [
         children: [
           { path: 'create', name: 'ReviewCreate', component: () => import('@/views/yanping/review/Create.vue'), meta: { title: '智能评审-创建', module: 'yanping', sidebar: 'yanping-review', key: 'create' } },
           { path: 'project', name: 'ReviewProject', component: () => import('@/views/yanping/review/Project.vue'), meta: { title: '智能评审-项目', module: 'yanping', sidebar: 'yanping-review', key: 'project' } },
-          { path: 'draft', name: 'ReviewDraft', component: () => import('@/views/yanping/review/DefaultProject.vue'), meta: { title: '智能评审-草稿', module: 'yanping', sidebar: 'yanping-review', key: 'draft' } },
+          { path: 'draft', name: 'ReviewDraft', component: () => import('@/views/yanping/review/Project.vue'), meta: { title: '智能评审-草稿', module: 'yanping', sidebar: 'yanping-review', key: 'draft' } },
         ]
       },
       {

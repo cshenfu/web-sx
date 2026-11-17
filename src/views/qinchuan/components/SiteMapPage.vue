@@ -187,7 +187,40 @@
           <div class="list-title"><el-icon><List /></el-icon>项目列表</div>
           <el-button type="primary" size="small" @click="openCreateProject"><el-icon><Plus /></el-icon>添加项目</el-button>
         </div>
-        <SearchBar :filters="filters" :stage-options="stageOptions" @search="handleSearch" @reset="handleReset" />
+        <SearchBar @search="handleSearch" @reset="handleReset">
+          <el-select v-model="filters.city" placeholder="所属市/区" size="small" clearable style="width: 120px">
+            <el-option v-for="city in CITY_OPTIONS" :key="city.value" :label="city.label" :value="city.value" />
+          </el-select>
+          <el-select v-model="filters.itemType" placeholder="项目类型" size="small" clearable style="width: 120px">
+            <el-option label="风电" value="FD" />
+            <el-option label="光伏" value="GF" />
+          </el-select>
+          <el-select v-model="filters.projectStage" placeholder="项目阶段" size="small" clearable style="width: 140px">
+            <el-option v-for="stage in stageOptions" :key="stage.code" :label="stage.desc" :value="stage.code" />
+          </el-select>
+          <el-select v-model="filters.approvalStatus" placeholder="审批状态" size="small" clearable style="width: 130px">
+            <el-option label="未审批" value="NO_APPROVAL" />
+            <el-option label="审批通过" value="APPROVED" />
+            <el-option label="审批不通过" value="REJECTED" />
+          </el-select>
+          <el-select v-model="filters.isVerified" placeholder="核查状态" size="small" clearable style="width: 120px">
+            <el-option label="未核查" value="0" />
+            <el-option label="已核查" value="1" />
+          </el-select>
+          <el-input v-model="filters.managerCompany" placeholder="所属公司" size="small" clearable style="width: 150px" @keyup.enter="handleSearch" />
+          <el-input v-model="filters.managerName" placeholder="负责人" size="small" clearable style="width: 120px" @keyup.enter="handleSearch" />
+          <el-date-picker
+            v-model="listCreateTimeRange"
+            type="daterange"
+            size="small"
+            value-format="YYYY-MM-DD"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            style="width: 240px"
+          />
+          <el-input v-model="filters.projectCode" placeholder="项目编号" size="small" clearable style="width: 150px" @keyup.enter="handleSearch" />
+          <el-input v-model="filters.projectName" placeholder="项目名称" size="small" clearable style="width: 150px" @keyup.enter="handleSearch" />
+        </SearchBar>
         <el-table v-loading="listLoading" :data="projectList" size="small" stripe class="project-table">
           <el-table-column label="项目编号" min-width="130"><template #default="{ row }">{{ row.projectCode || '-' }}</template></el-table-column>
           <el-table-column label="项目名称" min-width="220" show-overflow-tooltip>
@@ -195,7 +228,7 @@
               <span
                 class="project-name-link"
                 :title="row.projectName"
-                @click.stop="locateProjectFromList(row)"
+                @click.stop="openDetailPanel(row, 'main')"
               >
                 {{ row.projectName || '-' }}
               </span>
@@ -214,11 +247,11 @@
           <el-table-column label="所属" min-width="120" show-overflow-tooltip><template #default="{ row }">{{ row.managerCompany || '-' }}</template></el-table-column>
           <el-table-column label="负责人" width="90"><template #default="{ row }">{{ row.managerName || '-' }}</template></el-table-column>
           <el-table-column label="创建时间" width="170"><template #default="{ row }">{{ row.createTime || '-' }}</template></el-table-column>
-          <el-table-column label="操作" width="200" fixed="right">
+          <el-table-column label="操作" width="280" fixed="right">
             <template #default="{ row }">
-              <div class="row-actions">
+              <ActionOverflow class="row-actions">
                 <el-button v-for="action in rowActions" :key="action" link :type="action === 'delete' ? 'danger' : 'primary'" size="small" @click="executeAction(action, row)">{{ ACTION_LABELS[action] || action }}</el-button>
-              </div>
+              </ActionOverflow>
             </template>
           </el-table-column>
         </el-table>
@@ -248,13 +281,7 @@
       <CreateProjectForm ref="editProjectFormRef" :map-ref="mapRef" :panel-width="550" mode="edit" :project="editProjectTarget" @cancel="onEditProjectCancel" @saved="onProjectUpdated" />
     </section>
 
-    <VerifyPanel
-      v-if="showVerifyPanelFlag"
-      :visible="showVerifyPanel"
-      :project="selectedProject"
-      @close="showVerifyPanel = false"
-      @saved="onVerifySaved"
-    />
+    
     <ProjectDrawer :visible="showProjectDrawer" :list="projectList" :total="pagination.total" :page="pagination.page" :page-size="pagination.pageSize" :selected-id="popoverProject?.id ?? null" :loading="listLoading" :row-actions="rowActions" @close="showProjectDrawer = false" @select="focusProject" @action="handleDrawerAction" @page-change="handlePageChange" @size-change="handleSizeChange" @sort-change="handleDrawerSortChange" />
 
         <!-- ★ 1. 点击“项目名称”进的全量面板 -->
@@ -263,6 +290,7 @@
       :project="selectedProject"
       :is-fullscreen="true"
       :initial-tab="detailTabMapped"
+      :initial-report-sub-tab="generatedReportSubTab"
       :refresh-key="detailRefreshKey"
       @back="showDetailPanel = false"
       @toggle-fullscreen="() => {}"
@@ -300,11 +328,31 @@
       :secondary-business-title="generatePanelSecondaryBusinessTitle"
       :file-type-tag="generatePanelFileTypeTag"
       :ai-detail="selectedProject"
-      @close="showGeneratePanel = false"
+      @close="handleGeneratePanelClose"
       @generated="onReportGenerated"
     />    
-    <AssignDialog v-model="showAssignDialog" :project="assignTargetProject" @success="onAssignSuccess" />
-    <ReserveApprovalDialog v-model="showReserveDialog" :project="selectedProject" @saved="onReserveSaved" />
+    
+    
+
+    <ProjectWorkflowDialogs
+      :visibility="{ verify: showVerifyPanel, assign: showAssignDialog, reserve: showReserveDialog, addReport: showAddReportPanel, confirm: showConfirmPanel }"
+      :verify-project="selectedProject"
+      :assign-project="assignTargetProject"
+      :reserve-project="selectedProject"
+      :report-project="selectedProject"
+      :report-id="confirmReportId"
+      :verify-mounted="showVerifyPanelFlag"
+      @close-verify="showVerifyPanel = false"
+      @verify-saved="onVerifySaved"
+      @update:assign="showAssignDialog = $event"
+      @assign-success="onAssignSuccess"
+      @update:reserve="showReserveDialog = $event"
+      @reserve-saved="onReserveSaved"
+      @close-add-report="showAddReportPanel = false"
+      @report-success="handleReportPanelSuccess"
+      @close-confirm="showConfirmPanel = false"
+      @confirm-success="handleConfirmSuccess"
+    />
 
     <ReportGenerateModal
       :visible="showGenerateModal"
@@ -317,19 +365,9 @@
       @open-add-report="handleOpenAddReport"
     />
 
-    <AddReportPanel
-      :visible="showAddReportPanel"
-      :project="selectedProject"
-      @close="showAddReportPanel = false"
-      @success="handleReportPanelSuccess"
-    />
+    
 
-    <ConfirmReportPanel
-      :visible="showConfirmPanel"
-      :report-id="confirmReportId"
-      @close="showConfirmPanel = false"
-      @success="handleConfirmSuccess"
-    />
+    
 
     <ReportWizard
       v-if="wizardVisible"
@@ -337,8 +375,8 @@
       :create-project-mode="wizardMode"
       :title="wizardTitleLabel"
       :max-step="wizardMaxStep"
-      :project-name="selectedProject?.name || selectedProject?.projectName || ''"
-      :project="selectedProject"
+      :project-name="(wizardProject || selectedProject)?.name || (wizardProject || selectedProject)?.projectName || ''"
+      :project="wizardProject || selectedProject"
       @close="closeWizard"
       @save-draft="handleWizardSaveDraft"
       @submit="handleWizardSubmit"
@@ -349,23 +387,28 @@
 </template>
 
 <script setup>
+import { ensureOuterCCW, ensureHoleCW, smoothstep } from '../js/mapGeometry'
+import { getProjectCoords, getProjectCentroid, buildWindFC, buildBoosterFC } from '../js/projectGeoUtils'
+import { unwrapRoadResponse, buildRoadLineFeatures } from '../js/roadGeoUtils'
+import { useProjectHover } from '../js/useProjectHover'
+import { useReportPanelController } from '../js/useReportPanelController'
+import { useProjectContext } from '../js/useProjectContext'
+
+import ProjectWorkflowDialogs from './ProjectWorkflowDialogs.vue'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, ArrowRight, CircleCheck, Edit, Files, Fold, InfoFilled, List, Location, LocationFilled, MapLocation, Plus, Search, Setting } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, CircleCheck, Fold, InfoFilled, List, Location, LocationFilled, MapLocation, Plus, Search, Setting } from '@element-plus/icons-vue'
 import MapGL from '@/components/MapGL.vue'
 import SearchBar from '@/components/common/SearchBar.vue'
 import CreateProjectForm from './Createprojectform.vue'
 import ConfigForm from './ConfigForm.vue'
 import TaskPanel from './TaskPanel.vue'
-import VerifyPanel from './VerifyPanel.vue'
 import ProjectDrawer from './ProjectDrawer.vue'
 import ProjectDetailPanel from './ProjectDetailPanel.vue'                                        // 简版（其他阶段）
 // ★ 全量 overview 详情面板（路径按你项目实际调整）
 import ProjectDetailPanelFull from './area-panel/ProjectDetailPanel.vue'
-import AssignDialog from './AssignDialog.vue'
 import GenerateReportPanel from './GenerateReportPanel.vue'
-import ReserveApprovalDialog from './ReserveApprovalDialog.vue'
 import ReportGenerateModal from './area-panel/ReportGenerateModal.vue'
 import ReportWizard from './report-wizard/ReportWizard.vue'
 import { PACKAGE_TYPE } from '../js/Reportwizardmockdata'
@@ -384,7 +427,7 @@ import shengyazhanIcon from '@/assets/img/mapIcon/syz.png'
 import LayerChipPanel from '@/components/site-map/LayerChipPanel.vue'
 import { WHLN_LAYER_IDS, DEFAULT_VISIBLE } from '@/components/site-map/layerPanelConfig'
 import { attachSxLayers } from '@/components/site-map/attachSxLayers'
-import { addGradientExtrusion } from '@/utils/gradientExtrusion'
+
 import {
   getIconNaturalWidth,
   getCoordsBounds,
@@ -394,9 +437,8 @@ import {
 
 import { loadShaanxiProvince, loadShaanxiCities } from '@/utils/shaanxiBoundary'
 import { buildMainInfoFromAi } from '../js/aiProjectAdapter'
-import AddReportPanel from './area-panel/AddReportPanel.vue'
-import ConfirmReportPanel from './area-panel/ConfirmReportPanel.vue'
 import ProjectActionCard from './area-panel/ProjectActionCard.vue'
+import ActionOverflow from '@/components/ActionOverflow.vue'
 
 const props = defineProps({
   stage: { type: String, default: '' },
@@ -495,38 +537,18 @@ const SMART_SITE_STAGES = ['PRELIMINARY_SELECTION']
 
 // 报告与面板状态
 const showGenerateModal = ref(false)
-const wizardVisible = ref(false)
-const wizardMode = ref(PACKAGE_TYPE.default)
-const wizardTitleLabel = ref('')
-const wizardMaxStep = ref(2)
-const wizardReportSubTab = ref('')
 const reportKeyToWizardMode = {
   'feasibility-centralized': PACKAGE_TYPE.default,
   'feasibility-distributed': PACKAGE_TYPE.distributedDefault,
 }
-
-const SUB_TAB_REPORT_CONFIG = {
-  PROJECT_PROPOSAL:       { packageType: PACKAGE_TYPE.default, maxStep: 1, title: '一键生成项目建议书' },
-  FEASIBILITY_STUDY:      { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成风电场可行性研究报告' },
-  COMPETITIVE_ALLOCATION: { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成竞配申报报告' },
-  PROJECT_INITIATION:     { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成请示文件' },
-  POST_EVALUATION:        { packageType: PACKAGE_TYPE.default, maxStep: 2, title: '一键生成后评价报告' },
-}
 // 顶部加
 const detailRefreshKey = ref(0)
+const generatedReportSubTab = ref('')
+const pendingGeneratedReport = ref(null)
+
 function handleOpenCompetitivePanel(project) {
   showGenerateModal.value = false
-  generatePanelProject.value = project || selectedProject.value
-  generatePanelActionKey.value = 'bidding'
-  generatePanelSubCode.value = ''
-  generatePanelSource.value = 'competitive-modal'
-  generatePanelFirstBusinessTitle.value = ''
-  generatePanelSecondaryBusinessTitle.value = ''
-  generatePanelFileTypeTag.value = ''
-  showGeneratePanel.value = true
-}
-function getReportConfigBySubTab(subTab) {
-  return SUB_TAB_REPORT_CONFIG[subTab] || SUB_TAB_REPORT_CONFIG.FEASIBILITY_STUDY
+  reportPanels.openCompetitivePanel(project, selectedProject.value)
 }
 const showDetailPanel = ref(false)
 const showSiteMapDetailPanel = ref(false) // ★ 新增：专门控制简版面板
@@ -538,7 +560,7 @@ const TAB_KEY_MAP = {
   material: 'support',
   meeting:  'review',
 }
-const detailTabMapped = computed(() => TAB_KEY_MAP[detailPanelTab.value] || 'main')
+const detailTabMapped = computed(() => TAB_KEY_MAP[detailPanelTab.value] || (detailPanelTab.value === 'report' ? 'report' : 'main'))
 
 // ★ 当前项目 / 页面级 stage 是否为智能选址
 const isSmartSite = computed(() => {
@@ -546,19 +568,13 @@ const isSmartSite = computed(() => {
   return SMART_SITE_STAGES.includes(code)
 })
 
-const showGeneratePanel = ref(false)
-const generatePanelProject = ref(null)
-const generatePanelActionKey = ref('')
-const generatePanelSubCode = ref('')
-// ★ 新增
-const generatePanelSource = ref('')
-const generatePanelFirstBusinessTitle = ref('')
-const generatePanelSecondaryBusinessTitle = ref('')
-const generatePanelFileTypeTag = ref('')
-
-const showAddReportPanel = ref(false)
-const showConfirmPanel = ref(false)
-const confirmReportId = ref(null)
+const reportPanels = useReportPanelController(PACKAGE_TYPE)
+const {
+  showGeneratePanel, generatePanelProject, generatePanelActionKey, generatePanelSubCode,
+  generatePanelSource, generatePanelFirstBusinessTitle, generatePanelSecondaryBusinessTitle,
+  generatePanelFileTypeTag, showAddReportPanel, showConfirmPanel, confirmReportId,
+  wizardVisible, wizardProject, wizardMode, wizardTitleLabel, wizardMaxStep, wizardReportSubTab,
+} = reportPanels
   // ============================================================
   // ★ 计算并应用"当前容器下完整看到陕西"对应的最小 zoom
   //   用户不能再缩小到超过陕西范围
@@ -599,21 +615,33 @@ const confirmReportId = ref(null)
   }
 
 function handleOpenAddReport() {
-   showGenerateModal.value = false
-   showProjectDrawer.value = false
-   showDetailPanel.value = false
-   showAddReportPanel.value = true
+  showGenerateModal.value = false
+  showProjectDrawer.value = false
+  showDetailPanel.value = false
+  reportPanels.openAddReport()
 }
 
-function handleReportPanelSuccess() {
+function handleReportPanelSuccess(payload = {}) {
   fetchMapProjects()
   fetchProjectList()
+
+  const reportType = String(payload?.reportType || '').trim()
+  if (!PROJECT_REPORT_TYPE_KEYS.has(reportType)) return
+
+  const project = payload.project || selectedProject.value
+  if (project) {
+    selectedProject.value = allMapProjects.value.find(
+      (item) => String(item.id) === String(project.id)
+    ) || project
+  }
+
+  // 上传报告与生成报告共用同一套分类跳转逻辑。
+  pendingGeneratedReport.value = { project, reportType }
+  showAddReportPanel.value = false
+  handleGeneratePanelClose()
 }
 
-function handleOpenConfirm(id) {
-  confirmReportId.value = id
-  showConfirmPanel.value = true
-}
+function handleOpenConfirm(id) { reportPanels.openConfirm(id) }
 // 报告/函件生成 —— header 按钮 emit 过来
 function handleGenerateReportFromHeader(proj) {
   if (proj) selectedProject.value = proj
@@ -624,12 +652,7 @@ function handleConfirmSuccess() {
   fetchProjectList()
   if (selectedProject.value?.id) {
     const fresh = allMapProjects.value.find(p => p.id === selectedProject.value.id)
-    if (fresh) {
-      selectedProject.value = fresh
-      if (popoverProject.value && String(popoverProject.value.id) === String(fresh.id)) {
-        popoverProject.value = fresh
-      }
-    }
+    if (fresh) projectContext.syncProject(fresh)
   }
 }
 
@@ -679,36 +702,16 @@ const showAssignDialog = ref(false)
 const assignTargetProject = ref(null)
 const renderedLayerIds = new Set()
 const allMapProjects = ref([])
-const popoverProject = ref(null)
+const projectContext = useProjectContext()
+const {
+  focusedProject: popoverProject,
+  selectedProject
+} = projectContext
 const hoveredProject = ref(null)
 const hoveredPos = reactive({ x: 0, y: 0 })
 
-let hoverHideTimer = null
-const HOVER_HIDE_DELAY = 800
+const { clearHoverHideTimer, clearHoverState, scheduleHoverHide, onHoverCardEnter, onHoverCardLeave } = useProjectHover(hoveredProject)
 
-function clearHoverHideTimer() {
-  if (hoverHideTimer) {
-    clearTimeout(hoverHideTimer)
-    hoverHideTimer = null
-  }
-}
-
-function scheduleHoverHide() {
-  clearHoverHideTimer()
-  hoverHideTimer = setTimeout(() => {
-    hoveredProject.value = null
-    hoverHideTimer = null
-  }, HOVER_HIDE_DELAY)
-}
-
-function onHoverCardEnter() { clearHoverHideTimer() }
-function onHoverCardLeave() { scheduleHoverHide() }
-function clearHoverState() {
-  clearHoverHideTimer()
-  hoveredProject.value = null
-}
-
-const selectedProject = ref(null)
 
 const editMode = ref(null)
 const drawingNewPoint = ref(false)
@@ -861,10 +864,7 @@ async function onProjectUpdated() {
   await Promise.all([fetchMapProjects(), fetchProjectList(), fetchOverviewStats(), fetchCityStats()])
   const fresh = allMapProjects.value.find((p) => p.id === popoverProject.value?.id)
   if (fresh) {
-    popoverProject.value = fresh
-    if (selectedProject.value && String(selectedProject.value.id) === String(fresh.id)) {
-      selectedProject.value = fresh
-    }
+    projectContext.syncProject(fresh)
     initEditBuffer(fresh)
     await renderProjectsByStage('area')
   }
@@ -877,6 +877,15 @@ function onEditProjectCancel() {
 function onReserveSaved() { fetchMapProjects(); fetchProjectList() }
 
 const filters = reactive({ province: '610000', city: '', district: '', itemType: '', projectStage: '', approvalStatus: '', managerCompany: '', managerName: '', createTimeStart: '', createTimeEnd: '', projectCode: '', projectName: '', isVerified: '' })
+const listCreateTimeRange = computed({
+  get: () => (filters.createTimeStart || filters.createTimeEnd)
+    ? [filters.createTimeStart || '', filters.createTimeEnd || '']
+    : null,
+  set: (value) => {
+    filters.createTimeStart = value?.[0] || ''
+    filters.createTimeEnd = value?.[1] || ''
+  },
+})
 const projectList = ref([])
 const listLoading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
@@ -924,7 +933,7 @@ async function fetchProjectList() {
 }
 
 function handleSearch() { pagination.page = 1; fetchProjectList() }
-function handleReset() { Object.assign(filters, { city: '', district: '', itemType: '', projectStage: '', approvalStatus: '', managerCompany: '', managerName: '', createTimeStart: '', createTimeEnd: '', projectCode: '', projectName: '', isVerified: '' }); drawerSort.key = ''; drawerSort.dir = 'desc'; pagination.page = 1; fetchProjectList() }
+function handleReset() { Object.assign(filters, { city: '', district: '', itemType: '', projectStage: '', approvalStatus: '', managerCompany: '', managerName: '', createTimeStart: '', createTimeEnd: '', projectCode: '', projectName: '', isVerified: '' }); drawerSort.key = ''; drawerSort.dir = 'desc'; pagination.page = 1 }
 function handlePageChange(page) { pagination.page = page; fetchProjectList() }
 function handleSizeChange(size) { pagination.pageSize = size; pagination.page = 1; fetchProjectList() }
 
@@ -1025,7 +1034,8 @@ async function openDetailPanel(project, tab) {
     console.warn('[site-map] AI 详情加载失败:', err)
   }
 
-  detailPanelTab.value = tab
+  detailPanelTab.value = TAB_KEY_MAP[tab] || (['main', 'survey', 'support', 'report', 'review'].includes(tab) ? tab : 'main')
+  generatedReportSubTab.value = ''
   showSiteMapDetailPanel.value = false // ★ 互斥
   showDetailPanel.value = true         // ★ 打开全量
 }
@@ -1037,7 +1047,8 @@ async function openSiteMapDetailPanel(project, tab = 'main') {
   await onProjectClick(p.id)
   
   selectedProject.value = p
-  detailPanelTab.value = tab
+  detailPanelTab.value = TAB_KEY_MAP[tab] || (['main', 'survey', 'support', 'report', 'review'].includes(tab) ? tab : 'main')
+  generatedReportSubTab.value = ''
   showDetailPanel.value = false        // ★ 互斥
   showSiteMapDetailPanel.value = true  // ★ 打开简版
 }
@@ -1049,14 +1060,15 @@ function onDetailPanelAction(payload) {
     return
   }
   if (payload?.type === 'generate-report') {
-    generatePanelProject.value = payload.project || selectedProject.value
-    generatePanelActionKey.value = payload.actionKey || ''
-    generatePanelSubCode.value = payload.subCode || ''
-    generatePanelSource.value = 'sitemap-detail'   // ★ 触发 updateFile
-    generatePanelFirstBusinessTitle.value = payload.firstBusinessTitle || ''
-    generatePanelSecondaryBusinessTitle.value = payload.secondaryBusinessTitle || ''
-    generatePanelFileTypeTag.value = payload.fileTypeTag || ''
-    showGeneratePanel.value = true
+    reportPanels.openGeneratePanel({
+      project: payload.project || selectedProject.value,
+      actionKey: payload.actionKey,
+      subCode: payload.subCode,
+      source: 'sitemap-detail',
+      firstBusinessTitle: payload.firstBusinessTitle,
+      secondaryBusinessTitle: payload.secondaryBusinessTitle,
+      fileTypeTag: payload.fileTypeTag,
+    })
     return
   }
   if (payload?.type === 'create-report') {
@@ -1067,75 +1079,58 @@ function onDetailPanelAction(payload) {
 
 // ★ 全量面板 / 简版面板共用的 "create-report" 处理
 // 打开 GeneratePanel（用于 report-tab 的各种 subTab）
-function openGeneratePanelFromReportTab(payload, { actionKey, fileTypeTag, firstBusinessTitle }) {
-  generatePanelProject.value = payload.project || selectedProject.value
-  generatePanelActionKey.value = actionKey
-  generatePanelSubCode.value = ''
-  generatePanelSource.value = 'report-tab'
-  generatePanelFirstBusinessTitle.value = firstBusinessTitle || ''
-  generatePanelSecondaryBusinessTitle.value = ''
-  generatePanelFileTypeTag.value = fileTypeTag || ''
-  showGeneratePanel.value = true
-  showDetailPanel.value = false
-}
-
 function handleCreateReportFromDetail(payload) {
-  if (!payload?.subTab) return
-  const subTab = payload.subTab
-  const project = payload.project || selectedProject.value
-  const stage =
-    project?.projectStage ||
-    project?.stage ||
-    selectedProject.value?.projectStage ||
-    selectedProject.value?.stage ||
-    ''
-
-  switch (subTab) {
-    case 'COMPETITIVE_ALLOCATION':
-      return openGeneratePanelFromReportTab(payload, { actionKey: 'bidding' })
-
-    case 'FEASIBILITY_STUDY':
-      return openGeneratePanelFromReportTab(payload, {
-        actionKey: 'gen-report',
-        fileTypeTag: '可研审查报告',
-        firstBusinessTitle: 'PROJECT_FEASIBILITY_MATERIALS',
-      })
-
-    case 'PROJECT_INITIATION':
-      if (stage === 'INVESTMENT_DECISION') {
-        return openGeneratePanelFromReportTab(payload, {
-          actionKey: 'gen-invest-letter',
-          fileTypeTag: '投资决策请示函',
-          firstBusinessTitle: 'INVESTMENT_DECISION_MATERIALS',
-        })
-      }
-      return openGeneratePanelFromReportTab(payload, {
-        actionKey: 'gen-letter',
-        fileTypeTag: '立项请示函',
-        firstBusinessTitle: 'PROJECT_INITIATION_MATERIALS',
-      })
-
-    case 'PROJECT_PROPOSAL':
-    case 'POST_EVALUATION':
-    default: {
-      const config = getReportConfigBySubTab(subTab)
-      wizardMode.value = config.packageType
-      wizardTitleLabel.value = config.title
-      wizardMaxStep.value = config.maxStep
-      wizardReportSubTab.value = subTab
-      wizardVisible.value = true
-      showDetailPanel.value = false
-      return
-    }
-  }
+  return reportPanels.dispatchCreateReport(payload, selectedProject.value, (target) => {
+    if (target === 'generate' || target === 'wizard') showDetailPanel.value = false
+  })
 }
 
 
 
-function onReportGenerated() {
-  console.log('[site-map] 报告已生成')
-  // ★ 等后端落库再刷，避免接口抢先返回旧数据
-  window.setTimeout(() => { detailRefreshKey.value++ }, 300)
+// 项目报告列表只维护这六种报告类型；其他函件生成成功后不跳转报告列表。
+const PROJECT_REPORT_TYPE_KEYS = new Set([
+  'PROJECT_PROPOSAL',
+  'WIND_RESOURCE_ASSESSMENT',
+  'FEASIBILITY_STUDY',
+  'PROJECT_INITIATION',
+  'COMPETITIVE_ALLOCATION',
+  'POST_EVALUATION',
+])
+
+function onReportGenerated(payload = {}) {
+  const reportType = String(payload.reportType || '').trim()
+  if (!PROJECT_REPORT_TYPE_KEYS.has(reportType)) {
+    pendingGeneratedReport.value = null
+    return
+  }
+
+  pendingGeneratedReport.value = {
+    project: payload.project || generatePanelProject.value || selectedProject.value,
+    reportType,
+  }
+
+  // 创建成功后立即打开对应项目的报告分类。
+  handleGeneratePanelClose()
+}
+
+function handleGeneratePanelClose() {
+  showGeneratePanel.value = false
+  const pending = pendingGeneratedReport.value
+  if (!pending) return
+
+  pendingGeneratedReport.value = null
+  const project = pending.project
+  if (project) {
+    selectedProject.value = allMapProjects.value.find(
+      (item) => String(item.id) === String(project.id)
+    ) || project
+  }
+
+  generatedReportSubTab.value = pending.reportType
+  detailPanelTab.value = 'report'
+  showSiteMapDetailPanel.value = false
+  showDetailPanel.value = true
+  nextTick(() => { detailRefreshKey.value++ })
 }
 
 async function fetchOverviewStats() {
@@ -1197,10 +1192,6 @@ const MASK_PATTERN = 'shaanxi-starfield-mask'
 const MASK_SOURCE_ID = 'shaanxi-mask-src'
 const SHAANXI_BOUNDS = [[105.4, 31.7], [111.2, 39.6]]
 let lastMaskOpacity = -1
-function ensureClosed(ring) { if (!ring || ring.length < 3) return ring; const f = ring[0], l = ring[ring.length - 1]; return (f[0] === l[0] && f[1] === l[1]) ? ring : [...ring, [f[0], f[1]]] }
-function ringSignedArea(ring) { if (!ring || ring.length < 3) return 0; let a = 0; for (let i = 0; i < ring.length - 1; i++) { a += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1] } return a / 2 }
-function ensureOuterCCW(ring) { const r = ensureClosed(ring); return ringSignedArea(r) >= 0 ? r : r.slice().reverse() }
-function ensureHoleCW(ring) { const r = ensureClosed(ring); return ringSignedArea(r) <= 0 ? r : r.slice().reverse() }
 const WORLD_OUTER = ensureOuterCCW([[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]])
 function buildMaskGeoJSON(boundary) {
   const holes = []
@@ -1240,7 +1231,6 @@ function viewIntersectsShaanxi(map) {
   const [[sw, ss], [ne, nn]] = SHAANXI_BOUNDS
   return !(e < sw || w > ne || n < ss || s > nn)
 }
-function smoothstep(e0, e1, x) { if (e1 <= e0) return x >= e1 ? 1 : 0; const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t) }
 function computeMaskOpacity() {
   if (!props.enableShaanxiMask) return 0
   const map = mapRef.value?.getMap?.()
@@ -1258,19 +1248,6 @@ function syncMaskVisibility(force = false) {
   if (!force && Math.abs(target - lastMaskOpacity) < 0.01) return
   lastMaskOpacity = target
   map.setPaintProperty(MASK_LAYER_ID, 'fill-opacity', target)
-}
-
-function getProjectCoords(project) { return (project.coordinate || []).map((c) => [Number(c.longitude), Number(c.latitude)]).filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat)) }
-function getProjectCentroid(project) {
-  let coords = getProjectCoords(project)
-  if (coords.length > 1) {
-    const [firstLng, firstLat] = coords[0]
-    const [lastLng, lastLat] = coords[coords.length - 1]
-    if (firstLng === lastLng && firstLat === lastLat) coords = coords.slice(0, -1)
-  }
-  if (!coords.length) return null
-  let sx = 0, sy = 0; for (const [lng, lat] of coords) { sx += lng; sy += lat }
-  return [sx / coords.length, sy / coords.length]
 }
 
 function buildAreaCenterFC(projects = allMapProjects.value, naturalWidthMap = {}) {
@@ -1356,31 +1333,6 @@ function buildAreaFeature(project) {
   const coords = getProjectCoords(project); if (coords.length < 3) return null
   const f = coords[0], l = coords[coords.length - 1]; if (f[0] !== l[0] || f[1] !== l[1]) coords.push([f[0], f[1]])
   return { type: 'Feature', properties: { projectId: project.id, projectCode: project.projectCode, projectName: project.projectName, itemType: project.itemType }, geometry: { type: 'Polygon', coordinates: [coords] } }
-}
-function buildWindFC(project) {
-  const normal = [], reserve = []
-  for (const [index, p] of (project.windTurbinePoints || []).entries()) {
-    const lng = Number(p.longitude), lat = Number(p.latitude)
-    if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue
-    const isReserve = Number(p.isReserve) === 1
-    const feature = { type: 'Feature', properties: { projectId: project.id, index, isReserve: isReserve ? 1 : 0 }, geometry: { type: 'Point', coordinates: [lng, lat] } }
-    ;(isReserve ? reserve : normal).push(feature)
-  }
-  return { normal: { type: 'FeatureCollection', features: normal }, reserve: { type: 'FeatureCollection', features: reserve } }
-}
-function buildBoosterFC(project) {
-  return {
-    type: 'FeatureCollection',
-    features: (project.boosterStationLocations || [])
-      .map((p, index) => {
-        if (!(p.isBest === true || Number(p.isBest) === 1)) return null
-        const lng = Number(p.lng), lat = Number(p.lat)
-        return Number.isFinite(lng) && Number.isFinite(lat)
-          ? { type: 'Feature', properties: { projectId: project.id, index, isBest: true }, geometry: { type: 'Point', coordinates: [lng, lat] } }
-          : null
-      })
-      .filter(Boolean),
-  }
 }
 function clearProjectLayers() {
   if (!mapRef.value) return
@@ -1485,174 +1437,6 @@ async function onProjectClick(projectId) {
   await renderAreaCenterIcons()
   await renderSelectedProjectIcons(project)
   fetchAndRenderRoadData(project.id)
-}
-
-function unwrapApiPayload(response) {
-  let value = response
-  for (let i = 0; i < 4; i += 1) {
-    if (
-      value &&
-      typeof value === 'object' &&
-      value.data != null &&
-      !Object.prototype.hasOwnProperty.call(value, 'roadMap') &&
-      !Object.prototype.hasOwnProperty.call(value, 'line') &&
-      !Object.prototype.hasOwnProperty.call(value, 'CNKJ')
-    ) {
-      value = value.data
-      continue
-    }
-    break
-  }
-  return value
-}
-
-function toMapCoordinate(point) {
-  const lng = Number(Array.isArray(point) ? point[0] : (point?.lon ?? point?.lng ?? point?.longitude))
-  const lat = Number(Array.isArray(point) ? point[1] : (point?.lat ?? point?.latitude))
-  return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null
-}
-
-function pushLineFeatures(target, rows, baseProps) {
-  if (!Array.isArray(rows) || rows.length === 0) return 0
-  const groups = Array.isArray(rows[0]) ? rows : [rows]
-  let count = 0
-  groups.forEach((group) => {
-    if (!Array.isArray(group)) return
-    const coords = group.map(toMapCoordinate).filter(Boolean)
-    if (coords.length < 2) return
-    target.push({
-      type: 'Feature',
-      properties: { ...baseProps },
-      geometry: { type: 'LineString', coordinates: coords },
-    })
-    count += 1
-  })
-  return count
-}
-
-function buildRoadLineFeatures(data) {
-  const roadFeatures = []
-  const lineFeatures = []
-
-  // ---------- 道路（保持不变） ----------
-  const roadMap = data?.roadMap ?? data?.data?.roadMap ?? {}
-  for (const type of ['CNKJ', 'CNXJ', 'JZXJ']) {
-    pushLineFeatures(
-      roadFeatures,
-      roadMap?.[type]?.roadpoint,
-      { category: 'road', sourceType: type, label: '道路' }
-    )
-  }
-
-  // ---------- 35kV 线路 ----------
-  // ★ 补齐 line35Kv 的多路径解包（与 overview 对齐）
-  const line35Kv =
-    data?.line35Kv ??
-    data?.line35KV ??
-    data?.data?.line35Kv ??
-    data?.data?.line35KV ??
-    null
-
-  const mapGeoJson =
-    line35Kv?.mapGeoJson ??
-    line35Kv?.mapGeojson ??
-    line35Kv?.mapGeoJSON ??
-    data?.mapGeoJson ??
-    null
-
-  // loops 同时兼容 line35Kv.loops / line35Kv.line.loops / data.loops / data.line.loops
-  const loops =
-    line35Kv?.loops ??
-    line35Kv?.line?.loops ??
-    data?.loops ??
-    data?.line?.loops ??
-    []
-
-  // 建立 loopname -> { fanCount, loopLength } 映射，供 mapGeoJson 分支回查 fanCount
-  const loopMeta = new Map()
-  if (Array.isArray(loops)) {
-    loops.forEach((loop, index) => {
-      const name = loop?.loopname || String(index + 1)
-      loopMeta.set(String(name), {
-        fanCount: Number(loop?.fan) || (loop?.fanidarr?.length ?? 0),
-        loopLength: loop?.looplength || '',
-      })
-    })
-  }
-
-  // ★ 分支 A：mapGeoJson（新格式，优先）
-  if (mapGeoJson?.features?.length) {
-    const sorted = [...mapGeoJson.features].sort((a, b) => {
-      const ai = Number(a?.properties?.edge_index)
-      const bi = Number(b?.properties?.edge_index)
-      if (Number.isFinite(ai) && Number.isFinite(bi)) return ai - bi
-      return 0
-    })
-
-    sorted.forEach((feature) => {
-      const geom = feature?.geometry
-      if (!geom) return
-      const props = feature?.properties || {}
-      const loopName = props.loopname || ''
-      const meta = loopMeta.get(String(loopName)) || {}
-      const lengthM = Number(props.length_m) || 0
-      const lengthKm = lengthM > 0
-        ? (lengthM / 1000).toFixed(2)
-        : (meta.loopLength || '')
-      const typeText =
-        props.type === 'underground' ? '地埋'
-          : props.type === 'trunk' ? '主干'
-            : props.type === 'branch' ? '分支'
-              : ''
-
-      const coordsList =
-        geom.type === 'LineString'
-          ? [geom.coordinates]
-          : geom.type === 'MultiLineString'
-            ? (geom.coordinates || [])
-            : []
-
-      coordsList.forEach((coords) => {
-        const points = (coords || []).map(toMapCoordinate).filter(Boolean)
-        if (points.length < 2) return
-        lineFeatures.push({
-          type: 'Feature',
-          properties: {
-            category: 'line',
-            loopIndex: props.edge_index ?? null,
-            loopName,
-            lineType: props.type || '',
-            lineTypeText: typeText,
-            segmentName: props.name || '',
-            loopLength: lengthKm,
-            fanCount: meta.fanCount || 0,
-            label: loopName ? `35kV 线路 ${loopName}` : `35kV 线路 ${props.name || ''}`,
-          },
-          geometry: { type: 'LineString', coordinates: points },
-        })
-      })
-    })
-  }
-  // ★ 分支 B：loops（老格式，作为兜底）
-  // else if (Array.isArray(loops)) {
-  //   loops.forEach((loop, loopIndex) => {
-  //     const loopName = loop?.loopname || String(loopIndex + 1)
-  //     pushLineFeatures(
-  //       lineFeatures,
-  //       loop?.cablepoletower,
-  //       {
-  //         category: 'line',
-  //         loopIndex,
-  //         loopName,
-  //         loopLength: loop?.looplength || '',
-  //         fanCount: Number(loop?.fan) || (loop?.fanidarr?.length ?? 0),
-  //         label: `35kV 线路 ${loopName}`,
-  //       }
-  //     )
-  //   })
-  // }
-
-  return { roadFeatures, lineFeatures }
 }
 
 function upsertLineLayer(layerId, geojson, paint) {
@@ -1777,8 +1561,8 @@ async function fetchAndRenderRoadData(projectId) {
 
     if (requestVersion !== roadRequestVersion || String(popoverProject.value?.id ?? '') !== String(projectId)) return
 
-    const data = unwrapApiPayload(res)
-    const { roadFeatures, lineFeatures } = buildRoadLineFeatures(data)
+    const data = unwrapRoadResponse(res)
+    const { roadFeatures, lineFeatures } = buildRoadLineFeatures(data, { extendedLoopPaths: true })
     roadDataCache.set(projectId, { roadFeatures, lineFeatures })
     currentRoadProjectId = String(projectId)
     syncRoadLineVisibility()
@@ -1964,10 +1748,7 @@ async function onVerifySaved() {
   await fetchMapProjects()
   const fresh = allMapProjects.value.find(p => p.id === popoverProject.value?.id)
   if (fresh) {
-    popoverProject.value = fresh
-    if (selectedProject.value && String(selectedProject.value.id) === String(fresh.id)) {
-      selectedProject.value = fresh
-    }
+    projectContext.syncProject(fresh)
     initEditBuffer(fresh)
   }
   fetchProjectList()
@@ -2287,6 +2068,13 @@ function handleReportConfirm(payload) {
   if (project) selectedProject.value = { ...selectedProject.value, ...project }
   showGenerateModal.value = false
 
+  // 与项目报告列表为空时的“创建项目建议书”使用完全相同的向导入口。
+  if (option?.key === 'proposal') {
+    reportPanels.openWizard('PROJECT_PROPOSAL', project)
+    showDetailPanel.value = false
+    return
+  }
+
   if (reportKeyToWizardMode[option?.key] !== undefined) {
     wizardMode.value = reportKeyToWizardMode[option.key]
     wizardVisible.value = true
@@ -2295,10 +2083,7 @@ function handleReportConfirm(payload) {
 }
 
 function closeWizard() {
-  wizardVisible.value = false
-  wizardTitleLabel.value = ''
-  wizardMaxStep.value = 2
-  wizardReportSubTab.value = ''
+  reportPanels.closeWizard()
   showDetailPanel.value = true
 }
 
@@ -2409,20 +2194,37 @@ function handleGenerateRequest(payload) {
 
 .expand-button { position: absolute; top: 50%; right: 0; z-index: 3; width: 25px; height: 54px; color: #fff; background: rgba(30,30,30,0.4); border: 0; border-radius: 5px 0 0 5px; cursor: pointer; transition: right 0.25s ease, background 0.15s ease; }
 .expand-button:hover { background: rgba(30, 30, 30, 0.65); }
-.project-list-view { position: absolute; inset: 0; z-index: 4; height: 100%; padding: 60px 20px 12px; overflow: auto; box-sizing: border-box; background: #fff; }
-.list-heading { display: flex; align-items: center; justify-content: space-between; }
-.list-title { display: flex; align-items: center; gap: 6px; color: #333; font-size: 13px; font-weight: 600; }
-.project-table { width: 100%; margin-top: 2px; }
-.project-table :deep(.el-table__row) { height: 56px; }
-.project-table :deep(.el-table__cell) { padding: 10px 0; }
-.project-table :deep(.el-table__header-wrapper th) { background: #f7f8fa; color: #606266; font-weight: 500; }
-.project-table :deep(.el-table__body tr.el-table__row--striped td) { background: #fafbfc; }
-.project-table :deep(.el-table__body tr:hover > td) { background: #f5f8ff; }
+.project-list-view {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  height: 100%;
+  padding: 60px 20px 12px;
+  overflow: auto;
+  box-sizing: border-box;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(255, 205, 220, 0.34), transparent 30%),
+    radial-gradient(circle at 92% 10%, rgba(184, 219, 255, 0.4), transparent 32%),
+    radial-gradient(circle at 90% 100%, rgba(172, 216, 255, 0.34), transparent 36%),
+    linear-gradient(122deg, #eef3fa 0%, #f7f8fc 48%, #eaf2fb 100%);
+}
+.list-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.list-title { display: flex; align-items: center; gap: 6px; color: #152536; font-size: 14px; font-weight: 600; }
+.project-list-view :deep(.search-bar) { background: rgba(255, 255, 255, 0.72); border: 1px solid rgba(225, 231, 239, 0.9); border-radius: 6px; }
+.project-table { width: 100%; margin-top: 10px; border: 1px solid #e1e7ef; border-radius: 6px; overflow: hidden; background: rgba(255, 255, 255, 0.96); }
+.project-table :deep(.el-table) { --el-table-border-color: #e6ebf1; --el-table-header-bg-color: #f2f5f9; --el-table-row-hover-bg-color: #f7faff; background: transparent; }
+.project-table :deep(.el-table__row) { height: 40px; }
+.project-table :deep(.el-table__cell) { padding: 0; }
+.project-table :deep(.el-table__header-wrapper th) { height: 40px; padding: 0; background: #f2f5f9; color: #637285; font-size: 14px; font-weight: 600; border-bottom: 1px solid #e0e7ef; }
+.project-table :deep(.el-table th .cell), .project-table :deep(.el-table td .cell) { padding: 0 14px; line-height: 40px; }
+.project-table :deep(.el-table td.el-table__cell) { height: 40px; color: #304153; font-size: 14px; border-bottom: 1px solid #e8edf3; }
+.project-table :deep(.el-table__body tr:hover > td) { background: #f8fbff !important; }
+.project-table :deep(.el-table__inner-wrapper::before) { display: none; }
 .status-text.passed { color: #24b26b; }
 .status-text.pending { color: #e6a23c; }
 .status-text.rejected { color: #f56c6c; }
-.pagination-row { display: flex; align-items: center; justify-content: flex-end; gap: 18px; padding-top: 14px; color: #666; font-size: 12px; }
-.row-actions { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.pagination-row { display: flex; align-items: center; justify-content: flex-end; gap: 18px; padding-top: 14px; color: #666; font-size: 14px; }
+ .row-actions { display: inline-flex; align-items: center; gap: 8px; }
 .row-actions .el-button { margin: 0; padding: 0; }
 .rate-cell { display: inline-flex; flex-direction: column; line-height: 1.2; vertical-align: middle; margin-right: 8px; }
 .rate-line { font-size: 11px; white-space: nowrap; }

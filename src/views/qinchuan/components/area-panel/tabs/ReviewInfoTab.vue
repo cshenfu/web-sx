@@ -22,7 +22,7 @@
         </div>
 
         <div class="group-content" :class="{ active: group.active }">
-          <div class="group-meta">{{ group.date }} {{ group.to }}</div>
+          <div v-if="group.date || group.to" class="group-meta">{{ group.date }} {{ group.to }}</div>
           <div v-for="(item, idx) in group.items || []" :key="idx" class="group-item">
             <div class="item-top">
               <span class="tag">{{ item.tag }}</span>
@@ -31,6 +31,11 @@
               <span class="item-date"> | {{ item.date }}</span>
             </div>
             <div class="item-name">{{ item.name }}</div>
+            <div class="item-actions" v-if="item.filePath">
+              <button type="button" @click="$emit('file-action', 'download', item)">下载</button>
+              <button type="button" @click="$emit('file-action', 'edit', item)">编辑</button>
+              <button type="button" class="danger" @click="$emit('file-action', 'delete', item)">删除</button>
+            </div>
             <div class="item-footer">
               <span>{{ item.operator }}</span>
               <span>{{ item.updatedAt }}</span>
@@ -46,6 +51,8 @@
 
 <script setup>
 import { computed } from 'vue'
+
+const emit = defineEmits(['file-action'])
 
 const props = defineProps({
   data: { type: Object, default: () => ({}) },
@@ -185,6 +192,13 @@ const safeData = computed(() => {
   font-weight: 700;
 }
 
+.group-empty {
+  padding: 16px 0 4px;
+  color: #9CA3AF;
+  font-size: 12px;
+  text-align: center;
+}
+
 .group-item {
   padding-top: 12px;
   margin-top: 12px;
@@ -224,6 +238,9 @@ const safeData = computed(() => {
   font-size: 13px;
 }
 
+ .item-actions { display: flex; gap: 12px; margin-top: 8px; }
+.item-actions button { padding: 0; border: 0; background: transparent; color: #2563eb; font-size: 12px; cursor: pointer; }
+.item-actions button.danger { color: #dc6b6b; }
 .item-footer {
   display: flex;
   gap: 16px;
