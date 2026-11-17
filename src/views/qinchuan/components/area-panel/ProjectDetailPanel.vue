@@ -230,7 +230,7 @@ const supportSelectedTypeOptions = computed(() => supportStageTypes.value.map((i
   ...item,
   fileCode: item.fileCode || item.name || item.detailName,
   fileDesc: item.fileDesc || item.detailName || item.name,
-  _stageCode: String(supportCurrentStageNode.value?.id || ''),
+  _stageCode: String(item._stageNode?.id || supportCurrentStageNode.value?.id || ''),
   _stageLabel: supportSelectedDisplayStage.value,
 })))
 
@@ -262,7 +262,7 @@ async function handleSupportStageChange(stageName) {
     const stages = await ensureSupportStageNodes()
     const selectedNodes = requestStage === '全部'
       ? stages
-      : [findSupportStageNode(requestStage)].filter(Boolean)
+      : stages.filter((node) => getSupportDisplayStage(node) === requestStage)
     if (!selectedNodes.length) {
       supportCurrentStageNode.value = null
       return
