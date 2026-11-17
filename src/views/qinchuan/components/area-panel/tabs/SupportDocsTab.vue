@@ -7,7 +7,7 @@
         type="button"
         class="stage-tab"
         :class="{ active: stage === activeStage }"
-        @click="activeStage = stage"
+        @click="handleStageChange(stage)"
       >
         {{ stage }}
       </button>
@@ -39,6 +39,7 @@
         :key="idx"
         :file="{ ...file, actions: readonly ? ['download'] : ['download', 'edit', 'delete'] }"
         @action="(action, f) => $emit('file-action', action, f)"
+        @preview="(file) => $emit('file-preview', file)"
       />
       <div v-if="!filteredFiles.length" class="empty-state">暂无数据~</div>
     </div>
@@ -54,7 +55,7 @@ const props = defineProps({
   readonly: { type: Boolean, default: false },
 })
 
-defineEmits(['add-data', 'file-action'])
+const emit = defineEmits(['add-data', 'file-action', 'file-preview', 'stage-change'])
 
 // ★ 归一化：无论父组件传不传 / 传什么，都保证 4 个字段有兜底
 const safeData = computed(() => ({
@@ -67,6 +68,13 @@ const safeData = computed(() => ({
 
 const activeStage = ref(safeData.value.activeStage || safeData.value.stages[0] || '')
 const activeFilter = ref('')
+
+function handleStageChange(stage) {
+  if (activeStage.value === stage) return
+  activeStage.value = stage
+  activeFilter.value = ''
+  emit('stage-change', stage)
+}
 
 // ★ props.data 变化（切换项目）时同步当前选中的 stage
 watch(safeData, (v) => {
