@@ -160,22 +160,12 @@ let reviewRequestSeq = 0
 // 审查信息始终展示完整阶段序列；未到达阶段保留节点，日期与文件内容为空。
 const REVIEW_STAGE_CONFIG = [
   { stageCode: 'PRELIMINARY_SELECTION', label: '初步选址', fileCode: '' },
-  { stageCode: 'PROJECT_RESERVE', label: '项目储备', fileCode: '' },
+  { stageCode: 'PROJECT_RESERVE', label: '项目储备', fileCode: 'PROJECT_INITIATION_MATERIALS' },
   { stageCode: 'PROJECT_INITIATION', label: '立项', fileCode: 'PROJECT_INITIATION_MEETING_MATERIALS' },
   { stageCode: 'FEASIBILITY_REVIEW', label: '可研审查', fileCode: 'FEASIBILITY_REVIEW' },
   { stageCode: 'INVESTMENT_DECISION', label: '投资决策', fileCode: 'INVESTMENT_DECISION_MEETING_MATERIALS' },
-  { stageCode: 'PROJECT_CONSTRUCTION', label: '建设实施', fileCode: '' },
-  { stageCode: 'PROJECT_OPERATION', label: '竣工验收/运营', fileCode: '' },
 ]
-const PROJECT_STAGE_ORDER = [
-  'PRELIMINARY_SELECTION',
-  'PROJECT_RESERVE',
-  'PROJECT_INITIATION',
-  'FEASIBILITY_REVIEW',
-  'INVESTMENT_DECISION',
-  'PROJECT_CONSTRUCTION',
-  'PROJECT_OPERATION',
-]
+const PROJECT_STAGE_ORDER = REVIEW_STAGE_CONFIG.map((stage) => stage.stageCode)
 
 function normalizeReviewFiles(record) {
   let files = record?.fileUrlList
@@ -199,24 +189,20 @@ function formatReviewDate(value) {
 
 async function loadReviewInfo() {
   const projectId = props.project?.id
-  const currentStage = props.project?.projectStage || props.project?.stage || ''
   const requestSeq = ++reviewRequestSeq
-
-  if (!projectId || !currentStage) {
-    reviewData.value = { timeline: [], groups: [] }
-    reviewLoading.value = false
-    return
-  }
-
-  const currentIndex = PROJECT_STAGE_ORDER.indexOf(currentStage)
-  if (currentIndex < 0) {
-    reviewData.value = { timeline: [], groups: [] }
-    reviewLoading.value = false
-    return
-  }
-
   const displayStages = REVIEW_STAGE_CONFIG
-  const queryStages = displayStages.filter((item) => item.fileCode && PROJECT_STAGE_ORDER.indexOf(item.stageCode) <= currentIndex)
+
+  if (!projectId) {
+    reviewData.value = {
+      timeline: displayStages.map((stage) => ({ key: stage.stageCode, label: stage.label, date: '' })),
+      groups: displayStages.map((stage) => ({ key: stage.stageCode, stage: stage.label, date: '', items: [] })),
+    }
+    reviewLoading.value = false
+    return
+  }
+
+  // 不按项目当前阶段截断：所有阶段都参与查询和展示，未创建的阶段自然为空。
+  const queryStages = displayStages.filter((item) => item.fileCode)
 
   reviewLoading.value = true
   try {
