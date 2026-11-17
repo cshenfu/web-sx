@@ -166,6 +166,7 @@ import { useRouter } from 'vue-router'
 import { useOssUpload } from '@/components/ossClient/index'
 import * as configApi from '@/api/modules/configData'
 import { renderAsync } from 'docx-preview'
+import { getTempUrlSX } from '@/api/modules/upload'
 
 const props = defineProps({
   project: { type: Object, required: true },
@@ -573,15 +574,18 @@ function handleSupportFileAction(action, file) {
   if (action === 'download') {
     const path = file?.filePath
     if (!path) { ElMessage.warning('该文件缺少下载路径'); return }
-    ossUpload.getFileUrl(path).then((url) => {
+    ossUpload.getFileUrl(path).then(async (url) => {
       if (!url) throw new Error('获取下载地址失败')
+      const response = await fetch(url)
+      if (!response.ok) throw new Error('文件下载失败')
+      const blobUrl = URL.createObjectURL(await response.blob())
       const link = document.createElement('a')
-      link.href = url
+      link.href = blobUrl
       link.download = file.name || '文件'
-      link.rel = 'noopener'
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+      URL.revokeObjectURL(blobUrl)
     }).catch((err) => ElMessage.error(err?.message || '文件下载失败'))
     return
   }
@@ -627,9 +631,17 @@ async function handleSupportFilePreview(file) {
   const path = file?.filePath
   if (!path) { ElMessage.warning('该文件缺少预览路径'); return }
   try {
-    const url = await ossUpload.getFileUrl(path)
+    let url = ''
+    try {
+      const tempRes = await getTempUrlSX(path)
+      if (typeof tempRes === 'string') url = tempRes
+      else url = tempRes?.url || tempRes?.tempUrl || tempRes?.data?.url || tempRes?.data?.tempUrl || (typeof tempRes?.data === 'string' ? tempRes.data : '')
+    } catch (error) {
+      console.warn('[support] 获取临时预览地址失败，回退 OSS 签名地址:', error)
+    }
+    if (!url) url = await ossUpload.getFileUrl(path)
     if (!url) throw new Error('获取预览地址失败')
-    const ext = String(file.name || path).split('?')[0].split('.').pop().toLowerCase()
+    const ext = String(file.name || path).split('?')[0].split('#')[0].split('.').pop().toLowerCase()
     supportPreviewTitle.value = file.name || '文件预览'
     if (ext === 'pdf') {
       supportPdfVisible.value = true
