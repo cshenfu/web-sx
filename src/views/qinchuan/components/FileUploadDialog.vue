@@ -162,6 +162,7 @@ const props = defineProps({
   fileCode: { type: String, default: '' },
   secondaryBusinessTitle: { type: String, default: '' },
   record: { type: Object, default: null },
+  appendMode: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['close', 'saved', 'parsed'])
@@ -467,6 +468,19 @@ function normalizeBool(v) {
   return v === 1 || v === '1' || v === true || v === 'true'
 }
 
+function normalizeExistingFileList(value) {
+  if (Array.isArray(value)) return value
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
 async function handleSave() {
   if (!selectedFile.value) {
     ElMessage.warning('请先选择文件')
@@ -505,7 +519,9 @@ async function handleSave() {
         isRequiredUpload: normalizeBool(props.record.isRequiredUpload),
         notes: props.record.notes,
         recognitionContent, // ★ 记录级 AiProjectFileSaveReqVO.recognitionContent
-        fileUrlList: [newFile],
+        fileUrlList: props.appendMode
+          ? [...normalizeExistingFileList(props.record.fileUrlList), newFile]
+          : [newFile],
       }
       res = await updateFile(payload)
     } else {
