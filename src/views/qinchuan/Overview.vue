@@ -342,7 +342,7 @@
       @assign-success="onAssignSuccess"
       @update:reserve="showReserveDialog = $event"
       @reserve-saved="onReserveSaved"
-      @close-add-report="showAddReportPanel = false"
+      @close-add-report="showAddReportPanel = false; addReportType = ''"
       @report-success="handleReportPanelSuccess"
       @close-confirm="showConfirmPanel = false"
       @confirm-success="handleConfirmSuccess"
@@ -793,6 +793,7 @@ const popoverAltCount = computed(() => {
 
 function handleOpenAddReport(payload = {}) {
   reportModalVisible.value = false
+  addReportType.value = ''
   if (payload.project) activeProjectDetail.value = { ...(activeProjectDetail.value || {}), ...payload.project }
   generatedReportSubTab.value = payload.subTab || 'FEASIBILITY_STUDY'
   detailPanelTab.value = 'report'
