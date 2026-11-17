@@ -140,6 +140,7 @@
       :tag-name="supportUploadTag"
       :project="project"
       :file-code="supportUploadFileCode"
+      :secondary-business-title="supportSelectedStageCode"
       :record="supportUploadRecord"
       :append-mode="supportUploadAppendMode"
       @close="supportUploadVisible = false"
@@ -269,35 +270,52 @@ async function handleSupportStageChange(stageName) {
       const types = Array.isArray(res?.data) ? res.data : Array.isArray(res?.data?.list) ? res.data.list : []
       return { node, types }
     }))
-    const flattenedTypes = stageTypeGroups.flatMap(({ node, types }) => types.map((item) => ({
+    const allStageTypes = stageTypeGroups.flatMap(({ node, types }) => types.map((item) => ({
       ...item,
       _stageNode: node,
       _stageDisplayName: getSupportDisplayStage(node),
       fileCode: item.fileCode || item.name || item.detailName,
       fileDesc: item.fileDesc || item.detailName || item.name,
     })))
-    supportStageTypes.value = flattenedTypes
+    // “全部”展示类型并集：同一 fileCode 只保留一项；具体阶段仍保留各自的节点映射。
+    const typeMap = new Map()
+    allStageTypes.forEach((item) => {
+      const key = String(item.fileCode || item.id || item.name || '')
+      if (key && !typeMap.has(key)) typeMap.set(key, item)
+    })
+    const flattenedTypes = requestStage === '全部' ? [...typeMap.values()] : allStageTypes
+    supportStageTypes.value = allStageTypes
     supportCurrentStageNode.value = selectedNodes.length === 1 ? selectedNodes[0] : null
 
-    const queried = await Promise.all(flattenedTypes.map(async (type) => {
+    const queryTypes = requestStage === '全部'
+      ? flattenedTypes
+      : allStageTypes
+    const queried = await Promise.all(queryTypes.map(async (type) => {
       const fileCode = type.fileCode
       if (!fileCode) return { type, records: [] }
       const res = await fileApi.getFileListByProjectid({
         aiProjectId: props.project.id,
         firstBusinessTitle: fileCode,
+        secondaryBusinessTitle: String(type._stageNode?.id || ''),
       })
       return { type, records: normalizeSupportRecords(res) }
     }))
     const recordsByCode = {}
+    const seenFileRows = new Set()
     const files = queried.flatMap(({ type, records }) => {
-      recordsByCode[type.fileCode] = records
+      const recordKey = `${type._stageNode?.id || ''}::${type.fileCode}`
+      recordsByCode[recordKey] = records
       return records.flatMap((record) => {
         let fileList = record.fileUrlList
         if (typeof fileList === 'string') { try { fileList = JSON.parse(fileList) } catch { fileList = [] } }
         if (!Array.isArray(fileList) || !fileList.length) {
           fileList = record.fileName || record.filePath ? [{ fileName: record.fileName, filePath: record.filePath }] : []
         }
-        return fileList.map((file) => ({
+        return fileList.flatMap((file) => {
+          const rowKey = `${record.id || ''}::${file.filePath || file.url || file.fileName || file.name || ''}`
+          if (seenFileRows.has(rowKey)) return []
+          seenFileRows.add(rowKey)
+          return [{
           id: record.id,
           stage: type._stageDisplayName || requestStage,
           stageCode: String(type._stageNode?.id || ''),
@@ -309,7 +327,8 @@ async function handleSupportStageChange(stageName) {
           operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
           record,
           rawFile: file,
-        }))
+        }]
+        })
       })
     })
     supportFileRecords.value = recordsByCode
@@ -367,7 +386,7 @@ async function confirmSupportAddType() {
     ElMessage.warning('请选择支持性文件类型')
     return
   }
-  const existingRecords = supportFileRecords.value[type.fileCode] || []
+  const existingRecords = supportFileRecords.value[`${type._stageCode}::${type.fileCode}`] || []
   supportUploadRecord.value = existingRecords[0] || null
   supportUploadFileCode.value = type.fileCode
   supportSelectedStageCode.value = type._stageCode
