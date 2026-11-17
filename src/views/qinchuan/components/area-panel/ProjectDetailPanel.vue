@@ -1090,4 +1090,9 @@ watch(() => props.project?.id, (id) => { if (id) refreshSurveyData() })
   background: rgba(255, 255, 255, 0.5) !important;
 }
 
+
+.support-pdf-body { height: 70vh; min-height: 420px; }
+.support-pdf-iframe { width: 100%; height: 100%; border: 0; }
+.support-docx-body { height: 70vh; min-height: 420px; overflow: auto; }
+.support-docx-container { min-height: 100%; padding: 16px; background: #fff; color: #222; }
 </style>
