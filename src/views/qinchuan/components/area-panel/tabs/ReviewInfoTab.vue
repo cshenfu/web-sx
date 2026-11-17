@@ -41,7 +41,6 @@
               <span>{{ item.updatedAt }}</span>
             </div>
           </div>
-          <div v-if="!group.items || !group.items.length" class="group-empty">暂无</div>
         </div>
       </div>
 
