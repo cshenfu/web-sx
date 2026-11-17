@@ -236,6 +236,8 @@ async function loadReviewInfo() {
         operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
         updatedAt: formatReviewDate(record.updateTime || record.createTime),
         filePath: file.filePath || file.url || '',
+        record,
+        rawFile: file,
       })))
 
       const latestRecord = records.reduce((latest, record) => {
