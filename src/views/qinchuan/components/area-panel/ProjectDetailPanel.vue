@@ -287,17 +287,29 @@ async function handleSupportStageChange(stageName) {
     supportStageTypes.value = allStageTypes
     supportCurrentStageNode.value = selectedNodes.length === 1 ? selectedNodes[0] : null
 
-    // 文件记录仍按“阶段 + 类型”逐项查询；仅类型筛选列表做并集去重。
+    // 文件记录按“阶段 + 类型”查询。历史记录若未保存阶段字段，只归属到该类型首次出现的阶段，
+    // 避免同一条历史上传记录在多个阶段重复展示；新上传记录会保存 secondaryBusinessTitle。
+    const firstStageByFileCode = new Map()
+    allStageTypes.forEach((type) => {
+      if (type.fileCode && !firstStageByFileCode.has(String(type.fileCode))) {
+        firstStageByFileCode.set(String(type.fileCode), String(type._stageNode?.id || ''))
+      }
+    })
     const queryTypes = allStageTypes
     const queried = await Promise.all(queryTypes.map(async (type) => {
       const fileCode = type.fileCode
+      const stageCode = String(type._stageNode?.id || '')
       if (!fileCode) return { type, records: [] }
       const res = await fileApi.getFileListByProjectid({
         aiProjectId: props.project.id,
         firstBusinessTitle: fileCode,
-        secondaryBusinessTitle: String(type._stageNode?.id || ''),
+        secondaryBusinessTitle: stageCode,
       })
-      return { type, records: normalizeSupportRecords(res) }
+      const records = normalizeSupportRecords(res).filter((record) => {
+        const recordStage = String(record.secondaryBusinessTitle || '')
+        return recordStage ? recordStage === stageCode : firstStageByFileCode.get(String(fileCode)) === stageCode
+      })
+      return { type, records }
     }))
     const recordsByCode = {}
     const seenFileRows = new Set()
