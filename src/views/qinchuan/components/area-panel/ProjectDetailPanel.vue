@@ -97,12 +97,12 @@
     >
       <el-form label-position="top">
         <el-form-item label="项目阶段" required>
-          <el-select v-model="supportSelectedStageCode" placeholder="请选择项目阶段" style="width: 100%" :disabled="supportAddStageLocked">
+          <el-select v-model="supportSelectedDisplayStage" placeholder="请选择项目阶段" style="width: 100%" :disabled="supportAddStageLocked">
             <el-option
-              v-for="stage in supportStageConfigs"
-              :key="stage.stageCode"
-              :label="stage.stageDesc || stage.stageName || stage.stageCode"
-              :value="stage.stageCode"
+              v-for="stage in SUPPORT_DISPLAY_STAGES.filter((item) => item !== '全部')"
+              :key="stage"
+              :label="stage"
+              :value="stage"
             />
           </el-select>
         </el-form-item>
@@ -110,9 +110,9 @@
           <el-select v-model="supportSelectedFileCode" placeholder="请先选择项目阶段" style="width: 100%" :disabled="!supportSelectedStageCode">
             <el-option
               v-for="item in supportSelectedTypeOptions"
-              :key="item.fileCode"
+              :key="`${item._stageCode}-${item.fileCode}`"
               :label="item.fileDesc || item.fileCode"
-              :value="item.fileCode"
+              :value="item.fileCode + '::' + item._stageCode"
             />
           </el-select>
         </el-form-item>
@@ -172,7 +172,30 @@ defineEmits([
 const router = useRouter()
 const ossUpload = useOssUpload()
 const { mainInfo: mainInfoData, loading: mainInfoLoading } = useProjectMainInfo(computed(() => props.project))
-const supportDocsData = ref({ stages: ['全部'], activeStage: '全部', typeFilters: [], files: [] })
+const SUPPORT_DISPLAY_STAGES = [
+  '全部',
+  '立项阶段',
+  '投资决策阶段',
+  '建设准备阶段',
+  '建设实施阶段',
+  '竣工验收阶段',
+  '投产运营',
+]
+
+function getSupportDisplayStage(stage = {}) {
+  const code = String(stage.stageCode || '').toUpperCase()
+  const name = String(stage.stageDesc || stage.stageName || '').replace(/\s/g, '')
+  if (code.includes('RESERVE') || name.includes('项目储备') || name.includes('立项准备')) return '立项阶段'
+  if (code.includes('INITIATION') || name === '立项' || name.includes('立项材料')) return '立项阶段'
+  if (code.includes('FEASIBILITY') || code.includes('INVESTMENT') || name.includes('可研') || name.includes('投决')) return '投资决策阶段'
+  if (name.includes('建设准备')) return '建设准备阶段'
+  if (name.includes('建设实施')) return '建设实施阶段'
+  if (name.includes('竣工验收')) return '竣工验收阶段'
+  if (name.includes('投产运营')) return '投产运营'
+  return ''
+}
+
+const supportDocsData = ref({ stages: SUPPORT_DISPLAY_STAGES, activeStage: '全部', typeFilters: [], files: [] })
 const supportLoading = ref(false)
 const supportUploadVisible = ref(false)
 const supportUploadRecord = ref(null)
@@ -181,34 +204,44 @@ const supportUploadTag = ref('')
 const supportStageConfigs = ref([])
 const supportFileRecords = ref({})
 const supportAddDialogVisible = ref(false)
+const supportSelectedDisplayStage = ref('')
 const supportSelectedStageCode = ref('')
 const supportSelectedFileCode = ref('')
 const supportAddStageLocked = ref(false)
 const supportUploadAppendMode = ref(false)
-const supportSelectedTypeOptions = computed(() => {
-  const stage = supportStageConfigs.value.find((item) => item.stageCode === supportSelectedStageCode.value)
-  const children = stage?.firstBusinessTitle || stage?.children || []
-  return children.filter((item) => item.fileCode)
+const supportSelectedTypeOptions = computed(() => supportStageConfigs.value
+  .filter((stage) => !supportSelectedDisplayStage.value || getSupportDisplayStage(stage) === supportSelectedDisplayStage.value)
+  .flatMap((stage) => {
+    const children = stage.firstBusinessTitle || stage.children || []
+    return children.filter((item) => item.fileCode).map((item) => ({
+      ...item,
+      _stageCode: stage.stageCode || '',
+      _stageLabel: stage.stageDesc || stage.stageName || stage.stageCode || '',
+    }))
+  })
 })
 
 function resetSupportAddSelection() {
+  supportSelectedDisplayStage.value = ''
   supportSelectedStageCode.value = ''
   supportSelectedFileCode.value = ''
   supportAddStageLocked.value = false
 }
 
 function handleSupportAddData(stageName) {
-  const selectedStage = supportStageConfigs.value.find((item) =>
-    (item.stageDesc || item.stageName || item.stageCode) === stageName
-  )
-  supportSelectedStageCode.value = selectedStage?.stageCode || ''
+  const selectedStage = SUPPORT_DISPLAY_STAGES.includes(stageName) && stageName !== '全部' ? stageName : ''
+  supportSelectedDisplayStage.value = selectedStage
+  supportSelectedStageCode.value = ''
   supportAddStageLocked.value = Boolean(selectedStage)
   supportSelectedFileCode.value = ''
   supportAddDialogVisible.value = true
 }
 
 function confirmSupportAddType() {
-  const type = supportSelectedTypeOptions.value.find((item) => item.fileCode === supportSelectedFileCode.value)
+  const [selectedFileCode, selectedEnumStageCode] = supportSelectedFileCode.value.split('::')
+  const type = supportSelectedTypeOptions.value.find((item) =>
+    item.fileCode === selectedFileCode && item._stageCode === selectedEnumStageCode
+  )
   if (!type) {
     ElMessage.warning('请选择支持性文件类型')
     return
@@ -217,6 +250,7 @@ function confirmSupportAddType() {
   const existingRecords = supportFileRecords.value[type.fileCode] || []
   supportUploadRecord.value = existingRecords[0] || null
   supportUploadFileCode.value = type.fileCode
+  supportSelectedStageCode.value = type._stageCode
   supportUploadTag.value = type.fileDesc || '支持性文件'
   supportUploadAppendMode.value = true
   supportAddDialogVisible.value = false
@@ -351,7 +385,7 @@ async function loadReviewInfo() {
 
 async function loadSupportDocs() {
   if (!props.project?.id) {
-    supportDocsData.value = { stages: ['全部'], activeStage: '全部', typeFilters: [], files: [] }
+    supportDocsData.value = { stages: SUPPORT_DISPLAY_STAGES, activeStage: '全部', typeFilters: [], files: [] }
     return
   }
   supportLoading.value = true
@@ -382,7 +416,7 @@ async function loadSupportDocs() {
         }
         return fileList.map((file) => ({
           id: record.id,
-          stage: stage.stageDesc || stage.stageName || stage.stageCode || '其他阶段',
+          stage: getSupportDisplayStage(stage) || '其他阶段',
           stageCode: stage.stageCode || '',
           fileCode,
           tag: record.fileTypeTag || business.fileDesc || '其他文件',
@@ -396,18 +430,17 @@ async function loadSupportDocs() {
       })
     })
     supportFileRecords.value = recordsByCode
-    const stages = ['全部', ...new Set(stageConfigs.map((s) => s.stageDesc || s.stageName || s.stageCode).filter(Boolean))]
     const tags = [...new Set(files.map((file) => file.tag).filter(Boolean))]
     supportDocsData.value = {
-      stages,
-      activeStage: stages.includes(supportDocsData.value.activeStage) ? supportDocsData.value.activeStage : '全部',
+      stages: SUPPORT_DISPLAY_STAGES,
+      activeStage: SUPPORT_DISPLAY_STAGES.includes(supportDocsData.value.activeStage) ? supportDocsData.value.activeStage : '全部',
       typeFilters: tags.map((label, index) => ({ key: 'support-type-' + index, label, color: index % 2 ? 'green' : 'pink' })),
       files,
     }
   } catch (err) {
     console.error('[support] 加载支持性文件失败:', err)
     ElMessage.error('支持性文件加载失败')
-    supportDocsData.value = { stages: ['全部'], activeStage: '全部', typeFilters: [], files: [] }
+    supportDocsData.value = { stages: SUPPORT_DISPLAY_STAGES, activeStage: '全部', typeFilters: [], files: [] }
   } finally {
     supportLoading.value = false
   }
