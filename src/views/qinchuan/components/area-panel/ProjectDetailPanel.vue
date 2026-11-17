@@ -242,10 +242,6 @@ async function ensureSupportStageNodes() {
   return list
 }
 
-function findSupportStageNode(stageName) {
-  return supportStageNodes.value.find((node) => getSupportDisplayStage(node) === stageName) || null
-}
-
 function normalizeSupportRecords(res) {
   if (Array.isArray(res?.data)) return res.data
   if (Array.isArray(res?.data?.list)) return res.data.list
