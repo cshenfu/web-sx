@@ -12,7 +12,7 @@
 
     <main class="drawer-body">
       <!-- 报告类型 Tabs -->
-      <div class="report-tabs">
+      <div v-if="!reportType" class="report-tabs">
         <button
           v-for="tab in reportTypeOptions"
           :key="tab.key"
@@ -27,7 +27,7 @@
 
       <div class="upload-section">
         <div class="upload-hint">
-          支持 docx 支持 doc、docx、pdf 格式数据导入，每次只能选择一种类型并导入最多1个文件（系统会自动解析文档，请确认解析的内容）
+          支持 docx 支持 doc、docx、pdf 格式数据导入，支持一次选择多个文件，系统会逐份上传并自动解析（系统会自动解析文档，请确认解析的内容）
         </div>
         
         <div class="upload-action">
@@ -35,14 +35,15 @@
           <input
             ref="fileInputRef"
             type="file"
+            multiple
             accept=".doc,.docx,.pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"            style="display: none"
             @change="handleFileChange"
           />
         </div>
 
         <!-- 已上传文件展示 -->
-        <div v-if="currentFile" class="uploaded-file">
-          <span class="file-name">{{ currentFile.name }}</span>
+        <div v-for="file in currentFiles" :key="file.name + file.size + file.lastModified" class="uploaded-file">
+          <span class="file-name">{{ file.name }}</span>
         </div>
       </div>
       
@@ -71,7 +72,8 @@ import { useOssUpload } from '@/components/ossClient/index'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
-  project: { type: Object, default: () => null }
+  project: { type: Object, default: () => null },
+  reportType: { type: String, default: '' }
 })
 
 const emit = defineEmits(['close', 'success'])
@@ -90,15 +92,15 @@ const reportTypeOptions = [
 
 const activeReportTab = ref('FEASIBILITY_STUDY')
 const fileInputRef = ref(null)
-const currentFile = ref(null)
+const currentFiles = ref([])
 const remark = ref('')
 const saving = ref(false)
 
 watch(() => props.visible, (val) => {
   if (val) {
     console.log('【AddReportPanel】组件已显示，当前 project:', props.project)
-    activeReportTab.value = 'FEASIBILITY_STUDY'
-    currentFile.value = null
+    activeReportTab.value = props.reportType || 'FEASIBILITY_STUDY'
+    currentFiles.value = []
     remark.value = ''
     saving.value = false
   }
@@ -107,7 +109,7 @@ watch(() => props.visible, (val) => {
 function handleSwitchTab(key) {
   if (activeReportTab.value === key) return
   activeReportTab.value = key
-  currentFile.value = null
+  currentFiles.value = []
 }
 
 function triggerFileInput() {
@@ -115,88 +117,66 @@ function triggerFileInput() {
 }
 
 function handleFileChange(e) {
-  const file = e.target.files?.[0]
-  if (!file) return
-
-  // ★ 新增：后缀白名单校验
-  const ext = file.name.split('.').pop()?.toLowerCase()
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
   const allowExts = ['doc', 'docx', 'pdf']
-  if (!allowExts.includes(ext)) {
-    ElMessage.warning('仅支持 doc、docx、pdf 格式的文件')
+  const invalid = files.filter(file => !allowExts.includes(file.name.split('.').pop()?.toLowerCase()))
+  if (invalid.length) {
+    ElMessage.warning('仅支持 doc、docx、pdf 格式，请检查所选文件')
     e.target.value = ''
     return
   }
-
-  console.log('【AddReportPanel】选择文件:', file.name)
-  currentFile.value = file
+  const existing = new Set(currentFiles.value.map(file => file.name + file.size + file.lastModified))
+  currentFiles.value = [...currentFiles.value, ...files.filter(file => !existing.has(file.name + file.size + file.lastModified))]
   e.target.value = ''
 }
 // ★ 核心排错方法
 async function handleSave() {
-  
-  if (!currentFile.value) {
-    return;
+  if (!currentFiles.value.length) {
+    ElMessage.warning('请先选择报告文件')
+    return
   }
-
-  const projectId = props.project?.aiProjectId || props.project?.id;
+  const projectId = props.project?.aiProjectId || props.project?.id
   if (!projectId) {
-    console.error('【AddReportPanel】project 数据:', props.project);
-    return;
+    ElMessage.error('缺少项目 ID，无法上传报告')
+    return
   }
-
-  const file = currentFile.value;
-
+  let successCount = 0
+  const reportType = props.reportType || activeReportTab.value
   try {
-    saving.value = true;
-    
-    // 检查 OSS 实例
-    if (!ossUpload || typeof ossUpload.uploadFile !== 'function') {
-      console.error('ossUpload 的值:', ossUpload);
-      throw new Error('OSS 上传组件未正确初始化');
+    saving.value = true
+    if (!ossUpload || typeof ossUpload.uploadFile !== 'function') throw new Error('OSS 上传组件未正确初始化')
+    if (typeof aiProjectApi.uploadReport !== 'function') throw new Error('找不到 uploadReport 接口')
+    for (const file of [...currentFiles.value]) {
+      const uploadRes = await ossUpload.uploadFile(file)
+      const fileUrl = uploadRes?.obsPath || uploadRes?.url || ''
+      if (!fileUrl) throw new Error('文件「' + file.name + '」上传后未获取到文件地址')
+      const payload = {
+        aiProjectId: projectId,
+        fileName: file.name,
+        fileSize: file.size,
+        fileSuffix: file.name.split('.').pop().toLowerCase(),
+        fileUrl,
+        remark: remark.value,
+        reportType,
+      }
+      const res = await aiProjectApi.uploadReport(payload)
+      if (res?.code === 200 || res?.code === '200' || res?.success) {
+        successCount++
+        currentFiles.value = currentFiles.value.filter(item => item !== file)
+      } else {
+        throw new Error(res?.msg || '「' + file.name + '」保存失败')
+      }
     }
-
-    const uploadRes = await ossUpload.uploadFile(file);
-    console.log('【AddReportPanel】OSS 返回结果:', uploadRes);
-
-    const fileUrl = uploadRes?.obsPath || uploadRes?.url || '';
-    if (!fileUrl) {
-      throw new Error('未能获取文件URL');
-    }
-
-
-    const payload = {
-      aiProjectId: projectId, 
-      fileName: file.name,
-      fileSize: file.size,
-      fileSuffix: file.name.split('.').pop().toLowerCase(),
-      fileUrl: fileUrl,
-      remark: remark.value,
-      reportType: activeReportTab.value 
-    };
-
-    console.log('【AddReportPanel】准备提交的参数:', payload);
-
-    // 检查接口实例
-    if (typeof aiProjectApi.uploadReport !== 'function') {
-      throw new Error('找不到 uploadReport 接口');
-    }
-
-    const res = await aiProjectApi.uploadReport(payload);
-    console.log('【AddReportPanel】后端返回结果:', res);
-
-    if (res?.code === 200 || res?.code === '200' || res?.success) {
-      ElMessage.success('报告添加成功');
-      emit('success', {
-        reportType: activeReportTab.value,
-        project: props.project,
-      });
-      emit('close');
-    } else {
-    }
+    ElMessage.success('成功添加 ' + successCount + ' 份报告')
+    emit('success', { reportType, project: props.project, count: successCount })
+    if (!currentFiles.value.length) emit('close')
   } catch (err) {
-    console.error('【AddReportPanel】异常详情:', err);
+    console.error('【AddReportPanel】异常详情:', err)
+    if (successCount > 0) emit('success', { reportType: props.reportType || activeReportTab.value, project: props.project, count: successCount })
+    ElMessage.error(err?.message || '报告上传失败')
   } finally {
-    saving.value = false;
+    saving.value = false
   }
 }
 </script>

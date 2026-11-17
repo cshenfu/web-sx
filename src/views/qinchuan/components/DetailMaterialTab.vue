@@ -1,7 +1,23 @@
 <template>
   <div v-loading="loading" class="material-tab">
-    <!-- 必要材料 -->
-    <div class="section">
+    <!-- 可研报告固定入口，不依赖材料类型字典 -->
+    <div v-if="isFeasibilityStage" class="section">
+      <div class="section-header">
+        <span class="section-title">必要支持文件</span>
+      </div>
+      <div class="file-item">
+        <div class="file-title-row">
+          <span class="file-name">可研报告</span>
+          <div class="feasibility-report-actions">
+            <el-button link type="primary" size="small" @click="emit('generate-feasibility-report')">一键生成可研报告</el-button>
+            <el-button link type="primary" size="small" @click="emit('upload-feasibility-report')">选择可研报告</el-button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 其他阶段仍按材料配置展示必要文件 -->
+    <div v-if="!isFeasibilityStage" class="section">
       <div class="section-header">
         <span class="section-title">
           必要支持文件 ({{ completedCount }}/{{ requiredItems.length }})
@@ -60,7 +76,7 @@
     <!-- 其他材料 -->
     <div v-if="otherMaterials.length > 0" class="section">
       <div class="section-header">
-        <span class="section-title">其他材料</span>
+        <span class="section-title">其他文件</span>
         <el-button link type="primary" size="small" @click="emit('open-setting', 'other')">
           设置
         </el-button>
@@ -113,9 +129,10 @@ const props = defineProps({
   stageCode: { type: String, default: '' },
 })
 
-const emit = defineEmits(['open-setting', 'upload', 'deleted'])
+const emit = defineEmits(['open-setting', 'upload', 'deleted', 'generate-feasibility-report', 'upload-feasibility-report'])
 
 const ossUpload = useOssUpload()
+const isFeasibilityStage = computed(() => props.stageCode === 'FEASIBILITY_REVIEW')
 
 const loading = ref(false)
 const fileList = ref([])
@@ -137,6 +154,7 @@ function normalizeRecord(r) {
 const requiredItems = computed(() =>
   fileList.value
     .filter(isRequired)
+    .filter(r => !(isFeasibilityStage.value && String(r.fileTypeTag || '').includes('可研报告')))
     .map(r => ({
       key: r.id,
       label: r.fileTypeTag || '-',
@@ -148,6 +166,7 @@ const requiredItems = computed(() =>
 const otherMaterials = computed(() =>
   fileList.value
     .filter(r => !isRequired(r))
+    .filter(r => !(isFeasibilityStage.value && String(r.fileTypeTag || '').includes('可研报告')))
     .map(r => ({
       key: r.id,
       label: r.fileTypeTag || '-',
@@ -349,6 +368,8 @@ defineExpose({ loadFiles })
   color: #909399;
   font-size: 12px;
 }
+ .feasibility-report-actions { display: flex; align-items: center; gap: 12px; }
+
 .file-actions {
   display: flex;
   gap: 12px;

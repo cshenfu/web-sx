@@ -333,6 +333,7 @@
       :assign-project="actionProject"
       :reserve-project="actionProject"
       :report-project="activeProjectDetail"
+      :report-type="addReportType"
       :report-id="confirmReportId"
       :verify-mounted="true"
       @close-verify="showVerifyPanel = false"
@@ -341,7 +342,7 @@
       @assign-success="onAssignSuccess"
       @update:reserve="showReserveDialog = $event"
       @reserve-saved="onReserveSaved"
-      @close-add-report="showAddReportPanel = false"
+      @close-add-report="showAddReportPanel = false; addReportType = ''"
       @report-success="handleReportPanelSuccess"
       @close-confirm="showConfirmPanel = false"
       @confirm-success="handleConfirmSuccess"
@@ -641,7 +642,9 @@ function handleGeneratePanelClose() {
 
   generatedReportSubTab.value = pending.reportType
   detailPanelTab.value = 'report'
-  showSiteMapDetailPanel.value = false
+  // 阶段面板中的报告/函件生成完成后，切换到通用项目详情面板的项目报告列表。
+  actionProject.value = project || activeProjectDetail.value
+  showSiteMapDetailPanel.value = true
   isDetailFullscreen.value = false
   nextTick(() => { detailRefreshKey.value++ })
 }
@@ -677,6 +680,7 @@ const listExpanded = ref(false)
 const activeAreaId = ref(null)
 const activeProjectDetail = ref(projectDetailMockData)
 const reportModalVisible = ref(false)
+const addReportType = ref('')
 const detailLoading = ref(false)
 const detailPanelTab = ref('main')
 
@@ -789,12 +793,18 @@ const popoverAltCount = computed(() => {
 
 function handleOpenAddReport(payload = {}) {
   reportModalVisible.value = false
+  addReportType.value = ''
   if (payload.project) activeProjectDetail.value = { ...(activeProjectDetail.value || {}), ...payload.project }
   generatedReportSubTab.value = payload.subTab || 'FEASIBILITY_STUDY'
   detailPanelTab.value = 'report'
-  showSiteMapDetailPanel.value = false
+  const targetProject = payload.project || activeProjectDetail.value
+  if (targetProject) {
+    actionProject.value = targetProject
+    selectedProject.value = resolveMapProject(targetProject)
+  }
+  // 从阶段面板进入时，先打开通用项目详情面板并定位到项目报告列表。
+  showSiteMapDetailPanel.value = true
   isDetailFullscreen.value = false
-  // “添加项目报告”应打开实际的报告上传抽屉，而不是仅切换详情 Tab。
   reportPanels.openAddReport()
   nextTick(() => { detailRefreshKey.value++ })
 }
@@ -813,6 +823,7 @@ function dispatchCreateReport(payload) {
 function handleReportPanelSuccess() {
   fetchMapProjects()
   fetchProjectList()
+  detailRefreshKey.value++
 }
 
 function handleOpenConfirm(reportId) { reportPanels.openConfirm(reportId) }
@@ -1098,9 +1109,21 @@ async function onSiteMapDetailAction(payload) {
   }
 
   if (payload?.type === 'create-report') {
-    // ★ 不再直接 openWizard，改成分发
     dispatchCreateReport(payload)
     showSiteMapDetailPanel.value = false
+    return
+  }
+  if (payload?.type === 'generate-feasibility-report') {
+    reportPanels.openWizard('FEASIBILITY_STUDY', payload.project || actionProject.value || activeProjectDetail.value, {
+      packageType: 'default', title: '一键生成集中式可行性研究报告', maxStep: 2,
+    })
+    return
+  }
+  if (payload?.type === 'upload-feasibility-report') {
+    const project = payload.project || actionProject.value || activeProjectDetail.value
+    if (project) { activeProjectDetail.value = { ...(activeProjectDetail.value || {}), ...project }; actionProject.value = project }
+    addReportType.value = 'FEASIBILITY_STUDY'
+    reportPanels.openAddReport()
     return
   }
 }
@@ -1131,6 +1154,18 @@ async function onDetailPanelAction(payload) {
   // ============ 报告列表 tab 里点「创建 XXX」 ============
   if (payload.type === 'create-report') {
     dispatchCreateReport(payload)
+    return
+  }
+  if (payload.type === 'generate-feasibility-report') {
+    reportPanels.openWizard('FEASIBILITY_STUDY', payload.project || activeProjectDetail.value, {
+      packageType: 'default', title: '一键生成集中式可行性研究报告', maxStep: 2,
+    })
+    return
+  }
+  if (payload.type === 'upload-feasibility-report') {
+    if (payload.project) activeProjectDetail.value = { ...(activeProjectDetail.value || {}), ...payload.project }
+    addReportType.value = 'FEASIBILITY_STUDY'
+    reportPanels.openAddReport()
     return
   }
 
