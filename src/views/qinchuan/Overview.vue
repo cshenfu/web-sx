@@ -794,6 +794,8 @@ function handleOpenAddReport(payload = {}) {
   detailPanelTab.value = 'report'
   showSiteMapDetailPanel.value = false
   isDetailFullscreen.value = false
+  // “添加项目报告”应打开实际的报告上传抽屉，而不是仅切换详情 Tab。
+  reportPanels.openAddReport()
   nextTick(() => { detailRefreshKey.value++ })
 }
 

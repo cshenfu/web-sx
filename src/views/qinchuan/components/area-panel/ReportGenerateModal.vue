@@ -70,7 +70,7 @@
       <h1>请示文件生成</h1>
       <div class="request-header-actions">
         <button type="button" disabled>打印</button>
-        <button type="button" disabled>下载请示文件</button>
+        <button type="button" @click="downloadRequestTemplate">下载请示文件</button>
       </div>
     </header>
 
@@ -265,20 +265,9 @@
           <span v-for="tab in generatedTabs" :key="tab" class="preview-tab active">{{ tab }}</span>
         </div>
         <div class="preview-canvas">
-          <div class="preview-empty" v-if="!generatedTabs.length">
-            <svg viewBox="0 0 32 32" aria-hidden="true">
-              <path d="M9 4.5h9l6 6v16H9zM18 4.5v6h6M13 16h7M13 19.5h7M13 23h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-              <circle cx="23" cy="23" r="5" fill="#f4f7fb" stroke="currentColor" stroke-width="1.4" />
-              <path d="M26.5 26.5l3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-            </svg>
-            <strong>尚未生成文件</strong>
-            <p>请在左侧完成文件类型选择与信息填写，点击“开始生成”后，生成的请示文件将在此预览。</p>
-          </div>
-          <div class="preview-content" v-else>
-            <div class="mock-doc">
-              <h3>关于{{ projectName }}项目请示的函</h3>
-              <p>...生成成功，此处可展示接口返回的文档内容...</p>
-            </div>
+          <div v-loading="templateLoading" class="request-template-preview">
+            <div ref="requestTemplateRef" class="request-template-docx" />
+            <p v-if="templateError" class="template-error">{{ templateError }}</p>
           </div>
         </div>
       </section>
@@ -287,8 +276,9 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
+import { renderAsync } from 'docx-preview'
 import { reportTypeOptions } from '../../js/areaPanelMockData'
 import { createQXReport } from '@/api/modules/report'
 import { pageReport } from '@/api/modules/aiProject' // 引入接口
@@ -333,6 +323,10 @@ const reportLoading = ref(false)
 const isCollapsed = ref(false)
 const loading = ref(false)
 const generatedTabs = ref([])
+const requestTemplateRef = ref(null)
+const templateLoading = ref(false)
+const templateError = ref('')
+const REQUEST_TEMPLATE_URL = '/templates/请示文件模板.docx'
 
 const formData = ref({
   projectCapacity: '',
@@ -435,10 +429,55 @@ function handleAddReport() {
   emit('open-add-report', { subTab: 'FEASIBILITY_STUDY', project: props.project })
 }
 
-function openRequestForm() {
+async function openRequestForm() {
   requestFormVisible.value = true
   selectedKeys.value = []
   requestUnits.value = {}
+  await nextTick()
+  await renderRequestTemplate()
+}
+
+async function renderRequestTemplate() {
+  if (!requestTemplateRef.value) return
+  templateLoading.value = true
+  templateError.value = ''
+  try {
+    const response = await fetch(REQUEST_TEMPLATE_URL)
+    if (!response.ok) throw new Error(`模板加载失败（${response.status}）`)
+    const blob = await response.blob()
+    requestTemplateRef.value.innerHTML = ''
+    await renderAsync(blob, requestTemplateRef.value, undefined, {
+      className: 'docx-preview',
+      inWrapper: true,
+      ignoreLastRenderedPageBreak: true,
+      experimental: true,
+      useBase64URL: true,
+      breakPages: true,
+    })
+  } catch (error) {
+    console.error('[ReportGenerateModal] 请示模板预览失败:', error)
+    templateError.value = error?.message || '模板预览失败'
+  } finally {
+    templateLoading.value = false
+  }
+}
+
+async function downloadRequestTemplate() {
+  try {
+    const response = await fetch(REQUEST_TEMPLATE_URL)
+    if (!response.ok) throw new Error(`模板下载失败（${response.status}）`)
+    const blobUrl = URL.createObjectURL(await response.blob())
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = '请示文件模板.docx'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1500)
+  } catch (error) {
+    console.error('[ReportGenerateModal] 请示模板下载失败:', error)
+    ElMessage.error(error?.message || '模板下载失败')
+  }
 }
 
 function backToChooser() {
@@ -665,4 +704,9 @@ async function handleStartGeneration() {
   .unit-label, .field-label, .form-label { flex-basis: 100%; text-align: left; margin-bottom: 4px; }
   .mt-2 { margin-top: 0; }
 }
+.request-template-preview { height: 100%; min-height: 0; overflow: auto; padding: 12px; box-sizing: border-box; background: #f5f6f8; }
+.request-template-docx { min-height: 100%; }
+.request-template-docx :deep(.docx-wrapper) { padding: 0; background: transparent; }
+.request-template-docx :deep(.docx-wrapper > section.docx) { margin: 0 auto 16px; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1); }
+.template-error { color: #dc2626; text-align: center; font-size: 12px; }
 </style>
