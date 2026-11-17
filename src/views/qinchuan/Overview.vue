@@ -824,7 +824,6 @@ function handleReportPanelSuccess() {
   fetchMapProjects()
   fetchProjectList()
   detailRefreshKey.value++
-  addReportType.value = ''
 }
 
 function handleOpenConfirm(reportId) { reportPanels.openConfirm(reportId) }
