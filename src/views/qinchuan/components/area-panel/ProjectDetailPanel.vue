@@ -54,8 +54,9 @@
       <SupportDocsTab
         v-else-if="activeTab === 'support'"
         :data="supportDocsData"
+        v-loading="supportLoading"
         @add-data="$emit('support-add-data')"
-        @file-action="(...args) => $emit('support-file-action', ...args)"
+        @file-action="handleSupportFileAction"
       />
       
 <ProjectReportTab
@@ -68,7 +69,7 @@
   @create="(payload) => $emit('create-report', payload)"
 />
       
-      <ReviewInfoTab v-else-if="activeTab === 'review'" :data="reviewData" v-loading="reviewLoading" />
+      <ReviewInfoTab v-else-if="activeTab === 'review'" :data="reviewData" v-loading="reviewLoading" @file-action="handleReviewFileAction" />
     </div>
 
     <AddDataDialog
@@ -87,6 +88,15 @@
       :tower-file-name="addImageTowerFileName"
       @success="refreshSurveyData"
     />
+    <FileUploadDialog
+      :visible="supportUploadVisible"
+      :tag-name="supportUploadTag"
+      :project="project"
+      :file-code="supportUploadFileCode"
+      :record="supportUploadRecord"
+      @close="supportUploadVisible = false"
+      @saved="handleSupportUploadSaved"
+    />
   </section>
 </template>
 
@@ -101,8 +111,8 @@ import ReviewInfoTab from './tabs/ReviewInfoTab.vue'
 import AddDataDialog from './AddDataDialog.vue'
 import AddImageDialog from './AddImageDialog.vue'
 import { getDataById, delItem } from '@/api/modules/newAPI'
+import FileUploadDialog from '../FileUploadDialog.vue'
 import * as fileApi from '@/api/modules/projectFile'
-import { buildSupportDocsData } from '../../js/supportDocsAdapter'
 import { useProjectMainInfo } from '../../js/useProjectMainInfo'
 import { useRouter } from 'vue-router'
 
@@ -124,7 +134,12 @@ defineEmits([
 
 const router = useRouter()
 const { mainInfo: mainInfoData, loading: mainInfoLoading } = useProjectMainInfo(computed(() => props.project))
-const supportDocsData = computed(() => buildSupportDocsData(props.project || {}))
+const supportDocsData = ref({ stages: ['全部'], activeStage: '全部', typeFilters: [], files: [] })
+const supportLoading = ref(false)
+const supportUploadVisible = ref(false)
+const supportUploadRecord = ref(null)
+const supportUploadFileCode = ref('')
+const supportUploadTag = ref('')
 
 const mainTabs = [
   { key: 'main', label: '主要信息' },
@@ -142,9 +157,13 @@ let reviewRequestSeq = 0
 
 // 审查信息只展示当前项目阶段已经到达的阶段，不展示尚未发生的后续阶段。
 const REVIEW_STAGE_CONFIG = [
+  { stageCode: 'PRELIMINARY_SELECTION', label: '初步选址', fileCode: '' },
+  { stageCode: 'PROJECT_RESERVE', label: '项目储备', fileCode: '' },
   { stageCode: 'PROJECT_INITIATION', label: '立项', fileCode: 'PROJECT_INITIATION_MEETING_MATERIALS' },
   { stageCode: 'FEASIBILITY_REVIEW', label: '可研审查', fileCode: 'FEASIBILITY_REVIEW' },
   { stageCode: 'INVESTMENT_DECISION', label: '投资决策', fileCode: 'INVESTMENT_DECISION_MEETING_MATERIALS' },
+  { stageCode: 'PROJECT_CONSTRUCTION', label: '建设实施', fileCode: '' },
+  { stageCode: 'PROJECT_OPERATION', label: '竣工验收/运营', fileCode: '' },
 ]
 const PROJECT_STAGE_ORDER = [
   'PRELIMINARY_SELECTION',
@@ -194,19 +213,12 @@ async function loadReviewInfo() {
     return
   }
 
-  const completedReviewStages = REVIEW_STAGE_CONFIG.filter(
-    (item) => PROJECT_STAGE_ORDER.indexOf(item.stageCode) <= currentIndex
-  )
-
-  if (!completedReviewStages.length) {
-    reviewData.value = { timeline: [], groups: [] }
-    reviewLoading.value = false
-    return
-  }
+  const displayStages = REVIEW_STAGE_CONFIG
+  const queryStages = displayStages.filter((item) => item.fileCode && PROJECT_STAGE_ORDER.indexOf(item.stageCode) <= currentIndex)
 
   reviewLoading.value = true
   try {
-    const results = await Promise.all(completedReviewStages.map(async (stage) => {
+    const queried = await Promise.all(queryStages.map(async (stage) => {
       const res = await fileApi.getFileListByProjectid({
         aiProjectId: projectId,
         firstBusinessTitle: stage.fileCode,
@@ -240,27 +252,137 @@ async function loadReviewInfo() {
       }
     }))
 
+    const resultMap = new Map(queried.map((item) => [item.key, item]))
+    const results = displayStages.map((stage) => resultMap.get(stage.stageCode) || ({ key: stage.stageCode, stage: stage.label, date: '', items: [] }))
     if (requestSeq !== reviewRequestSeq) return
     reviewData.value = {
-      timeline: results.map((group) => ({
-        key: group.key,
-        label: group.stage,
-        date: group.date || (group.items.length ? '已归档' : ''),
-      })),
+      timeline: results.map((group) => ({ key: group.key, label: group.stage, date: group.date || (group.items.length ? '已归档' : '') })),
       groups: results,
     }
   } catch (err) {
     if (requestSeq === reviewRequestSeq) {
       console.error('[review] 加载审查信息失败:', err)
       reviewData.value = {
-        timeline: completedReviewStages.map((stage) => ({ key: stage.stageCode, label: stage.label, date: '' })),
-        groups: completedReviewStages.map((stage) => ({ key: stage.stageCode, stage: stage.label, date: '', items: [] })),
+        timeline: displayStages.map((stage) => ({ key: stage.stageCode, label: stage.label, date: '' })),
+        groups: displayStages.map((stage) => ({ key: stage.stageCode, stage: stage.label, date: '', items: [] })),
       }
     }
   } finally {
     if (requestSeq === reviewRequestSeq) reviewLoading.value = false
   }
 }
+
+async function loadSupportDocs() {
+  if (!props.project?.id) {
+    supportDocsData.value = { stages: ['全部'], activeStage: '全部', typeFilters: [], files: [] }
+    return
+  }
+  supportLoading.value = true
+  try {
+    const enumRes = await fileApi.getFileType()
+    const stageConfigs = Array.isArray(enumRes?.data) ? enumRes.data : []
+    const queryTasks = stageConfigs.flatMap((stage) => {
+      const businessList = stage.firstBusinessTitle || stage.children || []
+      return businessList.filter((business) => business.fileCode).map(async (business) => {
+        const res = await fileApi.getFileListByProjectid({
+          aiProjectId: props.project.id,
+          firstBusinessTitle: business.fileCode,
+        })
+        const records = Array.isArray(res?.data) ? res.data : Array.isArray(res?.data?.list) ? res.data.list : []
+        return records.flatMap((record) => {
+          let fileList = record.fileUrlList
+          if (typeof fileList === 'string') { try { fileList = JSON.parse(fileList) } catch { fileList = [] } }
+          if (!Array.isArray(fileList) || !fileList.length) {
+            fileList = record.fileName || record.filePath ? [{ fileName: record.fileName, filePath: record.filePath }] : []
+          }
+          return fileList.map((file) => ({
+            id: record.id,
+            stage: stage.stageDesc || stage.stageName || stage.stageCode || '其他阶段',
+            stageCode: stage.stageCode || '',
+            fileCode: business.fileCode,
+            tag: record.fileTypeTag || business.fileDesc || '其他文件',
+            name: file.fileName || file.name || '未命名文件',
+            filePath: file.filePath || file.url || '',
+            updatedAt: record.updateTime || record.createTime || '',
+            operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
+            record,
+            rawFile: file,
+          }))
+        })
+      })
+    })
+    const nested = await Promise.all(queryTasks)
+    const files = nested.flat()
+    const stages = ['全部', ...new Set(stageConfigs.map((s) => s.stageDesc || s.stageName || s.stageCode).filter(Boolean))]
+    const tags = [...new Set(files.map((file) => file.tag).filter(Boolean))]
+    supportDocsData.value = {
+      stages,
+      activeStage: stages.includes(supportDocsData.value.activeStage) ? supportDocsData.value.activeStage : '全部',
+      typeFilters: tags.map((label, index) => ({ key: 'support-type-' + index, label, color: index % 2 ? 'green' : 'pink' })),
+      files,
+    }
+  } catch (err) {
+    console.error('[support] 加载支持性文件失败:', err)
+    ElMessage.error('支持性文件加载失败')
+    supportDocsData.value = { stages: ['全部'], activeStage: '全部', typeFilters: [], files: [] }
+  } finally {
+    supportLoading.value = false
+  }
+}
+
+function handleSupportFileAction(action, file) {
+  const record = file?.record || {}
+  if (action === 'download') {
+    const path = file?.filePath
+    if (!path) { ElMessage.warning('该文件缺少下载路径'); return }
+    window.open(path, '_blank', 'noopener')
+    return
+  }
+  if (action === 'edit') {
+    supportUploadRecord.value = { ...record }
+    supportUploadFileCode.value = file.fileCode || record.firstBusinessTitle || ''
+    supportUploadTag.value = file.tag || record.fileTypeTag || '文件'
+    supportUploadVisible.value = true
+    return
+  }
+  if (action === 'delete') {
+    if (!record.id) { ElMessage.warning('缺少文件记录，无法删除'); return }
+    ElMessageBox.confirm('确认删除该文件吗？', '提示', { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' })
+      .then(async () => {
+        await fileApi.updateFile({
+          id: record.id,
+          aiProjectId: record.aiProjectId ?? props.project?.id,
+          firstBusinessTitle: record.firstBusinessTitle || file.fileCode,
+          secondaryBusinessTitle: record.secondaryBusinessTitle || '',
+          fileTypeTag: record.fileTypeTag,
+          isRequiredUpload: record.isRequiredUpload === 1 || record.isRequiredUpload === '1' || record.isRequiredUpload === true,
+          notes: record.notes,
+          recognitionContent: {},
+          fileUrlList: [],
+        })
+        ElMessage.success('删除成功')
+        await loadSupportDocs()
+      })
+      .catch(() => {})
+  }
+}
+
+async function handleReviewFileAction(action, item) {
+  handleSupportFileAction(action, {
+    ...item,
+    fileCode: item?.record?.firstBusinessTitle || '',
+    record: item?.record,
+  })
+}
+
+async function handleSupportUploadSaved() {
+  supportUploadVisible.value = false
+  await loadSupportDocs()
+}
+
+watch(() => [props.project?.id, activeTab.value, props.refreshKey], ([id, tab]) => {
+  if (id && tab === 'support') loadSupportDocs()
+}, { immediate: true })
 
 watch(
   () => [props.project?.id, props.project?.projectStage, props.project?.stage, activeTab.value, props.refreshKey],
