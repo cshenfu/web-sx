@@ -621,9 +621,24 @@ function handleOpenAddReport() {
   reportPanels.openAddReport()
 }
 
-function handleReportPanelSuccess() {
+function handleReportPanelSuccess(payload = {}) {
   fetchMapProjects()
   fetchProjectList()
+
+  const reportType = String(payload?.reportType || '').trim()
+  if (!PROJECT_REPORT_TYPE_KEYS.has(reportType)) return
+
+  const project = payload.project || selectedProject.value
+  if (project) {
+    selectedProject.value = allMapProjects.value.find(
+      (item) => String(item.id) === String(project.id)
+    ) || project
+  }
+
+  // 上传报告与生成报告共用同一套分类跳转逻辑。
+  pendingGeneratedReport.value = { project, reportType }
+  showAddReportPanel.value = false
+  handleGeneratePanelClose()
 }
 
 function handleOpenConfirm(id) { reportPanels.openConfirm(id) }
