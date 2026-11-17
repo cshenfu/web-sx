@@ -76,7 +76,10 @@ watch(safeData, (v) => {
 })
 
 const filteredFiles = computed(() => {
-  const files = safeData.value.files || []
+  let files = safeData.value.files || []
+  if (activeStage.value && activeStage.value !== '全部') {
+    files = files.filter((file) => file.stage === activeStage.value)
+  }
   if (!activeFilter.value) return files
   const label = (safeData.value.typeFilters || []).find((f) => f.key === activeFilter.value)?.label
   return label ? files.filter((file) => file.tag === label) : files
