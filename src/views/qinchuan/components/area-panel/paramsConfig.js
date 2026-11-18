@@ -183,7 +183,7 @@ export const MODULE_CONFIG = {
     '是否参与发电量计算'
   ]
 },
-    { title: '空气密度参数', type: 'table', fieldKey: '${hubHeightAirDensityRange}', defaultColumns: ['测风塔编号', '高度 (m)', '空气密度 (kg/m³)'], width: '50%' },
+    { title: '空气密度参数', type: 'table', fieldKey: '${hubHeightAirDensityRange}', objectFields: ['tower_code', 'height', 'value'], defaultColumns: ['测风塔编号', '高度 (m)', '空气密度 (kg/m³)'], width: '50%' },
     { title: '湍流强度参数', type: 'turbulence' }
   ],
   '发电量': [
