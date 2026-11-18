@@ -121,6 +121,44 @@ async function isInsideConfiguredBoundary(lng, lat) {
   })
 }
 
+// 在地图上绘制可查询区域边界，让用户直观看到陕西省的可点击范围。
+async function addProvinceBoundaryOutline() {
+  if (!map || !props.provinceBoundaryUrl) return
+
+  const boundary = await loadProvinceBoundary()
+  if (!boundary || map.getSource('province-boundary-source')) return
+
+  map.addSource('province-boundary-source', {
+    type: 'geojson',
+    data: boundary,
+  })
+
+  // 柔和外描边增强边界在卫星底图上的辨识度。
+  map.addLayer({
+    id: 'province-boundary-glow',
+    type: 'line',
+    source: 'province-boundary-source',
+    paint: {
+      'line-color': '#38BDF8',
+      'line-width': 6,
+      'line-opacity': 0.28,
+      'line-blur': 1.5,
+    },
+  })
+
+  // 清晰蓝色主边界。
+  map.addLayer({
+    id: 'province-boundary-outline',
+    type: 'line',
+    source: 'province-boundary-source',
+    paint: {
+      'line-color': '#1677FF',
+      'line-width': 2.5,
+      'line-opacity': 1,
+    },
+  })
+}
+
 let lastMoveTime = 0
 
 const BASE_LAYER_ID = 'hd-imagery'
@@ -265,6 +303,11 @@ function onMapLoad() {
 
   addBusinessLayers()
   syncLayersByProps()
+
+  addProvinceBoundaryOutline().catch((error) => {
+    console.error('[map] 省级边界线绘制失败:', error)
+    ElMessage.warning('陕西省范围边界加载失败，请刷新页面重试！')
+  })
 }
 
 function addRasterOverlay(sourceId, layerId, tiles, opacity = 0.65) {
