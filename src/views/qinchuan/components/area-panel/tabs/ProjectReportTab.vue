@@ -158,7 +158,7 @@
         <el-button
           v-if="officeOriginalUrl"
           type="primary"
-          @click="window.open(officeOriginalUrl, '_blank')"
+          @click="openOriginalOfficeFile"
         >新窗口打开</el-button>
       </template>
     </el-dialog>
@@ -318,6 +318,12 @@ function openOfficePreview(url, title) {
     ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`
     : ''
   officeDialogVisible.value = !!officePreviewSrc.value
+}
+
+function openOriginalOfficeFile() {
+  if (officeOriginalUrl.value) {
+    window.open(officeOriginalUrl.value, '_blank')
+  }
 }
 
 function canPreview(row) {
