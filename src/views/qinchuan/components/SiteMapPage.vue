@@ -16,6 +16,7 @@
     <div class="map-layer">
       <MapGL
         ref="mapRef"
+        :view-controls="viewMode === 'map'"
         :style="satelliteStyle"
         :fly-to-on-load="false"
         :fast-reveal="true"
@@ -1072,6 +1073,9 @@ async function openDetailPanel(project, tab) {
 // ★ 新增：打开简版详情面板（点击操作按钮）
 async function openSiteMapDetailPanel(project, tab = 'main') {
   clearHoverState()
+  // 列表模式点击阶段操作后，统一切换到地图模式再打开阶段面板。
+  viewMode.value = 'map'
+  showProjectDrawer.value = false
   const p = allMapProjects.value.find(item => item.id === project.id) || project
   await onProjectClick(p.id)
   
