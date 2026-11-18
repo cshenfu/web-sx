@@ -8,11 +8,12 @@
 
 import * as coord from '@/utils/parseCoordinate'
 import { normalizeCoords } from '@/utils/coordTransform'
-const parseKmlImpl   = coord.parseKml
-const parseKmzImpl   = coord.parseKmz
-const parseXlsxImpl  = coord.parseXlsx
-const parseOvkmlImpl = coord.parseOvkml || coord.parseKml
-const parseJsonImpl  = coord.parseJson
+const parseKmlImpl  = coord.parseKml
+const parseKmzImpl  = coord.parseKmz
+const parseXlsxImpl = coord.parseXlsx
+// OVKML / JSON 属于可选解析能力；使用动态读取，避免 Rollup 对尚未实现的可选导出产生构建警告。
+const parseOvkmlImpl = Reflect.get(coord, 'parseOvkml') || parseKmlImpl
+const parseJsonImpl = Reflect.get(coord, 'parseJson')
 
 /* ==================== 基础工具 ==================== */
 
