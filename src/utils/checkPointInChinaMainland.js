@@ -1,7 +1,6 @@
 /**
  * 完整的中国边界判断（包含港澳台）
  */
-import chinaBoundary from '@/assets/js/china.json'
 
 function pointInPolygon(point, polygon) {
     const [x, y] = point; // 经度, 纬度
@@ -19,8 +18,33 @@ function pointInPolygon(point, polygon) {
     return inside;
   }
    
+  let chinaBoundaryPromise
+
+  function loadChinaBoundary() {
+    if (!chinaBoundaryPromise) {
+      const baseUrl = new URL(import.meta.env.BASE_URL || '/', window.location.origin)
+      const boundaryUrl = new URL('geojson/china.json', baseUrl)
+
+      chinaBoundaryPromise = fetch(boundaryUrl)
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`中国边界数据加载失败：HTTP ${response.status}`)
+          }
+          return response.json()
+        })
+        .catch((error) => {
+          // 加载失败时清空缓存，允许用户稍后重试。
+          chinaBoundaryPromise = null
+          throw error
+        })
+    }
+
+    return chinaBoundaryPromise
+  }
+
   // 处理GeoJSON多边形（需遍历所有环）
-  function isInChina(longitude, latitude) {
+  async function isInChina(longitude, latitude) {
+    const chinaBoundary = await loadChinaBoundary()
     const point = [longitude, latitude];
     
     for (const feature of chinaBoundary.features) {

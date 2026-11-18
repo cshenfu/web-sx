@@ -308,12 +308,21 @@ watch(
 function bindMapEvents() {
   if (!map) return
 
-  map.on('click', (event) => {
+  map.on('click', async (event) => {
     if (isDrawing.value) return
 
     const { lng, lat } = event.lngLat
 
-    if (!isInChina(lng, lat)) {
+    let isInsideChina = false
+    try {
+      isInsideChina = await isInChina(lng, lat)
+    } catch (error) {
+      console.error('[map] 中国边界数据加载失败:', error)
+      ElMessage.error('区域边界数据加载失败，请稍后重试！')
+      return
+    }
+
+    if (!isInsideChina) {
       ElMessage.error('暂不支持该区域数据查询！')
       return
     }

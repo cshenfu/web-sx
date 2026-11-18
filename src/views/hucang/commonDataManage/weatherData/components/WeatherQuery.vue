@@ -214,7 +214,6 @@ import { useOssUpload } from '@/components/ossClient/modifytUpload';
 import isInChinaMainlandPrecise from '@/utils/checkPointInChinaMainland';
 import { isWithinDateRange } from '@/utils/isWithinDateRange.js';
 import { getHasDownloadHistory, postCreateDownloadTask, getHeightAndDetail } from '@/api/modules/weather';
-import chinaCounty from '@/assets/js/chinaCounty.json';
 import { WindPower, Sunny, Guide, Grid } from '@element-plus/icons-vue'
 // 定义事件，用于通知父组件打开下载列表
 const emit = defineEmits(['open-download']);
@@ -223,6 +222,29 @@ const router = useRouter();
 const publicDataStore = usePublicDataStore();
 const fieldFanDataStore = usefieldFanDataStore();
 const ossUpload = useOssUpload('fd/');
+
+// 县级边界数据较大，改为首次需要高亮县域时再加载，并缓存请求结果。
+let chinaCountyPromise = null;
+const loadChinaCounty = () => {
+    if (!chinaCountyPromise) {
+        const baseUrl = new URL(import.meta.env.BASE_URL || '/', window.location.origin);
+        const boundaryUrl = new URL('geojson/chinaCounty.json', baseUrl);
+
+        chinaCountyPromise = fetch(boundaryUrl)
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error(`县级边界数据加载失败：HTTP ${response.status}`);
+                }
+                return response.json();
+            })
+            .catch((error) => {
+                chinaCountyPromise = null;
+                throw error;
+            });
+    }
+
+    return chinaCountyPromise;
+};
 
 // 状态变量
 const downLoadDisabled = ref(false);
@@ -270,19 +292,24 @@ const goToDownloadList = () => {
 // 根据经纬度获取地址信息 (天地图逆地理编码)
 const getAddress = async (lng, lat) => {
     axios.get(`https://api.tianditu.gov.cn/geocoder?postStr={'lon':${lng},'lat':${lat},'ver':1}&type=geocod&tk=` + tdKeyList[Math.floor(Math.random() * tdKeyList.length)])
-        .then((res) => {
+        .then(async (res) => {
             if (res.data.status == 0) {
                 const addressData = res.data.result.addressComponent;
                 const addressStr = `${addressData.province}${addressData.city}${addressData.county}${addressData.town}${addressData.poi}${addressData.poi_distance ? addressData.poi_position : ''}${addressData.poi_distance ? addressData.poi_distance + '米' : ''}`;
                 weatherPointAddress.value = addressStr;
 
-                // 绘制行政区边界
-                const features = chinaCounty.features;
-                const county_code = addressData.county_code;
-                const currentData = features.find(item => item.properties.gb === county_code);
-                if (currentData && maplibreMapRef.value) {
-                    const currentGeoJson = currentData.geometry.coordinates;
-                    maplibreMapRef.value.addPolygonData(currentGeoJson);
+                // 首次需要绘制县级边界时再加载数据，避免地图页面初始化时下载整份县域 GeoJSON。
+                try {
+                    const chinaCounty = await loadChinaCounty();
+                    const features = chinaCounty.features || [];
+                    const county_code = addressData.county_code;
+                    const currentData = features.find(item => item.properties.gb === county_code);
+                    if (currentData && maplibreMapRef.value) {
+                        const currentGeoJson = currentData.geometry.coordinates;
+                        maplibreMapRef.value.addPolygonData(currentGeoJson);
+                    }
+                } catch (error) {
+                    console.warn('[weather] 县级边界数据加载失败:', error);
                 }
             }
         });
@@ -519,14 +546,21 @@ const formatStr = (str) => {
 };
 
 // 搜索并飞入
-const searchFlyTo = () => {
+const searchFlyTo = async () => {
     isShowAddressResult.value = false;
     if (!mapSearchValue.value) return false;
 
     mapSearchValue.value = formatStr(mapSearchValue.value);
     if (isLonLat(mapSearchValue.value) && !/[\u4E00-\u9FA5\uF900-\uFA2D]/.test(mapSearchValue.value)) {
         const [lon, lat] = mapSearchValue.value.split(',');
-        const isInChinaland = isInChinaMainlandPrecise(lon, lat);
+        let isInChinaland = false;
+        try {
+            isInChinaland = await isInChinaMainlandPrecise(lon, lat);
+        } catch (error) {
+            console.error('[weather] 中国边界数据加载失败:', error);
+            ElMessage.error('区域边界数据加载失败，请稍后重试！');
+            return false;
+        }
         if (!isInChinaland) {
             ElMessage.error(`目前暂不支持当前区域数据查询3！`);
             mapSearchValue.value = '';
