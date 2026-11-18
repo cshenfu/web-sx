@@ -2320,7 +2320,7 @@ function handleGenerateRequest(payload) {
 .summary-row-province {
   flex: 0 0 42px;
   height: 42px;
-  padding: 8px 6px;
+  padding: 8px 12px;
   background: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.5);
 }
