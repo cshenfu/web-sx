@@ -2287,7 +2287,7 @@ function handleGenerateRequest(payload) {
   align-items: center;
   width: 100%;
   height: 16px;
-  padding: 0 6px;
+  padding: 0 12px;
   color: #6B7280;
   font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
   font-size: 12px;
@@ -2298,11 +2298,14 @@ function handleGenerateRequest(payload) {
 .summary-head span:first-child {
   grid-column: 2;
   text-align: right;
+  padding-right: 0;
 }
+
 
 .summary-head span:last-child {
   grid-column: 3;
   text-align: right;
+  padding-right: 0;
 }
 
 .summary-row {
