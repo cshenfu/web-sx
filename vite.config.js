@@ -64,7 +64,12 @@ export default defineConfig(({ mode }) => {
 
     build: {
       chunkSizeWarningLimit: 3000,
-      sourcemap: !isProd,
+      // 默认关闭 Source Map，减少测试/生产构建的生成耗时；需要排查线上代码时可设置 BUILD_SOURCEMAP=true
+      sourcemap: process.env.BUILD_SOURCEMAP === 'true',
+      // 使用 Vite 默认的 esbuild 压缩器，并关闭 gzip 体积统计，减少构建结束阶段的额外耗时
+      minify: 'esbuild',
+      cssMinify: 'esbuild',
+      reportCompressedSize: false,
     },
   }
 })
