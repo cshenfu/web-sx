@@ -727,7 +727,7 @@ async function parseExcelCoordinates(file) {
 }
 
 async function uploadFileToOss(file) {
-  const result = await ossUpload.uploadFile(file, sessionStorage.getItem('obsFilePath') || '')
+  const result = await ossUpload.uploadFile(file)
   if (!result?.obsPath) throw new Error(result?.msg || '文件上传失败，未获得文件路径')
   const extension = file.name.includes('.') ? '.' + file.name.split('.').pop().toLowerCase() : ''
   return { fileName: file.name, filePath: result.obsPath, suffix: extension }
