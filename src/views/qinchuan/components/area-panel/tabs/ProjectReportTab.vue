@@ -133,33 +133,21 @@
       </template>
     </el-dialog>
 
-    <!-- ★ Office 在线预览兜底（DOC / DOCX） -->
+    <!-- ★ DOC 本地预览弹窗：浏览器端解析，不依赖 Office Online/后端转换 -->
     <el-dialog
-      v-model="officeDialogVisible"
-      :title="officeDialogTitle"
-      width="86%"
-      top="4vh"
+      v-model="docDialogVisible"
+      :title="docDialogTitle"
+      width="80%"
+      top="5vh"
       append-to-body
       destroy-on-close
-      class="office-preview-dialog"
+      class="doc-preview-dialog"
     >
-      <div class="office-preview-body">
-        <iframe
-          v-if="officePreviewSrc"
-          :src="officePreviewSrc"
-          class="office-preview-iframe"
-          frameborder="0"
-          allowfullscreen
-        />
-        <div v-else class="office-preview-empty">正在加载在线预览...</div>
+      <div v-loading="docLoading" class="doc-body">
+        <div ref="docContainerRef" class="doc-container" />
       </div>
       <template #footer>
-        <el-button @click="officeDialogVisible = false">关闭</el-button>
-        <el-button
-          v-if="officeOriginalUrl"
-          type="primary"
-          @click="openOriginalOfficeFile"
-        >新窗口打开</el-button>
+        <el-button @click="docDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
 
@@ -194,6 +182,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { pageReport, terminateCalculation } from '@/api/modules/aiProject'
 import { getTempUrlSX } from '@/api/modules/upload'
 import { renderAsync } from 'docx-preview'
+import { createMsDocViewer } from '@file-viewer/doc'
 
 const emit = defineEmits(['row-action', 'open-confirm', 'create'])
 
@@ -306,23 +295,50 @@ const docxDialogTitle = ref('文档预览')
 const docxLoading = ref(false)
 const docxContainerRef = ref(null)
 
-const officeDialogVisible = ref(false)
-const officeDialogTitle = ref('Office 文档预览')
-const officePreviewSrc = ref('')
-const officeOriginalUrl = ref('')
+const docDialogVisible = ref(false)
+const docDialogTitle = ref('Word 文档预览')
+const docLoading = ref(false)
+const docContainerRef = ref(null)
+let docViewer = null
 
-function openOfficePreview(url, title) {
-  officeDialogTitle.value = title || 'Office 文档预览'
-  officeOriginalUrl.value = url || ''
-  officePreviewSrc.value = url
-    ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`
-    : ''
-  officeDialogVisible.value = !!officePreviewSrc.value
+function clearDocPreview() {
+  if (docViewer) {
+    try {
+      docViewer.destroy()
+    } catch (e) {
+      console.warn('[ProjectReportTab] DOC viewer 销毁失败:', e)
+    }
+    docViewer = null
+  }
+  if (docContainerRef.value) {
+    docContainerRef.value.innerHTML = ''
+  }
 }
 
-function openOriginalOfficeFile() {
-  if (officeOriginalUrl.value) {
-    window.open(officeOriginalUrl.value, '_blank')
+async function openDocPreview(url, title) {
+  docDialogTitle.value = title || 'Word 文档预览'
+  docDialogVisible.value = true
+  docLoading.value = true
+
+  try {
+    await nextTick()
+    clearDocPreview()
+
+    const resp = await fetch(url, { mode: 'cors' })
+    if (!resp.ok) throw new Error(`文件下载失败 (${resp.status})`)
+    const buffer = await resp.arrayBuffer()
+
+    const container = docContainerRef.value
+    if (!container) throw new Error('DOC 预览容器未就绪')
+
+    docViewer = createMsDocViewer(container)
+    await docViewer.load(buffer)
+  } catch (e) {
+    console.error('[ProjectReportTab] DOC 本地预览失败:', e)
+    clearDocPreview()
+    ElMessage.warning('该 DOC 文件暂时无法在浏览器中预览，请使用下载方式查看')
+  } finally {
+    docLoading.value = false
   }
 }
 
@@ -411,15 +427,15 @@ async function openDocxPreview(url, title) {
     })
   } catch (e) {
     console.error('[ProjectReportTab] docx-preview 渲染失败:', e)
-
-    // 本地渲染失败时不要让用户停留在空白弹窗，自动切到 Office 在线预览。
-    docxDialogVisible.value = false
-    openOfficePreview(url, title)
-    ElMessage.info('本地文档预览失败，已切换为在线预览')
+    ElMessage.warning('DOCX 本地预览失败，请使用下载方式查看')
   } finally {
     docxLoading.value = false
   }
 }
+
+watch(docDialogVisible, (visible) => {
+  if (!visible) clearDocPreview()
+})
 
 // ============================================================
 // ★ PDF 预览
@@ -488,11 +504,9 @@ async function handlePreview(row) {
     return
   }
 
-  // DOC（老格式）→ Office 在线预览，但保持在当前页面弹窗内。
-  // .doc 是二进制旧格式，浏览器和 docx-preview 都无法直接解析，
-  // 因此这里交给 Word Online 转换/渲染，而不是直接新开页面。
+  // DOC（老格式）→ 浏览器端解析，完全不依赖 Office Online。
   if (ext === 'doc') {
-    openOfficePreview(url, fileName || 'Word 文档预览')
+    openDocPreview(url, fileName || 'Word 文档预览')
     return
   }
 
@@ -672,6 +686,7 @@ watch(() => props.project?.id, async (newId) => {
 
 // ★ 组件卸载：标记销毁 + 清定时器 + 移除监听，避免请求回来又续排
 onUnmounted(() => {
+  clearDocPreview()
   destroyed = true
   stopPolling()
   if (typeof document !== 'undefined') {
@@ -797,32 +812,44 @@ onUnmounted(() => {
   background: #fff;
 }
 
-/* ★ Office 在线预览弹窗 */
-.office-preview-dialog :deep(.el-dialog__body) {
+/* ★ DOC 本地预览 */
+.doc-preview-dialog :deep(.el-dialog__body) {
   padding: 0;
   background: #f5f6f8;
 }
-.office-preview-body {
-  position: relative;
-  height: 82vh;
-  min-height: 560px;
-  overflow: hidden;
-  background: #fff;
+.doc-body {
+  height: 75vh;
+  overflow: auto;
+  padding: 16px;
+  box-sizing: border-box;
+  background: #f5f6f8;
 }
-.office-preview-iframe {
-  display: block;
+.doc-container {
+  width: min(100%, 900px);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 28px 36px;
+  box-sizing: border-box;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+.doc-container :deep(.msdoc-root) {
   width: 100%;
-  height: 100%;
-  border: 0;
+  color: #111827;
   background: #fff;
 }
-.office-preview-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: #9CA3AF;
-  font-size: 14px;
+.doc-container :deep(.msdoc-root img) {
+  max-width: 100%;
+  height: auto;
+}
+.doc-container :deep(.msdoc-root table) {
+  max-width: 100%;
+}
+.doc-container :deep(.msdoc-root a) {
+  color: #2563eb;
+}
+.doc-container :deep(.msdoc-root > *) {
+  box-sizing: border-box;
 }
 
 /* ★ pdf 预览弹窗 */
