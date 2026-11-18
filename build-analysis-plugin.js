@@ -64,7 +64,7 @@ export function bundleAnalysisPlugin() {
             <details>
               <summary>查看模块明细（${chunk.modules.length} 个）</summary>
               <table>
-                <thead><tr><th>模块路径</th><th>压缩前贡献</th><th>转换前大小</th></tr></thead>
+                <thead><tr><th>模块路径</th><th>Tree-shaking 后代码量</th><th>模块原始代码量</th></tr></thead>
                 <tbody>${moduleRows}</tbody>
               </table>
             </details>
