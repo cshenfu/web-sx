@@ -632,19 +632,22 @@ function handleGeneratePanelClose() {
   if (!pending) return
 
   pendingGeneratedReport.value = null
-  const project = pending.project
+  const project = pending.project || generatePanelProject.value || activeProjectDetail.value
   if (project) {
     const resolvedProject = resolveMapProject(project)
     selectedProject.value = resolvedProject
     actionProject.value = resolvedProject
-    activeProjectDetail.value = { ...(activeProjectDetail.value || {}), ...resolvedProject }
+    activeAreaId.value = resolvedProject?.id ?? activeAreaId.value
+    activeProjectDetail.value = { ...(activeProjectDetail.value || {}), ...project, ...resolvedProject }
+    // 通用详情面板由 selectedProject 驱动；清除右上角场区卡片的选中态，
+    // 避免 area-view-layer 被 v-show 隐藏。
+    popoverProject.value = null
+    rightPanelMode.value = 'detail'
   }
 
   generatedReportSubTab.value = pending.reportType
   detailPanelTab.value = 'report'
-  // 阶段面板中的报告/函件生成完成后，切换到通用项目详情面板的项目报告列表。
-  actionProject.value = project || activeProjectDetail.value
-  showSiteMapDetailPanel.value = true
+  showSiteMapDetailPanel.value = false
   isDetailFullscreen.value = false
   nextTick(() => { detailRefreshKey.value++ })
 }
@@ -802,11 +805,9 @@ function handleOpenAddReport(payload = {}) {
     actionProject.value = targetProject
     selectedProject.value = resolveMapProject(targetProject)
   }
-  // 从阶段面板进入时，先打开通用项目详情面板并定位到项目报告列表。
-  showSiteMapDetailPanel.value = true
-  isDetailFullscreen.value = false
+  // 上传抽屉覆盖当前入口面板即可：从通用面板进入就保留通用面板，
+  // 从阶段操作面板进入就保留阶段面板，不要在这里强制切换面板类型。
   reportPanels.openAddReport()
-  nextTick(() => { detailRefreshKey.value++ })
 }
 
 function handleOpenCompetitivePanel(project) {
@@ -820,9 +821,23 @@ function dispatchCreateReport(payload) {
   })
 }
 
-function handleReportPanelSuccess() {
+function handleReportPanelSuccess(payload = {}) {
   fetchMapProjects()
   fetchProjectList()
+
+  const reportType = String(payload?.reportType || '').trim()
+  if (PROJECT_REPORT_TYPE_KEYS.has(reportType)) {
+    // 阶段面板和通用面板的上传成功后，统一回到通用项目详情的对应报告分类。
+    pendingGeneratedReport.value = {
+      project: payload.project || actionProject.value || activeProjectDetail.value || selectedProject.value,
+      reportType,
+    }
+    showAddReportPanel.value = false
+    addReportType.value = ''
+    handleGeneratePanelClose()
+    return
+  }
+
   detailRefreshKey.value++
 }
 
