@@ -203,7 +203,7 @@
   
   async function uploadToOss(file) {
     const ossUpload = useOssUpload()
-    const result = await ossUpload.uploadFile(file)
+    const result = await ossUpload.uploadFile(file, '', { projectId: props.project?.id })
     console.log('[meeting-upload] OSS 上传返回:', result)
     return result?.obsPath || ''
   }

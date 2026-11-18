@@ -357,7 +357,7 @@ async function onFilePicked(e) {
 
 async function uploadToOss(file) {
   const ossUpload = useOssUpload()
-  const result = await ossUpload.uploadFile(file)
+  const result = await ossUpload.uploadFile(file, '', { projectId: props.project?.id })
   return result?.obsPath || ''
 }
 

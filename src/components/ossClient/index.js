@@ -81,6 +81,13 @@ const createStoredPath = (bucket, objectKey) => {
 
 // ★ 默认上传目录：fd/{userName}/ai-project-files/
 // 调用方不传 storePath 时使用
+const getProjectStorePath = (projectId) => {
+    if (projectId === undefined || projectId === null || String(projectId).trim() === '') {
+        throw new Error('项目文件上传缺少项目ID');
+    }
+    return `fd/shanxiadmin/ai-project-files/${String(projectId).trim()}/`;
+};
+
 const getDefaultStorePath = () => {
     try {
         const userName = sessionStorage.getItem('userName') || 'anonymous';
@@ -815,7 +822,7 @@ export function useOssUpload() {
         storePath = '',
         options = {}, // ★ 新增参数，默认空对象，不传等于原来的行为
     ) => {
-        const { isPublic = false } = options; // ★ 默认 false = 私有桶
+        const { isPublic = false, projectId } = options; // 默认私有桶；项目文件传入 projectId
 
         processSize.value = 0;
 
@@ -828,7 +835,9 @@ export function useOssUpload() {
             const clientInfo = await getClient(isPublic); // ★
 
             // ★ 调用方没传 storePath 时，用默认目录
-            const finalStorePath = storePath || getDefaultStorePath();
+            const finalStorePath = projectId !== undefined && projectId !== null && String(projectId).trim() !== ''
+                ? getProjectStorePath(projectId)
+                : (storePath || getDefaultStorePath());
 
             const objectKey = createObjectKey(
                 file,

@@ -31,7 +31,7 @@
 </style>
 <script setup>
     import { ref, onMounted } from 'vue';
-    import { useOssUpload } from '@/components/ossClient/modifytUpload';
+    import { useOssUpload } from '@/components/ossClient/index';
     import { getCertificate } from '@/api/modules/base.js';
 
     import { extractOssPath } from '@/utils/utils';
@@ -54,13 +54,17 @@
             type: String,
             default: '',
         },
+        projectId: {
+            type: [String, Number],
+            default: null,
+        },
     });
     const fileList = ref([]);
     const fileListInfo = ref([]);
     // 上传前验证
     const beforeUpload = async (file) => {
         checkUpLoading.value = true;
-        let uploadResult = await ossUpload.uploadFile(file, props.obsFilePath);
+        let uploadResult = await ossUpload.uploadFile(file, props.obsFilePath, { projectId: props.projectId });
         fileList.value.push({
             url: uploadResult.obsPath,
             file: file,

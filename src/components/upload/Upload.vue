@@ -107,6 +107,7 @@
   const props = defineProps({
       multiple: { type: Boolean, default: false },
       dataObj: { type: Object, default: () => {} },
+      projectId: { type: [String, Number], default: null },
       name: { type: String, default: 'file' },
       listType: { type: String, default: 'text' },
       fileTypes: String,
@@ -197,7 +198,7 @@
                   item.processSelf = processSelf.value;
               }
           });
-          let uploadResult = await obsUpload.uploadFile(rawFile);
+          let uploadResult = await obsUpload.uploadFile(rawFile, '', { projectId: props.projectId || props.dataObj?.projectId || props.dataObj?.aiProjectId });
           emit('upFileList', {
               filePath: uploadResult.obsPath,
               fileName: fileName.value,

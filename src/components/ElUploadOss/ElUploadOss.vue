@@ -28,7 +28,7 @@ import { ref, watch, nextTick } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 // 注意：这里引入你们项目的 OSS 上传 Hook，路径需根据实际修改
-import { useOssUpload } from '@/hooks/ossClient/index' // 替换为你的真实路径
+import { useOssUpload } from '@/components/ossClient/index'
 
 const props = defineProps({
   modelValue: {
@@ -42,6 +42,10 @@ const props = defineProps({
   maxFileLength: {
     type: Number,
     default: 20
+  },
+  projectId: {
+    type: [String, Number],
+    default: null
   }
 })
 
@@ -97,7 +101,7 @@ const beforeUpload = (file) => {
 const customUpload = async (options) => {
   const { file } = options
   try {
-    const uploadResult = await obsUpload.uploadFile(file)
+    const uploadResult = await obsUpload.uploadFile(file, '', { projectId: props.projectId })
     // 假设 uploadResult.obsPath 是完整路径
     const filePath = uploadResult.obsPath
     

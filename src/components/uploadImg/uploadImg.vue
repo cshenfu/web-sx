@@ -80,6 +80,10 @@
             type: Boolean,
             default: false,
         },
+        projectId: {
+            type: [String, Number],
+            default: null,
+        },
     });
 
     const spinning = ref(false);
@@ -99,7 +103,7 @@
     const beforeUpload = async (file) => {
         spinning.value = true;
         try {
-            const uploadResult = await obsUpload.uploadFile(file);
+            const uploadResult = await obsUpload.uploadFile(file, '', { projectId: props.projectId });
             const obsPath = uploadResult.obsPath; // objectKey
 
             // 关键修复：通过路径换取可访问的 url 用于预览

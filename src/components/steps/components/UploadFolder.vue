@@ -91,13 +91,17 @@
 <script setup>
     import { ref, reactive, onMounted, computed, nextTick } from 'vue';
     import { message } from 'ant-design-vue';
-    import { useOssUpload } from '../../ossClient/modifytUpload';
+    import { useOssUpload } from '../../ossClient/index';
     import eventBus from '@/utils/eventBus';
 import { file } from 'jszip';
     const props = defineProps({
         maxGroupNum: {
             type: Number,
             default: 5,
+        },
+        projectId: {
+            type: [String, Number],
+            default: null,
         },
         descTip: {
             type: String,
@@ -326,6 +330,7 @@ import { file } from 'jszip';
                 let uploadResult = await ossUpload.uploadFile(
                     file,
                     sessionStorage.getItem('obsFilePath') || '',
+                    { projectId: props.projectId },
                 );
                 if (uploadResult.obsPath) {
                     updateFilePath(file.name, uploadResult.obsPath);

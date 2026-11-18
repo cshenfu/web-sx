@@ -110,7 +110,7 @@
     import { message, Upload } from 'ant-design-vue';
     import { LoadingOutlined } from '@ant-design/icons-vue';
     import { fileIconList } from '@/assets/js/static.js';
-    import { useOssUpload } from '@/components/ossClient/modifytUpload';
+    import { useOssUpload } from '@/components/ossClient/index';
     const props = defineProps({
         multiple: {
             type: Boolean,
@@ -120,6 +120,10 @@
         dataObj: {
             type: Object,
             default: () => {},
+        },
+        projectId: {
+            type: [String, Number],
+            default: null,
         },
         // 类型
         name: {
@@ -264,6 +268,7 @@
             let uploadResult = await ossUpload.uploadFile(
                 file.file,
                 sessionStorage.getItem('obsFilePath') || '',
+                { projectId: props.projectId || props.dataObj?.projectId || props.dataObj?.aiProjectId },
             );
             loading.value = false;
             if (fileList.value.length > 0) {
