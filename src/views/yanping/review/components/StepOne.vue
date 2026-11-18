@@ -240,7 +240,7 @@ import * as XLSX from 'xlsx'
 import { checkAreaPointData } from '@/api/modules/light/firstStep'
 import { coverPoints } from '@/api/modules/base.js'
 import { formatKMLFileEvent } from '@/utils/formatKMLFile'
-import { useOssUpload } from '@/components/ossClient/modifytUpload'
+import { useOssUpload } from '@/components/ossClient/index'
 import { PACKAGE_TYPE } from '@/views/qinchuan/js/Reportwizardmockdata'
 import * as newApi from '@/api/modules/project'
 
