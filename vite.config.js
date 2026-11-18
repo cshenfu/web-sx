@@ -6,6 +6,7 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { fileURLToPath, URL } from 'node:url'
 // 👇 1. 引入 polyfill 插件
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
+import { bundleAnalysisPlugin } from './build-analysis-plugin.js'
 
 // ✅ cross-env 注入的 Node 环境变量
 const env = process.env.NODE_ENV || 'development'
@@ -36,6 +37,8 @@ export default defineConfig(({ mode }) => {
           process: true,
         },
       }),
+      // 仅在 npm run build:analyze 时生成模块体积报告
+      ...(process.env.ANALYZE === 'true' ? [bundleAnalysisPlugin()] : []),
     ],
 
     resolve: {
