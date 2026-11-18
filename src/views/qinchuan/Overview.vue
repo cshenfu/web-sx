@@ -381,7 +381,7 @@
       :stage="actionProject?.projectStage || ''"
       :initial-tab="detailPanelTab"
       :refresh-key="detailRefreshKey"
-      @close="showSiteMapDetailPanel = false"
+      @close="handleSiteMapDetailClose"
       @action="onSiteMapDetailAction"
       @generate-report="handleGenerateReportFromHeader"
       @open-confirm="handleOpenConfirm"
@@ -956,6 +956,16 @@ async function handleOpenDetailPanel(item) {
 
 function resolveMapProject(project) {
   return mapProjects.value.find((item) => String(item.id) === String(project?.id)) || project
+}
+
+function handleSiteMapDetailClose() {
+  showSiteMapDetailPanel.value = false
+
+  // 阶段面板是从右上角场区操作卡片打开时，打开过程会设置 selectedProject，
+  // 从而隐藏原卡片。关闭阶段面板时恢复卡片所需状态，不清空 popoverProject。
+  selectedProject.value = null
+  isDetailFullscreen.value = false
+  rightPanelMode.value = 'list'
 }
 
 async function openSiteMapDetailPanel(project, tab = 'main') {
