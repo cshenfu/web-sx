@@ -97,13 +97,8 @@
   import { ref, computed } from "vue";
   import { ElMessage } from "element-plus";
   import { UploadFilled, CircleCheckFilled, Close } from "@element-plus/icons-vue";
-  import {
-    getObjectKeyByUserName,
-    getObjectKeyByProjectId,
-    uploadFile,
-    downloadByObjectKey,
-    getTempUrl
-  } from "@/api/modules/upload";
+  import { getTempUrl } from "@/api/modules/upload";
+  import { useOssUpload } from "@/components/ossClient/index";
   
   const props = defineProps({
     modelValue: {
@@ -172,9 +167,7 @@
   
   const emit = defineEmits(["update:modelValue", "success", "error", "remove", "start", "end"]);
   
-  const effectiveUserName = computed(() => {
-    return props.userName || sessionStorage.getItem("userName") || "anonymous";
-  });
+  const ossUpload = useOssUpload();
   
   // 单文件模式：显示已上传的文件名
   const uploadedName = computed(() => {
@@ -230,49 +223,39 @@
     return isValid;
   };
   
-  const getObjectKey = async (file) => {
-    const prefix = file.name;
-  
-    let objectKey = "";
-  
-    if (props.projectId) {
-      const res = await getObjectKeyByProjectId(prefix, props.projectId);
-      objectKey = res?.data || res;
-    } else {
-      const res = await getObjectKeyByUserName(prefix, effectiveUserName.value);
-      objectKey = res?.data || res;
-    }
-  
-    if (!objectKey || typeof objectKey !== "string") {
-      throw new Error(`获取 objectKey 失败: ${JSON.stringify(objectKey)}`);
-    }
-  
-    return objectKey;
-  };
-  
-  const uploadFileToServer = async (objectKey, file) => {
-    console.log(file)
-    if (props.showProgress) {
-      const interval = setInterval(() => {
-        if (uploadProgress.value < 90) {
-          uploadProgress.value += 10;
-        }
-      }, 200);
-  
-      try {
-        const uploadRes = await uploadFile(objectKey, file);
-        clearInterval(interval);
-        uploadProgress.value = 100;
-        return uploadRes;
-      } catch (err) {
-        clearInterval(interval);
-        throw err;
+  // 统一使用临时凭证上传链路，对象路径由 ossClient 统一生成。
+  const uploadFileToServer = async (file) => {
+    const upload = async () => {
+      const options = props.projectId ? { projectId: props.projectId } : {};
+      const uploadRes = await ossUpload.uploadFile(file, "", options);
+
+      // useOssUpload 内部会处理底层异常并返回空 obsPath，这里统一转换为组件错误。
+      if (!uploadRes?.obsPath) {
+        throw new Error(uploadRes?.msg || "文件上传失败，未获取到文件路径");
       }
-    } else {
-      return await uploadFile(objectKey, file);
+
+      return uploadRes;
+    };
+
+    if (!props.showProgress) {
+      return await upload();
+    }
+
+    const interval = setInterval(() => {
+      if (uploadProgress.value < 90) {
+        uploadProgress.value += 10;
+      }
+    }, 200);
+
+    try {
+      const uploadRes = await upload();
+      uploadProgress.value = 100;
+      return uploadRes;
+    } finally {
+      clearInterval(interval);
     }
   };
-  
+
   const buildFileDto = (uploadRes, file, objectKey) => {
     const responseData = uploadRes?.data || uploadRes;
     const uploadResult = responseData;
@@ -280,7 +263,7 @@
     return {
       fileType: props.bizType,
       fileName: file.name,
-      filePath: uploadResult?.key || objectKey,
+      filePath: uploadResult?.obsPath || uploadResult?.key || objectKey,
       fileSuffix: file.name.includes(".") ? file.name.split(".").pop().toLowerCase() : "",
       url: uploadResult?.url || "",
       size: uploadResult?.size || file.size,
@@ -293,14 +276,14 @@
   const uploadSingleFile = async (file) => {
     if (!validateExtension(file)) return null;
     if (!validateSize(file)) return null;
-  
-    const objectKey = await getObjectKey(file);
-    const uploadRes = await uploadFileToServer(objectKey, file);
-  
+
+    const uploadRes = await uploadFileToServer(file);
+    const objectKey = uploadRes.obsPath;
+
     const result = props.returnRawResponse
       ? { response: uploadRes, file, objectKey }
       : buildFileDto(uploadRes, file, objectKey);
-  
+
     return { result, file, uploadRes };
   };
   
