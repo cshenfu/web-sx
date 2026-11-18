@@ -2,11 +2,11 @@
   <div class="review-info-tab">
     <!-- 顶部进度条 -->
     <div v-if="safeData.timeline.length" class="progress-bar">
-      <div v-for="(step, idx) in safeData.timeline" :key="step.key ?? idx" class="progress-step">
+      <div v-for="(step, idx) in safeData.timeline" :key="step.key ?? idx" class="progress-step" :class="{ active: Boolean(step.date) }">
         <div class="progress-label">{{ step.label }}</div>
         <div class="progress-track">
           <span class="progress-dot" :class="{ done: step.date }" />
-          <span v-if="idx < safeData.timeline.length - 1" class="progress-line" />
+          <span v-if="idx < safeData.timeline.length - 1" class="progress-line" :class="{ active: Boolean(step.date) }" />
         </div>
         <div class="progress-date">{{ step.date || '' }}</div>
       </div>
@@ -92,6 +92,7 @@ const safeData = computed(() => {
   color: #6B7280;
   font-size: 13px;
 }
+.progress-step.active .progress-label { color: #1D4ED8; font-weight: 600; }
 
 .progress-track {
   position: relative;
@@ -106,7 +107,7 @@ const safeData = computed(() => {
   height: 10px;
   margin: 0 auto;
   border-radius: 50%;
-  background: #BFDBFE;
+  background: #D1D5DB;
 }
 
 .progress-dot.done {
@@ -122,12 +123,14 @@ const safeData = computed(() => {
   background: #E5E7EB;
   transform: translateY(-50%);
 }
+.progress-line.active { background: #BFDBFE; }
 
 .progress-date {
   margin-top: 6px;
   color: #9CA3AF;
   font-size: 12px;
 }
+.progress-step.active .progress-date { color: #1D4ED8; }
 
 /* ============ 时间轴分组 ============ */
 .groups {
@@ -159,14 +162,15 @@ const safeData = computed(() => {
   height: 8px;
   margin-top: 6px;
   border-radius: 50%;
-  background: #9CA3AF;
+  background: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
 }
 
 .axis-line {
   flex: 1;
   width: 2px;
   margin-top: 4px;
-  background: #E5E7EB;
+  background: #BFDBFE;
 }
 
 .group-content {
