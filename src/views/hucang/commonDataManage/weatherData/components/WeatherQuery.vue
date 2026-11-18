@@ -9,6 +9,7 @@
   :resourceMapKey="resourceMapKey"
   :ghiMapKey="ghiMapKey"
   :terrainMapKey="terrainMapKey"
+  provinceBoundaryUrl="/geojson/610000.json"
 >
                 <div class="weather-map-tools">
                     <div class="weather-map-search">

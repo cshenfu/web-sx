@@ -31,6 +31,8 @@ const props = defineProps({
   roadKey: { type: Boolean, default: false },
   // 普通地形栅格预览按钮；不启用高程
   terrainMapKey: { type: Boolean, default: false },
+  // 可选行政区边界；不传时继续使用全国边界校验。
+  provinceBoundaryUrl: { type: String, default: '' },
 })
 
 const emits = defineEmits([
@@ -46,6 +48,78 @@ let whlnPlugin = null
 let currentMarker = null
 let measurePoints = []
 const isDrawing = ref(false)
+
+let provinceBoundaryPromise = null
+
+function loadProvinceBoundary() {
+  if (!props.provinceBoundaryUrl) return Promise.resolve(null)
+
+  if (!provinceBoundaryPromise) {
+    const baseUrl = new URL(import.meta.env.BASE_URL || '/', window.location.origin)
+    const boundaryUrl = new URL(props.provinceBoundaryUrl.replace(/^\/+/, ''), baseUrl)
+
+    provinceBoundaryPromise = fetch(boundaryUrl)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`省级边界数据加载失败：HTTP ${response.status}`)
+        }
+        return response.json()
+      })
+      .catch((error) => {
+        provinceBoundaryPromise = null
+        throw error
+      })
+  }
+
+  return provinceBoundaryPromise
+}
+
+function isPointInRing(point, ring) {
+  const [x, y] = point
+  let inside = false
+
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]
+    const [xj, yj] = ring[j]
+    const intersects = (yi > y) !== (yj > y)
+      && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
+
+    if (intersects) inside = !inside
+  }
+
+  return inside
+}
+
+function isPointInPolygon(point, rings) {
+  if (!Array.isArray(rings) || !rings.length || !isPointInRing(point, rings[0])) {
+    return false
+  }
+
+  // GeoJSON Polygon 的第一个环是外环，其余环是需要排除的内洞。
+  return !rings.slice(1).some((ring) => isPointInRing(point, ring))
+}
+
+async function isInsideConfiguredBoundary(lng, lat) {
+  if (!props.provinceBoundaryUrl) return isInChina(lng, lat)
+
+  const boundary = await loadProvinceBoundary()
+  const point = [lng, lat]
+
+  return (boundary.features || []).some((feature) => {
+    const geometry = feature.geometry
+    if (!geometry) return false
+
+    if (geometry.type === 'Polygon') {
+      return isPointInPolygon(point, geometry.coordinates)
+    }
+
+    if (geometry.type === 'MultiPolygon') {
+      return geometry.coordinates.some((polygon) => isPointInPolygon(point, polygon))
+    }
+
+    return false
+  })
+}
 
 let lastMoveTime = 0
 
@@ -315,15 +389,15 @@ function bindMapEvents() {
 
     let isInsideChina = false
     try {
-      isInsideChina = await isInChina(lng, lat)
+      isInsideChina = await isInsideConfiguredBoundary(lng, lat)
     } catch (error) {
-      console.error('[map] 中国边界数据加载失败:', error)
+      console.error('[map] 区域边界数据加载失败:', error)
       ElMessage.error('区域边界数据加载失败，请稍后重试！')
       return
     }
 
     if (!isInsideChina) {
-      ElMessage.error('暂不支持该区域数据查询！')
+      ElMessage.error(props.provinceBoundaryUrl ? '暂不支持陕西省以外的区域数据查询！' : '暂不支持该区域数据查询！')
       return
     }
 
