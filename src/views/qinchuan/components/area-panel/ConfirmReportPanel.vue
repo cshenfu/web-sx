@@ -318,7 +318,7 @@ const isTableData = (val) => val && typeof val === 'object' && !Array.isArray(va
 
 const getProcessedTableColumns = (fieldKey) => {
   const config = fieldConfigMap[fieldKey]
-  if (config && config.columnIndexes) {
+  if (config && (config.columnIndexes || config.objectFields)) {
     return config.defaultColumns
   }
   const raw = formData.value[fieldKey]
@@ -339,6 +339,8 @@ const getProcessedTableData = (subModule) => {
   
   if (isTableData(raw) && Array.isArray(raw.data)) {
     rawRows = raw.data
+  } else if (Array.isArray(raw) && raw.length > 0 && config?.objectFields && raw.every(row => row && typeof row === 'object' && !Array.isArray(row))) {
+    rawRows = raw
   } else if (Array.isArray(raw) && raw.length > 1) {
     rawRows = raw.slice(1)
   }
@@ -354,7 +356,9 @@ const getProcessedTableData = (subModule) => {
     
     cols.forEach((_, idx) => {
       const realIdx = config?.columnIndexes ? config.columnIndexes[idx] : idx
-      const cell = safeRow[realIdx]
+      const cell = config?.objectFields && !Array.isArray(rowArr)
+        ? rowArr?.[config.objectFields[idx]]
+        : safeRow[realIdx]
       rowData[`col_${idx}`] = (cell === null || cell === undefined || typeof cell === 'object' && !Array.isArray(cell)) ? '' : cell
     })
     return rowData
@@ -372,15 +376,23 @@ const updateTableData = (fieldKey, rowIndex, colIndex, newVal) => {
 
   let rawRows = []
   if (isTableData(raw)) rawRows = raw.data
+  else if (Array.isArray(raw) && config?.objectFields && raw.every(row => row && typeof row === 'object' && !Array.isArray(row))) rawRows = raw
   else if (Array.isArray(raw)) rawRows = raw.slice(1)
 
-  if (rawRows.length === 0) rawRows = [[]]
-  if (!rawRows[rowIndex]) rawRows[rowIndex] = []
-  
-  const realIdx = config?.columnIndexes ? config.columnIndexes[colIndex] : colIndex
-  rawRows[rowIndex][realIdx] = newVal
+  if (rawRows.length === 0) rawRows = config?.objectFields ? [] : [[]]
+  if (!rawRows[rowIndex]) rawRows[rowIndex] = config?.objectFields ? {} : []
 
-  if (isTableData(raw)) {
+  if (config?.objectFields) {
+    rawRows[rowIndex][config.objectFields[colIndex]] = newVal
+  } else {
+    const realIdx = config?.columnIndexes ? config.columnIndexes[colIndex] : colIndex
+    rawRows[rowIndex][realIdx] = newVal
+  }
+
+  if (config?.objectFields) {
+    // 对象数组保持后端字段结构，仅更新当前单元格
+    formData.value[fieldKey] = rawRows
+  } else if (isTableData(raw)) {
     // 保留原始表头和完整数据，只修改对应单元格
     formData.value[fieldKey] = {
       columns: raw.columns,
@@ -397,12 +409,21 @@ const updateTableData = (fieldKey, rowIndex, colIndex, newVal) => {
 const groupedTurbulenceData = computed(() => {
   const rawList = rawData.value['${eachTierHeightTurbulenceTableList}'] || []
   if (!Array.isArray(rawList)) return []
+
+  // 新接口返回平铺的对象数组，按测风塔编号分组；兼容旧的嵌套数组结构。
+  if (rawList.every(item => item && typeof item === 'object' && !Array.isArray(item))) {
+    const groups = new Map()
+    rawList.forEach(item => {
+      const towerCode = item.tower_code || '未知测风塔'
+      if (!groups.has(towerCode)) groups.set(towerCode, [])
+      groups.get(towerCode).push(item)
+    })
+    return Array.from(groups, ([name, list]) => ({ name, list }))
+  }
+
   return rawList.map(towerArr => {
     if (Array.isArray(towerArr) && towerArr.length > 0 && typeof towerArr[0] === 'object') {
-      return {
-        name: towerArr[0].tower_code || '未知测风塔',
-        list: towerArr
-      }
+      return { name: towerArr[0].tower_code || '未知测风塔', list: towerArr }
     }
     return null
   }).filter(Boolean)
@@ -665,7 +686,7 @@ async function handleConfirm() {
 
     // 3. 过滤普通表格中全空行
     Object.keys(formData.value).forEach(key => {
-      if (tableFieldKeys.has(key) && key !== '${wind_farm_engineering_land_area_table}' && key !== '${eachTierHeightTurbulenceTableList}') {
+      if (tableFieldKeys.has(key) && key !== '${wind_farm_engineering_land_area_table}' && key !== '${eachTierHeightTurbulenceTableList}' && key !== '${hubHeightAirDensityRange}') {
         const val = formData.value[key]
         if (isTableData(val)) {
           val.data = val.data.filter(row => row.some(cell => cell !== null && cell !== undefined && cell !== ''))
