@@ -2202,13 +2202,13 @@ function handleGenerateRequest(payload) {
 .map-summary {
   box-sizing: border-box;
   position: absolute;
-  top: 171px;
-  left: 123px;
+  top: 68px;
+  left: 12px;
   z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  width: 254px;
+  width: 300px;
   height: 241px;
   padding: 0;
   color: #111827;
@@ -2283,7 +2283,7 @@ function handleGenerateRequest(payload) {
 .summary-head {
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: 1fr 84px 63px;
+  grid-template-columns: minmax(0, 1fr) 105px 70px;
   align-items: center;
   width: 100%;
   height: 16px;
@@ -2308,7 +2308,7 @@ function handleGenerateRequest(payload) {
 .summary-row {
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 84px 63px;
+  grid-template-columns: minmax(0, 1fr) 105px 70px;
   align-items: center;
   width: 100%;
   border-radius: 8px;
