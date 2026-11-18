@@ -18,6 +18,17 @@
 
     <div class="table-wrap" v-loading="loading">
       <table class="report-table">
+        <colgroup>
+          <col class="col-project-id" />
+          <col class="col-source-type" />
+          <col class="col-file-type" />
+          <col class="col-unit" />
+          <col class="col-capacity" />
+          <col class="col-status" />
+          <col class="col-remark" />
+          <col class="col-create-time" />
+          <col class="col-action" />
+        </colgroup>
         <thead>
           <tr>
             <th>项目ID</th>
@@ -119,6 +130,36 @@
       </div>
       <template #footer>
         <el-button @click="docxDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ★ Office 在线预览兜底（DOC / DOCX） -->
+    <el-dialog
+      v-model="officeDialogVisible"
+      :title="officeDialogTitle"
+      width="86%"
+      top="4vh"
+      append-to-body
+      destroy-on-close
+      class="office-preview-dialog"
+    >
+      <div class="office-preview-body">
+        <iframe
+          v-if="officePreviewSrc"
+          :src="officePreviewSrc"
+          class="office-preview-iframe"
+          frameborder="0"
+          allowfullscreen
+        />
+        <div v-else class="office-preview-empty">正在加载在线预览...</div>
+      </div>
+      <template #footer>
+        <el-button @click="officeDialogVisible = false">关闭</el-button>
+        <el-button
+          v-if="officeOriginalUrl"
+          type="primary"
+          @click="window.open(officeOriginalUrl, '_blank')"
+        >新窗口打开</el-button>
       </template>
     </el-dialog>
 
@@ -265,6 +306,20 @@ const docxDialogTitle = ref('文档预览')
 const docxLoading = ref(false)
 const docxContainerRef = ref(null)
 
+const officeDialogVisible = ref(false)
+const officeDialogTitle = ref('Office 文档预览')
+const officePreviewSrc = ref('')
+const officeOriginalUrl = ref('')
+
+function openOfficePreview(url, title) {
+  officeDialogTitle.value = title || 'Office 文档预览'
+  officeOriginalUrl.value = url || ''
+  officePreviewSrc.value = url
+    ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`
+    : ''
+  officeDialogVisible.value = !!officePreviewSrc.value
+}
+
 function canPreview(row) {
   const hasFile = !!(row.fileName || row.fileUrl)
   if (row.sourceType === 'UPLOAD_PARSE') return hasFile
@@ -351,14 +406,10 @@ async function openDocxPreview(url, title) {
   } catch (e) {
     console.error('[ProjectReportTab] docx-preview 渲染失败:', e)
 
-    const isCors = e instanceof TypeError
-      || /CORS|Access-Control-Allow-Origin|Failed to fetch/i.test(e?.message || '')
-
-    if (isCors) {
-      ElMessage.warning('文件存储未配置跨域，已切换为在线预览（如仍打不开请下载查看）')
-    } else {
-      ElMessage.warning('本地预览失败')
-    }
+    // 本地渲染失败时不要让用户停留在空白弹窗，自动切到 Office 在线预览。
+    docxDialogVisible.value = false
+    openOfficePreview(url, title)
+    ElMessage.info('本地文档预览失败，已切换为在线预览')
   } finally {
     docxLoading.value = false
   }
@@ -431,12 +482,11 @@ async function handlePreview(row) {
     return
   }
 
-  // DOC（老格式）→ office viewer
+  // DOC（老格式）→ Office 在线预览，但保持在当前页面弹窗内。
+  // .doc 是二进制旧格式，浏览器和 docx-preview 都无法直接解析，
+  // 因此这里交给 Word Online 转换/渲染，而不是直接新开页面。
   if (ext === 'doc') {
-    window.open(
-      `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`,
-      '_blank'
-    )
+    openOfficePreview(url, fileName || 'Word 文档预览')
     return
   }
 
@@ -635,7 +685,26 @@ onUnmounted(() => {
 .table-wrap { flex: 1; min-height: 0; overflow: auto; position: relative; background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05); border-radius: 8px; }
 .table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
 .table-wrap::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
-.report-table { width: 100%; min-width: 1050px; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.report-table {
+  width: 100%;
+  min-width: 1080px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+}
+
+/* 明确列宽，避免 table-layout: fixed 在窄面板中重新压缩“创建时间”列。
+   右侧操作列固定 140px，时间列保留完整的日期时间显示空间。 */
+.report-table .col-project-id { width: 82px; }
+.report-table .col-source-type { width: 92px; }
+.report-table .col-file-type { width: 110px; }
+.report-table .col-unit { width: 140px; }
+.report-table .col-capacity { width: 100px; }
+.report-table .col-status { width: 82px; }
+.report-table .col-remark { width: 150px; }
+.report-table .col-create-time { width: 182px; }
+.report-table .col-action { width: 140px; }
 .report-table th { position: sticky; top: 0; padding: 8px; color: #1F2937; text-align: center; font-weight: 400; background: rgba(241, 245, 249, 0.6); border-bottom: 1px solid rgba(209, 213, 219, 0.4); border-right: 1px solid rgba(209, 213, 219, 0.4); white-space: nowrap; z-index: 2; }
 .report-table td { padding: 8px; color: #374151; text-align: center; border-bottom: 1px solid rgba(209, 213, 219, 0.4); border-right: 1px solid rgba(209, 213, 219, 0.5); white-space: nowrap; background: transparent; }
 .report-table th:last-child, .report-table td:last-child { border-right: none; }
@@ -644,7 +713,42 @@ onUnmounted(() => {
 .report-table td.ellipsis { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
 .report-table td.font-bold { font-weight: 700; color: #111827; }
 .report-table td.text-gray { color: #374151; }
-.sticky-col { position: sticky !important; right: 0 !important; background: rgba(255, 255, 255, 0.5) !important; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); box-shadow: -6px 0 10px rgba(0, 0, 0, 0.05); z-index: 9 !important; }
+.sticky-col {
+  position: sticky !important;
+  right: 0 !important;
+  width: 140px !important;
+  min-width: 140px !important;
+  max-width: 140px !important;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.94) !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: -8px 0 14px rgba(15, 23, 42, 0.08);
+  z-index: 9 !important;
+}
+
+/* 操作列是冻结列，必须使用不透明背景，否则横向滚动到最右侧时
+   创建时间等相邻列会从冻结层下面透出来。 */
+.report-table th.sticky-col {
+  background: rgba(241, 245, 249, 0.98) !important;
+  z-index: 10 !important;
+}
+.report-table tbody tr:nth-child(even) td.sticky-col,
+.report-table tbody tr:hover td.sticky-col {
+  background: rgba(255, 255, 255, 0.96) !important;
+}
+
+/* 给时间列留出稳定的显示宽度，并禁止日期被单元格裁剪。 */
+.report-table th:nth-child(8),
+.report-table td:nth-child(8) {
+  width: 182px;
+  min-width: 182px;
+  max-width: 182px;
+}
+.report-table td.text-gray {
+  overflow: visible;
+  text-overflow: clip;
+}
 .report-table th.sticky-col { background: rgba(241, 245, 249, 0.95) !important; z-index: 10 !important; }
 .report-table tbody tr:nth-child(even) td.sticky-col { background: rgba(255, 255, 255, 0.5) !important; }
 .report-table tbody tr:hover td.sticky-col { background: rgba(255, 255, 255, 0.5) !important; }
@@ -685,6 +789,34 @@ onUnmounted(() => {
   margin-bottom: 16px;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
   background: #fff;
+}
+
+/* ★ Office 在线预览弹窗 */
+.office-preview-dialog :deep(.el-dialog__body) {
+  padding: 0;
+  background: #f5f6f8;
+}
+.office-preview-body {
+  position: relative;
+  height: 82vh;
+  min-height: 560px;
+  overflow: hidden;
+  background: #fff;
+}
+.office-preview-iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+.office-preview-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #9CA3AF;
+  font-size: 14px;
 }
 
 /* ★ pdf 预览弹窗 */
