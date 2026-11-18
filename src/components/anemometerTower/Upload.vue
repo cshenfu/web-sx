@@ -121,6 +121,7 @@
             type: Object,
             default: () => {},
         },
+        projectId: { type: [String, Number], default: null },
         // 类型
         name: {
             type: String,
@@ -264,6 +265,7 @@
             let uploadResult = await ossUpload.uploadFile(
                 file.file,
                 sessionStorage.getItem('obsFilePath') || '',
+                { projectId: props.projectId || props.dataObj?.projectId || props.dataObj?.aiProjectId },
             );
             loading.value = false;
             if (fileList.value.length > 0) {

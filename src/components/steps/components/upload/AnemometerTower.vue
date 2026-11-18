@@ -129,12 +129,15 @@
         checkWindTowerFileData,
         checkWindTowerFileCsvData,
     } from '@/api/modules/wind/secondStep';
-    import { useOssUpload } from '@/components/ossClient/modifytUpload';
+    import { useOssUpload } from '@/components/ossClient/index';
     import { fileIconList } from '@/assets/js/static.js';
     import { cloneDeep } from 'lodash-es';
     import { message, Modal } from 'ant-design-vue';
     import { templatePath } from '@/assets/js/static.js';
 
+    const props = defineProps({
+        projectId: { type: [String, Number], default: null },
+    });
     const emit = defineEmits(['upAnemomentTowerFiles']);
     const fileType = 'jpeg,png,jpg';
     const fileSize = 5;
@@ -245,6 +248,7 @@
                         let uploadResult = await ossUpload.uploadFile(
                             val,
                             sessionStorage.getItem('obsFilePath') || '',
+                            { projectId: props.projectId },
                         );
                         disabled.value = false;
                         obj = Object.assign(
