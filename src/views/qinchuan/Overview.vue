@@ -3,6 +3,7 @@
   <main class="dashboard-page">
     <MapGL
       ref="mapRef"
+      :view-controls="!isAreaView || viewMode === 'map'"
       :style="satelliteStyle"
       :fly-to-on-load="false"
       :isDashboard="true"
@@ -970,6 +971,8 @@ function handleSiteMapDetailClose() {
 
 async function openSiteMapDetailPanel(project, tab = 'main') {
   if (!project) return
+  // 从列表模式的操作栏进入阶段面板时，先切回地图模式。
+  viewMode.value = 'map'
   clearHoverState()
   actionMenuOpen.value = false
 
