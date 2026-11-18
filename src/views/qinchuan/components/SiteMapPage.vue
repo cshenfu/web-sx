@@ -47,16 +47,45 @@
 
       <section v-if="viewMode === 'map'" class="map-view">
         <div v-if="!popoverProject" class="map-summary">
-          <div class="summary-title"><span>{{ summaryTitle }}</span><el-icon><Fold /></el-icon></div>
-          <div class="summary-location">
-            <el-icon><LocationFilled /></el-icon><span>陕西省</span>
-            <strong>{{ overviewStats.totalCapacity }}/{{ overviewStats.totalCount }}</strong><small>总容量/数量</small>
+          <div class="summary-title">
+            <span>{{ summaryTitle }}</span>
+            <button class="summary-collapse" type="button" aria-label="收起" title="收起">
+              <el-icon><Fold /></el-icon>
+            </button>
           </div>
-          <div class="summary-row">
-            <span><i class="dot wind" />风电项目</span><b>{{ overviewStats.windCapacity }}/{{ overviewStats.windCount }}</b><small>容量/数量</small>
-          </div>
-          <div class="summary-row">
-            <span><i class="dot solar" />光伏项目</span><b>{{ overviewStats.solarCapacity }}/{{ overviewStats.solarCount }}</b><small>容量/数量</small>
+          <div class="summary-divider" />
+          <div class="summary-content">
+            <div class="summary-head">
+              <span>总容量/MW</span>
+              <span>项目数</span>
+            </div>
+
+            <div class="summary-row summary-row-province">
+              <div class="summary-project-type">
+                <el-icon class="summary-location-icon"><LocationFilled /></el-icon>
+                <span>陕西省</span>
+              </div>
+              <strong>{{ overviewStats.totalCapacity }}</strong>
+              <strong>{{ overviewStats.totalCount }}</strong>
+            </div>
+
+            <div class="summary-row summary-row-type">
+              <div class="summary-project-type">
+                <i class="dot wind" />
+                <span>风电项目</span>
+              </div>
+              <strong>{{ overviewStats.windCapacity }}</strong>
+              <strong class="value-wind">{{ overviewStats.windCount }}</strong>
+            </div>
+
+            <div class="summary-row summary-row-type">
+              <div class="summary-project-type">
+                <i class="dot solar" />
+                <span>光伏项目</span>
+              </div>
+              <strong>{{ overviewStats.solarCapacity }}</strong>
+              <strong class="value-solar">{{ overviewStats.solarCount }}</strong>
+            </div>
           </div>
         </div>
 
@@ -2170,16 +2199,198 @@ function handleGenerateRequest(payload) {
 .config-button:hover { color: #1677ff; }
 .map-view { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .map-view > * { pointer-events: auto; }
-.map-summary { position: absolute; top: 60px; left: 12px; z-index: 2; width: 175px; padding: 12px; color: #303133; background: rgba(255,255,255,0.94); border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.12); }
-.summary-title { display: flex; justify-content: space-between; padding-bottom: 9px; margin-bottom: 7px; font-size: 12px; font-weight: 600; border-bottom: 1px solid #eee; }
-.summary-location, .summary-row { display: flex; align-items: center; min-height: 31px; font-size: 11px; }
-.summary-location { gap: 4px; }
-.summary-location strong, .summary-row b { margin-left: auto; font-size: 11px; font-weight: 500; }
-.summary-location small, .summary-row small { width: 46px; color: #999; font-size: 9px; text-align: right; }
-.summary-row { border-top: 1px solid #f0f0f0; }
-.dot { width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; }
-.dot.wind { background: #4f9cff; }
-.dot.solar { background: #f0c83e; }
+.map-summary {
+  box-sizing: border-box;
+  position: absolute;
+  top: 171px;
+  left: 123px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 254px;
+  height: 241px;
+  padding: 0;
+  color: #111827;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(235, 247, 255, 0.7) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(42, 63, 84, 0.08);
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+}
+
+.summary-title {
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 52px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 52px;
+  padding: 0 12px;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 26px;
+}
+
+.summary-title > span {
+  font-family: 'Noto Sans SC', 'PingFang SC', sans-serif;
+}
+
+.summary-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #53657D;
+  background: rgba(255, 255, 255, 0.64);
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.summary-collapse:hover {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.summary-collapse .el-icon {
+  font-size: 16px;
+}
+
+.summary-divider {
+  flex: 0 0 1px;
+  width: 100%;
+  height: 1px;
+  background: #D9E4EF;
+}
+
+.summary-content {
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 186px;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  height: 186px;
+  padding: 12px;
+  gap: 8px;
+}
+
+.summary-head {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr 84px 63px;
+  align-items: center;
+  width: 100%;
+  height: 16px;
+  padding: 0 6px;
+  color: #6B7280;
+  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+}
+
+.summary-head span:first-child {
+  grid-column: 2;
+  text-align: right;
+}
+
+.summary-head span:last-child {
+  grid-column: 3;
+  text-align: right;
+}
+
+.summary-row {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px 63px;
+  align-items: center;
+  width: 100%;
+  border-radius: 8px;
+}
+
+.summary-row-province {
+  flex: 0 0 42px;
+  height: 42px;
+  padding: 8px 6px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.summary-row-type {
+  flex: 0 0 40px;
+  height: 40px;
+  padding: 8px 12px;
+  gap: 6px;
+  background: linear-gradient(149.65deg, rgba(255, 255, 255, 0.2) 4.61%, rgba(255, 255, 255, 0.15) 29.07%, rgba(255, 255, 255, 0.15) 49.01%, rgba(255, 255, 255, 0.1) 61.4%, rgba(255, 255, 255, 0.2) 74.74%, rgba(255, 255, 255, 0.22) 97.19%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(4px);
+}
+
+.summary-project-type {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  color: #111827;
+  font-family: 'Noto Sans SC', 'PingFang SC', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+.summary-row-type .summary-project-type {
+  gap: 10px;
+}
+
+.summary-project-type span {
+  white-space: nowrap;
+}
+
+.summary-location-icon {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: #2563EB;
+  font-size: 16px;
+}
+
+.summary-project-type .dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  margin: 0;
+  border-radius: 50%;
+}
+
+.summary-row > strong {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 24px;
+  color: #111827;
+  font-family: 'Inter', 'Arial', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 24px;
+  text-align: right;
+}
+
+.summary-row-type > strong.value-wind {
+  color: #2563EB;
+}
+
+.summary-row-type > strong.value-solar {
+  color: #FFBF2D;
+}
+
+.dot.wind { background: #2563EB; }
+.dot.solar { background: #FFBF2D; }
 .search-panel { position: absolute; top: 12px; right: 12px; z-index: 6; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; background: #fff; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
 .edit-toolbar { position: absolute; top: 12px; right: 12px; z-index: 6; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; padding: 4px 8px; height: 36px; background: #fff; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: calc(100vw - 24px); }
 .edit-tool-button { display: flex; align-items: center; gap: 4px; padding: 4px 8px; color: #444; font-size: 12px; background: transparent; border: 0; border-radius: 4px; cursor: pointer; white-space: nowrap; }
