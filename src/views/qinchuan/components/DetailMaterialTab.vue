@@ -8,21 +8,54 @@
       <div class="file-item">
         <div class="file-title-row">
           <span class="file-name">可研报告</span>
-          <div class="feasibility-report-actions">
-            <el-button link type="primary" size="small" @click="emit('generate-feasibility-report')">一键生成可研报告</el-button>
-            <el-button link type="primary" size="small" :loading="feasibilityUploading" @click="pickFeasibilityReport">
-              {{ feasibilityReportFile ? '重新选择' : '选择可研报告' }}
-            </el-button>
+          <div v-if="!feasibilityReportRecord" class="feasibility-report-actions">
+            <el-button
+              link
+              type="primary"
+              size="small"
+              @click="emit('generate-feasibility-report')"
+            >一键生成可研报告</el-button>
+            <el-button
+              link
+              type="primary"
+              size="small"
+              :loading="feasibilityUploading"
+              @click="pickFeasibilityReport"
+            >选择可研报告</el-button>
           </div>
         </div>
-        <div v-if="feasibilityReportFile" class="file-card">
+
+        <div
+          v-if="feasibilityReportRecord"
+          class="file-card feasibility-report-card"
+        >
           <div class="file-card-top">
             <span class="file-icon">📄</span>
-            <span class="file-real-name" :title="feasibilityReportFile.fileName">{{ feasibilityReportFile.fileName }}</span>
-            <el-button link type="primary" size="small" :loading="feasibilityDownloading" @click="downloadFeasibilityReport">下载</el-button>
+            <span
+              class="file-real-name"
+              :title="feasibilityReportFile?.fileName || '可研报告'"
+            >{{ feasibilityReportFile?.fileName || '可研报告已生成' }}</span>
+            <div class="feasibility-report-card-actions">
+              <el-button
+                v-if="feasibilityReportFile?.filePath"
+                link
+                type="primary"
+                size="small"
+                :loading="feasibilityDownloading"
+                @click="downloadFeasibilityReport"
+              >下载</el-button>
+              <el-button
+                link
+                type="danger"
+                size="small"
+                :loading="feasibilityDeleting"
+                @click="deleteFeasibilityReport"
+              >删除</el-button>
+            </div>
           </div>
         </div>
-        <div v-else class="feasibility-empty">暂未上传可研报告</div>
+        <div v-else class="feasibility-empty">暂未上传或生成可研报告</div>
+
         <input
           ref="feasibilityFileInput"
           class="hidden-file-input"
@@ -157,6 +190,7 @@ const downloadingKey = ref(null)   // 正在下载的项 key
 const feasibilityFileInput = ref(null)
 const feasibilityUploading = ref(false)
 const feasibilityDownloading = ref(false)
+const feasibilityDeleting = ref(false)
 
 const feasibilityReportRecord = computed(() =>
   fileList.value.find(r => String(r.fileTypeTag || '').trim() === '可研报告') || null
@@ -225,6 +259,40 @@ async function handleFeasibilityFileChange(event) {
     ElMessage.error(err?.message || '可研报告上传失败')
   } finally {
     feasibilityUploading.value = false
+  }
+}
+
+async function deleteFeasibilityReport() {
+  const record = feasibilityReportRecord.value
+  if (!record?.id || feasibilityDeleting.value) {
+    if (!record?.id) ElMessage.warning('缺少可研报告记录，无法删除')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      '确认删除当前可研报告吗？删除后可重新选择或生成',
+      '删除可研报告',
+      { type: 'warning', confirmButtonText: '确定删除', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+
+  feasibilityDeleting.value = true
+  try {
+    const result = await fileApi.delFileType(record.id)
+    if (result?.code !== undefined && result.code !== 200) {
+      throw new Error(result.msg || '删除可研报告失败')
+    }
+    ElMessage.success('可研报告删除成功')
+    await loadFiles()
+    emit('deleted', { record, label: '可研报告' })
+  } catch (err) {
+    console.error('[material] 删除可研报告失败:', err)
+    ElMessage.error(err?.message || '删除可研报告失败')
+  } finally {
+    feasibilityDeleting.value = false
   }
 }
 
@@ -487,7 +555,18 @@ defineExpose({ loadFiles })
   color: #909399;
   font-size: 12px;
 }
- .feasibility-report-actions { display: flex; align-items: center; gap: 12px; }
+.feasibility-report-actions { display: flex; align-items: center; gap: 12px; }
+.feasibility-report-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.feasibility-report-card:hover .feasibility-report-card-actions,
+.feasibility-report-card:focus-within .feasibility-report-card-actions {
+  opacity: 1;
+}
 .feasibility-empty { padding: 10px 12px; color: #909399; font-size: 12px; background: #f7f8fa; border-radius: 4px; }
 .hidden-file-input { display: none; }
 
