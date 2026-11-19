@@ -2856,7 +2856,7 @@ async function handleWizardSubmit(payload) {
   if (subTab === 'FEASIBILITY_STUDY') {
     const project = wizardProject.value || payload?.project || activeProjectDetail.value
     const aiProjectId = project?.id
-    const reportId = findReportIdInResult(payload?.data?.[2] ?? payload?.data)
+    const reportId = findReportIdInResult(payload?.data ?? payload)
 
     if (!aiProjectId) {
       ElMessage.error('缺少项目 ID，无法保存可研报告')
