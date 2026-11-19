@@ -249,6 +249,14 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => props.refreshKey,
+  () => {
+    materialTabRef.value?.loadFiles()
+    loadNecessaryFiles()
+  }
+)
+
 async function handleHeaderAction() {
   if (!advanceConfig.value || !necessaryFilesDone.value || advancing.value) return
   const { label, next } = advanceConfig.value
