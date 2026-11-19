@@ -236,7 +236,7 @@ async function loadNecessaryFiles() {
     })
     const list = (res?.data || []).map(normalizeRecord)
     const required = list.filter(isRequired)
-    necessaryFilesDone.value = required.length > 0 && required.every(f => f.fileUrlList.length > 0)
+    necessaryFilesDone.value = required.length > 0 && required.every(f => f.fileUrlList.length > 0 || (String(f.fileTypeTag || '').trim() === '可研报告' && !!f.reportId))
   } catch (err) {
     console.error('[panel] 加载必要性文件失败:', err)
     necessaryFilesDone.value = false
