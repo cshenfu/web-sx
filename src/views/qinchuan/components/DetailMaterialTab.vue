@@ -29,25 +29,25 @@
           v-if="feasibilityReportRecord"
           class="file-card feasibility-report-card"
         >
-          <div class="file-card-top">
+          <div v-if="isFeasibilityGenerating" class="feasibility-generating">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span>可研报告正在生成中</span>
+          </div>
+          <div v-else class="file-card-top">
             <span class="file-icon">📄</span>
-            <span
-              class="file-real-name"
-              :title="feasibilityReportFile?.fileName || '可研报告'"
-            >{{ feasibilityReportFile?.fileName || '可研报告已生成' }}</span>
+            <span class="file-real-name" :title="feasibilityReportFile?.fileName || '可研报告'">
+              {{ feasibilityReportFile?.fileName || '可研报告已生成' }}
+            </span>
             <div class="feasibility-report-card-actions">
               <el-button
                 v-if="feasibilityReportFile?.filePath"
-                link
-                type="primary"
-                size="small"
+                link type="primary" size="small"
                 :loading="feasibilityDownloading"
                 @click="downloadFeasibilityReport"
               >下载</el-button>
               <el-button
-                link
-                type="danger"
-                size="small"
+                v-if="!feasibilityReportRecord?.reportId"
+                link type="danger" size="small"
                 :loading="feasibilityDeleting"
                 @click="deleteFeasibilityReport"
               >删除</el-button>
@@ -168,7 +168,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { CircleCheckFilled, CircleClose, Delete } from '@element-plus/icons-vue'
+import { CircleCheckFilled, CircleClose, Delete, Loading } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as fileApi from '@/api/modules/projectFile'
 import { useOssUpload } from '@/components/ossClient/index'
@@ -191,11 +191,39 @@ const feasibilityFileInput = ref(null)
 const feasibilityUploading = ref(false)
 const feasibilityDownloading = ref(false)
 const feasibilityDeleting = ref(false)
+const feasibilityReportStatus = ref(null)
 
 const feasibilityReportRecord = computed(() =>
   fileList.value.find(r => String(r.fileTypeTag || '').trim() === '可研报告') || null
 )
-const feasibilityReportFile = computed(() => feasibilityReportRecord.value?.fileUrlList?.[0] || null)
+const isFeasibilityGenerating = computed(() => {
+  const record = feasibilityReportRecord.value
+  if (!record?.reportId || record.fileUrlList?.length) return false
+  return feasibilityReportStatus.value?.statusType !== 'COMCOMPLETED'
+})
+const feasibilityReportFile = computed(() => {
+  const uploadedFile = feasibilityReportRecord.value?.fileUrlList?.[0]
+  if (uploadedFile) return uploadedFile
+  const report = feasibilityReportStatus.value
+  if (report?.statusType !== 'COMCOMPLETED' || !report?.fileUrl) return null
+  return { fileName: report.fileName || '可研报告', filePath: report.fileUrl }
+})
+
+async function loadFeasibilityReportStatus(record) {
+  feasibilityReportStatus.value = null
+  if (!record?.reportId || record.fileUrlList?.length || !props.project?.id) return
+  try {
+    const response = await fileApi.getReportByProject({
+      aiProjectId: props.project.id,
+      reportProjectId: record.reportId,
+    })
+    feasibilityReportStatus.value = response?.data || null
+  } catch (error) {
+    // 查询失败不影响材料记录；本次不轮询，重新加载材料页时再查询。
+    console.error('[material] 查询可研报告生成状态失败:', error)
+    feasibilityReportStatus.value = null
+  }
+}
 
 function pickFeasibilityReport() {
   if (feasibilityUploading.value) return
@@ -386,6 +414,8 @@ async function loadFiles() {
       firstBusinessTitle: props.fileCode,
     })
     fileList.value = (res?.data || []).map(normalizeRecord)
+    const reportRecord = fileList.value.find(r => String(r.fileTypeTag || '').trim() === '可研报告')
+    await loadFeasibilityReportStatus(reportRecord)
     console.log('[material] 上传记录:', fileList.value)
   } catch (err) {
     console.error('[material] 加载失败:', err)
@@ -516,6 +546,16 @@ defineExpose({ loadFiles })
 }
 .file-check.done { color: #24b26b; }
 .file-name { color: #303133; font-size: 13px; }
+
+.feasibility-generating {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  color: #409eff;
+  font-size: 13px;
+}
+.feasibility-generating .el-icon { font-size: 17px; }
 
 .file-card {
   padding: 10px 12px;
