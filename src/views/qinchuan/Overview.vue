@@ -445,6 +445,7 @@ import { projectDetailMockData } from './js/areaPanelMockData'
 import { buildMainInfoFromAi } from './js/aiProjectAdapter'
 import * as newApi from '@/api/modules/project'
 import * as configApi from '@/api/modules/selectConfig'
+import * as fileApi from '@/api/modules/projectFile'
 
 import {
   satelliteStyle,
@@ -2822,10 +2823,75 @@ function handleWizardSaveDraft(payload) {
   console.log('[overview][wizard] save-draft:', payload)
 }
 
-function handleWizardSubmit(payload) {
+function findReportIdInResult(value, depth = 0) {
+  if (value == null || depth > 6) return null
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findReportIdInResult(item, depth + 1)
+      if (found !== null) return found
+    }
+    return null
+  }
+  if (typeof value !== 'object') return null
+
+  if (value.reportId !== undefined && value.reportId !== null && value.reportId !== '') {
+    return String(value.reportId)
+  }
+
+  // 仅沿接口响应常见的数据包装字段查找，避免误把项目 id 当作报告 id。
+  for (const key of ['response', 'data', 'result', 'report', 'reportInfo', 'generateResult']) {
+    if (value[key] !== undefined) {
+      const found = findReportIdInResult(value[key], depth + 1)
+      if (found !== null) return found
+    }
+  }
+  return null
+}
+
+async function handleWizardSubmit(payload) {
   const subTab = wizardReportSubTab.value
   const label = wizardTitleLabel.value || '报告'
   console.log(`[overview][wizard] submit subTab=${subTab}`, payload)
+
+  if (subTab === 'FEASIBILITY_STUDY') {
+    const project = wizardProject.value || payload?.project || activeProjectDetail.value
+    const aiProjectId = project?.id
+    const reportId = findReportIdInResult(payload?.data?.[2] ?? payload?.data)
+
+    if (!aiProjectId) {
+      ElMessage.error('缺少项目 ID，无法保存可研报告')
+      return
+    }
+    if (!reportId) {
+      console.error('[overview][wizard] 三步提交结果中未找到 reportId:', payload)
+      ElMessage.error('三步提交已完成，但接口未返回可研报告 ID，暂未保存材料记录')
+      return
+    }
+
+    try {
+      const saveResult = await fileApi.addFileType({
+        aiProjectId,
+        firstBusinessTitle: 'PROJECT_FEASIBILITY_MATERIALS',
+        secondaryBusinessTitle: '',
+        fileTypeTag: '可研报告',
+        isRequiredUpload: true,
+        reportId,
+      })
+      if (saveResult?.code !== undefined && saveResult.code !== 200) {
+        throw new Error(saveResult.msg || '可研报告材料记录保存失败')
+      }
+
+      ElMessage.success('可研报告生成并保存成功')
+      reportPanels.closeWizard()
+      detailRefreshKey.value++
+      return
+    } catch (error) {
+      console.error('[overview][wizard] 保存可研报告材料记录失败:', error)
+      ElMessage.error(error?.message || '可研报告生成成功，但材料记录保存失败')
+      return
+    }
+  }
+
   ElMessage.success(`${label}提交成功（演示流程，接口待接）`)
   wizardVisible.value = false
   wizardTitleLabel.value = ''
