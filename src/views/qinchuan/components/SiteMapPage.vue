@@ -448,6 +448,7 @@ import { useZoomThresholdSwitch } from '../js/useZoomThresholdSwitch'
 import { searchPlaceName } from '../js/useTiandituGeocode'
 import { ICON_SIZE_WIND, ICON_SIZE_BOOSTER } from '@/components/site-map/iconSize.js'
 import * as api from '@/api/modules/project'
+import * as fileApi from '@/api/modules/projectFile'
 import * as configApi from '@/api/modules/selectConfig'
 import fjIcon from '@/assets/img/mapIcon/fj-icon.png'
 import gfIcon from '@/assets/img/mapIcon/gf-icon.png'
@@ -575,6 +576,8 @@ const reportKeyToWizardMode = {
 const detailRefreshKey = ref(0)
 const generatedReportSubTab = ref('')
 const pendingGeneratedReport = ref(null)
+// 记录从哪个详情面板打开向导，关闭或提交后返回原面板。
+const wizardReturnToSiteMapPanel = ref(false)
 
 function handleOpenCompetitivePanel(project) {
   showGenerateModal.value = false
@@ -1080,7 +1083,9 @@ async function openSiteMapDetailPanel(project, tab = 'main') {
   await onProjectClick(p.id)
   
   selectedProject.value = p
-  detailPanelTab.value = TAB_KEY_MAP[tab] || (['main', 'survey', 'support', 'report', 'review'].includes(tab) ? tab : 'main')
+  // 简版面板使用自己的 tab key（material / meeting），不能套用全量面板映射。
+  const validTabs = ['main', 'support', 'material', 'meeting', 'invest-material', 'request-file', 'project-proposal', 'competitive-allocation']
+  detailPanelTab.value = validTabs.includes(tab) ? tab : 'main'
   generatedReportSubTab.value = ''
   showDetailPanel.value = false        // ★ 互斥
   showSiteMapDetailPanel.value = true  // ★ 打开简版
@@ -1090,6 +1095,18 @@ function onDetailPanelAction(payload) {
   if (payload?.type === 'stage-changed') {
     showDetailPanel.value = false
     fetchMapProjects(); fetchProjectList(); fetchOverviewStats(); fetchCityStats()
+    return
+  }
+  if (payload?.type === 'generate-feasibility-report') {
+    const project = payload.project || selectedProject.value
+    if (!project?.id) {
+      ElMessage.error('缺少项目 ID，无法生成可研报告')
+      return
+    }
+    wizardReturnToSiteMapPanel.value = true
+    showSiteMapDetailPanel.value = false
+    showDetailPanel.value = false
+    reportPanels.openWizard('FEASIBILITY_STUDY', project)
     return
   }
   if (payload?.type === 'generate-report') {
@@ -2117,6 +2134,12 @@ function handleReportConfirm(payload) {
 
 function closeWizard() {
   reportPanels.closeWizard()
+  if (wizardReturnToSiteMapPanel.value) {
+    wizardReturnToSiteMapPanel.value = false
+    showDetailPanel.value = false
+    showSiteMapDetailPanel.value = true
+    return
+  }
   showDetailPanel.value = true
 }
 
@@ -2124,15 +2147,62 @@ function handleWizardSaveDraft(payload) {
   console.log('[site-map][wizard] save-draft:', payload)
 }
 
-function handleWizardSubmit(payload) {
+async function handleWizardSubmit(payload) {
   const subTab = wizardReportSubTab.value
   const label = wizardTitleLabel.value || '报告'
   console.log(`[site-map][wizard] submit subTab=${subTab}`, payload)
+
+  if (subTab === 'FEASIBILITY_STUDY') {
+    const project = wizardProject.value || payload?.project || selectedProject.value
+    const aiProjectId = project?.id
+    // 第三步接口返回结构：{ code: 200, data: "报告ID", msg: "" }
+    const thirdStepResponse = payload?.data?.[2]?.response
+    const reportIdValue = thirdStepResponse?.data
+    const reportId = reportIdValue !== undefined && reportIdValue !== null && reportIdValue !== ''
+      ? String(reportIdValue)
+      : null
+
+    if (!aiProjectId) {
+      ElMessage.error('缺少项目 ID，无法保存可研报告')
+      return
+    }
+    if (!reportId) {
+      console.error('[site-map][wizard] 三步提交结果中未找到 reportId:', payload)
+      ElMessage.error('三步提交已完成，但接口未返回可研报告 ID，暂未保存材料记录')
+      return
+    }
+
+    try {
+      const saveResult = await fileApi.addFileType({
+        aiProjectId,
+        firstBusinessTitle: 'PROJECT_FEASIBILITY_MATERIALS',
+        secondaryBusinessTitle: '',
+        fileTypeTag: '可研报告',
+        isRequiredUpload: true,
+        reportId,
+      })
+      if (saveResult?.code !== undefined && saveResult.code !== 200) {
+        throw new Error(saveResult.msg || '可研报告材料记录保存失败')
+      }
+
+      ElMessage.success('可研报告生成并保存成功')
+      reportPanels.closeWizard()
+      if (wizardReturnToSiteMapPanel.value) {
+        wizardReturnToSiteMapPanel.value = false
+        showDetailPanel.value = false
+        showSiteMapDetailPanel.value = true
+      }
+      detailRefreshKey.value++
+      return
+    } catch (error) {
+      console.error('[site-map][wizard] 保存可研报告材料记录失败:', error)
+      ElMessage.error(error?.message || '可研报告生成成功，但材料记录保存失败')
+      return
+    }
+  }
+
   ElMessage.success(`${label}提交成功（演示流程，接口待接）`)
-  wizardVisible.value = false
-  wizardTitleLabel.value = ''
-  wizardMaxStep.value = 2
-  wizardReportSubTab.value = ''
+  reportPanels.closeWizard()
 }
 
 function handleGenerateRequest(payload) {
