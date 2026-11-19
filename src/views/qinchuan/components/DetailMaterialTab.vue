@@ -10,9 +10,26 @@
           <span class="file-name">可研报告</span>
           <div class="feasibility-report-actions">
             <el-button link type="primary" size="small" @click="emit('generate-feasibility-report')">一键生成可研报告</el-button>
-            <el-button link type="primary" size="small" @click="emit('upload-feasibility-report')">选择可研报告</el-button>
+            <el-button link type="primary" size="small" :loading="feasibilityUploading" @click="pickFeasibilityReport">
+              {{ feasibilityReportFile ? '重新选择' : '选择可研报告' }}
+            </el-button>
           </div>
         </div>
+        <div v-if="feasibilityReportFile" class="file-card">
+          <div class="file-card-top">
+            <span class="file-icon">📄</span>
+            <span class="file-real-name" :title="feasibilityReportFile.fileName">{{ feasibilityReportFile.fileName }}</span>
+            <el-button link type="primary" size="small" :loading="feasibilityDownloading" @click="downloadFeasibilityReport">下载</el-button>
+          </div>
+        </div>
+        <div v-else class="feasibility-empty">暂未上传可研报告</div>
+        <input
+          ref="feasibilityFileInput"
+          class="hidden-file-input"
+          type="file"
+          accept=".pdf,.doc,.docx"
+          @change="handleFeasibilityFileChange"
+        />
       </div>
     </div>
 
@@ -129,7 +146,7 @@ const props = defineProps({
   stageCode: { type: String, default: '' },
 })
 
-const emit = defineEmits(['open-setting', 'upload', 'deleted', 'generate-feasibility-report', 'upload-feasibility-report'])
+const emit = defineEmits(['open-setting', 'upload', 'deleted', 'generate-feasibility-report'])
 
 const ossUpload = useOssUpload()
 const isFeasibilityStage = computed(() => props.stageCode === 'FEASIBILITY_REVIEW')
@@ -137,6 +154,108 @@ const isFeasibilityStage = computed(() => props.stageCode === 'FEASIBILITY_REVIE
 const loading = ref(false)
 const fileList = ref([])
 const downloadingKey = ref(null)   // 正在下载的项 key
+const feasibilityFileInput = ref(null)
+const feasibilityUploading = ref(false)
+const feasibilityDownloading = ref(false)
+
+const feasibilityReportRecord = computed(() =>
+  fileList.value.find(r => String(r.fileTypeTag || '').trim() === '可研报告') || null
+)
+const feasibilityReportFile = computed(() => feasibilityReportRecord.value?.fileUrlList?.[0] || null)
+
+function pickFeasibilityReport() {
+  if (feasibilityUploading.value) return
+  feasibilityFileInput.value?.click()
+}
+
+async function handleFeasibilityFileChange(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  if (!['pdf', 'doc', 'docx'].includes(ext)) {
+    ElMessage.error('可研报告仅支持 PDF、DOC、DOCX 格式')
+    return
+  }
+  if (file.size > 100 * 1024 * 1024) {
+    ElMessage.error('文件大小不能超过 100M')
+    return
+  }
+  if (!props.project?.id || !props.fileCode) {
+    ElMessage.error('缺少项目或材料阶段信息，无法上传')
+    return
+  }
+
+  feasibilityUploading.value = true
+  try {
+    // 第一步：上传至 OSS，获取文件路径
+    const uploadResult = await ossUpload.uploadFile(file, '', { projectId: props.project.id })
+    const filePath = uploadResult?.obsPath || ''
+    if (!filePath) {
+      throw new Error(uploadResult?.msg || '文件上传失败')
+    }
+
+    // 第二步：创建/更新必要支持文件记录。可研报告不调用 fileParse。
+    const payload = {
+      aiProjectId: props.project.id,
+      firstBusinessTitle: props.fileCode,
+      secondaryBusinessTitle: feasibilityReportRecord.value?.secondaryBusinessTitle || '',
+      fileTypeTag: '可研报告',
+      isRequiredUpload: true,
+      fileUrlList: [{
+        fileName: file.name,
+        filePath,
+        fileSuffix: ext,
+      }],
+    }
+    const record = feasibilityReportRecord.value
+    const saveResult = record?.id
+      ? await fileApi.updateFile({ ...payload, id: record.id })
+      : await fileApi.addFileType(payload)
+
+    if (saveResult?.code !== 200) {
+      throw new Error(saveResult?.msg || '可研报告材料记录保存失败')
+    }
+
+    ElMessage.success('可研报告上传成功')
+    await loadFiles()
+  } catch (err) {
+    console.error('[material] 可研报告上传失败:', err)
+    ElMessage.error(err?.message || '可研报告上传失败')
+  } finally {
+    feasibilityUploading.value = false
+  }
+}
+
+async function downloadFeasibilityReport() {
+  const file = feasibilityReportFile.value
+  if (!file?.filePath) {
+    ElMessage.warning('文件路径为空，无法下载')
+    return
+  }
+  feasibilityDownloading.value = true
+  try {
+    const url = await ossUpload.getFileUrl(file.filePath)
+    if (!url) {
+      ElMessage.error('获取下载地址失败')
+      return
+    }
+    const a = document.createElement('a')
+    a.href = url
+    a.download = file.fileName || ''
+    a.target = '_blank'
+    a.rel = 'noopener'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  } catch (err) {
+    console.error('[material] 可研报告下载失败:', err)
+    ElMessage.error('下载失败：' + (err?.message || '未知错误'))
+  } finally {
+    feasibilityDownloading.value = false
+  }
+}
 
 function isRequired(r) {
   const v = r?.isRequiredUpload
@@ -369,6 +488,8 @@ defineExpose({ loadFiles })
   font-size: 12px;
 }
  .feasibility-report-actions { display: flex; align-items: center; gap: 12px; }
+.feasibility-empty { padding: 10px 12px; color: #909399; font-size: 12px; background: #f7f8fa; border-radius: 4px; }
+.hidden-file-input { display: none; }
 
 .file-actions {
   display: flex;
