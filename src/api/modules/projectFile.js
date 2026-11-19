@@ -12,6 +12,14 @@ export async function fileParse(data) {
 //    GET /ai/api/aiProjectFile/projectStageFileEnum
 //    返回：[{ stageCode, stageDesc, children: [{ fileCode, fileDesc }] }]
 // ========================================================
+
+// 根据报告项目查询报告生成状态及文件信息
+// GET /ai/ai-project/report/list-by-report-project
+// params: { aiProjectId, reportProjectId }
+export async function getReportByProject(data) {
+  return await publicService4.get('/ai/ai-project/report/list-by-report-project', data)
+}
+
 export async function getFileType() {
   return await publicService4.get('/ai/api/aiProjectFile/projectStageFileEnum')
 }
