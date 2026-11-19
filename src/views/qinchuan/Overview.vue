@@ -2857,7 +2857,13 @@ async function handleWizardSubmit(payload) {
   if (subTab === 'FEASIBILITY_STUDY') {
     const project = wizardProject.value || payload?.project || activeProjectDetail.value
     const aiProjectId = project?.id
-    const reportId = findReportIdInResult(payload?.data ?? payload)
+    // 第三步接口返回结构：{ code: 200, data: "报告ID", msg: "" }
+    // ReportWizard 将第三步结果保存在 payload.data[2]，真正的报告 ID 位于 response.data。
+    const thirdStepResponse = payload?.data?.[2]?.response
+    const reportIdValue = thirdStepResponse?.data
+    const reportId = reportIdValue !== undefined && reportIdValue !== null && reportIdValue !== ''
+      ? String(reportIdValue)
+      : null
 
     if (!aiProjectId) {
       ElMessage.error('缺少项目 ID，无法保存可研报告')
