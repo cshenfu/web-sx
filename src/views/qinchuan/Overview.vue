@@ -2838,10 +2838,11 @@ function findReportIdInResult(value, depth = 0) {
     return String(value.reportId)
   }
 
-  // 仅沿接口响应常见的数据包装字段查找，避免误把项目 id 当作报告 id。
-  for (const key of ['response', 'data', 'result', 'report', 'reportInfo', 'generateResult']) {
-    if (value[key] !== undefined) {
-      const found = findReportIdInResult(value[key], depth + 1)
+  // 遍历三步向导收集的各步骤结果及接口响应包装层，只识别明确命名的 reportId，
+  // 避免误把项目 id 当作报告 id。
+  for (const child of Object.values(value)) {
+    if (child && typeof child === 'object') {
+      const found = findReportIdInResult(child, depth + 1)
       if (found !== null) return found
     }
   }
