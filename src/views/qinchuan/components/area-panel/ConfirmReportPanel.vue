@@ -260,6 +260,8 @@ const loading = ref(false)
 const confirming = ref(false)
 const rawData = ref({})
 const formData = ref({})
+// 接口原始报告信息（文件名、文件地址等元数据不属于 parseResultJson）
+const reportMeta = ref({})
 const activeModule = ref(MODULES[0])
 const contentRef = ref(null)
 
@@ -557,7 +559,26 @@ async function loadData() {
     }
 
     if (res?.code === 0 || res?.code === 200) {
-      rawData.value = res.data || {}
+      // 新接口将解析结果放在 parseResultJson 中，字段本身是 JSON 字符串。
+      // 兼容旧接口直接返回参数对象的情况，避免影响已有数据。
+      const responseData = res.data || {}
+      let parsedResult = responseData.parseResultJson
+
+      if (typeof parsedResult === 'string') {
+        try {
+          parsedResult = parsedResult.trim() ? JSON.parse(parsedResult) : {}
+        } catch (parseError) {
+          console.error('[可研报告待确认] parseResultJson 解析失败:', parseError)
+          throw new Error('报告解析结果格式异常，无法填充待确认数据')
+        }
+      }
+
+      if (!parsedResult || typeof parsedResult !== 'object' || Array.isArray(parsedResult)) {
+        parsedResult = responseData.parsedDataJson || responseData.params || responseData
+      }
+
+      reportMeta.value = responseData
+      rawData.value = parsedResult || {}
       formData.value = JSON.parse(JSON.stringify(rawData.value))
       cleanEmptyValues(formData.value)
 
@@ -657,11 +678,16 @@ async function handleConfirm() {
   }
   confirming.value = true
   try {
-    let fileUrl = rawData.value.fileUrl || formData.value.fileUrl || ''
-    let fileName = ''
-    if (fileUrl) {
+    // 文件元数据位于接口外层，解析字段只取 parseResultJson。
+    let fileUrl = reportMeta.value.fileUrl || rawData.value.fileUrl || formData.value.fileUrl || ''
+    let fileName = reportMeta.value.fileName || rawData.value.fileName || ''
+    if (!fileName && fileUrl) {
       const lastPart = fileUrl.split('/').pop()
-      fileName = decodeURIComponent(lastPart.split('?')[0])
+      try {
+        fileName = decodeURIComponent(lastPart.split('?')[0])
+      } catch {
+        fileName = lastPart.split('?')[0]
+      }
     }
 
     // 1. 用地面积回写
