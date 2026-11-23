@@ -44,14 +44,17 @@
               :file="uploads.completionSettlement"
               @select="(file) => handleSingleFile('completionSettlement', file)"
               @remove="removeUpload('completionSettlement')"
+              @template-download="showTemplatePlaceholder"
             />
             <p class="section-notice">说明：下面各项运行数据需满足至少1年时长，Scada时长需满足满发电量的时间周期</p>
             <PostEvaluationUpload
               label="区间发电量"
               field-key="intervalGeneration"
+              hint-text="支持 xlsx 格式数据（从生产运行平台导出该场区月度发电量）"
               :file="uploads.intervalGeneration"
               @select="(file) => handleSingleFile('intervalGeneration', file)"
               @remove="removeUpload('intervalGeneration')"
+              @template-download="showTemplatePlaceholder"
             />
             <PostEvaluationUpload
               label="Scada风机坐标对照表"
@@ -59,6 +62,7 @@
               :file="uploads.scadaCoordinate"
               @select="(file) => handleSingleFile('scadaCoordinate', file)"
               @remove="removeUpload('scadaCoordinate')"
+              @template-download="showTemplatePlaceholder"
             />
             <div class="upload-row folder-row">
               <label class="upload-label required">各风机Scada风速和发电量数据</label>
@@ -70,7 +74,13 @@
                   :files="folderFiles"
                   @select="handleFolderChange"
                   @remove="clearFolder"
-                />
+                  :show-hint="false"
+                >
+                  <template #hint>
+                    选择数据文件目录，需包含该风电场所有风机的逐10分钟风速时序数据，查看
+                    <a class="template-link" href="#" @click.prevent="showScadaExample = true">文件示意</a>
+                  </template>
+                </PostEvaluationUpload>
                 <div v-if="folderFiles.length" class="folder-summary">
                   {{ folderSummary }}
                   <el-button link type="primary" @click="showFolderDetails = !showFolderDetails">
@@ -102,9 +112,16 @@
                 placeholder="请选择"
                 class="model-value-select"
               >
-                <el-option v-for="name in turbineModelOptions" :key="name" :label="name" :value="name" />
+                <el-option v-for="item in turbineModelOptions" :key="item.value" :label="item.label" :value="item.value" />
               </el-select>
               <el-input v-else v-model="form.turbineModel" placeholder="请输入风机型号" class="model-value-select" />
+            </div>
+            <div class="form-row capacity-row">
+              <label class="upload-label">建设容量</label>
+              <el-input :model-value="buildCapacity" disabled placeholder="系统自动计算">
+                <template #append>MW</template>
+              </el-input>
+              <p class="field-tip">系统根据风机坐标数量及所选风机型号的单机容量自动计算，不可手动修改</p>
             </div>
             <div class="form-row k-value-row">
               <label class="upload-label required">机组保证K值</label>
@@ -129,6 +146,7 @@
               :file="uploads.investmentStatus"
               @select="(file) => handleSingleFile('investmentStatus', file)"
               @remove="removeUpload('investmentStatus')"
+              @template-download="showTemplatePlaceholder"
             />
             <PostEvaluationUpload
               label="项目资本金投入表"
@@ -136,6 +154,7 @@
               :file="uploads.capitalContribution"
               @select="(file) => handleSingleFile('capitalContribution', file)"
               @remove="removeUpload('capitalContribution')"
+              @template-download="showTemplatePlaceholder"
             />
             <PostEvaluationUpload
               label="项目主要经营数据表（来源财务报表）"
@@ -143,6 +162,7 @@
               :file="uploads.operationData"
               @select="(file) => handleSingleFile('operationData', file)"
               @remove="removeUpload('operationData')"
+              @template-download="showTemplatePlaceholder"
             />
             <PostEvaluationUpload
               label="项目总成本费用对比表（来源财务报表）"
@@ -150,6 +170,7 @@
               :file="uploads.costComparison"
               @select="(file) => handleSingleFile('costComparison', file)"
               @remove="removeUpload('costComparison')"
+              @template-download="showTemplatePlaceholder"
             />
             <PostEvaluationUpload
               label="项目日电量电价表（来源财务报表）"
@@ -157,6 +178,7 @@
               :file="uploads.dailyPowerFinance"
               @select="(file) => handleSingleFile('dailyPowerFinance', file)"
               @remove="removeUpload('dailyPowerFinance')"
+              @template-download="showTemplatePlaceholder"
             />
             <PostEvaluationUpload
               label="项目日电量电价表（来源市场部）"
@@ -164,6 +186,7 @@
               :file="uploads.dailyPowerMarket"
               @select="(file) => handleSingleFile('dailyPowerMarket', file)"
               @remove="removeUpload('dailyPowerMarket')"
+              @template-download="showTemplatePlaceholder"
             />
             <PostEvaluationUpload
               label="贷款信息"
@@ -171,10 +194,21 @@
               :file="uploads.loanInfo"
               @select="(file) => handleSingleFile('loanInfo', file)"
               @remove="removeUpload('loanInfo')"
+              @template-download="showTemplatePlaceholder"
             />
           </section>
         </div>
       </el-scrollbar>
+
+      <el-dialog v-model="showScadaExample" title="SCADA 数据文件示意" width="620px" append-to-body>
+        <div class="scada-example">
+          <div class="example-folder"><el-icon><FolderOpened /></el-icon><span>风电场 SCADA 数据目录</span></div>
+          <div class="example-file" v-for="name in scadaExampleFiles" :key="name">
+            <el-icon><Document /></el-icon><span>{{ name }}</span><el-tag size="small" type="success">示例文件</el-tag>
+          </div>
+          <p>示意：目录中应包含该风电场各台风机的逐 10 分钟风速及发电量时序数据文件。实际目录和文件命名以项目数据为准。</p>
+        </div>
+      </el-dialog>
 
       <footer v-show="!isCollapsed" class="panel-footer">
         <el-button @click="$emit('close')">取消</el-button>
@@ -211,7 +245,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, ArrowRight, Back, InfoFilled, Location } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Back, Document, FolderOpened, InfoFilled, Location } from '@element-plus/icons-vue'
 import PostEvaluationUpload from './PostEvaluationUpload.vue'
 import MapGL from '@/components/MapGL.vue'
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
@@ -237,7 +271,13 @@ const submitting = ref(false)
 const folderUploading = ref(false)
 const folderFiles = ref([])
 const showFolderDetails = ref(false)
-const turbineModelOptions = ['MySE 5.0-200', 'MySE 6.25-220', 'GW 6.7-220', '其他']
+const showScadaExample = ref(false)
+const scadaExampleFiles = ['WTG-001_10min_SCADA.xlsx', 'WTG-002_10min_SCADA.xlsx', 'WTG-003_10min_SCADA.xlsx']
+const turbineModelOptions = [
+  { label: 'MySE 5.0-200', value: 'MySE 5.0-200', capacity: 5 },
+  { label: 'MySE 6.25-220', value: 'MySE 6.25-220', capacity: 6.25 },
+  { label: 'GW 6.7-220', value: 'GW 6.7-220', capacity: 6.7 },
+]
 const form = reactive({ turbineModelType: 'platform', turbineModel: '', kOperator: '>', kValue: '98' })
 
 const uploadKeys = [
@@ -253,6 +293,14 @@ const hasMapGeometry = computed(() => {
     (p.coordinate || p.rawProject?.coordinate || []).length ||
     (p.windTurbinePoints || p.rawProject?.windTurbinePoints || []).length
   )
+})
+const buildCapacity = computed(() => {
+  const project = selectedProject.value || {}
+  const fans = project.windTurbinePoints || project.rawProject?.windTurbinePoints || []
+  const model = turbineModelOptions.find(item => item.value === form.turbineModel)
+  if (!fans.length || !model) return ''
+  const value = fans.length * model.capacity
+  return Number.isInteger(value) ? String(value) : value.toFixed(2)
 })
 const folderSummary = computed(() => {
   const ok = folderFiles.value.filter(item => item.inspectStatus === 'success').length
@@ -379,6 +427,11 @@ async function handleSingleFile(key, file) {
 function removeUpload(key) {
   uploads[key] = null
 }
+
+function showTemplatePlaceholder() {
+  ElMessage.info('数据模板文件暂未提供，后续补充下载地址')
+}
+
 
 async function inspectFolderFile(file) {
   const extension = file.name.split('.').pop()?.toLowerCase()
@@ -560,6 +613,8 @@ function toggleCollapse() {
 .folder-details { margin-top: 8px; max-height: 180px; overflow: auto; padding: 8px 10px; border: 1px solid #ebeef5; background: #fafafa; }
 .folder-file { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 5px 0; font-size: 12px; }
 .file-name { min-width: 0; overflow-wrap: anywhere; color: #606266; }
+.capacity-row { grid-template-columns: minmax(150px, 190px) minmax(0, 1fr); }
+.capacity-row .field-tip { grid-column: 2; }
 .fan-model-row { grid-template-columns: minmax(150px, 190px) 120px minmax(0, 1fr); align-items: center; }
 .model-type-select { width: 120px; }
 .model-value-select { min-width: 0; }
@@ -573,6 +628,14 @@ function toggleCollapse() {
   transform: translateY(-50%); border: 1px solid #ebeef5; border-left: 0;
   border-radius: 0 6px 6px 0; background: #fff; color: #909399; cursor: pointer;
 }
+.scada-example { padding: 8px 12px; border: 1px solid #ebeef5; border-radius: 6px; background: #fafcff; color: #606266; }
+.example-folder, .example-file { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.example-folder { color: #303133; font-weight: 600; background: #f1f6fd; border-radius: 4px; }
+.example-folder .el-icon { color: #e6a23c; font-size: 18px; }
+.example-file { margin: 6px 0 0 24px; border-bottom: 1px dashed #e4e7ed; font-size: 13px; }
+.example-file .el-icon { color: #409eff; }
+.example-file .el-tag { margin-left: auto; }
+.scada-example p { margin: 14px 4px 4px; color: #909399; font-size: 12px; line-height: 1.7; }
 .map-area { position: relative; flex: 1; min-width: 0; height: 100%; }
 .map-empty-tip {
   position: absolute; top: 50%; left: 50%; display: flex; align-items: center; gap: 8px;
