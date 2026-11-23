@@ -50,7 +50,7 @@
         @project-select="onProjectStageSelect"
       />
       <ReportWizard
-        v-else
+        v-else-if="wizardReportSubTab !== 'POST_EVALUATION'"
         class="left-layer wizard-layer"
         :create-project-mode="wizardMode"
         :title="wizardTitleLabel"
@@ -99,7 +99,7 @@
           </aside>
 
           <ReportWizard
-            v-else
+            v-else-if="wizardReportSubTab !== 'POST_EVALUATION'"
             class="area-summary wizard-layer"
             :create-project-mode="wizardMode"
             :title="wizardTitleLabel"
