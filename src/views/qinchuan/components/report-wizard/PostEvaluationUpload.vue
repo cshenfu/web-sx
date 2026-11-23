@@ -1,5 +1,7 @@
 <template>
-  <div class="post-upload">
+  <div class="upload-row">
+    <label v-if="label" class="upload-label">{{ label }}<span v-if="required" class="required-mark"> *</span></label>
+    <div class="post-upload">
     <input
       ref="inputRef"
       class="native-input"
@@ -27,6 +29,7 @@
       <span v-if="status" class="file-status">{{ status }}</span>
       <button v-if="clearable" type="button" class="remove-action" @click="$emit('remove')">移除</button>
     </div>
+    </div>
   </div>
 </template>
 
@@ -35,6 +38,8 @@ import { computed, ref } from 'vue'
 import { FolderChecked, Loading, Plus } from '@element-plus/icons-vue'
 
 const props = defineProps({
+  label: { type: String, default: '' },
+  required: { type: Boolean, default: true },
   accept: { type: String, default: '.xlsx,.xls' },
   directory: { type: Boolean, default: false },
   multiple: { type: Boolean, default: false },
@@ -64,6 +69,9 @@ function handleChange(event) {
 </script>
 
 <style scoped>
+.upload-row { display: grid; grid-template-columns: minmax(150px, 190px) minmax(0, 1fr); gap: 18px; align-items: center; margin: 18px 0; }
+.upload-label { color: #303133; font-size: 13px; line-height: 1.45; text-align: right; }
+.required-mark { color: #f56c6c; }
 .post-upload { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .native-input { display: none; }
 .upload-trigger {
