@@ -212,7 +212,7 @@
         :fly-to-on-load="false"
         :view-controls="true"
         view-controls-position="bottom-left"
-        :style="mapStyle"
+        :style="satelliteStyle"
         @ready="onMapReady"
       />
       <div v-if="!selectedProjectId" class="map-empty-tip">
@@ -234,6 +234,7 @@ import { ArrowLeft, ArrowRight, Back, FolderOpened, InfoFilled, Location, Upload
 import MapGL from '@/components/MapGL.vue'
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
 import { ICON_SIZE_WIND } from '@/components/site-map/iconSize.js'
+import { satelliteStyle } from '../../js/mapConfig'
 import { getPageList } from '@/api/modules/project'
 import { useOssUpload } from '@/components/ossClient/index'
 import * as XLSX from 'xlsx'
@@ -307,11 +308,6 @@ const uploadKeys = [
 ]
 const uploads = reactive(Object.fromEntries(uploadKeys.map(key => [key, null])))
 
-const mapStyle = {
-  version: 8,
-  sources: {},
-  layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#0c1b33' } }],
-}
 const hasMapGeometry = computed(() => {
   const p = selectedProject.value || {}
   return Boolean(
