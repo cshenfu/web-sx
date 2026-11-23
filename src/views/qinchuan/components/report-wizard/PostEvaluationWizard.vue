@@ -232,6 +232,8 @@ import { computed, defineComponent, h, onMounted, reactive, ref, watch } from 'v
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, ArrowRight, Back, FolderOpened, InfoFilled, Location, Upload } from '@element-plus/icons-vue'
 import MapGL from '@/components/MapGL.vue'
+import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
+import { ICON_SIZE_WIND } from '@/components/site-map/iconSize.js'
 import { getPageList } from '@/api/modules/project'
 import { useOssUpload } from '@/components/ossClient/index'
 import * as XLSX from 'xlsx'
@@ -399,10 +401,13 @@ function renderProjectOnMap() {
       properties: { index },
     })).filter(item => item.geometry.coordinates.every(Number.isFinite))
     if (features.length) {
-      map.addPoints?.({
+      map.addImagePoints?.({
         id: 'post-evaluation-fans',
         geojson: { type: 'FeatureCollection', features },
-        color: '#f59e0b',
+        iconId: 'post-evaluation-fan-icon',
+        iconUrl: fengjiIcon,
+        iconSize: ICON_SIZE_WIND,
+        iconAnchor: 'bottom',
       })
     }
   }
@@ -515,7 +520,7 @@ function handleStart() {
   uploadKeys.forEach(key => {
     if (!uploads[key]) missing.push(uploadLabels[key])
   })
-  if (!folderFiles.value.some(item => item.obsPath)) missing.push('各风机Scada风速和发电量数据')
+  if (!folderFiles.value.some(item => item.obsPath && item.inspectStatus === 'success')) missing.push('各风机Scada风速和发电量数据（至少需要一个可读取的 Excel / CSV 文件）')
   if (!form.turbineModel) missing.push('风机型号')
   if (!form.kValue || !Number.isFinite(Number(form.kValue))) missing.push('机组保证K值')
 
@@ -624,7 +629,7 @@ function toggleCollapse() {
 .folder-details { grid-column: 2; max-height: 180px; overflow: auto; padding: 8px 10px; border: 1px solid #ebeef5; background: #fafafa; }
 .folder-file { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 5px 0; font-size: 12px; }
 .file-name { min-width: 0; overflow-wrap: anywhere; color: #606266; }
-.fan-model-row { align-items: center; }
+.fan-model-row { grid-template-columns: 128px 120px minmax(0, 1fr); align-items: center; }
 .model-type-select { width: 120px; }
 .model-value-select { min-width: 0; }
 .k-value-control { display: flex; min-width: 0; }
