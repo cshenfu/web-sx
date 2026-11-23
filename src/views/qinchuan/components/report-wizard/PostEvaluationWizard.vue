@@ -99,6 +99,7 @@
             </div>
             <div class="form-row fan-model-row">
               <label class="upload-label required">风机型号</label>
+              <div class="paired-fields model-fields">
               <el-select v-model="form.turbineModelType" class="model-type-select">
                 <el-option label="平台机型库" value="platform" />
                 <el-option label="自定义型号" value="custom" />
@@ -115,17 +116,18 @@
                 <el-option v-for="item in turbineModelOptions" :key="item.value" :label="item.label" :value="item.value" />
               </el-select>
               <el-input v-else v-model="form.turbineModel" placeholder="请输入风机型号" class="model-value-select" />
+              </div>
             </div>
             <div class="form-row capacity-row">
               <label class="upload-label">建设容量</label>
-              <el-input :model-value="buildCapacity" disabled placeholder="系统自动计算">
+              <el-input :model-value="buildCapacity" disabled placeholder="系统自动计算" class="capacity-input">
                 <template #append>MW</template>
               </el-input>
               <p class="field-tip">系统根据风机坐标数量及所选风机型号的单机容量自动计算，不可手动修改</p>
             </div>
             <div class="form-row k-value-row">
               <label class="upload-label required">机组保证K值</label>
-              <div class="k-value-control">
+              <div class="paired-fields k-value-control">
                 <el-select v-model="form.kOperator" class="operator-select">
                   <el-option label="大于（>）" value=">" />
                   <el-option label="大于等于（≥）" value=">=" />
@@ -197,6 +199,9 @@
               @template-download="showTemplatePlaceholder"
             />
           </section>
+          <div class="generate-action">
+            <el-button type="primary" size="large" :loading="submitting" @click="handleStart">开始生成</el-button>
+          </div>
         </div>
       </el-scrollbar>
 
@@ -210,11 +215,6 @@
         </div>
       </el-dialog>
 
-      <footer v-show="!isCollapsed" class="panel-footer">
-        <el-button @click="$emit('close')">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleStart">开始生成</el-button>
-      </footer>
-
       <button class="collapse-trigger" type="button" @click="toggleCollapse">
         <el-icon><ArrowLeft v-if="!isCollapsed" /><ArrowRight v-else /></el-icon>
       </button>
@@ -226,7 +226,7 @@
         :is-dashboard="false"
         :fly-to-on-load="false"
         :view-controls="true"
-        view-controls-position="bottom-left"
+        view-controls-position="top-left"
         :style="satelliteStyle"
         @ready="onMapReady"
       />
@@ -254,6 +254,11 @@ import { satelliteStyle } from '../../js/mapConfig'
 import { getPageList } from '@/api/modules/project'
 import { useOssUpload } from '@/components/ossClient/index'
 import * as XLSX from 'xlsx'
+import {
+  POST_EVALUATION_UPLOAD_KEYS,
+  POST_EVALUATION_TURBINE_MODELS,
+  POST_EVALUATION_SCADA_EXAMPLE_FILES,
+} from './postEvaluationConfig'
 
 const props = defineProps({
   project: { type: Object, default: null },
@@ -272,19 +277,11 @@ const folderUploading = ref(false)
 const folderFiles = ref([])
 const showFolderDetails = ref(false)
 const showScadaExample = ref(false)
-const scadaExampleFiles = ['WTG-001_10min_SCADA.xlsx', 'WTG-002_10min_SCADA.xlsx', 'WTG-003_10min_SCADA.xlsx']
-const turbineModelOptions = [
-  { label: 'MySE 5.0-200', value: 'MySE 5.0-200', capacity: 5 },
-  { label: 'MySE 6.25-220', value: 'MySE 6.25-220', capacity: 6.25 },
-  { label: 'GW 6.7-220', value: 'GW 6.7-220', capacity: 6.7 },
-]
+const scadaExampleFiles = POST_EVALUATION_SCADA_EXAMPLE_FILES
+const turbineModelOptions = POST_EVALUATION_TURBINE_MODELS
 const form = reactive({ turbineModelType: 'platform', turbineModel: '', kOperator: '>', kValue: '98' })
 
-const uploadKeys = [
-  'completionSettlement', 'intervalGeneration', 'scadaCoordinate',
-  'investmentStatus', 'capitalContribution', 'operationData', 'costComparison',
-  'dailyPowerFinance', 'dailyPowerMarket', 'loanInfo',
-]
+const uploadKeys = POST_EVALUATION_UPLOAD_KEYS
 const uploads = reactive(Object.fromEntries(uploadKeys.map(key => [key, null])))
 
 const hasMapGeometry = computed(() => {
@@ -576,7 +573,7 @@ function toggleCollapse() {
 .header-title { display: flex; align-items: center; gap: 12px; color: #303133; font-size: 16px; font-weight: 600; }
 .back-icon { color: #409eff; font-size: 20px; cursor: pointer; }
 .panel-scroll { flex: 1; min-height: 0; }
-.form-content { padding: 20px 28px 28px 18px; max-width: 980px; margin: 0 auto; }
+.form-content { padding: 20px 28px 28px 18px; max-width: 860px; margin: 0 auto; }
 .form-section { padding: 8px 0 16px; border-bottom: 1px solid #f0f2f5; }
 .form-section:last-child { border-bottom: 0; }
 .section-title { margin: 0 0 12px 12px; color: #303133; font-size: 14px; font-weight: 600; }
@@ -615,13 +612,17 @@ function toggleCollapse() {
 .file-name { min-width: 0; overflow-wrap: anywhere; color: #606266; }
 .capacity-row { grid-template-columns: minmax(150px, 190px) minmax(0, 1fr); }
 .capacity-row .field-tip { grid-column: 2; }
-.fan-model-row { grid-template-columns: minmax(150px, 190px) 120px minmax(0, 1fr); align-items: center; }
-.model-type-select { width: 120px; }
-.model-value-select { min-width: 0; }
-.k-value-control { display: flex; min-width: 0; }
-.operator-select { flex: 0 0 145px; }
+.fan-model-row { grid-template-columns: minmax(150px, 190px) minmax(0, 360px); align-items: center; }
+.paired-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; width: 100%; max-width: 360px; }
+.model-type-select, .model-value-select, .operator-select { width: 100%; min-width: 0; }
+.capacity-row { grid-template-columns: minmax(150px, 190px) minmax(0, 360px); }
+.capacity-input { width: 100%; max-width: 360px; }
+.k-value-row { grid-template-columns: minmax(150px, 190px) minmax(0, 360px); }
+.k-value-control { min-width: 0; }
+.operator-select { min-width: 0; }
 .field-tip { grid-column: 2 / 4; margin: -6px 0 0; color: #a0a3a8; font-size: 12px; }
-.panel-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 18px; border-top: 1px solid #ebeef5; background: #fff; }
+.generate-action { display: flex; justify-content: center; padding: 26px 0 12px; }
+.generate-action :deep(.el-button) { min-width: 190px; height: 46px; font-size: 15px; font-weight: 600; }
 .collapse-trigger {
   position: absolute; top: 50%; right: -24px; z-index: 11; display: flex;
   width: 24px; height: 48px; align-items: center; justify-content: center;
@@ -647,5 +648,6 @@ function toggleCollapse() {
   .left-panel { flex-basis: 50%; width: 50%; }
   .form-content { padding: 16px 18px 24px 12px; }
   .upload-row, .form-row, .folder-row { grid-template-columns: minmax(125px, 165px) minmax(0, 1fr); gap: 12px; }
+  .paired-fields, .capacity-input { max-width: 100%; }
 }
 </style>
