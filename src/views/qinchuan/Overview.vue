@@ -359,6 +359,13 @@
       @open-add-report="handleOpenAddReport"
     />
 
+    <PostEvaluationWizard
+      v-if="wizardVisible && wizardReportSubTab === 'POST_EVALUATION'"
+      :project="wizardProject || activeProjectDetail"
+      @close="handlePostEvaluationClose"
+      @submit="handleWizardSubmit"
+    />
+
     
 
     <section v-if="showEditProject" class="create-project-fullpage">
@@ -439,6 +446,7 @@ import CreateProjectForm from './components/Createprojectform.vue'
 import SiteMapProjectDetailPanel from './components/ProjectDetailPanel.vue'
 import SiteMapGenerateReportPanel from './components/GenerateReportPanel.vue'
 import ReportWizard from './components/report-wizard/ReportWizard.vue'
+import PostEvaluationWizard from './components/report-wizard/PostEvaluationWizard.vue'
 import { PACKAGE_TYPE } from './js/Reportwizardmockdata'
 import { projectOverviewRows } from './js/dashboardMcokData'
 import { projectDetailMockData } from './js/areaPanelMockData'
@@ -2810,6 +2818,14 @@ function handleReportConfirm(payload) {
     return
   }
 
+  if (option?.key === 'postEval') {
+    reportPanels.openWizard('POST_EVALUATION', project, {
+      title: '一键生成后评价报告',
+      maxStep: 1,
+    })
+    return
+  }
+
   const packageType = reportKeyToWizardMode[option?.key]
   if (packageType !== undefined) {
     reportPanels.openWizard('FEASIBILITY_STUDY', project, {
@@ -2819,6 +2835,10 @@ function handleReportConfirm(payload) {
     })
   }
 }
+function handlePostEvaluationClose() {
+  reportPanels.closeWizard()
+}
+
 function handleWizardSaveDraft(payload) {
   console.log('[overview][wizard] save-draft:', payload)
 }
@@ -2853,6 +2873,11 @@ async function handleWizardSubmit(payload) {
   const subTab = wizardReportSubTab.value
   const label = wizardTitleLabel.value || '报告'
   console.log(`[overview][wizard] submit subTab=${subTab}`, payload)
+
+  if (subTab === 'POST_EVALUATION') {
+    ElMessage.info('后评价报告生成接口尚未接入，表单数据已提交到前端')
+    return
+  }
 
   if (subTab === 'FEASIBILITY_STUDY') {
     const project = wizardProject.value || payload?.project || activeProjectDetail.value
