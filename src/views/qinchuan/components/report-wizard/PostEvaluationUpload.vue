@@ -1,7 +1,8 @@
 <template>
   <div class="upload-row" :class="{ 'no-label': !label }">
     <label v-if="label" class="upload-label">{{ label }}<span v-if="required" class="required-mark"> *</span></label>
-    <div class="post-upload">
+    <div class="upload-content">
+      <div class="post-upload">
     <input
       ref="inputRef"
       class="native-input"
@@ -29,6 +30,8 @@
       <span v-if="status" class="file-status">{{ status }}</span>
       <button v-if="clearable" type="button" class="remove-action" @click="$emit('remove')">移除</button>
     </div>
+      </div>
+      <div v-if="$slots.hint" class="upload-hint"><slot name="hint" /></div>
     </div>
   </div>
 </template>
@@ -73,7 +76,11 @@ function handleChange(event) {
 .upload-row.no-label { grid-template-columns: minmax(0, 1fr); margin: 0; }
 .upload-label { color: #303133; font-size: 13px; line-height: 1.45; text-align: right; }
 .required-mark { color: #f56c6c; }
+.upload-content { min-width: 0; }
 .post-upload { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.upload-hint { margin-top: 5px; color: #a0a3a8; font-size: 12px; line-height: 1.6; }
+.upload-hint :deep(.template-link) { color: #1677ff; cursor: pointer; transition: color .18s ease; }
+.upload-hint :deep(.template-link:hover) { color: #409eff; text-decoration: underline; }
 .native-input { display: none; }
 .upload-trigger {
   display: inline-flex;
