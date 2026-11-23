@@ -611,7 +611,7 @@ function toggleCollapse() {
 .folder-file { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 5px 0; font-size: 12px; }
 .file-name { min-width: 0; overflow-wrap: anywhere; color: #606266; }
 .capacity-row { grid-template-columns: minmax(150px, 190px) minmax(0, 1fr); }
-.capacity-row .field-tip { grid-column: 2; }
+.capacity-row .field-tip, .k-value-row .field-tip { grid-column: 2; }
 .fan-model-row { grid-template-columns: minmax(150px, 190px) minmax(0, 360px); align-items: center; }
 .paired-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; width: 100%; max-width: 360px; }
 .model-type-select, .model-value-select, .operator-select { width: 100%; min-width: 0; }
