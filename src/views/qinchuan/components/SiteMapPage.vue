@@ -2133,6 +2133,13 @@ function handleReportConfirm(payload) {
     return
   }
 
+  // 后评价报告从通用面板 / 阶段面板的“生成报告/函件”弹窗进入专属组件。
+  if (option?.key === 'postEval') {
+    wizardReturnToSiteMapPanel.value = showSiteMapDetailPanel.value && !showDetailPanel.value
+    reportPanels.openWizard('POST_EVALUATION', project)
+    return
+  }
+
   if (reportKeyToWizardMode[option?.key] !== undefined) {
     wizardMode.value = reportKeyToWizardMode[option.key]
     wizardVisible.value = true
