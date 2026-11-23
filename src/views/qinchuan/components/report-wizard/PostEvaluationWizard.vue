@@ -77,7 +77,7 @@
                   :show-hint="false"
                 >
                   <template #hint>
-                    选择数据文件目录，需包含该风电场所有风机的逐10分钟风速时序数据，查看
+                    选择数据文件目录，需包含该风电场所有风机逐10分钟的风速及发电量时序数据，查看
                     <a class="template-link" href="#" @click.prevent="showScadaExample = true">文件示意</a>
                   </template>
                 </PostEvaluationUpload>
