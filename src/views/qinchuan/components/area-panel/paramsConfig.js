@@ -71,6 +71,7 @@ export const LABELS = {
   '${equity_internal_return_rate}': '资本金财务内部收益率(不含送出)', '${equity_after_tax_internal_rate}': '资本金财务内部收益率',
   '${labor_wages_benefits}': '人工工资及福利费', '${insurance_cost}': '保险费', '${other_expenses}': '其他费用',
   '${fixed_asset_original_value}': '原值', '${income_tax}': '所得税',
+  '${total_sales_revenue}': '销售收入', '${total_cost_expense}': '总成本费用', '${total_profit}': '利润总额',
   '${material_cost}': '材料费', '${repair_cost}': '修理费',
   '${net_electricity_price_excluding_value_added_tax}': '上网电价（不含税）',
   '${net_electricity_price_including_value_added_tax}': '上网电价（含税）',
@@ -112,6 +113,7 @@ export const UNITS = {
   '${repayment_period}': '年', '${fix_num_person}': '人', '${employee_welfare_ratio}': '%', '${grid_feed_in_tariff}': '元/kWh', '${long_term_loan_rate}': '%', '${short_term_loan_rate}': '%',
   '${curtailment_rate_single}': '%', '${annual_grid_energy_curtailment}': 'MWh', '${curtailment_equivalent_full_load_hours}': 'h', '${land_tax}': '万元',
   '${working_capital}': '万元', '${installed_capacity}': 'MW', '${annual_grid_energy}': 'MWh',
+  '${total_sales_revenue}': '万元', '${total_cost_expense}': '万元', '${total_profit}': '万元',
   '${equity_internal_return_rate}': '%', '${equity_after_tax_internal_rate}': '%', '${labor_wages_benefits}': '万元', '${insurance_cost}': '万元', '${other_expenses}': '万元', '${fixed_asset_original_value}': '万元', '${income_tax}': '万元',
   '${permanent_land_wind_farms}': '㎡', '${wind_turbine_foundation_land_area}': '㎡', '${box_transformer_foundation_land_area}': '㎡',
   '${booster_station_land_area}': '㎡', '${entrance_road_land_area}': '㎡',
@@ -317,7 +319,7 @@ export const MODULE_CONFIG = {
     ]},
     { title: '', type: 'financial', fieldKeys: ['${material_cost}', '${repair_cost}'] },
     { title: '总成本费用估算表参数', cols: 3, fields: ['${fixed_asset_original_value}'] },
-    { title: '利润与利润分配表参数', cols: 3, fields: ['${income_tax}'] },
+    { title: '利润与利润分配表参数', cols: 3, fields: ['${income_tax}', '${total_sales_revenue}', '${total_cost_expense}', '${total_profit}'] },
     { title: '', type: 'financial', fieldKeys: ['${net_electricity_price_excluding_value_added_tax}', '${net_electricity_price_including_value_added_tax}'] }
   ]
 }
