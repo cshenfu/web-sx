@@ -32,6 +32,10 @@
     </div>
       </div>
       <div v-if="$slots.hint" class="upload-hint"><slot name="hint" /></div>
+      <div v-else-if="showHint" class="upload-hint">
+        {{ hintText }}，查看下载
+        <a class="template-link" href="#" @click.prevent="$emit('template-download')">{{ templateName }}</a>
+      </div>
     </div>
   </div>
 </template>
@@ -51,8 +55,11 @@ const props = defineProps({
   files: { type: Array, default: () => [] },
   status: { type: String, default: '' },
   clearable: { type: Boolean, default: true },
+  showHint: { type: Boolean, default: true },
+  hintText: { type: String, default: '支持 xlsx 格式数据' },
+  templateName: { type: String, default: '数据模板.xlsx' },
 })
-const emit = defineEmits(['select', 'remove'])
+const emit = defineEmits(['select', 'remove', 'template-download'])
 const inputRef = ref(null)
 const hasFile = computed(() => props.directory ? props.files.length > 0 : Boolean(props.file))
 const displayName = computed(() => {
