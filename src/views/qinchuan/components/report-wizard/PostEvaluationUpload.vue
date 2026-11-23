@@ -1,5 +1,5 @@
 <template>
-  <div class="upload-row">
+  <div class="upload-row" :class="{ &quot;no-label&quot;: !label }">
     <label v-if="label" class="upload-label">{{ label }}<span v-if="required" class="required-mark"> *</span></label>
     <div class="post-upload">
     <input
@@ -70,6 +70,7 @@ function handleChange(event) {
 
 <style scoped>
 .upload-row { display: grid; grid-template-columns: minmax(150px, 190px) minmax(0, 1fr); gap: 18px; align-items: center; margin: 18px 0; }
+.upload-row.no-label { grid-template-columns: minmax(0, 1fr); margin: 0; }
 .upload-label { color: #303133; font-size: 13px; line-height: 1.45; text-align: right; }
 .required-mark { color: #f56c6c; }
 .post-upload { display: flex; align-items: center; gap: 12px; min-width: 0; }
