@@ -1,5 +1,5 @@
 <template>
-  <div class="upload-row" :class="{ &quot;no-label&quot;: !label }">
+  <div class="upload-row" :class="{ 'no-label': !label }">
     <label v-if="label" class="upload-label">{{ label }}<span v-if="required" class="required-mark"> *</span></label>
     <div class="post-upload">
     <input
