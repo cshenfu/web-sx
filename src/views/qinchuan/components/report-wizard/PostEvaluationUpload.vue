@@ -28,7 +28,7 @@
     <div v-if="displayName" class="upload-meta">
       <span class="file-name" :title="displayName">{{ displayName }}</span>
       <span v-if="status" class="file-status">{{ status }}</span>
-      <button v-if="clearable" type="button" class="remove-action" @click="$emit('remove')">移除</button>
+      <button v-if="clearable" type="button" class="remove-action" title="删除文件" aria-label="删除文件" @click="$emit('remove')"><el-icon><Delete /></el-icon></button>
     </div>
       </div>
       <div v-if="$slots.hint" class="upload-hint"><slot name="hint" /></div>
@@ -42,7 +42,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { FolderChecked, Loading, Plus } from '@element-plus/icons-vue'
+import { Delete, FolderChecked, Loading, Plus } from '@element-plus/icons-vue'
 
 const props = defineProps({
   label: { type: String, default: '' },
@@ -110,5 +110,6 @@ function handleChange(event) {
 .upload-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; font-size: 12px; }
 .file-name { max-width: 280px; overflow: hidden; color: #526174; text-overflow: ellipsis; white-space: nowrap; }
 .file-status { color: #67c23a; }
-.remove-action { padding: 0; border: 0; background: none; color: #f56c6c; cursor: pointer; font-size: 12px; }
+.remove-action { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #f56c6c; cursor: pointer; font-size: 16px; transition: background .18s ease, color .18s ease; }
+.remove-action:hover { color: #dc2626; background: #fef2f2; }
 </style>
