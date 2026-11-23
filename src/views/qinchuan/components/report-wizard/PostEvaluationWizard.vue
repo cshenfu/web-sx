@@ -38,10 +38,9 @@
 
           <section class="form-section">
             <h3 class="section-title">设备运行数据</h3>
-            <UploadField
+            <PostEvaluationUpload
               label="竣工结算报告"
               field-key="completionSettlement"
-              tip="支持 xlsx 格式数据。"
               :file="uploads.completionSettlement"
               @select="(file) => handleSingleFile('completionSettlement', file)"
               @remove="removeUpload('completionSettlement')"
@@ -50,7 +49,6 @@
             <UploadField
               label="区间发电量"
               field-key="intervalGeneration"
-              tip="支持 xlsx 格式数据（从生产运行平台导出该场区月度发电量）。"
               :file="uploads.intervalGeneration"
               @select="(file) => handleSingleFile('intervalGeneration', file)"
               @remove="removeUpload('intervalGeneration')"
@@ -65,37 +63,28 @@
             />
             <div class="upload-row folder-row">
               <label class="upload-label required">各风机Scada风速和发电量数据</label>
-              <div class="upload-control">
-                <input
-                  ref="folderInputRef"
-                  class="hidden-input"
-                  type="file"
-                  webkitdirectory
+              <div class="upload-stack">
+                <PostEvaluationUpload
                   directory
-                  multiple
-                  @change="handleFolderChange"
+                  accept=".xlsx,.xls,.csv"
+                  :loading="folderUploading"
+                  :files="folderFiles"
+                  @select="handleFolderChange"
+                  @remove="clearFolder"
                 />
-                <el-button class="upload-button" :loading="folderUploading" @click="triggerFolderSelect">
-                  <el-icon><FolderOpened /></el-icon>
-                  选择文件夹
-                </el-button>
-                <div class="upload-description">
-                  <template v-if="folderFiles.length">
-                    已选择 {{ folderFiles.length }} 个文件，{{ folderSummary }}
-                    <el-button link type="primary" @click="showFolderDetails = !showFolderDetails">
-                      {{ showFolderDetails ? '收起文件详情' : '查看文件详情' }}
-                    </el-button>
-                    <el-button link type="danger" @click="clearFolder">清空</el-button>
-                  </template>
-                  <span v-else>选择数据文件夹，系统将读取文件列表并尝试检查 Excel / CSV 文件结构</span>
+                <div v-if="folderFiles.length" class="folder-summary">
+                  {{ folderSummary }}
+                  <el-button link type="primary" @click="showFolderDetails = !showFolderDetails">
+                    {{ showFolderDetails ? '收起详情' : '查看详情' }}
+                  </el-button>
                 </div>
-              </div>
-              <div v-if="showFolderDetails && folderFiles.length" class="folder-details">
-                <div v-for="item in folderFiles" :key="item.relativePath" class="folder-file">
-                  <span class="file-name">{{ item.relativePath }}</span>
-                  <el-tag size="small" :type="item.inspectStatus === 'success' ? 'success' : item.inspectStatus === 'warning' ? 'warning' : 'info'">
-                    {{ item.inspectMessage }}
-                  </el-tag>
+                <div v-if="showFolderDetails && folderFiles.length" class="folder-details">
+                  <div v-for="item in folderFiles" :key="item.relativePath" class="folder-file">
+                    <span class="file-name">{{ item.relativePath }}</span>
+                    <el-tag size="small" :type="item.inspectStatus === 'success' ? 'success' : item.inspectStatus === 'warning' ? 'warning' : 'info'">
+                      {{ item.inspectMessage }}
+                    </el-tag>
+                  </div>
                 </div>
               </div>
             </div>
@@ -228,9 +217,10 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, ArrowRight, Back, FolderOpened, InfoFilled, Location, Upload } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Back, InfoFilled, Location } from '@element-plus/icons-vue'
+import PostEvaluationUpload from './PostEvaluationUpload.vue'
 import MapGL from '@/components/MapGL.vue'
 import fengjiIcon from '@/assets/img/mapIcon/fengji.png'
 import { ICON_SIZE_WIND } from '@/components/site-map/iconSize.js'
@@ -245,48 +235,6 @@ const props = defineProps({
 const emit = defineEmits(['close', 'submit'])
 const ossUpload = useOssUpload()
 
-const UploadField = defineComponent({
-  name: 'UploadField',
-  props: {
-    label: String,
-    fieldKey: String,
-    tip: String,
-    file: { type: Object, default: null },
-  },
-  emits: ['select', 'remove'],
-  setup(fieldProps, { emit: fieldEmit }) {
-    const input = ref(null)
-    return () => h('div', { class: 'upload-row' }, [
-      h('label', { class: 'upload-label required' }, fieldProps.label),
-      h('div', { class: 'upload-control' }, [
-        h('input', {
-          ref: input,
-          class: 'hidden-input',
-          type: 'file',
-          accept: '.xlsx,.xls',
-          onChange: (event) => {
-            const file = event.target.files?.[0]
-            if (file) fieldEmit('select', file)
-            event.target.value = ''
-          },
-        }),
-        h('button', {
-          type: 'button',
-          class: 'upload-button',
-          onClick: () => input.value?.click(),
-        }, [h('span', { class: 'upload-icon' }, [h(Upload)]), h('span', '点击上传')]),
-        h('div', { class: 'upload-description' }, fieldProps.file
-          ? [
-              h('span', { class: 'uploaded-name' }, fieldProps.file.name),
-              h('span', { class: 'upload-status' }, fieldProps.file.statusText || '已选择'),
-              h('button', { type: 'button', class: 'remove-file', onClick: () => fieldEmit('remove') }, '移除'),
-            ]
-          : [h('span', fieldProps.tip || '支持 xlsx 格式数据。'), h('a', { class: 'template-link', onClick: () => ElMessage.info('模板下载功能待接入') }, '数据模板.xlsx')]),
-      ]),
-    ])
-  },
-})
-
 const projectOptions = ref([])
 const loadingProjects = ref(false)
 const selectedProjectId = ref('')
@@ -294,7 +242,6 @@ const selectedProject = ref(null)
 const isCollapsed = ref(false)
 const mapRef = ref(null)
 const submitting = ref(false)
-const folderInputRef = ref(null)
 const folderUploading = ref(false)
 const folderFiles = ref([])
 const showFolderDetails = ref(false)
@@ -441,10 +388,6 @@ function removeUpload(key) {
   uploads[key] = null
 }
 
-function triggerFolderSelect() {
-  folderInputRef.value?.click()
-}
-
 async function inspectFolderFile(file) {
   const extension = file.name.split('.').pop()?.toLowerCase()
   if (!['xlsx', 'xls', 'csv'].includes(extension)) {
@@ -466,9 +409,7 @@ async function inspectFolderFile(file) {
   return { inspectStatus: 'success', inspectMessage: `可读取，${sheets.length} 个工作表` }
 }
 
-async function handleFolderChange(event) {
-  const files = Array.from(event.target.files || [])
-  event.target.value = ''
+async function handleFolderChange(files) {
   if (!files.length) return
   folderUploading.value = true
   folderFiles.value = []
@@ -566,10 +507,10 @@ function toggleCollapse() {
   position: relative;
   z-index: 10;
   display: flex;
-  flex: 0 0 610px;
+  flex: 0 0 50%;
   flex-direction: column;
-  width: 610px;
-  min-width: 460px;
+  width: 50%;
+  min-width: 0;
   background: #fff;
   box-shadow: 2px 0 8px rgba(0, 0, 0, .06);
   transition: width .25s ease, flex-basis .25s ease;
@@ -590,15 +531,15 @@ function toggleCollapse() {
 .header-title { display: flex; align-items: center; gap: 12px; color: #303133; font-size: 16px; font-weight: 600; }
 .back-icon { color: #409eff; font-size: 20px; cursor: pointer; }
 .panel-scroll { flex: 1; min-height: 0; }
-.form-content { padding: 14px 16px 24px 8px; }
+.form-content { padding: 20px 28px 28px 18px; max-width: 980px; margin: 0 auto; }
 .form-section { padding: 8px 0 16px; border-bottom: 1px solid #f0f2f5; }
 .form-section:last-child { border-bottom: 0; }
 .section-title { margin: 0 0 12px 12px; color: #303133; font-size: 14px; font-weight: 600; }
 .section-notice { margin: 0 0 14px 136px; color: #e6a23c; font-size: 12px; line-height: 1.6; }
-.upload-row, .form-row { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 12px; align-items: start; margin: 12px 0; }
-.upload-label { padding-top: 8px; color: #303133; font-size: 13px; line-height: 1.45; text-align: right; }
+.upload-row, .form-row { display: grid; grid-template-columns: minmax(150px, 190px) minmax(0, 1fr); gap: 18px; align-items: center; margin: 18px 0; }
+.upload-label { padding-top: 0; color: #303133; font-size: 13px; line-height: 1.45; text-align: right; }
 .upload-label.required::after { content: ' *'; color: #f56c6c; }
-.upload-control { display: flex; align-items: flex-start; gap: 16px; min-width: 0; }
+.upload-control { display: flex; align-items: center; gap: 16px; min-width: 0; }
 .hidden-input { display: none; }
 .upload-button {
   display: inline-flex;
@@ -621,16 +562,18 @@ function toggleCollapse() {
 .upload-status { color: #67c23a; margin-right: 8px; }
 .template-link { color: #1677ff; cursor: pointer; }
 .remove-file { margin-left: 8px; border: 0; padding: 0; background: none; color: #f56c6c; cursor: pointer; font-size: 12px; }
-.folder-row { grid-template-columns: 128px minmax(0, 1fr); }
-.folder-details { grid-column: 2; max-height: 180px; overflow: auto; padding: 8px 10px; border: 1px solid #ebeef5; background: #fafafa; }
+.folder-row { grid-template-columns: minmax(150px, 190px) minmax(0, 1fr); }
+.upload-stack { min-width: 0; }
+.folder-summary { margin-top: 8px; color: #8492a6; font-size: 12px; }
+.folder-details { margin-top: 8px; max-height: 180px; overflow: auto; padding: 8px 10px; border: 1px solid #ebeef5; background: #fafafa; }
 .folder-file { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 5px 0; font-size: 12px; }
 .file-name { min-width: 0; overflow-wrap: anywhere; color: #606266; }
-.fan-model-row { grid-template-columns: 128px 120px minmax(0, 1fr); align-items: center; }
+.fan-model-row { grid-template-columns: minmax(150px, 190px) 120px minmax(0, 1fr); align-items: center; }
 .model-type-select { width: 120px; }
 .model-value-select { min-width: 0; }
 .k-value-control { display: flex; min-width: 0; }
 .operator-select { flex: 0 0 145px; }
-.field-tip { grid-column: 2; margin: -6px 0 0; color: #a0a3a8; font-size: 12px; }
+.field-tip { grid-column: 2 / 4; margin: -6px 0 0; color: #a0a3a8; font-size: 12px; }
 .panel-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 18px; border-top: 1px solid #ebeef5; background: #fff; }
 .collapse-trigger {
   position: absolute; top: 50%; right: -24px; z-index: 11; display: flex;
@@ -646,6 +589,8 @@ function toggleCollapse() {
   pointer-events: none;
 }
 @media (max-width: 1100px) {
-  .left-panel { flex-basis: 540px; width: 540px; }
+  .left-panel { flex-basis: 50%; width: 50%; }
+  .form-content { padding: 16px 18px 24px 12px; }
+  .upload-row, .form-row, .folder-row { grid-template-columns: minmax(125px, 165px) minmax(0, 1fr); gap: 12px; }
 }
 </style>
