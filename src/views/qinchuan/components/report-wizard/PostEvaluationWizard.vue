@@ -1,7 +1,7 @@
 <template>
   <div class="post-evaluation-wizard">
     <aside class="left-panel" :class="{ collapsed: isCollapsed }">
-      <header class="panel-header">
+      <header v-show="!isCollapsed" class="panel-header">
         <div class="header-title">
           <el-icon class="back-icon" @click="$emit('close')"><Back /></el-icon>
           <span>一键生成后评价报告</span>
@@ -226,7 +226,7 @@
         :is-dashboard="false"
         :fly-to-on-load="false"
         :view-controls="true"
-        view-controls-position="top-left"
+        view-controls-position="bottom-left"
         :style="satelliteStyle"
         @ready="onMapReady"
       />
