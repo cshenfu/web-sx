@@ -399,8 +399,15 @@
 
     
 
+    <PostEvaluationWizard
+      v-if="wizardVisible && wizardReportSubTab === 'POST_EVALUATION'"
+      :project="wizardProject || selectedProject"
+      @close="closeWizard"
+      @submit="handleWizardSubmit"
+    />
+
     <ReportWizard
-      v-if="wizardVisible"
+      v-else-if="wizardVisible"
       class="wizard-overlay"
       :create-project-mode="wizardMode"
       :title="wizardTitleLabel"
@@ -441,6 +448,7 @@ import ProjectDetailPanelFull from './area-panel/ProjectDetailPanel.vue'
 import GenerateReportPanel from './GenerateReportPanel.vue'
 import ReportGenerateModal from './area-panel/ReportGenerateModal.vue'
 import ReportWizard from './report-wizard/ReportWizard.vue'
+import PostEvaluationWizard from './report-wizard/PostEvaluationWizard.vue'
 import { PACKAGE_TYPE } from '../js/Reportwizardmockdata'
 
 import { satelliteStyle } from '../js/mapConfig'
