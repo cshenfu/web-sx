@@ -46,17 +46,16 @@
               @remove="removeUpload('completionSettlement')"
             />
             <p class="section-notice">说明：下面各项运行数据需满足至少1年时长，Scada时长需满足满发电量的时间周期</p>
-            <UploadField
+            <PostEvaluationUpload
               label="区间发电量"
               field-key="intervalGeneration"
               :file="uploads.intervalGeneration"
               @select="(file) => handleSingleFile('intervalGeneration', file)"
               @remove="removeUpload('intervalGeneration')"
             />
-            <UploadField
+            <PostEvaluationUpload
               label="Scada风机坐标对照表"
               field-key="scadaCoordinate"
-              tip="支持 xlsx 格式数据。"
               :file="uploads.scadaCoordinate"
               @select="(file) => handleSingleFile('scadaCoordinate', file)"
               @remove="removeUpload('scadaCoordinate')"
@@ -124,58 +123,51 @@
 
           <section class="form-section">
             <h3 class="section-title">项目经营数据</h3>
-            <UploadField
+            <PostEvaluationUpload
               label="项目投资情况表"
               field-key="investmentStatus"
-              tip="支持 xlsx 格式数据。"
               :file="uploads.investmentStatus"
               @select="(file) => handleSingleFile('investmentStatus', file)"
               @remove="removeUpload('investmentStatus')"
             />
-            <UploadField
+            <PostEvaluationUpload
               label="项目资本金投入表"
               field-key="capitalContribution"
-              tip="支持 xlsx 格式数据。"
               :file="uploads.capitalContribution"
               @select="(file) => handleSingleFile('capitalContribution', file)"
               @remove="removeUpload('capitalContribution')"
             />
-            <UploadField
+            <PostEvaluationUpload
               label="项目主要经营数据表（来源财务报表）"
               field-key="operationData"
-              tip="支持 xlsx 格式数据。"
               :file="uploads.operationData"
               @select="(file) => handleSingleFile('operationData', file)"
               @remove="removeUpload('operationData')"
             />
-            <UploadField
+            <PostEvaluationUpload
               label="项目总成本费用对比表（来源财务报表）"
               field-key="costComparison"
-              tip="支持 xlsx 格式数据。"
               :file="uploads.costComparison"
               @select="(file) => handleSingleFile('costComparison', file)"
               @remove="removeUpload('costComparison')"
             />
-            <UploadField
+            <PostEvaluationUpload
               label="项目日电量电价表（来源财务报表）"
               field-key="dailyPowerFinance"
-              tip="支持 xlsx 格式数据。"
               :file="uploads.dailyPowerFinance"
               @select="(file) => handleSingleFile('dailyPowerFinance', file)"
               @remove="removeUpload('dailyPowerFinance')"
             />
-            <UploadField
+            <PostEvaluationUpload
               label="项目日电量电价表（来源市场部）"
               field-key="dailyPowerMarket"
-              tip="支持 xlsx 格式数据。"
               :file="uploads.dailyPowerMarket"
               @select="(file) => handleSingleFile('dailyPowerMarket', file)"
               @remove="removeUpload('dailyPowerMarket')"
             />
-            <UploadField
+            <PostEvaluationUpload
               label="贷款信息"
               field-key="loanInfo"
-              tip="支持 xlsx 格式数据。"
               :file="uploads.loanInfo"
               @select="(file) => handleSingleFile('loanInfo', file)"
               @remove="removeUpload('loanInfo')"
