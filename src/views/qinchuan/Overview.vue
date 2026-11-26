@@ -449,7 +449,6 @@ import ReportWizard from './components/report-wizard/ReportWizard.vue'
 import PostEvaluationWizard from './components/report-wizard/PostEvaluationWizard.vue'
 import { PACKAGE_TYPE } from './js/Reportwizardmockdata'
 import { projectOverviewRows } from './js/dashboardMcokData'
-import { projectDetailMockData } from './js/areaPanelMockData'
 import { buildMainInfoFromAi } from './js/aiProjectAdapter'
 import * as newApi from '@/api/modules/project'
 import * as configApi from '@/api/modules/selectConfig'
@@ -691,7 +690,7 @@ const activeEditTool = ref('')
 const rightPanelMode = ref('list')
 const listExpanded = ref(false)
 const activeAreaId = ref(null)
-const activeProjectDetail = ref(projectDetailMockData)
+const activeProjectDetail = ref({})
 const reportModalVisible = ref(false)
 const addReportType = ref('')
 const detailLoading = ref(false)
@@ -1775,20 +1774,21 @@ function toggleTerrain(shouldEnable) {
 }
 
 function buildDetailFromListItem(item) {
-  const base = cloneValue(projectDetailMockData)
-  base.id = item.id
-  base.name = item.projectName || base.name
-  base.projectName = item.projectName || base.projectName || base.name
-  base.code = item.projectCode || base.code
-  base.projectCode = item.projectCode || base.projectCode
-  base.type = item.itemType || base.type
-  base.capacity = item.currentProjectCapacity ?? base.capacity
-  base.stage = item.projectStage || base.stage
-  base.approvalStatus = item.approvalStatus || base.approvalStatus
-  base.company = item.managerCompany || base.company
-  base.manager = item.managerName || base.manager
-  base.notes = item.notes || base.notes
-  base.address = item.address || base.address
+  const base = {
+    id: item.id || '-',
+    name: item.projectName || '-',
+    projectName: item.projectName || '-',
+    code: item.projectCode || '-',
+    projectCode: item.projectCode || '-',
+    type: item.itemType || '-',
+    capacity: item.currentProjectCapacity ?? '-',
+    stage: item.projectStage || '-',
+    approvalStatus: item.approvalStatus || '-',
+    company: item.managerCompany || '-',
+    manager: item.managerName || '-',
+    notes: item.notes || '-',
+    address: item.address || '-',
+  }
   base.coordinate = cloneValue(item.coordinate || [])
   base.windTurbinePoints = cloneValue(item.windTurbinePoints || [])
   base.boosterStationLocations = cloneValue(item.boosterStationLocations || [])
@@ -2604,17 +2604,13 @@ function syncCityBoundaryVisibility() {
     map.getLayoutProperty(PROVINCE_EXTRUSION_ID, 'visibility') !== 'none'
 
   const shouldShow = zoom >= AREA_ZOOM_THRESHOLD && !extrusionVisible
-  if (cityBoundaryVisible === shouldShow) return
-  cityBoundaryVisible = shouldShow
-
-  map.setLayoutProperty(
-    CITY_BOUNDARY_LAYER_ID,
-    'visibility',
-    shouldShow ? 'visible' : 'none'
-  )
+  if (map.getLayer(CITY_BOUNDARY_LAYER_ID) && cityBoundaryVisible !== shouldShow) {
+    cityBoundaryVisible = shouldShow
+    map.setLayoutProperty(CITY_BOUNDARY_LAYER_ID, 'visibility', shouldShow ? 'visible' : 'none')
+  }
 
   if (map.getLayer(COUNTY_BOUNDARY_LAYER_ID)) {
-    map.setLayoutProperty(COUNTY_BOUNDARY_LAYER_ID, 'visibility', shouldShow && (map.getZoom?.() ?? 0) >= 10 ? 'visible' : 'none')
+    map.setLayoutProperty(COUNTY_BOUNDARY_LAYER_ID, 'visibility', shouldShow && zoom >= 10 ? 'visible' : 'none')
   }
 
   if (shouldShow && mapRef.value?.hasMaskLayer?.(MASK_LAYER_ID)) {
@@ -2625,6 +2621,9 @@ function setCityBoundaryVisible(visible) {
   const map = mapRef.value?.getMap?.()
   if (!map || !map.getLayer(CITY_BOUNDARY_LAYER_ID)) return
   map.setLayoutProperty(CITY_BOUNDARY_LAYER_ID, 'visibility', visible ? 'visible' : 'none')
+  if (map.getLayer(COUNTY_BOUNDARY_LAYER_ID)) {
+    map.setLayoutProperty(COUNTY_BOUNDARY_LAYER_ID, 'visibility', visible && (map.getZoom?.() ?? 0) >= 10 ? 'visible' : 'none')
+  }
   if (visible && mapRef.value?.hasMaskLayer?.(MASK_LAYER_ID)) {
     mapRef.value.bringMaskToTop(MASK_LAYER_ID)
   }
@@ -2633,18 +2632,13 @@ async function ensureCityBoundaryLine() {
   const map = mapRef.value?.getMap?.()
   if (!map) return
 
-  if (map.getLayer(CITY_BOUNDARY_LAYER_ID)) {
-    return
-  }
+  const cities = map.getSource(CITY_BOUNDARY_SOURCE_ID) ? null : await loadCityGeoJSON()
+  const counties = map.getSource(COUNTY_BOUNDARY_SOURCE_ID) ? null : await loadShaanxiCounties().catch((err) => { console.error('[overview] 陕西省县界加载失败:', err); return null })
 
-  const cities = await loadCityGeoJSON()
-  if (!cities) return
-  const counties = await loadShaanxiCounties().catch((err) => { console.error('[overview] 陕西省县界加载失败:', err); return null })
-
-  if (!map.getSource(CITY_BOUNDARY_SOURCE_ID)) {
+  if (cities && !map.getSource(CITY_BOUNDARY_SOURCE_ID)) {
     map.addSource(CITY_BOUNDARY_SOURCE_ID, { type: 'geojson', data: cities })
   }
-  if (!map.getLayer(CITY_BOUNDARY_LAYER_ID)) {
+  if (cities && !map.getLayer(CITY_BOUNDARY_LAYER_ID)) {
     map.addLayer({
       id: CITY_BOUNDARY_LAYER_ID,
       type: 'line',
