@@ -8,7 +8,7 @@
           <span class="progress-dot" :class="{ done: step.date }" />
           <span v-if="idx < safeData.timeline.length - 1" class="progress-line" :class="{ active: Boolean(step.date) }" />
         </div>
-        <div class="progress-date">{{ step.date || '' }}</div>
+        <div class="progress-date">{{ step.date || '-' }}</div>
       </div>
     </div>
 
@@ -22,23 +22,23 @@
         </div>
 
         <div class="group-content" :class="{ active: group.active }">
-          <div v-if="group.date || group.to" class="group-meta">{{ group.date }} {{ group.to }}</div>
+          <div v-if="group.date || group.to" class="group-meta">{{ group.date || '-' }} {{ group.to || '' }}</div>
           <div v-for="(item, idx) in group.items || []" :key="idx" class="group-item">
             <div class="item-top">
-              <span class="tag">{{ item.tag }}</span>
-              <span class="item-org">{{ item.org }}</span>
-              <span v-if="item.docNo" class="item-doc"> | {{ item.docNo }}</span>
-              <span class="item-date"> | {{ item.date }}</span>
+              <span class="tag">{{ item.tag || '-' }}</span>
+              <span class="item-org">{{ item.org || '-' }}</span>
+              <span v-if="item.docNo" class="item-doc"> | {{ item.docNo || '-' }}</span>
+              <span class="item-date"> | {{ item.date || '-' }}</span>
             </div>
-            <div class="item-name">{{ item.name }}</div>
+            <div class="item-name">{{ item.name || '-' }}</div>
             <div class="item-actions" v-if="item.filePath">
               <button type="button" @click="$emit('file-action', 'download', item)">下载</button>
               <button type="button" @click="$emit('file-action', 'edit', item)">编辑</button>
               <button type="button" class="danger" @click="$emit('file-action', 'delete', item)">删除</button>
             </div>
             <div class="item-footer">
-              <span>{{ item.operator }}</span>
-              <span>{{ item.updatedAt }}</span>
+              <span>{{ item.operator || '-' }}</span>
+              <span>{{ item.updatedAt || '-' }}</span>
             </div>
           </div>
         </div>
