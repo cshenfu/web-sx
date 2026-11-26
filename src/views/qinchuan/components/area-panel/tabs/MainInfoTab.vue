@@ -97,11 +97,11 @@
               </tr>
             </tbody>
           </table>
-          <div v-else class="empty-state">暂无数据~</div>
+          <div v-else class="empty-state">-</div>
         </div>
       </template>
 
-      <div v-if="!currentBlocks.length" class="empty-state">暂无数据~</div>
+      <div v-if="!currentBlocks.length" class="empty-state">-</div>
     </div>
   </div>
 </template>
