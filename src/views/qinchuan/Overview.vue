@@ -2631,7 +2631,12 @@ async function ensureCityBoundaryLine() {
   if (!map) return
 
   const cities = !map.getLayer(CITY_BOUNDARY_LAYER_ID) ? await loadCityGeoJSON() : null
-  const counties = !map.getLayer(COUNTY_BOUNDARY_LAYER_ID) ? await loadShaanxiCounties().catch((err) => { console.error('[overview] 陕西省县界加载失败:', err); return null })
+  const counties = !map.getLayer(COUNTY_BOUNDARY_LAYER_ID)
+    ? await loadShaanxiCounties().catch((err) => {
+        console.error('[overview] 陕西省县界加载失败:', err)
+        return null
+      })
+    : null
 
   if (cities && !map.getSource(CITY_BOUNDARY_SOURCE_ID)) {
     map.addSource(CITY_BOUNDARY_SOURCE_ID, { type: 'geojson', data: cities })
