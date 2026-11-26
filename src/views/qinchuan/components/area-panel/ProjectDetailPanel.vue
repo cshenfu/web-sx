@@ -7,7 +7,7 @@
 
     <header class="detail-header">
       <div class="header-left">
-        <div class="project-name">{{ project.name }}</div>
+        <div class="project-name">{{ project.name || '-' }}</div>
         <div class="project-company">
           <svg viewBox="0 0 16 16" class="company-icon"><path d="M3 13.5V4l5-2 5 2v9.5M6 13.5v-3h4v3" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>
           所属公司：{{ project.company || '-' }}
@@ -332,7 +332,7 @@ async function handleSupportStageChange(stageName) {
           stageCode: String(type._stageNode?.id || ''),
           fileCode: type.fileCode,
           tag: record.fileTypeTag || type.fileDesc || '其他文件',
-          name: file.fileName || file.name || '未命名文件',
+          name: file.fileName || file.name || '-',
           filePath: file.filePath || file.url || '',
           updatedAt: record.updateTime || record.createTime || '',
           operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
@@ -401,7 +401,7 @@ async function confirmSupportAddType() {
   supportUploadRecord.value = existingRecords[0] || null
   supportUploadFileCode.value = type.fileCode
   supportSelectedStageCode.value = type._stageCode
-  supportUploadTag.value = type.fileDesc || '支持性文件'
+  supportUploadTag.value = type.fileDesc || '-'
   supportUploadAppendMode.value = true
   supportAddDialogVisible.value = false
   supportUploadVisible.value = true
@@ -487,11 +487,11 @@ async function loadReviewInfo() {
         : Array.isArray(res?.data?.list) ? res.data.list : []
 
       const items = records.flatMap((record) => normalizeReviewFiles(record).map((file) => ({
-        tag: record.fileTypeTag || '审查文件',
+        tag: record.fileTypeTag || '-',
         org: record.organizationName || record.orgName || record.uploaderName || record.assignedUploaderName || '',
         docNo: record.documentNo || record.docNo || '',
         date: formatReviewDate(record.updateTime || record.createTime),
-        name: file.fileName || file.name || '未命名文件',
+        name: file.fileName || file.name || '-',
         operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
         updatedAt: formatReviewDate(record.updateTime || record.createTime),
         filePath: file.filePath || file.url || '',
@@ -517,7 +517,7 @@ async function loadReviewInfo() {
     const results = displayStages.map((stage) => resultMap.get(stage.stageCode) || ({ key: stage.stageCode, stage: stage.label, date: '', items: [] }))
     if (requestSeq !== reviewRequestSeq) return
     reviewData.value = {
-      timeline: results.map((group) => ({ key: group.key, label: group.stage, date: group.date || (group.items.length ? '已归档' : '') })),
+      timeline: results.map((group) => ({ key: group.key, label: group.stage, date: group.date || '-' })),
       groups: results,
     }
   } catch (err) {
@@ -743,7 +743,7 @@ function mapSurveyResponseToSections(raw) {
   const grouped = {}
   groups.forEach((g) => { grouped[g.dataCategory] = g.fileList || [] })
   return SURVEY_SECTIONS.map((s) => ({
-    key: s.key, title: s.title, files: (grouped[s.dataCategory] || []).map((item) => mapFileItem(item)), emptyText: '暂无数据~',
+    key: s.key, title: s.title, files: (grouped[s.dataCategory] || []).map((item) => mapFileItem(item)), emptyText: '-',
   }))
 }
 
@@ -768,7 +768,7 @@ async function refreshSurveyData() {
     surveyData.value = { sections: mapSurveyResponseToSections(res?.data ?? []) }
   } catch (err) {
     console.error('获取勘测数据失败:', err)
-    surveyData.value = { sections: SURVEY_SECTIONS.map((s) => ({ key: s.key, title: s.title, files: [], emptyText: '暂无数据~' })) }
+    surveyData.value = { sections: SURVEY_SECTIONS.map((s) => ({ key: s.key, title: s.title, files: [], emptyText: '-' })) }
   } finally { surveyLoading.value = false }
 }
 
