@@ -183,6 +183,15 @@
               @template-download="handleTemplateDownload('dailyPowerMarket')"
             />
             <PostEvaluationUpload
+              label="财务评价基础数据表"
+              field-key="financialBasicData"
+              hint-text="支持 xlsx 格式数据"
+              :file="uploads.financialBasicData"
+              @select="(file) => handleSingleFile('financialBasicData', file)"
+              @remove="removeUpload('financialBasicData')"
+              @template-download="handleTemplateDownload('financialBasicData')"
+            />
+            <PostEvaluationUpload
               label="贷款信息"
               field-key="loanInfo"
               :file="uploads.loanInfo"
@@ -530,6 +539,7 @@ const uploadLabels = {
   costComparison: '项目总成本费用对比表',
   dailyPowerFinance: '项目日电量电价表（来源财务报表）',
   dailyPowerMarket: '项目日电量电价表（来源市场部）',
+  financialBasicData: '财务评价基础数据表',
   loanInfo: '贷款信息',
 }
 
