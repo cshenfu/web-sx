@@ -2632,8 +2632,8 @@ async function ensureCityBoundaryLine() {
   const map = mapRef.value?.getMap?.()
   if (!map) return
 
-  const cities = map.getSource(CITY_BOUNDARY_SOURCE_ID) ? null : await loadCityGeoJSON()
-  const counties = map.getSource(COUNTY_BOUNDARY_SOURCE_ID) ? null : await loadShaanxiCounties().catch((err) => { console.error('[overview] 陕西省县界加载失败:', err); return null })
+  const cities = !map.getLayer(CITY_BOUNDARY_LAYER_ID) ? await loadCityGeoJSON() : null
+  const counties = !map.getLayer(COUNTY_BOUNDARY_LAYER_ID) ? await loadShaanxiCounties().catch((err) => { console.error('[overview] 陕西省县界加载失败:', err); return null })
 
   if (cities && !map.getSource(CITY_BOUNDARY_SOURCE_ID)) {
     map.addSource(CITY_BOUNDARY_SOURCE_ID, { type: 'geojson', data: cities })
@@ -2663,6 +2663,7 @@ async function ensureCityBoundaryLine() {
       paint: { 'line-color': '#fbbf24', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.7, 13, 1.2], 'line-opacity': 0.75 },
     })
   }
+  syncCityBoundaryVisibility()
 }
 
 function onLayerToggle(item) {
