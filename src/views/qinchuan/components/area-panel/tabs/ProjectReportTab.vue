@@ -54,7 +54,7 @@
                 {{ getStatusDesc(row) }}
               </span>
             </td>
-            <td class="ellipsis" :title="row.remark">{{ row.remark || '--' }}</td>
+            <td class="ellipsis" :title="row.remark">{{ row.remark || '-' }}</td>
             <td class="text-gray">{{ formatDateTime(row.createTime) }}</td>
 
             <td class="sticky-col" style="width: 140px; min-width: 140px;">
@@ -94,7 +94,7 @@
 
       <!-- 空状态 -->
       <div v-if="!list.length && !loading" class="empty-state">
-        <p class="empty-tip">暂无{{ currentTabLabel }}</p>
+        <p class="empty-tip">-</p>
         <el-button type="primary" size="small" @click="handleCreate">
           创建{{ currentTabLabel }}
         </el-button>
