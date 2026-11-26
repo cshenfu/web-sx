@@ -2597,8 +2597,6 @@ let cityBoundaryVisible = null
 function syncCityBoundaryVisibility() {
   const map = mapRef.value?.getMap?.()
   if (!map) return
-  if (!map.getLayer(CITY_BOUNDARY_LAYER_ID)) return
-
   const zoom = map.getZoom?.() ?? 0
   const extrusionVisible = !!map.getLayer(PROVINCE_EXTRUSION_ID) &&
     map.getLayoutProperty(PROVINCE_EXTRUSION_ID, 'visibility') !== 'none'
