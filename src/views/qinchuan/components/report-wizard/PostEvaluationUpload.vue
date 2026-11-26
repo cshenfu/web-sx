@@ -28,6 +28,7 @@
     <div v-if="displayName" class="upload-meta">
       <span class="file-name" :title="displayName">{{ displayName }}</span>
       <span v-if="status" class="file-status">{{ status }}</span>
+      <span v-if="validationMessage" class="validation-message" :class="'is-' + (validationStatus || 'success')">{{ validationMessage }}</span>
       <button v-if="clearable" type="button" class="remove-action" title="删除文件" aria-label="删除文件" @click="$emit('remove')"><el-icon><Delete /></el-icon></button>
     </div>
       </div>
@@ -58,6 +59,8 @@ const props = defineProps({
   showHint: { type: Boolean, default: true },
   hintText: { type: String, default: '支持 xlsx 格式数据' },
   templateName: { type: String, default: '数据模板.xlsx' },
+  validationStatus: { type: String, default: '' },
+  validationMessage: { type: String, default: '' },
 })
 const emit = defineEmits(['select', 'remove', 'template-download'])
 const inputRef = ref(null)
@@ -110,6 +113,10 @@ function handleChange(event) {
 .upload-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; font-size: 12px; }
 .file-name { max-width: 280px; overflow: hidden; color: #526174; text-overflow: ellipsis; white-space: nowrap; }
 .file-status { color: #67c23a; }
+.validation-message { flex-basis: 100%; line-height: 1.5; }
+.validation-message.is-success { color: #67c23a; }
+.validation-message.is-warning { color: #e6a23c; }
+.validation-message.is-error { color: #f56c6c; }
 .remove-action { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #f56c6c; cursor: pointer; font-size: 16px; transition: background .18s ease, color .18s ease; }
 .remove-action:hover { color: #dc2626; background: #fef2f2; }
 </style>
