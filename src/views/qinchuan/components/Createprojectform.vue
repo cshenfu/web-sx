@@ -28,9 +28,23 @@
         </el-form-item>
 
         <el-form-item label="项目阶段" required>
-          <el-select v-model="form.projectStage" placeholder="请选择" :loading="stageLoading" style="width: 100%">
+          <el-select v-model="form.projectStage" placeholder="请选择" style="width: 100%">
             <el-option v-for="opt in projectStageOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
+          <div v-if="activeStageDateFields.length" class="cp-stage-date-list">
+            <div v-for="field in activeStageDateFields" :key="field.key" class="cp-stage-date-row">
+              <span class="cp-stage-date-label">{{ field.label }}</span>
+              <el-date-picker
+                v-model="form[field.key]"
+                type="date"
+                value-format="YYYY-MM-DD"
+                format="YYYY-MM-DD"
+                placeholder="选择日期"
+                style="width: 100%"
+                clearable
+              />
+            </div>
+          </div>
         </el-form-item>
 
         <!-- ================= 场区范围 ================= -->
@@ -268,18 +282,6 @@
           </el-radio-group>
         </el-form-item>
 
-        <el-form-item label="首次并网日期">
-          <el-date-picker v-model="form.firstGridConnectionTime" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
-        </el-form-item>
-
-        <el-form-item label="全容量并网日期">
-          <el-date-picker v-model="form.fullCapacityGridDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
-        </el-form-item>
-
-        <el-form-item label="转商业运行日期">
-          <el-date-picker v-model="form.commercialOperationDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
-        </el-form-item>
-
         <el-form-item label="项目备注">
           <el-input v-model="form.notes" type="textarea" :rows="3" placeholder="请输入" />
         </el-form-item>
@@ -365,8 +367,28 @@ function resolveMapInstance(mapRefProp) {
 
 const userName = sessionStorage.getItem('userName') || ''
 const submitting = ref(false)
-const stageLoading = ref(false)
-const projectStageOptions = ref([])
+const projectStageOptions = [
+  { value: 'PROJECT_RESERVE', label: '储备阶段' },
+  { value: 'PROJECT_INITIATION', label: '立项阶段' },
+  { value: 'FEASIBILITY_REVIEW', label: '可研阶段' },
+  { value: 'INVESTMENT_DECISION', label: '投决阶段' },
+  { value: 'PROJECT_CONSTRUCTION', label: '建设阶段' },
+  { value: 'PROJECT_OPERATION', label: '运营阶段' },
+]
+
+const stageDateFieldMap = {
+  PROJECT_RESERVE: [{ key: 'projectReserveTime', label: '储备审批时间' }],
+  PROJECT_INITIATION: [{ key: 'projectInitiationTime', label: '立项批复时间' }],
+  FEASIBILITY_REVIEW: [{ key: 'feasibilityReviewTime', label: '审查通过时间' }],
+  INVESTMENT_DECISION: [{ key: 'investmentDecisionTime', label: '投决批复时间' }],
+  PROJECT_CONSTRUCTION: [{ key: 'projectConstructionTime', label: '开工批复时间' }],
+  PROJECT_OPERATION: [
+    { key: 'firstGridConnectionTime', label: '首次并网日期' },
+    { key: 'fullCapacityGridDate', label: '全容量并网日期' },
+    { key: 'commercialOperationDate', label: '转商业运行日期' },
+  ],
+}
+const activeStageDateFields = computed(() => stageDateFieldMap[form.projectStage] || [])
 
 const form = reactive({
   itemType: 'FD',
@@ -389,7 +411,12 @@ const form = reactive({
   isReturnProject: 0,
   firstGridConnectionTime: '',
   fullCapacityGridDate: '',
-  commercialOperationDate: ''
+  commercialOperationDate: '',
+  projectReserveTime: '',
+  projectInitiationTime: '',
+  feasibilityReviewTime: '',
+  investmentDecisionTime: '',
+  projectConstructionTime: ''
 })
 
 const mockCompanyOptions = [
@@ -988,7 +1015,6 @@ watch(() => resolveMapInstance(props.mapRef), (mapInstance) => { if (mapInstance
 
 onMounted(() => {
   bindSiteRangeDrawEvents()
-  loadProjectStages()
 
   // ★ 改动：编辑模式回显；创建模式保持"打开即开始绘制"
   if (props.mode === 'edit' && props.project) {
@@ -1005,16 +1031,6 @@ onUnmounted(() => {
 })
 
 /* ==================== 其他 ==================== */
-async function loadProjectStages() {
-  stageLoading.value = true
-  try {
-    const response = await api.getStageList()
-    const body = response?.data && !Array.isArray(response.data) && Array.isArray(response.data.data) ? response.data : response
-    if (body?.code !== undefined && Number(body.code) !== 200) throw new Error(body.msg)
-    projectStageOptions.value = (body?.data || []).map(item => ({ value: String(item.code).trim(), label: String(item.desc).trim() })).filter(i => i.value && i.label)
-  } catch (err) { ElMessage.error('获取项目阶段失败') } finally { stageLoading.value = false }
-}
-
 function validate() {
   if (!form.projectCode.trim()) return '请输入项目编号'
   if (!form.projectName.trim()) return '请输入项目名称'
@@ -1097,6 +1113,11 @@ function initFromProject(project) {
   form.firstGridConnectionTime = normalizeDate(project.firstGridConnectionTime)
   form.fullCapacityGridDate = normalizeDate(project.fullCapacityGridDate)
   form.commercialOperationDate = normalizeDate(project.commercialOperationDate)
+  form.projectReserveTime = normalizeDate(project.projectReserveTime)
+  form.projectInitiationTime = normalizeDate(project.projectInitiationTime)
+  form.feasibilityReviewTime = normalizeDate(project.feasibilityReviewTime)
+  form.investmentDecisionTime = normalizeDate(project.investmentDecisionTime)
+  form.projectConstructionTime = normalizeDate(project.projectConstructionTime)
   // 编辑数据中的公司名称若不在模拟选项中，仍保留名称，避免回显丢失
   for (const [id, name] of [[form.constructionUnitId, form.constructionUnit], [form.investmentUnitId, form.investmentUnit]]) {
     if (id && name && !mockCompanyOptions.some(item => item.id === id)) mockCompanyOptions.push({ id, name })
@@ -1240,6 +1261,11 @@ function buildPayload(region, isEdit) {
     firstGridConnectionTime: normalizeDate(form.firstGridConnectionTime),
     fullCapacityGridDate: normalizeDate(form.fullCapacityGridDate),
     commercialOperationDate: normalizeDate(form.commercialOperationDate),
+    projectReserveTime: normalizeDate(form.projectReserveTime),
+    projectInitiationTime: normalizeDate(form.projectInitiationTime),
+    feasibilityReviewTime: normalizeDate(form.feasibilityReviewTime),
+    investmentDecisionTime: normalizeDate(form.investmentDecisionTime),
+    projectConstructionTime: normalizeDate(form.projectConstructionTime),
   }
 
   if (!isEdit) {
@@ -1305,6 +1331,9 @@ defineExpose({
 :deep(.el-form-item__content) { flex: 1; display: block; }
 
 .cp-full-width { width: 100%; margin-top: 8px; }
+.cp-stage-date-list { width: 100%; margin-top: 12px; }
+.cp-stage-date-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.cp-stage-date-label { flex: 0 0 108px; color: #606266; font-size: 12px; text-align: right; }
 .cp-tip { margin-top: 4px; color: #a0a5ad; font-size: 12px; line-height: 1.6; }
 .cp-tip-success { color: #24b26b; }
 .cp-tip-error { color: #f56c6c; }
