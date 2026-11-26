@@ -216,17 +216,17 @@ export function safeParseJson(str) {
   function buildSubTabs(p, parsed, center, windTable, geoFiles) {
     const centerStr = center
       ? `${center[0].toFixed(6)},${center[1].toFixed(6)}`
-      : ''
+      : '-'
   
     // —— 1. 风机坐标 ——
     const windRows = windTable
       .filter((w) => !['MAX', 'MIN', '平均'].includes(w.label))
       .map((w) => [
-        w.label ?? '-',
-        w.x ?? '-',
-        w.y ?? '-',
-        w.avgWindSpeed ?? '-',
-        w.yearPower ?? '-',
+        w.label == null || w.label === '' ? '-' : w.label,
+        w.x == null || w.x === '' ? '-' : w.x,
+        w.y == null || w.y === '' ? '-' : w.y,
+        w.avgWindSpeed == null || w.avgWindSpeed === '' ? '-' : w.avgWindSpeed,
+        w.yearPower == null || w.yearPower === '' ? '-' : w.yearPower,
       ])
     const windTab = {
       key: 'wind',
@@ -281,7 +281,7 @@ export function safeParseJson(str) {
     roadBlocks.push({ type: 'text', label: '新建进站道路长度', value: newEntryLen != null ? `${newEntryLen}km` : '-' })
     roadBlocks.push({ type: 'text', label: '扩建道路长度', value: expandLen != null ? `${expandLen}km` : '-' })
     roadFiles.forEach((f) => {
-      roadBlocks.push({ type: 'file', label: '道路文件', name: f.fileName, url: f.url || f.filePath })
+      roadBlocks.push({ type: 'file', label: '道路文件', name: f.fileName || '-', url: f.url || f.filePath })
     })
     const roadTab = { key: 'road', label: '道路数据', blocks: roadBlocks }
   
