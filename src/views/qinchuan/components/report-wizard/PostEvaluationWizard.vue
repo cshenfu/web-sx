@@ -44,7 +44,7 @@
               :file="uploads.completionSettlement"
               @select="(file) => handleSingleFile('completionSettlement', file)"
               @remove="removeUpload('completionSettlement')"
-              @template-download="showTemplatePlaceholder"
+              @template-download="handleTemplateDownload('completionSettlement')"
             />
             <p class="section-notice">说明：下面各项运行数据需满足至少1年时长，Scada时长需满足满发电量的时间周期</p>
             <PostEvaluationUpload
@@ -54,7 +54,7 @@
               :file="uploads.intervalGeneration"
               @select="(file) => handleSingleFile('intervalGeneration', file)"
               @remove="removeUpload('intervalGeneration')"
-              @template-download="showTemplatePlaceholder"
+              @template-download="handleTemplateDownload('intervalGeneration')"
             />
             <PostEvaluationUpload
               label="Scada风机坐标对照表"
@@ -62,7 +62,7 @@
               :file="uploads.scadaCoordinate"
               @select="(file) => handleSingleFile('scadaCoordinate', file)"
               @remove="removeUpload('scadaCoordinate')"
-              @template-download="showTemplatePlaceholder"
+              @template-download="handleTemplateDownload('scadaCoordinate')"
             />
             <div class="upload-row folder-row">
               <label class="upload-label required">各风机Scada风速和发电量数据</label>
@@ -143,20 +143,12 @@
           <section class="form-section">
             <h3 class="section-title">项目经营数据</h3>
             <PostEvaluationUpload
-              label="项目投资情况表"
-              field-key="investmentStatus"
-              :file="uploads.investmentStatus"
-              @select="(file) => handleSingleFile('investmentStatus', file)"
-              @remove="removeUpload('investmentStatus')"
-              @template-download="showTemplatePlaceholder"
-            />
-            <PostEvaluationUpload
               label="项目资本金投入表"
               field-key="capitalContribution"
               :file="uploads.capitalContribution"
               @select="(file) => handleSingleFile('capitalContribution', file)"
               @remove="removeUpload('capitalContribution')"
-              @template-download="showTemplatePlaceholder"
+              @template-download="handleTemplateDownload('capitalContribution')"
             />
             <PostEvaluationUpload
               label="项目主要经营数据表（来源财务报表）"
@@ -164,7 +156,7 @@
               :file="uploads.operationData"
               @select="(file) => handleSingleFile('operationData', file)"
               @remove="removeUpload('operationData')"
-              @template-download="showTemplatePlaceholder"
+              @template-download="handleTemplateDownload('operationData')"
             />
             <PostEvaluationUpload
               label="项目总成本费用对比表（来源财务报表）"
@@ -172,7 +164,7 @@
               :file="uploads.costComparison"
               @select="(file) => handleSingleFile('costComparison', file)"
               @remove="removeUpload('costComparison')"
-              @template-download="showTemplatePlaceholder"
+              @template-download="handleTemplateDownload('costComparison')"
             />
             <PostEvaluationUpload
               label="项目日电量电价表（来源财务报表）"
@@ -180,7 +172,7 @@
               :file="uploads.dailyPowerFinance"
               @select="(file) => handleSingleFile('dailyPowerFinance', file)"
               @remove="removeUpload('dailyPowerFinance')"
-              @template-download="showTemplatePlaceholder"
+              @template-download="handleTemplateDownload('dailyPowerFinance')"
             />
             <PostEvaluationUpload
               label="项目日电量电价表（来源市场部）"
@@ -188,7 +180,7 @@
               :file="uploads.dailyPowerMarket"
               @select="(file) => handleSingleFile('dailyPowerMarket', file)"
               @remove="removeUpload('dailyPowerMarket')"
-              @template-download="showTemplatePlaceholder"
+              @template-download="handleTemplateDownload('dailyPowerMarket')"
             />
             <PostEvaluationUpload
               label="贷款信息"
@@ -196,7 +188,7 @@
               :file="uploads.loanInfo"
               @select="(file) => handleSingleFile('loanInfo', file)"
               @remove="removeUpload('loanInfo')"
-              @template-download="showTemplatePlaceholder"
+              @template-download="handleTemplateDownload('loanInfo')"
             />
           </section>
           <div class="generate-action">
@@ -258,6 +250,7 @@ import {
   POST_EVALUATION_UPLOAD_KEYS,
   POST_EVALUATION_TURBINE_MODELS,
   POST_EVALUATION_SCADA_EXAMPLE_FILES,
+  POST_EVALUATION_TEMPLATE_FILES,
 } from './postEvaluationConfig'
 
 const props = defineProps({
@@ -425,8 +418,19 @@ function removeUpload(key) {
   uploads[key] = null
 }
 
-function showTemplatePlaceholder() {
-  ElMessage.info('数据模板文件暂未提供，后续补充下载地址')
+function handleTemplateDownload(key) {
+  const fileName = POST_EVALUATION_TEMPLATE_FILES[key]
+  if (!fileName) {
+    ElMessage.warning('暂未配置该数据模板')
+    return
+  }
+  const link = document.createElement('a')
+  link.href = `/modelTemplate/${encodeURIComponent(fileName)}`
+  link.download = fileName
+  link.rel = 'noopener'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
 }
 
 
@@ -521,7 +525,6 @@ const uploadLabels = {
   completionSettlement: '竣工结算报告',
   intervalGeneration: '区间发电量',
   scadaCoordinate: 'Scada风机坐标对照表',
-  investmentStatus: '项目投资情况表',
   capitalContribution: '项目资本金投入表',
   operationData: '项目主要经营数据表',
   costComparison: '项目总成本费用对比表',
