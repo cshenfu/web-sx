@@ -1757,15 +1757,13 @@ async function ensureProvinceBoundaryLine() {
 async function ensureCityBoundaryLine() {
   const map = mapRef.value?.getMap?.()
   if (!map) return
-  if (map.getLayer(CITY_BOUNDARY_LAYER_ID)) return
-  const cities = await loadCityGeoJSON()
-  if (!cities) return
-  const counties = await loadShaanxiCounties().catch((err) => { console.error('[sitemap] 陕西省县界加载失败:', err); return null })
+  const cities = map.getSource(CITY_BOUNDARY_SOURCE_ID) ? null : await loadCityGeoJSON()
+  const counties = map.getSource(COUNTY_BOUNDARY_SOURCE_ID) ? null : await loadShaanxiCounties().catch((err) => { console.error('[sitemap] 陕西省县界加载失败:', err); return null })
 
-  if (!map.getSource(CITY_BOUNDARY_SOURCE_ID)) {
+  if (cities && !map.getSource(CITY_BOUNDARY_SOURCE_ID)) {
     map.addSource(CITY_BOUNDARY_SOURCE_ID, { type: 'geojson', data: cities })
   }
-  if (!map.getLayer(CITY_BOUNDARY_LAYER_ID)) {
+  if (cities && !map.getLayer(CITY_BOUNDARY_LAYER_ID)) {
     map.addLayer({
       id: CITY_BOUNDARY_LAYER_ID,
       type: 'line',
