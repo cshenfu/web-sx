@@ -2082,7 +2082,7 @@ async function renderAreaCenterIcons() {
   if (!mapReady.value || !mapRef.value || !isAreaView.value) return
 
   const [fjW, gfW] = await Promise.all([
-    getIconNaturalWidth(fjIcon),
+    // getIconNaturalWidth(fjIcon),
     getIconNaturalWidth(gfIcon),
   ])
   if (requestVersion !== areaCenterIconRequestVersion) return
@@ -2095,7 +2095,7 @@ async function renderAreaCenterIcons() {
   }
 
   try {
-    await mapRef.value.ensureImage(ICON_AREA_FJ, fjIcon)
+    // await mapRef.value.ensureImage(ICON_AREA_FJ, fjIcon)
     await mapRef.value.ensureImage(ICON_AREA_GF, gfIcon)
     if (requestVersion !== areaCenterIconRequestVersion) return
 
@@ -2103,7 +2103,7 @@ async function renderAreaCenterIcons() {
       id: AREA_CENTER_LAYER_ID,
       geojson: featureCollection,
       iconId: ICON_AREA_FJ,
-      iconUrl: fjIcon,
+      // iconUrl: fjIcon,
       iconImage: ['get', 'iconId'],
       iconSize: 0.5,
       iconAnchor: 'center',
