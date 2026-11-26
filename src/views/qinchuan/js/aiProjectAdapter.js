@@ -17,7 +17,7 @@ export function safeParseJson(str) {
   export function formatDate(ts) {
     if (ts == null || ts === '') return '-'
     const d = new Date(Number(ts))
-    if (Number.isNaN(d.getTime())) return '——'
+    if (Number.isNaN(d.getTime())) return '-'
     const y = d.getFullYear()
     const m = String(d.getMonth() + 1).padStart(2, '0')
     const day = String(d.getDate()).padStart(2, '0')
@@ -266,7 +266,7 @@ export function safeParseJson(str) {
         { type: 'text', label: '接入站名称', value: extractAccessStationName(p.accessStation) || '-' },
         { type: 'text', label: '接入站中心点', value: centerStr || '-' },
         { type: 'text', label: '可接入电压', value: '-' },
-        { type: 'text', label: '可接入容量', value: '——' },
+        { type: 'text', label: '可接入容量', value: '-' },
       ],
     }
   
