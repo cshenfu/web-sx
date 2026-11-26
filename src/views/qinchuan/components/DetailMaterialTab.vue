@@ -36,7 +36,7 @@
           <div v-else class="file-card-top">
             <span class="file-icon">📄</span>
             <span class="file-real-name" :title="feasibilityReportFile?.fileName || '可研报告'">
-              {{ feasibilityReportFile?.fileName || '可研报告已生成' }}
+              {{ feasibilityReportFile?.fileName || '-' }}
             </span>
             <div class="feasibility-report-card-actions">
               <el-button
@@ -78,7 +78,7 @@
       </div>
 
       <div v-if="!requiredItems.length" class="section-empty">
-        暂无必要材料，请点击「设置」添加
+        -
       </div>
 
       <div v-for="item in requiredItems" :key="item.key" class="file-item">
@@ -206,7 +206,7 @@ const feasibilityReportFile = computed(() => {
   if (uploadedFile) return uploadedFile
   const report = feasibilityReportStatus.value
   if (report?.statusType !== 'COMCOMPLETED' || !report?.fileUrl) return null
-  return { fileName: report.fileName || '可研报告', filePath: report.fileUrl }
+  return { fileName: report.fileName || '-', filePath: report.fileUrl }
 })
 
 async function loadFeasibilityReportStatus(record) {
@@ -395,7 +395,7 @@ const completedCount = computed(
 )
 
 function formatTime(t) {
-  if (!t) return ''
+  if (!t) return '-'
   const d = new Date(t)
   if (Number.isNaN(d.getTime())) return t
   const pad = n => String(n).padStart(2, '0')
