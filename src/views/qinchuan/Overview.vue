@@ -464,7 +464,7 @@ import {
 import { cloneValue } from './js/geoUtils'
 import { useZoomThresholdSwitch } from './js/useZoomThresholdSwitch'
 
-import { loadShaanxiProvince, loadShaanxiCities } from '@/utils/shaanxiBoundary'
+import { loadShaanxiProvince, loadShaanxiCities, loadShaanxiCounties } from '@/utils/shaanxiBoundary'
 
 import fjIcon from '@/assets/img/mapIcon/fj-icon.png'
 import gfIcon from '@/assets/img/mapIcon/gf-icon.png'
@@ -2590,6 +2590,8 @@ async function ensureShaanxiMask() {
 
 const CITY_BOUNDARY_LAYER_ID = 'sx-city-boundary-line'
 const CITY_BOUNDARY_SOURCE_ID = 'sx-city-boundary-src'
+const COUNTY_BOUNDARY_LAYER_ID = 'sx-county-boundary-line'
+const COUNTY_BOUNDARY_SOURCE_ID = 'sx-county-boundary-src'
 let cityBoundaryVisible = null
 
 function syncCityBoundaryVisibility() {
@@ -2610,6 +2612,10 @@ function syncCityBoundaryVisibility() {
     'visibility',
     shouldShow ? 'visible' : 'none'
   )
+
+  if (map.getLayer(COUNTY_BOUNDARY_LAYER_ID)) {
+    map.setLayoutProperty(COUNTY_BOUNDARY_LAYER_ID, 'visibility', shouldShow && (map.getZoom?.() ?? 0) >= 10 ? 'visible' : 'none')
+  }
 
   if (shouldShow && mapRef.value?.hasMaskLayer?.(MASK_LAYER_ID)) {
     mapRef.value.bringMaskToTop(MASK_LAYER_ID)
@@ -2633,6 +2639,7 @@ async function ensureCityBoundaryLine() {
 
   const cities = await loadCityGeoJSON()
   if (!cities) return
+  const counties = await loadShaanxiCounties().catch((err) => { console.error('[overview] 陕西省县界加载失败:', err); return null })
 
   if (!map.getSource(CITY_BOUNDARY_SOURCE_ID)) {
     map.addSource(CITY_BOUNDARY_SOURCE_ID, { type: 'geojson', data: cities })
@@ -2648,6 +2655,18 @@ async function ensureCityBoundaryLine() {
         'line-width': ['interpolate', ['linear'], ['zoom'], 4, 1, 10, 2],
         'line-opacity': 0.9,
       },
+    })
+  }
+
+  if (counties) {
+    if (!map.getSource(COUNTY_BOUNDARY_SOURCE_ID)) map.addSource(COUNTY_BOUNDARY_SOURCE_ID, { type: 'geojson', data: counties })
+    if (!map.getLayer(COUNTY_BOUNDARY_LAYER_ID)) map.addLayer({
+      id: COUNTY_BOUNDARY_LAYER_ID,
+      type: 'line',
+      source: COUNTY_BOUNDARY_SOURCE_ID,
+      minzoom: 10,
+      layout: { visibility: 'none' },
+      paint: { 'line-color': '#fbbf24', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.7, 13, 1.2], 'line-opacity': 0.75 },
     })
   }
 }
