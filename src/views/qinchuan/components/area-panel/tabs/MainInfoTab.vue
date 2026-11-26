@@ -14,7 +14,7 @@
           <span class="step-dot" />
           <span v-if="index < data.timeline.length - 1" class="step-line" />
         </div>
-        <div class="step-date">{{ step.date }}</div>
+        <div class="step-date">{{ step.date || '-' }}</div>
       </div>
     </div>
 
@@ -63,7 +63,7 @@
       <template v-for="(block, bi) in currentBlocks" :key="bi">
         <div v-if="block.type === 'text'" class="kv-line">
           <span class="kv-label">{{ block.label }}：</span>
-          <span class="kv-value">{{ block.value }}</span>
+          <span class="kv-value">{{ block.value ?? '-' }}</span>
         </div>
 
         <div v-else-if="block.type === 'file'" class="kv-line">
@@ -92,7 +92,7 @@
                   :key="ci"
                   :class="{ link: ci === 0 && String(cell).startsWith('XZ') }"
                 >
-                  {{ cell }}
+                  {{ cell ?? '-' }}
                 </td>
               </tr>
             </tbody>
