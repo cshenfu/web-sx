@@ -153,7 +153,7 @@ export function safeParseJson(str) {
   }
   
   function buildMetrics(p) {
-    const safe = (v) => (v == null || v === '' ? '暂无数据' : String(v))
+    const safe = (v) => (v == null || v === '' ? '-' : String(v))
     const unit = (v, u) => (v == null || v === '' ? '' : u)
   
     return [
@@ -168,32 +168,42 @@ export function safeParseJson(str) {
     const roadLen = extractTotalRoadLength(p.newRoadInfo, p.expandRoadInfo, p.entryRoadInfo)
     const lineLen = extractLineTotalLength(p.lineTotalLength)
   
-    const planRows = []
+    const planRows = [
+      ['风机数量', '-'],
+      ['轮毂高度/叶轮直径', '-'],
+      ['道路总长度', '-'],
+      ['线路总长度', '-'],
+    ]
     const turbineDesc =
       p.turbineCount && p.ratedPower
         ? `${p.turbineCount}台(单机${p.ratedPower}MW)`
         : p.turbineCount
           ? `${p.turbineCount}台`
           : ''
-    if (turbineDesc) planRows.push(['风机数量', turbineDesc])
+    if (turbineDesc) planRows[0][1] = turbineDesc
   
     const hubDesc =
       p.hubHeight && p.rotorDiameter ? `${p.hubHeight}m/${p.rotorDiameter}m` : ''
-    if (hubDesc) planRows.push(['轮毂高度/叶轮直径', hubDesc])
+    if (hubDesc) planRows[1][1] = hubDesc
   
-    if (roadLen != null) planRows.push(['道路总长度', `${roadLen}km`])
+    if (roadLen != null) planRows[2][1] = `${roadLen}km`
     if (lineLen != null) planRows.push(['线路总长度', `${lineLen}km`])
   
-    const stationRows = []
-    if (p.substationVoltage) stationRows.push(['升压站电压等级', p.substationVoltage])
+    const stationRows = [
+      ['升压站电压等级', '-'],
+      ['主变容量', '-'],
+      ['集电线路敷设方式', '-'],
+      ['接入站', '-'],
+    ]
+    if (p.substationVoltage) stationRows[0][1] = p.substationVoltage
   
     const transformerCap = extractMainTransformerCapacity(p.mainTransformerParam)
-    if (transformerCap) stationRows.push(['主变容量', transformerCap])
+    if (transformerCap) stationRows[1][1] = transformerCap
   
-    if (p.lineLayingMethod) stationRows.push(['集电线路敷设方式', p.lineLayingMethod])
+    if (p.lineLayingMethod) stationRows[2][1] = p.lineLayingMethod
   
     const accessName = extractAccessStationName(p.accessStation)
-    if (accessName) stationRows.push(['接入站', accessName])
+    if (accessName) stationRows[3][1] = accessName
   
     // 接入距离 / 永久征地面积：接口没有，整行不渲染
   
@@ -236,12 +246,8 @@ export function safeParseJson(str) {
       c.latitude ?? '-',
     ])
     const stationBlocks = []
-    if (p.substationVoltage) {
-      stationBlocks.push({ type: 'text', label: '升压站电压等级', value: p.substationVoltage })
-    }
-    if (centerStr) {
-      stationBlocks.push({ type: 'text', label: '升压站中心点', value: centerStr })
-    }
+    stationBlocks.push({ type: 'text', label: '升压站电压等级', value: p.substationVoltage || '-' })
+    stationBlocks.push({ type: 'text', label: '升压站中心点', value: centerStr || '-' })
     if (corners.length) {
       stationBlocks.push({
         type: 'table',
@@ -257,9 +263,9 @@ export function safeParseJson(str) {
       key: 'access',
       label: '接入站',
       blocks: [
-        { type: 'text', label: '接入站名称', value: extractAccessStationName(p.accessStation) || '暂无数据' },
-        { type: 'text', label: '接入站中心点', value: centerStr || '暂无数据' },
-        { type: 'text', label: '可接入电压', value: '——' },
+        { type: 'text', label: '接入站名称', value: extractAccessStationName(p.accessStation) || '-' },
+        { type: 'text', label: '接入站中心点', value: centerStr || '-' },
+        { type: 'text', label: '可接入电压', value: '-' },
         { type: 'text', label: '可接入容量', value: '——' },
       ],
     }
@@ -271,9 +277,9 @@ export function safeParseJson(str) {
     const expandLen = extractSingleLength(p.expandRoadInfo, /长约([\d.]+)\s*km/)
   
     const roadBlocks = []
-    if (newFieldLen != null) roadBlocks.push({ type: 'text', label: '新建场内道路长度', value: `${newFieldLen}km` })
-    if (newEntryLen != null) roadBlocks.push({ type: 'text', label: '新建进站道路长度', value: `${newEntryLen}km` })
-    if (expandLen != null) roadBlocks.push({ type: 'text', label: '扩建道路长度', value: `${expandLen}km` })
+    roadBlocks.push({ type: 'text', label: '新建场内道路长度', value: newFieldLen != null ? `${newFieldLen}km` : '-' })
+    roadBlocks.push({ type: 'text', label: '新建进站道路长度', value: newEntryLen != null ? `${newEntryLen}km` : '-' })
+    roadBlocks.push({ type: 'text', label: '扩建道路长度', value: expandLen != null ? `${expandLen}km` : '-' })
     roadFiles.forEach((f) => {
       roadBlocks.push({ type: 'file', label: '道路文件', name: f.fileName, url: f.url || f.filePath })
     })
@@ -285,12 +291,8 @@ export function safeParseJson(str) {
     const loopItems = extractLoopItems(p.lineLoopDesc)
   
     const lineBlocks = []
-    if (p.lineLayingMethod) {
-      lineBlocks.push({ type: 'text', label: '线路敷设方式', value: p.lineLayingMethod })
-    }
-    if (loopCount != null) {
-      lineBlocks.push({ type: 'text', label: '回路数', value: String(loopCount) })
-    }
+    lineBlocks.push({ type: 'text', label: '线路敷设方式', value: p.lineLayingMethod || '-' })
+    lineBlocks.push({ type: 'text', label: '回路数', value: loopCount != null ? String(loopCount) : '-' })
     if (loopItems.length) {
       lineBlocks.push({ type: 'indent', lines: loopItems })
     }
