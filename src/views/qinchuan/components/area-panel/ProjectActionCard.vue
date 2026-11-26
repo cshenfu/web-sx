@@ -36,13 +36,13 @@
       <div class="grid-item border-right">
         <div class="grid-label">推荐机型</div>
         <div class="grid-value">
-          <span class="bold">{{ project.deviceModel || 'MySE5.0-200' }}</span>
+          <span class="bold">{{ project.deviceModel || '-' }}</span>
         </div>
       </div>
       <div class="grid-item">
         <div class="grid-label">资本金IRR</div>
         <div class="grid-value text-red">
-          {{ project.capitalFinancialRate != null ? project.capitalFinancialRate : '5.96' }} <span class="unit">%</span>
+          {{ project.capitalFinancialRate != null ? project.capitalFinancialRate : '-' }} <span class="unit">%</span>
         </div>
       </div>
     </div>
