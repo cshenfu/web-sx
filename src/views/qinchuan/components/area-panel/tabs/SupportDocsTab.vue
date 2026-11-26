@@ -41,7 +41,7 @@
         @action="(action, f) => $emit('file-action', action, f)"
         @preview="(file) => $emit('file-preview', file)"
       />
-      <div v-if="!filteredFiles.length" class="empty-state">暂无数据~</div>
+      <div v-if="!filteredFiles.length" class="empty-state">-</div>
     </div>
   </div>
 </template>
