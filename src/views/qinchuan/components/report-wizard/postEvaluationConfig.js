@@ -7,6 +7,7 @@ export const POST_EVALUATION_UPLOAD_KEYS = [
   'costComparison',
   'dailyPowerFinance',
   'dailyPowerMarket',
+  'financialBasicData',
   'loanInfo',
 ]
 
@@ -36,5 +37,6 @@ export const POST_EVALUATION_TEMPLATE_FILES = {
   costComparison: '项目总成本费用对比表模板.xlsx',
   dailyPowerFinance: '项目日电量电价表（财务报表）模板.xlsx',
   dailyPowerMarket: '项目日电量电价表（市场部）模板.xlsx',
+  financialBasicData: '财务评价基础数据表模板.xlsx',
   loanInfo: '贷款信息模板.xlsx',
 }
