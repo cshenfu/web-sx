@@ -41,7 +41,9 @@
             <PostEvaluationUpload
               label="竣工结算报告"
               field-key="completionSettlement"
-               :validation-message="uploads.completionSettlement?.validationMessage"\n              :validation-status="uploads.completionSettlement?.validationStatus"\n              :file="uploads.completionSettlement"
+               :validation-message="uploads.completionSettlement?.validationMessage"
+              :validation-status="uploads.completionSettlement?.validationStatus"
+              :file="uploads.completionSettlement"
               @select="(file) => handleSingleFile('completionSettlement', file)"
               @remove="removeUpload('completionSettlement')"
               @template-download="handleTemplateDownload('completionSettlement')"
@@ -51,7 +53,9 @@
               label="区间发电量"
               field-key="intervalGeneration"
               hint-text="支持 xlsx 格式数据（从生产运行平台导出该场区月度发电量）"
-              :validation-message="uploads.intervalGeneration?.validationMessage"\n              :validation-status="uploads.intervalGeneration?.validationStatus"\n              :file="uploads.intervalGeneration"
+              :validation-message="uploads.intervalGeneration?.validationMessage"
+              :validation-status="uploads.intervalGeneration?.validationStatus"
+              :file="uploads.intervalGeneration"
               @select="(file) => handleSingleFile('intervalGeneration', file)"
               @remove="removeUpload('intervalGeneration')"
               @template-download="handleTemplateDownload('intervalGeneration')"
@@ -59,7 +63,9 @@
             <PostEvaluationUpload
               label="Scada风机坐标对照表"
               field-key="scadaCoordinate"
-              :validation-message="uploads.scadaCoordinate?.validationMessage"\n              :validation-status="uploads.scadaCoordinate?.validationStatus"\n              :file="uploads.scadaCoordinate"
+              :validation-message="uploads.scadaCoordinate?.validationMessage"
+              :validation-status="uploads.scadaCoordinate?.validationStatus"
+              :file="uploads.scadaCoordinate"
               @select="(file) => handleSingleFile('scadaCoordinate', file)"
               @remove="removeUpload('scadaCoordinate')"
               @template-download="handleTemplateDownload('scadaCoordinate')"
@@ -145,7 +151,9 @@
             <PostEvaluationUpload
               label="项目资本金投入表"
               field-key="capitalContribution"
-              :validation-message="uploads.capitalContribution?.validationMessage"\n              :validation-status="uploads.capitalContribution?.validationStatus"\n              :file="uploads.capitalContribution"
+              :validation-message="uploads.capitalContribution?.validationMessage"
+              :validation-status="uploads.capitalContribution?.validationStatus"
+              :file="uploads.capitalContribution"
               @select="(file) => handleSingleFile('capitalContribution', file)"
               @remove="removeUpload('capitalContribution')"
               @template-download="handleTemplateDownload('capitalContribution')"
@@ -153,7 +161,9 @@
             <PostEvaluationUpload
               label="项目主要经营数据表（来源财务报表）"
               field-key="operationData"
-              :validation-message="uploads.operationData?.validationMessage"\n              :validation-status="uploads.operationData?.validationStatus"\n              :file="uploads.operationData"
+              :validation-message="uploads.operationData?.validationMessage"
+              :validation-status="uploads.operationData?.validationStatus"
+              :file="uploads.operationData"
               @select="(file) => handleSingleFile('operationData', file)"
               @remove="removeUpload('operationData')"
               @template-download="handleTemplateDownload('operationData')"
@@ -161,7 +171,9 @@
             <PostEvaluationUpload
               label="项目总成本费用对比表（来源财务报表）"
               field-key="costComparison"
-              :validation-message="uploads.costComparison?.validationMessage"\n              :validation-status="uploads.costComparison?.validationStatus"\n              :file="uploads.costComparison"
+              :validation-message="uploads.costComparison?.validationMessage"
+              :validation-status="uploads.costComparison?.validationStatus"
+              :file="uploads.costComparison"
               @select="(file) => handleSingleFile('costComparison', file)"
               @remove="removeUpload('costComparison')"
               @template-download="handleTemplateDownload('costComparison')"
@@ -169,7 +181,9 @@
             <PostEvaluationUpload
               label="项目日电量电价表（来源财务报表）"
               field-key="dailyPowerFinance"
-              :validation-message="uploads.dailyPowerFinance?.validationMessage"\n              :validation-status="uploads.dailyPowerFinance?.validationStatus"\n              :file="uploads.dailyPowerFinance"
+              :validation-message="uploads.dailyPowerFinance?.validationMessage"
+              :validation-status="uploads.dailyPowerFinance?.validationStatus"
+              :file="uploads.dailyPowerFinance"
               @select="(file) => handleSingleFile('dailyPowerFinance', file)"
               @remove="removeUpload('dailyPowerFinance')"
               @template-download="handleTemplateDownload('dailyPowerFinance')"
@@ -177,7 +191,9 @@
             <PostEvaluationUpload
               label="项目日电量电价表（来源市场部）"
               field-key="dailyPowerMarket"
-              :validation-message="uploads.dailyPowerMarket?.validationMessage"\n              :validation-status="uploads.dailyPowerMarket?.validationStatus"\n              :file="uploads.dailyPowerMarket"
+              :validation-message="uploads.dailyPowerMarket?.validationMessage"
+              :validation-status="uploads.dailyPowerMarket?.validationStatus"
+              :file="uploads.dailyPowerMarket"
               @select="(file) => handleSingleFile('dailyPowerMarket', file)"
               @remove="removeUpload('dailyPowerMarket')"
               @template-download="handleTemplateDownload('dailyPowerMarket')"
@@ -186,7 +202,9 @@
               label="财务评价基础数据表"
               field-key="financialBasicData"
               hint-text="支持 xlsx 格式数据"
-              :validation-message="uploads.financialBasicData?.validationMessage"\n              :validation-status="uploads.financialBasicData?.validationStatus"\n              :file="uploads.financialBasicData"
+              :validation-message="uploads.financialBasicData?.validationMessage"
+              :validation-status="uploads.financialBasicData?.validationStatus"
+              :file="uploads.financialBasicData"
               @select="(file) => handleSingleFile('financialBasicData', file)"
               @remove="removeUpload('financialBasicData')"
               @template-download="handleTemplateDownload('financialBasicData')"
@@ -194,7 +212,9 @@
             <PostEvaluationUpload
               label="贷款信息"
               field-key="loanInfo"
-              :validation-message="uploads.loanInfo?.validationMessage"\n              :validation-status="uploads.loanInfo?.validationStatus"\n              :file="uploads.loanInfo"
+              :validation-message="uploads.loanInfo?.validationMessage"
+              :validation-status="uploads.loanInfo?.validationStatus"
+              :file="uploads.loanInfo"
               @select="(file) => handleSingleFile('loanInfo', file)"
               @remove="removeUpload('loanInfo')"
               @template-download="handleTemplateDownload('loanInfo')"
@@ -465,7 +485,8 @@ async function inspectFolderFile(file) {
   if (!file.size) return { inspectStatus: 'error', inspectMessage: '空文件' }
   if (extension === 'csv') {
     const content = await file.text()
-    const rows = content.split(/\\r?\\n/).filter(line => line.trim())
+    const rows = content.split(/\\r?\
+/).filter(line => line.trim())
     if (rows.length < 2) return { inspectStatus: 'error', inspectMessage: '至少需要一行有效数据' }
     return { inspectStatus: 'success', inspectMessage: `可读取，${rows.length - 1} 行` }
   }
