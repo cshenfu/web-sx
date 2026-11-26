@@ -187,7 +187,7 @@ export function safeParseJson(str) {
     if (hubDesc) planRows[1][1] = hubDesc
   
     if (roadLen != null) planRows[2][1] = `${roadLen}km`
-    if (lineLen != null) planRows.push(['线路总长度', `${lineLen}km`])
+    if (lineLen != null) planRows[3][1] = `${lineLen}km`
   
     const stationRows = [
       ['升压站电压等级', '-'],
