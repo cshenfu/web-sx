@@ -28,7 +28,7 @@
           @click="(f) => handleFileClick(f, section.key)"
         />
       </div>
-      <div v-else class="empty-state">{{ section.emptyText || '暂无数据~' }}</div>
+      <div v-else class="empty-state">{{ section.emptyText || '-' }}</div>
     </div>
   </div>
 </template>
