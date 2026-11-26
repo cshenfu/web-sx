@@ -441,6 +441,7 @@ const boosterOutOfRangeList = ref([])
 
 // ★ 改动：编辑时的原始文件集合，保存时与新增文件合并
 const originalFileCollection = ref([])
+const removedFileBusinessTypes = ref(new Set())
 
 function addBoosterPoint() {
   if (boosterPoints.value.length >= 2) {
@@ -824,6 +825,7 @@ function clearSiteRange() {
 
 /* ==================== 上传处理 ==================== */
 async function handleSiteRangeUploadSuccess(dto, file) {
+  removedFileBusinessTypes.value.delete('场区范围')
   siteRangeFileDto.value = { ...dto }
   try {
     const raw = await resolveUploadFile(dto, file)
@@ -841,11 +843,13 @@ async function handleSiteRangeUploadSuccess(dto, file) {
   }
 }
 function handleSiteRangeUploadRemove() {
+  removedFileBusinessTypes.value.add('场区范围')
   siteRangeFileDto.value = null
   clearSiteRange()
 }
 
 async function handleWindTurbineUploadSuccess(dto, file) {
+  removedFileBusinessTypes.value.delete('风机点位')
   windTurbineFileDto.value = { ...dto }
   try {
     const raw = await resolveUploadFile(dto, file)
@@ -863,6 +867,7 @@ async function handleWindTurbineUploadSuccess(dto, file) {
   }
 }
 function handleWindTurbineUploadRemove() {
+  removedFileBusinessTypes.value.add('风机点位')
   windTurbineFileDto.value = null
   windTurbinePoints.value = []
   windOutOfRangeList.value = []
@@ -882,6 +887,7 @@ function removeAllOutOfRangeWindPoints() {
 }
 
 async function handleBoosterUploadSuccess(dto, file) {
+  removedFileBusinessTypes.value.delete('升压站点位')
   boosterFileDto.value = { ...dto }
   try {
     const raw = await resolveUploadFile(dto, file)
@@ -935,6 +941,7 @@ async function handleBoosterUploadSuccess(dto, file) {
   }
 }
 function handleBoosterUploadRemove() {
+  removedFileBusinessTypes.value.add('升压站点位')
   boosterFileDto.value = null
   boosterPoints.value = [createBoosterPoint()]
   boosterOutOfRangeList.value = []
@@ -1057,7 +1064,7 @@ function mergeFileCollection(original, newFiles) {
   const seen = new Set()
   const newBizTypes = new Set(newFiles.map((f) => f.fileBusinessType))
   for (const f of original || []) {
-    if (f.fileBusinessType && newBizTypes.has(f.fileBusinessType)) continue
+    if (f.fileBusinessType && (newBizTypes.has(f.fileBusinessType) || removedFileBusinessTypes.value.has(f.fileBusinessType))) continue
     const key = f.fileId || f.filePath || `${f.fileBusinessType}-${f.fileName}`
     if (seen.has(key)) continue
     seen.add(key)
@@ -1152,6 +1159,7 @@ function initFromProject(project) {
   originalFileCollection.value = Array.isArray(project.fileCollection)
     ? project.fileCollection.map((f) => ({ ...f }))
     : []
+  removedFileBusinessTypes.value = new Set()
 
   // ---- 地图渲染 ----
   nextTick(() => {
