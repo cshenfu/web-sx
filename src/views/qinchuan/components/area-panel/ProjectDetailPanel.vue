@@ -335,7 +335,7 @@ async function handleSupportStageChange(stageName) {
           name: file.fileName || file.name || '-',
           filePath: file.filePath || file.url || '',
           updatedAt: record.updateTime || record.createTime || '',
-          operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
+          operator: record.uploaderName || record.assignedUploaderName || record.creator || '-',
           record,
           rawFile: file,
         }]
@@ -451,7 +451,7 @@ function normalizeReviewFiles(record) {
 }
 
 function formatReviewDate(value) {
-  if (!value) return ''
+  if (!value) return '-'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return String(value)
   const pad = (n) => String(n).padStart(2, '0')
@@ -465,7 +465,7 @@ async function loadReviewInfo() {
 
   if (!projectId) {
     reviewData.value = {
-      timeline: displayStages.map((stage) => ({ key: stage.stageCode, label: stage.label, date: '' })),
+      timeline: displayStages.map((stage) => ({ key: stage.stageCode, label: stage.label, date: '-' })),
       groups: displayStages.map((stage) => ({ key: stage.stageCode, stage: stage.label, date: '', items: [] })),
     }
     reviewLoading.value = false
@@ -488,8 +488,8 @@ async function loadReviewInfo() {
 
       const items = records.flatMap((record) => normalizeReviewFiles(record).map((file) => ({
         tag: record.fileTypeTag || '-',
-        org: record.organizationName || record.orgName || record.uploaderName || record.assignedUploaderName || '',
-        docNo: record.documentNo || record.docNo || '',
+        org: record.organizationName || record.orgName || record.uploaderName || record.assignedUploaderName || '-',
+        docNo: record.documentNo || record.docNo || '-',
         date: formatReviewDate(record.updateTime || record.createTime),
         name: file.fileName || file.name || '-',
         operator: record.uploaderName || record.assignedUploaderName || record.creator || '',
@@ -754,8 +754,8 @@ function mapFileItem(item) {
   actions.push('delete')
   const parse = PARSE_STATUS_MAP[item.parseStatus]
   return {
-    id: item.id, name: item.fileName || '', tag: item.fileTypeTag || '', tag2: parse?.text || '', description: item.notes || '', updatedAt: item.createTime || item.updateTime || '', operator: item.creator || item.updater || '', filePath: item.filePath || '', fileSuffix: item.fileSuffix || '', parseStatus: item.parseStatus,
-    imageList: (item.imageList || []).map((img) => ({ id: img.id, fileName: img.fileName || '', filePath: img.filePath || '', fileSuffix: img.fileSuffix || '' })).filter((img) => img.filePath),
+    id: item.id, name: item.fileName || '-', tag: item.fileTypeTag || '-', tag2: parse?.text || '-', description: item.notes || '-', updatedAt: item.createTime || item.updateTime || '-', operator: item.creator || item.updater || '-', filePath: item.filePath || '', fileSuffix: item.fileSuffix || '-', parseStatus: item.parseStatus,
+    imageList: (item.imageList || []).map((img) => ({ id: img.id, fileName: img.fileName || '-', filePath: img.filePath || '', fileSuffix: img.fileSuffix || '-' })).filter((img) => img.filePath),
     actions, _raw: item,
   }
 }
