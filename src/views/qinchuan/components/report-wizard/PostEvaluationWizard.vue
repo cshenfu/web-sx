@@ -41,7 +41,7 @@
             <PostEvaluationUpload
               label="竣工结算报告"
               field-key="completionSettlement"
-              :file="uploads.completionSettlement"
+               :validation-message="uploads.completionSettlement?.validationMessage"\n              :validation-status="uploads.completionSettlement?.validationStatus"\n              :file="uploads.completionSettlement"
               @select="(file) => handleSingleFile('completionSettlement', file)"
               @remove="removeUpload('completionSettlement')"
               @template-download="handleTemplateDownload('completionSettlement')"
@@ -51,7 +51,7 @@
               label="区间发电量"
               field-key="intervalGeneration"
               hint-text="支持 xlsx 格式数据（从生产运行平台导出该场区月度发电量）"
-              :file="uploads.intervalGeneration"
+              :validation-message="uploads.intervalGeneration?.validationMessage"\n              :validation-status="uploads.intervalGeneration?.validationStatus"\n              :file="uploads.intervalGeneration"
               @select="(file) => handleSingleFile('intervalGeneration', file)"
               @remove="removeUpload('intervalGeneration')"
               @template-download="handleTemplateDownload('intervalGeneration')"
@@ -59,7 +59,7 @@
             <PostEvaluationUpload
               label="Scada风机坐标对照表"
               field-key="scadaCoordinate"
-              :file="uploads.scadaCoordinate"
+              :validation-message="uploads.scadaCoordinate?.validationMessage"\n              :validation-status="uploads.scadaCoordinate?.validationStatus"\n              :file="uploads.scadaCoordinate"
               @select="(file) => handleSingleFile('scadaCoordinate', file)"
               @remove="removeUpload('scadaCoordinate')"
               @template-download="handleTemplateDownload('scadaCoordinate')"
@@ -145,7 +145,7 @@
             <PostEvaluationUpload
               label="项目资本金投入表"
               field-key="capitalContribution"
-              :file="uploads.capitalContribution"
+              :validation-message="uploads.capitalContribution?.validationMessage"\n              :validation-status="uploads.capitalContribution?.validationStatus"\n              :file="uploads.capitalContribution"
               @select="(file) => handleSingleFile('capitalContribution', file)"
               @remove="removeUpload('capitalContribution')"
               @template-download="handleTemplateDownload('capitalContribution')"
@@ -153,7 +153,7 @@
             <PostEvaluationUpload
               label="项目主要经营数据表（来源财务报表）"
               field-key="operationData"
-              :file="uploads.operationData"
+              :validation-message="uploads.operationData?.validationMessage"\n              :validation-status="uploads.operationData?.validationStatus"\n              :file="uploads.operationData"
               @select="(file) => handleSingleFile('operationData', file)"
               @remove="removeUpload('operationData')"
               @template-download="handleTemplateDownload('operationData')"
@@ -161,7 +161,7 @@
             <PostEvaluationUpload
               label="项目总成本费用对比表（来源财务报表）"
               field-key="costComparison"
-              :file="uploads.costComparison"
+              :validation-message="uploads.costComparison?.validationMessage"\n              :validation-status="uploads.costComparison?.validationStatus"\n              :file="uploads.costComparison"
               @select="(file) => handleSingleFile('costComparison', file)"
               @remove="removeUpload('costComparison')"
               @template-download="handleTemplateDownload('costComparison')"
@@ -169,7 +169,7 @@
             <PostEvaluationUpload
               label="项目日电量电价表（来源财务报表）"
               field-key="dailyPowerFinance"
-              :file="uploads.dailyPowerFinance"
+              :validation-message="uploads.dailyPowerFinance?.validationMessage"\n              :validation-status="uploads.dailyPowerFinance?.validationStatus"\n              :file="uploads.dailyPowerFinance"
               @select="(file) => handleSingleFile('dailyPowerFinance', file)"
               @remove="removeUpload('dailyPowerFinance')"
               @template-download="handleTemplateDownload('dailyPowerFinance')"
@@ -177,7 +177,7 @@
             <PostEvaluationUpload
               label="项目日电量电价表（来源市场部）"
               field-key="dailyPowerMarket"
-              :file="uploads.dailyPowerMarket"
+              :validation-message="uploads.dailyPowerMarket?.validationMessage"\n              :validation-status="uploads.dailyPowerMarket?.validationStatus"\n              :file="uploads.dailyPowerMarket"
               @select="(file) => handleSingleFile('dailyPowerMarket', file)"
               @remove="removeUpload('dailyPowerMarket')"
               @template-download="handleTemplateDownload('dailyPowerMarket')"
@@ -186,7 +186,7 @@
               label="财务评价基础数据表"
               field-key="financialBasicData"
               hint-text="支持 xlsx 格式数据"
-              :file="uploads.financialBasicData"
+              :validation-message="uploads.financialBasicData?.validationMessage"\n              :validation-status="uploads.financialBasicData?.validationStatus"\n              :file="uploads.financialBasicData"
               @select="(file) => handleSingleFile('financialBasicData', file)"
               @remove="removeUpload('financialBasicData')"
               @template-download="handleTemplateDownload('financialBasicData')"
@@ -194,7 +194,7 @@
             <PostEvaluationUpload
               label="贷款信息"
               field-key="loanInfo"
-              :file="uploads.loanInfo"
+              :validation-message="uploads.loanInfo?.validationMessage"\n              :validation-status="uploads.loanInfo?.validationStatus"\n              :file="uploads.loanInfo"
               @select="(file) => handleSingleFile('loanInfo', file)"
               @remove="removeUpload('loanInfo')"
               @template-download="handleTemplateDownload('loanInfo')"
@@ -435,7 +435,7 @@ async function handleSingleFile(key, file) {
       try {
         const { sheets } = await readExcel(file)
         const rows = sheets.flatMap(sheet => sheet.rows)
-        const headerRow = rows.find(row => row.some(cell => /日期|时间|年份|年月/.test(String(cell ?? '')))
+        const headerRow = rows.find(row => row.some(cell => /日期|时间|年份|年月/.test(String(cell ?? ''))))
         const headers = headerRow || []
         const dateIndex = headers.findIndex(cell => /日期|时间|年月|date/i.test(String(cell ?? '')))
         const yearIndex = headers.findIndex(cell => /年份|年度|year/i.test(String(cell ?? '')))
