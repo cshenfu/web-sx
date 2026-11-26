@@ -249,6 +249,37 @@
           </div>
         </el-form-item>
 
+        <el-form-item label="建设单位">
+          <el-select v-model="form.constructionUnitId" placeholder="请选择建设单位" style="width: 100%" @change="syncCompanyName('construction')">
+            <el-option v-for="item in mockCompanyOptions" :key="item.id" :label="item.name" :value="item.id" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="投资单位">
+          <el-select v-model="form.investmentUnitId" placeholder="请选择投资单位" style="width: 100%" @change="syncCompanyName('investment')">
+            <el-option v-for="item in mockCompanyOptions" :key="item.id" :label="item.name" :value="item.id" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="是否重跑项目">
+          <el-radio-group v-model="form.isReturnProject">
+            <el-radio :label="0">不需要</el-radio>
+            <el-radio :label="1">需要</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item label="首次并网日期">
+          <el-date-picker v-model="form.firstGridConnectionTime" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
+        </el-form-item>
+
+        <el-form-item label="全容量并网日期">
+          <el-date-picker v-model="form.fullCapacityGridDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
+        </el-form-item>
+
+        <el-form-item label="转商业运行日期">
+          <el-date-picker v-model="form.commercialOperationDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
+        </el-form-item>
+
         <el-form-item label="项目备注">
           <el-input v-model="form.notes" type="textarea" :rows="3" placeholder="请输入" />
         </el-form-item>
@@ -350,8 +381,41 @@ const form = reactive({
   accessLng: '',
   accessLat: '',
   sendOutType: 1,
-  notes: ''
+  notes: '',
+  constructionUnit: '',
+  constructionUnitId: '',
+  investmentUnit: '',
+  investmentUnitId: '',
+  isReturnProject: 0,
+  firstGridConnectionTime: '',
+  fullCapacityGridDate: '',
+  commercialOperationDate: ''
 })
+
+const mockCompanyOptions = [
+  { id: 'company-001', name: '陕西华电新能源发电有限公司' },
+  { id: 'company-002', name: '陕西华电新能源投资有限公司' },
+  { id: 'company-003', name: '陕西华电新能源建设有限公司' },
+]
+
+function syncCompanyName(type) {
+  const isConstruction = type === 'construction'
+  const id = isConstruction ? form.constructionUnitId : form.investmentUnitId
+  const selected = mockCompanyOptions.find(item => item.id === id)
+  if (isConstruction) form.constructionUnit = selected?.name || ''
+  else form.investmentUnit = selected?.name || ''
+}
+
+function normalizeDate(value) {
+  if (!value) return ''
+  if (typeof value === 'string') return value.slice(0, 10)
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
 
 /* ==================== 场区范围 ==================== */
 const siteRangePoints = ref([])
@@ -377,6 +441,7 @@ const boosterOutOfRangeList = ref([])
 
 // ★ 改动：编辑时的原始文件集合，保存时与新增文件合并
 const originalFileCollection = ref([])
+const removedFileBusinessTypes = ref(new Set())
 
 function addBoosterPoint() {
   if (boosterPoints.value.length >= 2) {
@@ -760,6 +825,7 @@ function clearSiteRange() {
 
 /* ==================== 上传处理 ==================== */
 async function handleSiteRangeUploadSuccess(dto, file) {
+  removedFileBusinessTypes.value.delete('场区范围')
   siteRangeFileDto.value = { ...dto }
   try {
     const raw = await resolveUploadFile(dto, file)
@@ -777,11 +843,13 @@ async function handleSiteRangeUploadSuccess(dto, file) {
   }
 }
 function handleSiteRangeUploadRemove() {
+  removedFileBusinessTypes.value.add('场区范围')
   siteRangeFileDto.value = null
   clearSiteRange()
 }
 
 async function handleWindTurbineUploadSuccess(dto, file) {
+  removedFileBusinessTypes.value.delete('风机点位')
   windTurbineFileDto.value = { ...dto }
   try {
     const raw = await resolveUploadFile(dto, file)
@@ -799,6 +867,7 @@ async function handleWindTurbineUploadSuccess(dto, file) {
   }
 }
 function handleWindTurbineUploadRemove() {
+  removedFileBusinessTypes.value.add('风机点位')
   windTurbineFileDto.value = null
   windTurbinePoints.value = []
   windOutOfRangeList.value = []
@@ -818,6 +887,7 @@ function removeAllOutOfRangeWindPoints() {
 }
 
 async function handleBoosterUploadSuccess(dto, file) {
+  removedFileBusinessTypes.value.delete('升压站点位')
   boosterFileDto.value = { ...dto }
   try {
     const raw = await resolveUploadFile(dto, file)
@@ -871,6 +941,7 @@ async function handleBoosterUploadSuccess(dto, file) {
   }
 }
 function handleBoosterUploadRemove() {
+  removedFileBusinessTypes.value.add('升压站点位')
   boosterFileDto.value = null
   boosterPoints.value = [createBoosterPoint()]
   boosterOutOfRangeList.value = []
@@ -993,7 +1064,7 @@ function mergeFileCollection(original, newFiles) {
   const seen = new Set()
   const newBizTypes = new Set(newFiles.map((f) => f.fileBusinessType))
   for (const f of original || []) {
-    if (f.fileBusinessType && newBizTypes.has(f.fileBusinessType)) continue
+    if (f.fileBusinessType && (newBizTypes.has(f.fileBusinessType) || removedFileBusinessTypes.value.has(f.fileBusinessType))) continue
     const key = f.fileId || f.filePath || `${f.fileBusinessType}-${f.fileName}`
     if (seen.has(key)) continue
     seen.add(key)
@@ -1018,6 +1089,18 @@ function initFromProject(project) {
   form.projectName = project.projectName || ''
   form.projectStage = project.projectStage || ''
   form.notes = project.notes || ''
+  form.constructionUnit = project.constructionUnit || ''
+  form.constructionUnitId = project.constructionUnitId || ''
+  form.investmentUnit = project.investmentUnit || ''
+  form.investmentUnitId = project.investmentUnitId || ''
+  form.isReturnProject = Number(project.isReturnProject ?? 0)
+  form.firstGridConnectionTime = normalizeDate(project.firstGridConnectionTime)
+  form.fullCapacityGridDate = normalizeDate(project.fullCapacityGridDate)
+  form.commercialOperationDate = normalizeDate(project.commercialOperationDate)
+  // 编辑数据中的公司名称若不在模拟选项中，仍保留名称，避免回显丢失
+  for (const [id, name] of [[form.constructionUnitId, form.constructionUnit], [form.investmentUnitId, form.investmentUnit]]) {
+    if (id && name && !mockCompanyOptions.some(item => item.id === id)) mockCompanyOptions.push({ id, name })
+  }
 
   // ---- 场区范围（coordinate: [{longitude, latitude, regionCode}]）----
   const coords = (project.coordinate || [])
@@ -1076,6 +1159,7 @@ function initFromProject(project) {
   originalFileCollection.value = Array.isArray(project.fileCollection)
     ? project.fileCollection.map((f) => ({ ...f }))
     : []
+  removedFileBusinessTypes.value = new Set()
 
   // ---- 地图渲染 ----
   nextTick(() => {
@@ -1148,6 +1232,14 @@ function buildPayload(region, isEdit) {
 
     fileCollection,
     notes: form.notes,
+    constructionUnit: form.constructionUnit,
+    constructionUnitId: form.constructionUnitId,
+    investmentUnit: form.investmentUnit,
+    investmentUnitId: form.investmentUnitId,
+    isReturnProject: Number(form.isReturnProject),
+    firstGridConnectionTime: normalizeDate(form.firstGridConnectionTime),
+    fullCapacityGridDate: normalizeDate(form.fullCapacityGridDate),
+    commercialOperationDate: normalizeDate(form.commercialOperationDate),
   }
 
   if (!isEdit) {
