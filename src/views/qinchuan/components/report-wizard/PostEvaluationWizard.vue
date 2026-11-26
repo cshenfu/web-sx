@@ -485,8 +485,7 @@ async function inspectFolderFile(file) {
   if (!file.size) return { inspectStatus: 'error', inspectMessage: '空文件' }
   if (extension === 'csv') {
     const content = await file.text()
-    const rows = content.split(/\\r?\
-/).filter(line => line.trim())
+    const rows = content.split(/\r?\n/).filter(line => line.trim())
     if (rows.length < 2) return { inspectStatus: 'error', inspectMessage: '至少需要一行有效数据' }
     return { inspectStatus: 'success', inspectMessage: `可读取，${rows.length - 1} 行` }
   }
@@ -496,3 +495,203 @@ async function inspectFolderFile(file) {
   return { inspectStatus: 'success', inspectMessage: `可读取，${sheets.length} 个工作表` }
 }
 
+async function handleFolderChange(files) {
+  if (!files.length) return
+  folderUploading.value = true
+  folderFiles.value = []
+  showFolderDetails.value = true
+
+  try {
+    const inspected = []
+    for (const file of files) {
+      const relativePath = file.webkitRelativePath || file.name
+      let inspection
+      try {
+        inspection = await inspectFolderFile(file)
+      } catch (error) {
+        inspection = { inspectStatus: 'error', inspectMessage: '内容读取失败' }
+      }
+      inspected.push({ file, relativePath, ...inspection })
+    }
+
+    const uploaded = []
+    for (const item of inspected) {
+      try {
+        const uploadResult = await uploadToOss(item.file, item.relativePath)
+        uploaded.push({ ...item, ...uploadResult })
+      } catch (error) {
+        uploaded.push({ ...item, inspectStatus: 'error', inspectMessage: error?.message || '上传失败' })
+      }
+    }
+    folderFiles.value = uploaded
+    const failed = uploaded.filter(item => !item.obsPath).length
+    if (failed) ElMessage.warning(`文件夹处理完成，${failed} 个文件上传失败`)
+    else ElMessage.success(`已检查并上传 ${uploaded.length} 个文件`)
+  } finally {
+    folderUploading.value = false
+  }
+}
+
+function clearFolder() {
+  folderFiles.value = []
+  showFolderDetails.value = false
+}
+
+function handleStart() {
+  const missing = []
+  if (!selectedProjectId.value) missing.push('项目可研报告')
+  uploadKeys.forEach(key => {
+    if (!uploads[key]) missing.push(uploadLabels[key])
+  })
+  if (!folderFiles.value.some(item => item.obsPath && item.inspectStatus === 'success')) missing.push('各风机Scada风速和发电量数据（至少需要一个可读取的 Excel / CSV 文件）')
+  if (!form.turbineModel) missing.push('风机型号')
+  if (!form.kValue || !Number.isFinite(Number(form.kValue))) missing.push('机组保证K值')
+
+  if (missing.length) {
+    ElMessage.warning(`请完善：${missing.join('、')}`)
+    return
+  }
+
+  ElMessage.info('后评价报告生成接口尚未接入，当前已完成表单和材料采集')
+  emit('submit', {
+    project: selectedProject.value,
+    form: { ...form },
+    uploads: Object.fromEntries(uploadKeys.map(key => [key, uploads[key]])),
+    scadaFolderFiles: folderFiles.value.map(({ file, ...item }) => item),
+  })
+}
+
+const uploadLabels = {
+  completionSettlement: '竣工结算报告',
+  intervalGeneration: '区间发电量',
+  scadaCoordinate: 'Scada风机坐标对照表',
+  capitalContribution: '项目资本金投入表',
+  operationData: '项目主要经营数据表',
+  costComparison: '项目总成本费用对比表',
+  dailyPowerFinance: '项目日电量电价表（来源财务报表）',
+  dailyPowerMarket: '项目日电量电价表（来源市场部）',
+  financialBasicData: '财务评价基础数据表',
+  loanInfo: '贷款信息',
+}
+
+function toggleCollapse() {
+  isCollapsed.value = !isCollapsed.value
+  window.setTimeout(() => mapRef.value?.getMap?.()?.resize?.(), 320)
+}
+</script>
+
+<style scoped>
+.post-evaluation-wizard {
+  position: fixed;
+  inset: 65px 0 0;
+  z-index: 2000;
+  display: flex;
+  overflow: hidden;
+  background: #f5f7fa;
+}
+.left-panel {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex: 0 0 50%;
+  flex-direction: column;
+  width: 50%;
+  min-width: 0;
+  background: #fff;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, .06);
+  transition: width .25s ease, flex-basis .25s ease;
+}
+.left-panel.collapsed {
+  flex-basis: 0;
+  width: 0;
+  min-width: 0;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  flex-shrink: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+.header-title { display: flex; align-items: center; gap: 12px; color: #303133; font-size: 16px; font-weight: 600; }
+.back-icon { color: #409eff; font-size: 20px; cursor: pointer; }
+.panel-scroll { flex: 1; min-height: 0; }
+.form-content { padding: 20px 28px 28px 18px; max-width: 860px; margin: 0 auto; }
+.form-section { padding: 8px 0 16px; border-bottom: 1px solid #f0f2f5; }
+.form-section:last-child { border-bottom: 0; }
+.section-title { margin: 0 0 12px 12px; color: #303133; font-size: 14px; font-weight: 600; }
+.section-notice { margin: 0 0 14px 136px; color: #e6a23c; font-size: 12px; line-height: 1.6; }
+.upload-row, .form-row { display: grid; grid-template-columns: minmax(150px, 190px) minmax(0, 1fr); gap: 18px; align-items: center; margin: 18px 0; }
+.upload-label { padding-top: 0; color: #303133; font-size: 13px; line-height: 1.45; text-align: right; }
+.upload-label.required::after { content: ' *'; color: #f56c6c; }
+.upload-control { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.hidden-input { display: none; }
+.upload-button {
+  display: inline-flex;
+  flex: 0 0 48px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 4px;
+  border: 1px dashed #c0c4cc;
+  border-radius: 0;
+  color: #606266;
+  background: #fff;
+  font-size: 10px;
+}
+.upload-icon { display: flex; font-size: 18px; }
+.upload-description { min-width: 0; padding-top: 8px; color: #a0a3a8; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.uploaded-name { color: #409eff; margin-right: 8px; }
+.upload-status { color: #67c23a; margin-right: 8px; }
+.template-link { color: #1677ff; cursor: pointer; }
+.remove-file { margin-left: 8px; border: 0; padding: 0; background: none; color: #f56c6c; cursor: pointer; font-size: 12px; }
+.folder-row { grid-template-columns: minmax(150px, 190px) minmax(0, 1fr); }
+.upload-stack { min-width: 0; }
+.folder-summary { margin-top: 8px; color: #8492a6; font-size: 12px; }
+.folder-details { margin-top: 8px; max-height: 180px; overflow: auto; padding: 8px 10px; border: 1px solid #ebeef5; background: #fafafa; }
+.folder-file { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 5px 0; font-size: 12px; }
+.file-name { min-width: 0; overflow-wrap: anywhere; color: #606266; }
+.capacity-row { grid-template-columns: minmax(150px, 190px) minmax(0, 1fr); }
+.capacity-row .field-tip, .k-value-row .field-tip { grid-column: 2; }
+.fan-model-row { grid-template-columns: minmax(150px, 190px) minmax(0, 360px); align-items: center; }
+.paired-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; width: 100%; max-width: 360px; }
+.model-type-select, .model-value-select, .operator-select { width: 100%; min-width: 0; }
+.capacity-row { grid-template-columns: minmax(150px, 190px) minmax(0, 360px); }
+.capacity-input { width: 100%; max-width: 360px; }
+.k-value-row { grid-template-columns: minmax(150px, 190px) minmax(0, 360px); }
+.k-value-control { min-width: 0; }
+.operator-select { min-width: 0; }
+.field-tip { grid-column: 2 / 4; margin: -6px 0 0; color: #a0a3a8; font-size: 12px; }
+.generate-action { display: flex; justify-content: center; padding: 26px 0 12px; }
+.generate-action :deep(.el-button) { min-width: 190px; height: 46px; font-size: 15px; font-weight: 600; }
+.collapse-trigger {
+  position: absolute; top: 50%; right: -24px; z-index: 11; display: flex;
+  width: 24px; height: 48px; align-items: center; justify-content: center;
+  transform: translateY(-50%); border: 1px solid #ebeef5; border-left: 0;
+  border-radius: 0 6px 6px 0; background: #fff; color: #909399; cursor: pointer;
+}
+.scada-example { padding: 8px 12px; border: 1px solid #ebeef5; border-radius: 6px; background: #fafcff; color: #606266; }
+.example-folder, .example-file { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.example-folder { color: #303133; font-weight: 600; background: #f1f6fd; border-radius: 4px; }
+.example-folder .el-icon { color: #e6a23c; font-size: 18px; }
+.example-file { margin: 6px 0 0 24px; border-bottom: 1px dashed #e4e7ed; font-size: 13px; }
+.example-file .el-icon { color: #409eff; }
+.example-file .el-tag { margin-left: auto; }
+.scada-example p { margin: 14px 4px 4px; color: #909399; font-size: 12px; line-height: 1.7; }
+.map-area { position: relative; flex: 1; min-width: 0; height: 100%; }
+.map-empty-tip {
+  position: absolute; top: 50%; left: 50%; display: flex; align-items: center; gap: 8px;
+  transform: translate(-50%, -50%); padding: 12px 18px; border: 1px solid rgba(255,255,255,.18);
+  border-radius: 6px; background: rgba(12,27,51,.78); color: #d7e4f5; font-size: 13px;
+  pointer-events: none;
+}
+@media (max-width: 1100px) {
+  .left-panel { flex-basis: 50%; width: 50%; }
+  .form-content { padding: 16px 18px 24px 12px; }
+  .upload-row, .form-row, .folder-row { grid-template-columns: minmax(125px, 165px) minmax(0, 1fr); gap: 12px; }
+  .paired-fields, .capacity-input { max-width: 100%; }
+}
+</style>
