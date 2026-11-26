@@ -474,7 +474,7 @@ import {
   buildIconSizeExpression,
 } from '@/components/site-map/areaCenterIcon'
 
-import { loadShaanxiProvince, loadShaanxiCities } from '@/utils/shaanxiBoundary'
+import { loadShaanxiProvince, loadShaanxiCities, loadShaanxiCounties } from '@/utils/shaanxiBoundary'
 import { buildMainInfoFromAi } from '../js/aiProjectAdapter'
 import ProjectActionCard from './area-panel/ProjectActionCard.vue'
 import ActionOverflow from '@/components/ActionOverflow.vue'
@@ -508,6 +508,8 @@ const PROVINCE_BOUNDARY_LAYER_ID = 'site-province-boundary-line'
 const PROVINCE_BOUNDARY_SOURCE_ID = 'site-province-boundary-src'
 const CITY_BOUNDARY_LAYER_ID = 'site-city-boundary-line'
 const CITY_BOUNDARY_SOURCE_ID = 'site-city-boundary-src'
+const COUNTY_BOUNDARY_LAYER_ID = 'site-county-boundary-line'
+const COUNTY_BOUNDARY_SOURCE_ID = 'site-county-boundary-src'
 const SHAANXI_FIT_BOUNDS = [[105.4, 31.7], [111.2, 39.6]]
 
 // ★ 星空渐变阈值（zoom）
@@ -1758,6 +1760,7 @@ async function ensureCityBoundaryLine() {
   if (map.getLayer(CITY_BOUNDARY_LAYER_ID)) return
   const cities = await loadCityGeoJSON()
   if (!cities) return
+  const counties = await loadShaanxiCounties().catch((err) => { console.error('[sitemap] 陕西省县界加载失败:', err); return null })
 
   if (!map.getSource(CITY_BOUNDARY_SOURCE_ID)) {
     map.addSource(CITY_BOUNDARY_SOURCE_ID, { type: 'geojson', data: cities })
@@ -1773,6 +1776,16 @@ async function ensureCityBoundaryLine() {
         'line-width': ['interpolate', ['linear'], ['zoom'], 4, 1, 10, 2],
         'line-opacity': 0.9,
       },
+    })
+  }
+  if (counties) {
+    if (!map.getSource(COUNTY_BOUNDARY_SOURCE_ID)) map.addSource(COUNTY_BOUNDARY_SOURCE_ID, { type: 'geojson', data: counties })
+    if (!map.getLayer(COUNTY_BOUNDARY_LAYER_ID)) map.addLayer({
+      id: COUNTY_BOUNDARY_LAYER_ID,
+      type: 'line',
+      source: COUNTY_BOUNDARY_SOURCE_ID,
+      minzoom: 10,
+      paint: { 'line-color': '#fbbf24', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.7, 13, 1.2], 'line-opacity': 0.75 },
     })
   }
 }

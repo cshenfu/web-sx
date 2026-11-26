@@ -8,6 +8,7 @@ const WFS_BASE =
 // 模块级内存缓存：同一会话内只请求一次
 let provincePromise = null
 let citiesPromise = null
+let countiesPromise = null
 
 function buildUrl(cql) {
   return `${WFS_BASE}&CQL_FILTER=${encodeURIComponent(cql)}`
@@ -29,7 +30,6 @@ export function loadShaanxiProvince() {
     provincePromise = fetchGeoJSON(buildUrl("code='610000'"), 'province')
       .catch((err) => { provincePromise = null; throw err })
   }
-  console.log(provincePromise,"ddddddddddddddddddddddddddddddddddddd")
   return provincePromise
 }
 
@@ -40,6 +40,16 @@ export function loadShaanxiCities() {
       .catch((err) => { citiesPromise = null; throw err })
   }
   return citiesPromise
+}
+
+
+/** 陕西全部县级行政区边界 */
+export function loadShaanxiCounties() {
+  if (!countiesPromise) {
+    countiesPromise = fetchGeoJSON(buildUrl("level='county'"), 'counties')
+      .catch((err) => { countiesPromise = null; throw err })
+  }
+  return countiesPromise
 }
 
 /** 按需：单个市界（比如只关心西安） */
