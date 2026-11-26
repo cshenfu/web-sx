@@ -15,7 +15,7 @@ export function safeParseJson(str) {
   }
   
   export function formatDate(ts) {
-    if (ts == null || ts === '') return '——'
+    if (ts == null || ts === '') return '-'
     const d = new Date(Number(ts))
     if (Number.isNaN(d.getTime())) return '——'
     const y = d.getFullYear()
