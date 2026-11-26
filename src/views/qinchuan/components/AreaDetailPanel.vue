@@ -31,7 +31,7 @@
   
   defineEmits(['start-approval'])
   
-  const areaName = computed(() => props.area?.name || '未命名区域')
+  const areaName = computed(() => props.area?.name || '-')
   const activeTab = ref(props.tabs[0]?.key)
   
   // 切换到另一个区域时，tab 重置回第一个
