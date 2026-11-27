@@ -2695,6 +2695,11 @@ async function ensureCityBoundaryLine() {
       featureCount: counties.features?.length || 0,
     })
   }
+
+  // 县界创建在市界之后，随后将市界提到县界上方，避免绿色县界覆盖蓝色市界。
+  if (map.getLayer(COUNTY_BOUNDARY_LAYER_ID) && map.getLayer(CITY_BOUNDARY_LAYER_ID)) {
+    map.moveLayer(CITY_BOUNDARY_LAYER_ID)
+  }
   syncCityBoundaryVisibility()
 }
 function onLayerToggle(item) {
