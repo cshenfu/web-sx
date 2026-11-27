@@ -73,23 +73,6 @@ export class MeasureController {
         const measureElement = corner?.querySelector('.map-measure-controls');
         if (corner && measureElement) corner.insertBefore(measureElement, corner.firstElementChild);
         this._bindDrawEvents();
-        this._debugMapClick = (event) => {
-            if (!this._tool) return;
-            const features = this._draw.getAll()?.features || [];
-            console.info('[MeasureDebug][MapClick]', {
-                lngLat: event?.lngLat ? [event.lngLat.lng, event.lngLat.lat] : null,
-                tool: this._tool,
-                mode: this._draw.getMode(),
-                draftId: this._draftId,
-                features: features.map((feature) => ({
-                    id: feature.id,
-                    type: feature.geometry?.type,
-                    coordinates: feature.geometry?.coordinates,
-                    measureType: feature.properties?.[MEASURE_USER_PROP],
-                })),
-            });
-        };
-        map.on('click', this._debugMapClick);
         this._bindDrawToolbar(map);
         this._ensureLabelLayer();
         map.on('styledata', this._onStyleData);
@@ -165,10 +148,6 @@ export class MeasureController {
         this._cancelDraft();
         this._tool = tool;
         this._control?.setActiveTool(tool);
-        console.info('[MeasureDebug][enter]', {
-            tool, modeBefore: this._draw.getMode(),
-            featureCountBefore: this._draw.getAll()?.features?.length,
-        });
         this._continueDrawing();
         this._entering = false;
         this._setCanvasCursor('crosshair');
@@ -268,10 +247,6 @@ export class MeasureController {
             this._drawToolbarClick = null;
         }
         this._map?.off('styledata', this._onStyleData);
-        if (this._map && this._debugMapClick) {
-            this._map.off('click', this._debugMapClick);
-            this._debugMapClick = null;
-        }
         if (this._map && this._control) {
             this._map.removeControl(this._control);
         }
@@ -289,40 +264,16 @@ export class MeasureController {
     _bindDrawEvents() {
         this._unsubscribers.push(
             this._draw.on('create', (payload) => {
-                console.info('[MeasureDebug][draw.create]', {
-                    tool: this._tool, mode: this._draw.getMode(),
-                    features: payload?.features?.map((feature) => ({
-                        id: feature.id, type: feature.geometry?.type,
-                        coordinates: feature.geometry?.coordinates,
-                    })),
-                });
                 this._onCreate(payload);
             }),
             this._draw.on('update', (payload) => {
-                console.info('[MeasureDebug][draw.update]', {
-                    tool: this._tool, mode: this._draw.getMode(),
-                    changed: payload?.features?.map((feature) => ({
-                        id: feature.id, type: feature.geometry?.type,
-                        coordinates: feature.geometry?.coordinates,
-                    })),
-                });
                 this._scheduleLabels();
             }),
             this._draw.on('delete', (payload) => {
-                console.info('[MeasureDebug][draw.delete]', {
-                    tool: this._tool, mode: this._draw.getMode(),
-                    ids: payload?.features?.map((feature) => feature.id),
-                });
                 this._scheduleLabels();
             }),
             this._draw.on('render', () => this._scheduleLabels()),
             this._draw.on('modechange', (payload) => {
-                console.info('[MeasureDebug][modechange]', {
-                    nextMode: payload?.mode, tool: this._tool,
-                    reentering: this._reentering, entering: this._entering,
-                    ignoreSimpleSelect: this._ignoreSimpleSelect,
-                    draftId: this._draftId,
-                });
                 this._onModeChange(payload);
             }),
         );
@@ -428,20 +379,8 @@ export class MeasureController {
         }
         this._reentering = true;
         const before = new Set(this._listFeatureIds());
-        console.info('[MeasureDebug][changeMode:before]', {
-            requestedMode: mode, currentMode: this._draw.getMode(),
-            featureIdsBefore: [...before],
-        });
         this._draw.changeMode(mode);
         this._draftId = this._listFeatureIds().find((id) => !before.has(id)) ?? null;
-        console.info('[MeasureDebug][changeMode:after]', {
-            requestedMode: mode, currentMode: this._draw.getMode(),
-            draftId: this._draftId,
-            features: this._draw.getAll()?.features?.map((feature) => ({
-                id: feature.id, type: feature.geometry?.type,
-                coordinates: feature.geometry?.coordinates,
-            })),
-        });
         this._reentering = false;
         if (this._draftId && this._tool) {
             this._draw.setFeatureProperty(this._draftId, MEASURE_USER_PROP, this._tool);
