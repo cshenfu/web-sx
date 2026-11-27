@@ -37,25 +37,10 @@ export class MeasureControl {
         this._container.className = 'maplibregl-ctrl maplibregl-ctrl-group map-measure-controls';
         this._lengthBtn = this._createButton(
             'map-measure-length',
-            '测距（单击加点，双击结束）',
+            '测量长度（单击添加测量点，双击结束；再次点击退出）',
             () => this._handlers.onLength(),
         );
-        this._areaBtn = this._createButton(
-            'map-measure-area',
-            '测面（单击加点，双击闭合）',
-            () => this._handlers.onArea(),
-        );
-        const nodes = [this._lengthBtn, this._areaBtn];
-        if (this._showCircle) {
-            this._circleBtn = this._createButton(
-                'map-measure-circle',
-                '画圆（单击圆心，再单击确定半径）',
-                () => this._handlers.onCircle(),
-            );
-            nodes.push(this._circleBtn);
-        }
-        nodes.push(this._createButton('map-measure-clear', '清除测量', () => this._handlers.onClear()));
-        this._container.append(...nodes);
+        this._container.append(this._lengthBtn);
         this.setActiveTool(null);
         return this._container;
     }
