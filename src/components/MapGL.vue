@@ -300,6 +300,7 @@ if (props.viewControls) {
   bindBoxSelect()
 
   map.on('click', (e) => {
+    if (window.getMeasureController?.()?.isActive?.()) return
     if (!cityBoundariesCache) return
     const feature = findCityAtLngLat(e.lngLat)
     if (feature) emit('city-click', feature)
@@ -355,7 +356,7 @@ syncHaloVisibility()
 
     // 测距工具独立挂载，复用项目统一的测量控制器与标注样式。
     try {
-      measureDrawAdapter = new DrawAdapter({ getMap: () => map }, { controlPosition: 'top-right' })
+      measureDrawAdapter = new DrawAdapter({ getMap: () => map }, { controlPosition: 'top-right', DrawClass: MapboxDraw })
       await measureDrawAdapter.mount()
       initMeasureModule({ engine: { getMap: () => map }, drawAdapter: measureDrawAdapter })
       measureModuleReady = true
