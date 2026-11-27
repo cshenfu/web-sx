@@ -2601,6 +2601,7 @@ function syncCityBoundaryVisibility() {
   const extrusionVisible = !!map.getLayer(PROVINCE_EXTRUSION_ID) &&
     map.getLayoutProperty(PROVINCE_EXTRUSION_ID, 'visibility') !== 'none'
 
+  // 省级挤出层存在时不显示平面边界；挤出层移除后，市界和县界同步显示。
   const shouldShow = zoom >= AREA_ZOOM_THRESHOLD && !extrusionVisible
   if (map.getLayer(CITY_BOUNDARY_LAYER_ID) && cityBoundaryVisible !== shouldShow) {
     cityBoundaryVisible = shouldShow
@@ -2608,7 +2609,7 @@ function syncCityBoundaryVisibility() {
   }
 
   if (map.getLayer(COUNTY_BOUNDARY_LAYER_ID)) {
-    map.setLayoutProperty(COUNTY_BOUNDARY_LAYER_ID, 'visibility', shouldShow && zoom >= 10 ? 'visible' : 'none')
+    map.setLayoutProperty(COUNTY_BOUNDARY_LAYER_ID, 'visibility', shouldShow ? 'visible' : 'none')
   }
 
   if (shouldShow && mapRef.value?.hasMaskLayer?.(MASK_LAYER_ID)) {
@@ -2679,12 +2680,12 @@ async function ensureCityBoundaryLine() {
         id: COUNTY_BOUNDARY_LAYER_ID,
         type: 'line',
         source: COUNTY_BOUNDARY_SOURCE_ID,
-        minzoom: 10,
+        minzoom: AREA_ZOOM_THRESHOLD,
         layout: { visibility: 'none' },
         paint: {
-          'line-color': '#fbbf24',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.7, 13, 1.2],
-          'line-opacity': 0.75,
+          'line-color': '#22c55e',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 4, 1.5, 8, 3, 12, 4],
+          'line-opacity': 0.95,
         },
       })
     }
