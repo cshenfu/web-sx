@@ -163,13 +163,13 @@ function createVertexOnlyDirectSelectMode(DrawClass) {
     throw new Error('MapLibre Draw 缺少 direct_select 模式')
   }
 
-  return {
-    ...baseDirectSelectMode,
+  // 保留 Draw 原生模式原型上的处理方法，避免对象展开导致事件处理器丢失。
+  return Object.assign(Object.create(baseDirectSelectMode), {
     onMouseDown(state, event) {
       if (event.featureTarget?.properties?.meta !== 'vertex') return
       return baseDirectSelectMode.onMouseDown.call(this, state, event)
     },
-  }
+  })
 }
 
 // ✅ 全局统一设置 globe 投影（兼容 v4/v5 API）
