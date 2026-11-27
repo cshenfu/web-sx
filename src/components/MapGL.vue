@@ -89,6 +89,19 @@ let cityLabelMoveHandler = null
 let globeHalo = null
 
 const drawStyles = [
+  // 测距核心：补齐 LineString 样式，否则绘制中的线段和完成后的线段都不会显示。
+  {
+    id: 'gl-draw-line-inactive', type: 'line',
+    filter: ['all', ['==', 'active', 'false'], ['==', '$type', 'LineString'], ['!=', 'mode', 'static']],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#2A9FFF', 'line-width': 3 },
+  },
+  {
+    id: 'gl-draw-line-active', type: 'line',
+    filter: ['all', ['==', 'active', 'true'], ['==', '$type', 'LineString']],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#FFD700', 'line-width': 3 },
+  },
   {
     id: 'gl-draw-polygon-fill-inactive', type: 'fill',
     filter: ['all', ['==', 'active', 'false'], ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
