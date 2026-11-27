@@ -370,6 +370,11 @@ syncHaloVisibility()
       map.on('draw.delete', (e) => emit('draw-delete', e.features))
       initMeasureModule({ engine: { getMap: () => map }, drawAdapter: measureDrawAdapter, controlPosition: props.viewControlsPosition })
       measureModuleReady = true
+      console.info('[MeasureDebug][MapGL] 测量模块初始化完成', {
+        drawMode: draw?.getMode?.(),
+        drawFeatureCount: draw?.getAll?.()?.features?.length,
+        drawLayers: map.getStyle()?.layers?.filter(layer => layer.id?.startsWith('gl-draw')).map(layer => layer.id),
+      })
     } catch (error) {
       console.warn('[MapGL] 测距工具初始化失败:', error)
       measureDrawAdapter?.destroy?.()
