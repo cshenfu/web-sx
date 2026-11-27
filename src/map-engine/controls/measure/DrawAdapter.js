@@ -86,11 +86,11 @@ function withLargerVertexHandles(styles) {
  *
  * @returns {Promise<typeof MapboxDraw>}
  */
-async function loadDrawClass() {
+async function loadDrawClass(preferMapLibre = false) {
     if (cachedDrawClass) {
         return cachedDrawClass;
     }
-    let DrawClass = typeof window !== 'undefined' && window.MapboxDraw
+    let DrawClass = !preferMapLibre && typeof window !== 'undefined' && window.MapboxDraw
         ? window.MapboxDraw
         : null;
     if (!DrawClass) {
@@ -136,7 +136,7 @@ export class DrawAdapter {
             throw new Error('地图未初始化，无法挂载 draw 控件');
         }
         ensureDrawCss();
-        const DrawClass = this._options.DrawClass || await loadDrawClass();
+        const DrawClass = this._options.DrawClass || await loadDrawClass(this._options.preferMapLibre === true);
         applyMapLibreCompat(DrawClass);
         this._draw = this._createDraw(DrawClass);
         map.addControl(this._draw, this._options.controlPosition || 'top-right');
@@ -156,7 +156,9 @@ export class DrawAdapter {
     _createDraw(DrawClass) {
         const modes = {
             ...DrawClass.modes,
-            ...(this._options.modes || {}),
+            ...(typeof this._options.getModes === 'function'
+                ? this._options.getModes(DrawClass)
+                : this._options.modes || {}),
             [DRAW_MODES.DRAW_CIRCLE]: DrawCircle,
             [DRAW_MODES.DRAW_RECTANGLE]: DrawRectangle,
             [DRAW_MODES.DRAW_ORIENTED_RECTANGLE]: DrawOrientedRectangle,
