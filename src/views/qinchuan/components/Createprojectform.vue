@@ -275,7 +275,7 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="是否重跑项目">
+        <el-form-item v-if="isEditMode" label="是否重跑项目">
           <el-radio-group v-model="form.isReturnProject">
             <el-radio :label="0">不需要</el-radio>
             <el-radio :label="1">需要</el-radio>
@@ -408,7 +408,7 @@ const form = reactive({
   constructionUnitId: '',
   investmentUnit: '',
   investmentUnitId: '',
-  isReturnProject: 0,
+  isReturnProject: 1,
   firstGridConnectionTime: '',
   fullCapacityGridDate: '',
   commercialOperationDate: '',
