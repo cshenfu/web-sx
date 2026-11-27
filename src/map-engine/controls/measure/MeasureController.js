@@ -29,6 +29,7 @@ export class MeasureController {
         this._draw = options.drawAdapter;
         this._featureQuery = options.featureQuery || null;
         this._onInfo = options.onInfo || null;
+        this._controlPosition = options.controlPosition || 'top-right';
         /** @type {import('maplibre-gl').Map|null} */
         this._map = null;
         /** @type {MeasureControl|null} */
@@ -67,7 +68,10 @@ export class MeasureController {
             onCircle: () => this.toggleCircle(),
             onClear: () => this.clear(),
         });
-        map.addControl(this._control, 'top-right');
+        map.addControl(this._control, this._controlPosition);
+        const corner = map.getContainer().querySelector(`.maplibregl-ctrl-${this._controlPosition}`);
+        const measureElement = corner?.querySelector('.map-measure-controls');
+        if (corner && measureElement) corner.insertBefore(measureElement, corner.firstElementChild);
         this._bindDrawEvents();
         this._bindDrawToolbar(map);
         this._ensureLabelLayer();
