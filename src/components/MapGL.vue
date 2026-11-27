@@ -163,13 +163,23 @@ function createVertexOnlyDirectSelectMode(DrawClass) {
     throw new Error('MapLibre Draw 缺少 direct_select 模式')
   }
 
-  // 保留 Draw 原生模式原型上的处理方法，避免对象展开导致事件处理器丢失。
-  return Object.assign(Object.create(baseDirectSelectMode), {
-    onMouseDown(state, event) {
-      if (event.featureTarget?.properties?.meta !== 'vertex') return
-      return baseDirectSelectMode.onMouseDown.call(this, state, event)
-    },
-  })
+  // Draw 的 object_to_mode 只枚举自身属性；将原型链方法复制成可枚举自身属性。
+  const mode = {}
+  let current = baseDirectSelectMode
+  while (current && current !== Object.prototype) {
+    for (const key of Object.getOwnPropertyNames(current)) {
+      if (key === 'constructor' || Object.prototype.hasOwnProperty.call(mode, key)) continue
+      const descriptor = Object.getOwnPropertyDescriptor(current, key)
+      if (descriptor) Object.defineProperty(mode, key, { ...descriptor, enumerable: true })
+    }
+    current = Object.getPrototypeOf(current)
+  }
+
+  mode.onMouseDown = function onMouseDown(state, event) {
+    if (event.featureTarget?.properties?.meta !== 'vertex') return
+    return baseDirectSelectMode.onMouseDown.call(this, state, event)
+  }
+  return mode
 }
 
 // ✅ 全局统一设置 globe 投影（兼容 v4/v5 API）
