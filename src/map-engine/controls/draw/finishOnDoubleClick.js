@@ -1,10 +1,5 @@
 /**
- * 地球投影下 lng/lat 很难完全相等，原生 draw_polygon / draw_line_string
- * 的「再点同一坐标结束」经常失效。双击（detail === 2）直接闭合。
- */
-
-/**
- * 包装 Draw 线/面模式，使双击结束绘制。
+ * 包装 Draw 线/面模式，使真实鼠标双击可以结束绘制。
  *
  * @param {object} baseMode Draw.modes.draw_polygon 或 draw_line_string
  * @param {'polygon'|'line'} kind 几何族
@@ -26,13 +21,17 @@ export function finishOnDoubleClick(baseMode, kind) {
             return baseMode.onClick.call(this, state, event);
         },
         onTap(state, event) {
+            // 保留 Draw 原生触摸处理，避免把 touch tap 伪装成鼠标 click。
+            if (typeof baseMode.onTap === 'function') {
+                return baseMode.onTap.call(this, state, event);
+            }
             return this.onClick(state, event);
         },
     };
 }
 
 /**
- * 是否应按双击结束当前草稿。
+ * 仅真实鼠标双击且已达到最少顶点数时结束草稿。
  *
  * @param {object} state Draw 模式 state
  * @param {object} event Draw click 事件
@@ -41,10 +40,14 @@ export function finishOnDoubleClick(baseMode, kind) {
  * @returns {boolean} 应结束
  */
 function shouldFinish(state, event, kind, minPos) {
-    const detail = event?.originalEvent?.detail;
+    const originalEvent = event?.originalEvent;
     const pos = Number(state?.currentVertexPosition) || 0;
     const id = featureId(state, kind);
-    return detail === 2 && pos >= minPos && Boolean(id);
+    return originalEvent?.type === 'click'
+        && originalEvent?.button === 0
+        && originalEvent?.detail === 2
+        && pos >= minPos
+        && Boolean(id);
 }
 
 /**
@@ -55,8 +58,5 @@ function shouldFinish(state, event, kind, minPos) {
  * @returns {string|undefined} 要素 id
  */
 function featureId(state, kind) {
-    if (kind === 'line') {
-        return state?.line?.id;
-    }
-    return state?.polygon?.id;
+    return kind === 'line' ? state?.line?.id : state?.polygon?.id;
 }
