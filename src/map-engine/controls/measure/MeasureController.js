@@ -182,7 +182,7 @@ export class MeasureController {
     }
 
     /**
-     * 退出测量绘制（保留已完成的测量几何）。
+     * 退出测量绘制并清除本次测量产生的全部几何与标注。
      *
      * @param {object} [options] 选项
      * @param {boolean} [options.resetMode=false] 是否回到 simple_select
@@ -195,6 +195,9 @@ export class MeasureController {
         this._ignoreSimpleSelect = false;
         this._control?.setActiveTool(null);
         this._setCanvasCursor('');
+        const measureIds = this._listMeasureIds();
+        if (measureIds.length) this._draw.delete(measureIds);
+        this._draftId = null;
         if (resetMode && this._draw.getMode() !== DRAW_MODES.SIMPLE_SELECT) {
             this._draw.changeMode(DRAW_MODES.SIMPLE_SELECT);
         }
