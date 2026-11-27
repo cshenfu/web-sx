@@ -15,9 +15,23 @@ function buildUrl(cql) {
 }
 
 async function fetchGeoJSON(url, label) {
+  if (label === 'counties') {
+    console.info('[county] 开始请求陕西区县 WFS:', url)
+  }
   const resp = await fetch(url)
+  if (label === 'counties') {
+    console.info('[county] WFS 响应状态:', resp.status, resp.ok)
+  }
   if (!resp.ok) throw new Error(`[${label}] WFS HTTP ${resp.status}`)
   const geojson = await resp.json()
+  if (label === 'counties') {
+    const geometryTypes = [...new Set((geojson?.features || []).map((feature) => feature?.geometry?.type).filter(Boolean))]
+    console.info('[county] WFS 数据解析完成:', {
+      type: geojson?.type,
+      featureCount: geojson?.features?.length || 0,
+      geometryTypes,
+    })
+  }
   if (geojson?.type !== 'FeatureCollection' || !geojson.features?.length) {
     throw new Error(`[${label}] WFS 返回空或格式异常`)
   }
