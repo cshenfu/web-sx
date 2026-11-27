@@ -18,6 +18,8 @@ import { addGradientExtrusion } from '@/utils/gradientExtrusion'
 import { GlobeHalo } from '@/map-engine/adapters/maplibre/globeHalo.js'
 // ★ 视图控件：恢复全景 / 恢复正北 / 2D·3D / 地球投影
 import { MapViewControls } from '@/map-engine/controls/view/index.js'
+import { DrawAdapter } from '@/map-engine/controls/measure/DrawAdapter.js'
+import { initMeasureModule, destroyMeasureModule } from '@/map-engine/controls/measure/index.js'
 
 if (typeof maplibregl.setWorkerUrl === 'function') {
   maplibregl.setWorkerUrl(workerUrl)
@@ -53,6 +55,8 @@ let map = null
 let draw = null
 // ★ 视图控件实例
 let viewControls = null
+let measureDrawAdapter = null
+let measureModuleReady = false
 const hoverHandlers = new Map()
 const addedLayers = new Set()
 const lastHighlightBySource = new Map()
@@ -309,7 +313,7 @@ if (props.viewControls) {
     applyGlobeSky()
   })
 
-  map.on('load', () => {
+  map.on('load', async () => {
     // ✅ load 后兜底确保 globe（防止任何 setStyle / 插件覆盖）
     applyGlobeProjection()
 
@@ -348,6 +352,18 @@ syncHaloVisibility()
     }
 
     if (props.flyToOnLoad) flyToShaanxi()
+
+    // 测距工具独立挂载，复用项目统一的测量控制器与标注样式。
+    try {
+      measureDrawAdapter = new DrawAdapter({ getMap: () => map }, { controlPosition: 'top-right' })
+      await measureDrawAdapter.mount()
+      initMeasureModule({ engine: { getMap: () => map }, drawAdapter: measureDrawAdapter })
+      measureModuleReady = true
+    } catch (error) {
+      console.warn('[MapGL] 测距工具初始化失败:', error)
+      measureDrawAdapter?.destroy?.()
+      measureDrawAdapter = null
+    }
     emit('ready')
 
     // ★ 遮罩淡出：优先等 map idle（瓦片全部就绪），并给 3s 硬兜底
@@ -367,6 +383,10 @@ syncHaloVisibility()
 })
 
 onUnmounted(() => {
+  if (measureModuleReady) destroyMeasureModule()
+  measureModuleReady = false
+  measureDrawAdapter?.destroy?.()
+  measureDrawAdapter = null
   stopAutoRotate()
 
   // ★ GlobeHalo 清理（含星空）
