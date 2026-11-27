@@ -2242,6 +2242,7 @@ function handleBackToList() {
 
 // ★★★ 关键修复：点场区外可以取消选中
 function handleMapBlankClick(e) {
+  if (window.getMeasureController?.()?.isActive?.()) return
   // 编辑态 / 各类面板打开时，点地图空白不做取消处理（避免误关）
   if (isEditing.value || isActionPanelOpen.value) return
 
