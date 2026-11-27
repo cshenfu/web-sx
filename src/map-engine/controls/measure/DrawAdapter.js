@@ -3,7 +3,7 @@
  * 加载策略与 whln-web-edit 相同：优先全局 MapboxDraw，否则动态 import ESM。
  */
 
-import { DrawOrientedRectangle } from '@whln/vector-edit';
+import { DrawOrientedRectangle } from '../draw/DrawOrientedRectangle.js';
 import { DrawRectangle } from '../draw/DrawRectangle.js';
 import { finishOnDoubleClick } from '../draw/finishOnDoubleClick.js';
 import { withRangeDrawStyles } from '../draw/rangeStyles.js';
