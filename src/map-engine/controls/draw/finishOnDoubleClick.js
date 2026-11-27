@@ -43,11 +43,56 @@ function shouldFinish(state, event, kind, minPos) {
     const originalEvent = event?.originalEvent;
     const pos = Number(state?.currentVertexPosition) || 0;
     const id = featureId(state, kind);
-    return originalEvent?.type === 'click'
-        && originalEvent?.button === 0
-        && originalEvent?.detail === 2
-        && pos >= minPos
-        && Boolean(id);
+    if (
+        originalEvent?.type !== 'click'
+        || originalEvent?.button !== 0
+        || originalEvent?.detail !== 2
+        || pos < minPos
+        || !id
+    ) {
+        if (originalEvent?.type === 'click' && originalEvent?.button === 0) {
+            rememberClick(state, originalEvent);
+        }
+        return false;
+    }
+
+    const previous = state.__measureLastClick;
+    const current = clickPosition(originalEvent);
+    const isSamePosition = previous && current
+        && Math.hypot(current.x - previous.x, current.y - previous.y) <= 6;
+
+    if (isSamePosition) {
+        state.__measureLastClick = null;
+        return true;
+    }
+
+    // click.detail 也会因短时间内点击不同位置而递增，不能仅凭 detail=2 结束绘制。
+    rememberClick(state, originalEvent);
+    return false;
+}
+
+/**
+ * 记录上一次鼠标点击位置，避免把不同位置的连续加点误判为双击。
+ *
+ * @param {object} state Draw 模式 state
+ * @param {MouseEvent} event 原始鼠标事件
+ * @returns {void}
+ */
+function rememberClick(state, event) {
+    const position = clickPosition(event);
+    state.__measureLastClick = position;
+}
+
+/**
+ * 读取浏览器视口坐标。
+ *
+ * @param {MouseEvent} event 原始鼠标事件
+ * @returns {{x:number,y:number}|null} 点击坐标
+ */
+function clickPosition(event) {
+    const x = Number(event?.clientX);
+    const y = Number(event?.clientY);
+    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
 
 /**
