@@ -10,8 +10,9 @@ export function finishOnDoubleClick(baseMode, kind) {
         return baseMode;
     }
     const minPos = kind === 'line' ? 2 : 3;
-    return {
-        ...baseMode,
+    // Draw 的模式方法可能定义在原型上，不能用对象展开复制，否则会丢失原生事件处理器。
+    // 通过原型继承保留全部原生方法，只覆盖需要增强的点击处理。
+    return Object.assign(Object.create(baseMode), {
         onClick(state, event) {
             if (shouldFinish(state, event, kind, minPos)) {
                 return this.changeMode('simple_select', {
@@ -27,7 +28,7 @@ export function finishOnDoubleClick(baseMode, kind) {
             }
             return this.onClick(state, event);
         },
-    };
+    });
 }
 
 /**
