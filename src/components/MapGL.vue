@@ -358,7 +358,7 @@ syncHaloVisibility()
     try {
       measureDrawAdapter = new DrawAdapter({ getMap: () => map }, { controlPosition: 'top-right', DrawClass: MapboxDraw })
       await measureDrawAdapter.mount()
-      initMeasureModule({ engine: { getMap: () => map }, drawAdapter: measureDrawAdapter })
+      initMeasureModule({ engine: { getMap: () => map }, drawAdapter: measureDrawAdapter, controlPosition: props.viewControlsPosition })
       measureModuleReady = true
     } catch (error) {
       console.warn('[MapGL] 测距工具初始化失败:', error)
