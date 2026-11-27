@@ -1756,11 +1756,26 @@ async function ensureProvinceBoundaryLine() {
 
 async function ensureCityBoundaryLine() {
   const map = mapRef.value?.getMap?.()
-  if (!map) return
-  const cities = !map.getLayer(CITY_BOUNDARY_LAYER_ID) ? await loadCityGeoJSON() : null
-  const counties = !map.getLayer(COUNTY_BOUNDARY_LAYER_ID)
+  if (!map) {
+    console.warn('[sitemap][county] 地图实例尚未就绪，暂不加载县界')
+    return
+  }
+
+  console.info('[sitemap][county] 开始检查县界 source/layer', {
+    sourceExists: !!map.getSource(COUNTY_BOUNDARY_SOURCE_ID),
+    layerExists: !!map.getLayer(COUNTY_BOUNDARY_LAYER_ID),
+    zoom: map.getZoom?.(),
+  })
+
+  const cities = (!map.getSource(CITY_BOUNDARY_SOURCE_ID) || !map.getLayer(CITY_BOUNDARY_LAYER_ID))
+    ? await loadCityGeoJSON().catch((err) => {
+        console.error('[sitemap] 陕西省市界加载失败:', err)
+        return null
+      })
+    : null
+  const counties = (!map.getSource(COUNTY_BOUNDARY_SOURCE_ID) || !map.getLayer(COUNTY_BOUNDARY_LAYER_ID))
     ? await loadShaanxiCounties().catch((err) => {
-        console.error('[sitemap] 陕西省县界加载失败:', err)
+        console.error('[sitemap][county] 陕西省县界请求失败:', err)
         return null
       })
     : null
@@ -1782,17 +1797,29 @@ async function ensureCityBoundaryLine() {
     })
   }
   if (counties) {
-    if (!map.getSource(COUNTY_BOUNDARY_SOURCE_ID)) map.addSource(COUNTY_BOUNDARY_SOURCE_ID, { type: 'geojson', data: counties })
-    if (!map.getLayer(COUNTY_BOUNDARY_LAYER_ID)) map.addLayer({
-      id: COUNTY_BOUNDARY_LAYER_ID,
-      type: 'line',
-      source: COUNTY_BOUNDARY_SOURCE_ID,
-      minzoom: 10,
-      paint: { 'line-color': '#fbbf24', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.7, 13, 1.2], 'line-opacity': 0.75 },
+    if (!map.getSource(COUNTY_BOUNDARY_SOURCE_ID)) {
+      map.addSource(COUNTY_BOUNDARY_SOURCE_ID, { type: 'geojson', data: counties })
+    }
+    if (!map.getLayer(COUNTY_BOUNDARY_LAYER_ID)) {
+      map.addLayer({
+        id: COUNTY_BOUNDARY_LAYER_ID,
+        type: 'line',
+        source: COUNTY_BOUNDARY_SOURCE_ID,
+        minzoom: 10,
+        paint: {
+          'line-color': '#fbbf24',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.7, 13, 1.2],
+          'line-opacity': 0.75,
+        },
+      })
+    }
+    console.info('[sitemap][county] 县界 source/layer 已就绪', {
+      sourceExists: !!map.getSource(COUNTY_BOUNDARY_SOURCE_ID),
+      layerExists: !!map.getLayer(COUNTY_BOUNDARY_LAYER_ID),
+      featureCount: counties.features?.length || 0,
     })
   }
-}
-function handleCityFillClick(e) {
+}function handleCityFillClick(e) {
   if (isAreaView.value) return
   if (showCreateProject.value || showEditProject.value) return
   const map = mapRef.value?.getMap?.(); if (!map) return
@@ -2068,6 +2095,7 @@ async function handleMapStyleLoad() {
 }
 
 async function onMapReady() {
+  console.info('[sitemap][county] onMapReady 已触发')
   await Promise.allSettled([loadShaanxiBoundary(), loadCityGeoJSON()])
   mapReady.value = true
 
