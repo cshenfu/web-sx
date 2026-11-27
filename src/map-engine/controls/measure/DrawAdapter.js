@@ -136,7 +136,8 @@ export class DrawAdapter {
             throw new Error('地图未初始化，无法挂载 draw 控件');
         }
         ensureDrawCss();
-        const DrawClass = await loadDrawClass();
+        const DrawClass = this._options.DrawClass || await loadDrawClass();
+        applyMapLibreCompat(DrawClass);
         this._draw = this._createDraw(DrawClass);
         map.addControl(this._draw, this._options.controlPosition || 'top-right');
         this._hideEmptyNativeGroup(map);
