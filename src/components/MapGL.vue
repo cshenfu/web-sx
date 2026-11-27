@@ -9,8 +9,6 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import MapboxDraw from '@mapbox/mapbox-gl-draw'
-import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { addGradientExtrusion } from '@/utils/gradientExtrusion'
 
@@ -159,14 +157,19 @@ function setCentroidLabelsVisible(visible) {
     labelsContainer.style.display = labelsVisible ? '' : 'none'
   }
 }
-const baseDirectSelectMode = MapboxDraw.modes.direct_select
+function createVertexOnlyDirectSelectMode(DrawClass) {
+  const baseDirectSelectMode = DrawClass?.modes?.direct_select
+  if (!baseDirectSelectMode) {
+    throw new Error('MapLibre Draw 缺少 direct_select 模式')
+  }
 
-const vertexOnlyDirectSelectMode = {
-  ...baseDirectSelectMode,
-  onMouseDown(state, event) {
-    if (event.featureTarget?.properties?.meta !== 'vertex') return
-    return baseDirectSelectMode.onMouseDown.call(this, state, event)
-  },
+  return {
+    ...baseDirectSelectMode,
+    onMouseDown(state, event) {
+      if (event.featureTarget?.properties?.meta !== 'vertex') return
+      return baseDirectSelectMode.onMouseDown.call(this, state, event)
+    },
+  }
 }
 
 // ✅ 全局统一设置 globe 投影（兼容 v4/v5 API）
@@ -358,9 +361,12 @@ syncHaloVisibility()
     try {
       measureDrawAdapter = new DrawAdapter({ getMap: () => map }, {
         controlPosition: 'top-left',
-        DrawClass: MapboxDraw,
+        // 使用 MapLibre 专用 Draw，避免误加载 @mapbox/mapbox-gl-draw。
+        preferMapLibre: true,
         styles: drawStyles,
-        modes: { vertex_only_direct_select: vertexOnlyDirectSelectMode },
+        getModes: (DrawClass) => ({
+          vertex_only_direct_select: createVertexOnlyDirectSelectMode(DrawClass),
+        }),
       })
       await measureDrawAdapter.mount()
       // 编辑、框选与测量统一使用 DrawAdapter 内部的唯一 Draw 实例。
