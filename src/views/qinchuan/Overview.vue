@@ -2949,11 +2949,13 @@ async function handleWizardSubmit(payload) {
 }
 const SHAANXI_BOUNDS = [[105.4, 31.6], [111.3, 39.6]]
 
-function handleStyleLoad() {
+async function handleStyleLoad() {
   try {
     syncMaskVisibility(true)
+    await ensureShaanxiMask()
+    await ensureCityBoundaryLine()
   } catch (err) {
-    console.warn('[style.load] 重绘失败:', err)
+    console.warn('[style.load] 边界图层恢复失败:', err)
   }
 }
 
@@ -3001,7 +3003,9 @@ async function onMapReady() {
   map.on('move', syncMaskVisibility)
   map.on('style.load', handleStyleLoad)
   await ensureShaanxiMask()
-  nextTick(() => { syncByZoom() })
+  // 地图首次就绪时主动加载市界和县界；县界图层会根据 zoom >= 10 自动显示
+  await ensureCityBoundaryLine()
+  nextTick(() => { syncByZoom(); syncCityBoundaryVisibility() })
 
   try {
     whlnPlugin = attachSxLayers(map, {
