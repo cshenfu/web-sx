@@ -1805,7 +1805,7 @@ async function ensureCityBoundaryLine() {
         id: COUNTY_BOUNDARY_LAYER_ID,
         type: 'line',
         source: COUNTY_BOUNDARY_SOURCE_ID,
-        minzoom: 10,
+        minzoom: 7.5,
         paint: {
           'line-color': '#22c55e',
           'line-width': ['interpolate', ['linear'], ['zoom'], 4, 1.5, 8, 3, 12, 4],
@@ -1818,6 +1818,14 @@ async function ensureCityBoundaryLine() {
       layerExists: !!map.getLayer(COUNTY_BOUNDARY_LAYER_ID),
       featureCount: counties.features?.length || 0,
     })
+  }
+
+  // 绘制顺序：县界在底、市界在上、省界最上，保持行政区轮廓清晰。
+  if (map.getLayer(COUNTY_BOUNDARY_LAYER_ID) && map.getLayer(CITY_BOUNDARY_LAYER_ID)) {
+    map.moveLayer(CITY_BOUNDARY_LAYER_ID)
+  }
+  if (map.getLayer(PROVINCE_BOUNDARY_LAYER_ID)) {
+    map.moveLayer(PROVINCE_BOUNDARY_LAYER_ID)
   }
 }function handleCityFillClick(e) {
   if (isAreaView.value) return
