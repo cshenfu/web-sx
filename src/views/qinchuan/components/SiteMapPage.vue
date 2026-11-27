@@ -2057,6 +2057,16 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
   },
 })
 
+async function handleMapStyleLoad() {
+  try {
+    await ensureShaanxiMask()
+    await ensureProvinceBoundaryLine()
+    await ensureCityBoundaryLine()
+  } catch (err) {
+    console.warn('[site-map] 地图样式重载后恢复边界图层失败:', err)
+  }
+}
+
 async function onMapReady() {
   await Promise.allSettled([loadShaanxiBoundary(), loadCityGeoJSON()])
   mapReady.value = true
@@ -2097,7 +2107,7 @@ async function onMapReady() {
   map.on('click', handleMapBlankClick)
   map.on('click', handleCityFillClick)
   if (isAreaView.value) { hideCityStats(); renderProjectsByStage('area') } else await renderCityStats()
-  map.on('zoom', syncMaskVisibility); map.on('move', syncMaskVisibility); map.on('style.load', ensureShaanxiMask)
+  map.on('zoom', syncMaskVisibility); map.on('move', syncMaskVisibility); map.on('style.load', handleMapStyleLoad)
   await ensureShaanxiMask()
 
   await ensureProvinceBoundaryLine()
