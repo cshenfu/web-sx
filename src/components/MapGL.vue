@@ -281,20 +281,7 @@ if (props.viewControls) {
     }
   })
 
-  draw = new MapboxDraw({
-    displayControlsDefault: false,
-    userProperties: true,
-    styles: drawStyles,
-    modes: {
-      ...MapboxDraw.modes,
-      vertex_only_direct_select: vertexOnlyDirectSelectMode,
-    },
-  })
-  map.addControl(draw, 'top-left')
-
-  map.on('draw.update', (e) => { handleDrawUpdate(e); emit('draw-update', e.features) })
-  map.on('draw.create', (e) => emit('draw-create', e.features))
-  map.on('draw.delete', (e) => emit('draw-delete', e.features))
+  // Draw 由测量适配器统一创建，编辑/框选/测量共用同一个实例，避免重复注册内部 source。
 
   bindPointInteraction()
   bindBoxSelect()
@@ -356,8 +343,18 @@ syncHaloVisibility()
 
     // 测距工具独立挂载，复用项目统一的测量控制器与标注样式。
     try {
-      measureDrawAdapter = new DrawAdapter({ getMap: () => map }, { controlPosition: 'top-right', DrawClass: MapboxDraw })
+      measureDrawAdapter = new DrawAdapter({ getMap: () => map }, {
+        controlPosition: 'top-left',
+        DrawClass: MapboxDraw,
+        styles: drawStyles,
+        modes: { vertex_only_direct_select: vertexOnlyDirectSelectMode },
+      })
       await measureDrawAdapter.mount()
+      // 编辑、框选与测量统一使用 DrawAdapter 内部的唯一 Draw 实例。
+      draw = measureDrawAdapter.getNative()
+      map.on('draw.update', (e) => { handleDrawUpdate(e); emit('draw-update', e.features) })
+      map.on('draw.create', (e) => emit('draw-create', e.features))
+      map.on('draw.delete', (e) => emit('draw-delete', e.features))
       initMeasureModule({ engine: { getMap: () => map }, drawAdapter: measureDrawAdapter, controlPosition: props.viewControlsPosition })
       measureModuleReady = true
     } catch (error) {
