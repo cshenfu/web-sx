@@ -10,9 +10,10 @@ export function finishOnDoubleClick(baseMode, kind) {
         return baseMode;
     }
     const minPos = kind === 'line' ? 2 : 3;
-    // Draw 的模式方法可能定义在原型上，不能用对象展开复制，否则会丢失原生事件处理器。
-    // 通过原型继承保留全部原生方法，只覆盖需要增强的点击处理。
-    return Object.assign(Object.create(baseMode), {
+    // Draw 的 object_to_mode 会枚举模式对象自身属性；仅靠原型继承会再次丢失原生方法。
+    // 将原型链上的方法复制为可枚举自身属性，确保 clickAnywhere 等内部方法一并传入运行上下文。
+    const wrappedMode = copyModeMethods(baseMode);
+    Object.assign(wrappedMode, {
         onClick(state, event) {
             if (shouldFinish(state, event, kind, minPos)) {
                 return this.changeMode('simple_select', {
@@ -29,6 +30,29 @@ export function finishOnDoubleClick(baseMode, kind) {
             return this.onClick(state, event);
         },
     });
+    return wrappedMode;
+}
+
+/**
+ * 将模式对象及原型链上的自有属性复制到普通对象。
+ * Draw 的 object_to_mode 只处理自身可枚举属性，因此复制时统一设为 enumerable。
+ */
+function copyModeMethods(mode) {
+    const result = {};
+    let current = mode;
+    while (current && current !== Object.prototype) {
+        for (const key of Object.getOwnPropertyNames(current)) {
+            if (key === 'constructor' || Object.prototype.hasOwnProperty.call(result, key)) continue;
+            const descriptor = Object.getOwnPropertyDescriptor(current, key);
+            if (!descriptor) continue;
+            Object.defineProperty(result, key, {
+                ...descriptor,
+                enumerable: true,
+            });
+        }
+        current = Object.getPrototypeOf(current);
+    }
+    return result;
 }
 
 /**
