@@ -156,6 +156,7 @@ export class DrawAdapter {
     _createDraw(DrawClass) {
         const modes = {
             ...DrawClass.modes,
+            ...(this._options.modes || {}),
             [DRAW_MODES.DRAW_CIRCLE]: DrawCircle,
             [DRAW_MODES.DRAW_RECTANGLE]: DrawRectangle,
             [DRAW_MODES.DRAW_ORIENTED_RECTANGLE]: DrawOrientedRectangle,
@@ -166,7 +167,7 @@ export class DrawAdapter {
                 DrawClass.modes.draw_line_string, 'line',
             ),
         };
-        const baseStyles = DrawClass.lib?.theme || DrawClass.styles;
+        const baseStyles = this._options.styles || DrawClass.lib?.theme || DrawClass.styles;
         let styles = Array.isArray(baseStyles) ? withLargerVertexHandles(baseStyles) : null;
         if (styles && this._options.rangeTheme) {
             styles = withRangeDrawStyles(styles);
