@@ -1807,9 +1807,9 @@ async function ensureCityBoundaryLine() {
         source: COUNTY_BOUNDARY_SOURCE_ID,
         minzoom: 10,
         paint: {
-          'line-color': '#fbbf24',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.7, 13, 1.2],
-          'line-opacity': 0.75,
+          'line-color': '#22c55e',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 4, 1.5, 8, 3, 12, 4],
+          'line-opacity': 0.95,
         },
       })
     }
