@@ -2621,7 +2621,7 @@ function setCityBoundaryVisible(visible) {
   if (!map || !map.getLayer(CITY_BOUNDARY_LAYER_ID)) return
   map.setLayoutProperty(CITY_BOUNDARY_LAYER_ID, 'visibility', visible ? 'visible' : 'none')
   if (map.getLayer(COUNTY_BOUNDARY_LAYER_ID)) {
-    map.setLayoutProperty(COUNTY_BOUNDARY_LAYER_ID, 'visibility', visible && (map.getZoom?.() ?? 0) >= 10 ? 'visible' : 'none')
+    map.setLayoutProperty(COUNTY_BOUNDARY_LAYER_ID, 'visibility', visible && (map.getZoom?.() ?? 0) >= AREA_ZOOM_THRESHOLD ? 'visible' : 'none')
   }
   if (visible && mapRef.value?.hasMaskLayer?.(MASK_LAYER_ID)) {
     mapRef.value.bringMaskToTop(MASK_LAYER_ID)
@@ -2724,6 +2724,8 @@ const { isAreaView, syncByZoom, bindZoomListener, unbindZoomListener } = useZoom
   onAboveThreshold: () => {
     const map = mapRef.value?.getMap?.()
     if (map?.getLayer(PROVINCE_EXTRUSION_ID)) mapRef.value.removeLayer(PROVINCE_EXTRUSION_ID)
+    // 挤出层移除后立即同步显示市界和县界。
+    syncCityBoundaryVisibility()
   },
   onEnter: async () => {
     const map = mapRef.value?.getMap?.()
@@ -3032,7 +3034,7 @@ async function onMapReady() {
   map.on('move', syncMaskVisibility)
   map.on('style.load', handleStyleLoad)
   await ensureShaanxiMask()
-  // 地图首次就绪时主动加载市界和县界；县界图层会根据 zoom >= 10 自动显示
+  // 地图首次就绪时主动加载市界和县界；县界图层会在省级挤出层消失后自动显示
   await ensureCityBoundaryLine()
   nextTick(() => { syncByZoom(); syncCityBoundaryVisibility() })
 
