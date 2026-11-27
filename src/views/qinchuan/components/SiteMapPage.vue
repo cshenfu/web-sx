@@ -1667,6 +1667,7 @@ function clearPopover() {
 }
 
 function handleMapBlankClick(e) {
+  if (window.getMeasureController?.()?.isActive?.()) return
   if (showCreateProject.value || showEditProject.value) return
   if (!popoverProject.value && !showDetailPanel.value) return
 
@@ -1828,6 +1829,7 @@ async function ensureCityBoundaryLine() {
     map.moveLayer(PROVINCE_BOUNDARY_LAYER_ID)
   }
 }function handleCityFillClick(e) {
+  if (window.getMeasureController?.()?.isActive?.()) return
   if (isAreaView.value) return
   if (showCreateProject.value || showEditProject.value) return
   const map = mapRef.value?.getMap?.(); if (!map) return
